@@ -694,6 +694,15 @@ format clause — `recovered`, 269 → 137 — turns out to be **91% `put`** in 
 inside the one kind whose clause was removed while the other five rose 23 → 35, so `aggregate.py` now prints it on each
 kind's own line, with that kind's own calls as the denominator.
 
+**Then the same bank was re-drawn three times, and the pool is what is stable.** 264, 264 and **266** of 274 across three
+packs — the published one, an added 259-character entry about the turn budget, and that entry with its words permuted —
+with the unseen section at 131 to 133 of 134. The instruction, its permutation and the bank without either are one arm:
+paired −0.73 pp, p = 0.66. What moves between draws is not the score but **which games are lost**: ten losses became
+eight and ten, and only three of twenty game-slots stayed lost, because a rumination loop is a state the model enters on
+a draw rather than a property of a task. So the quotable numbers are the pool and its band, and the losses are read as
+rates: **11 thought-heavy losses per 822 game-draws (1.34%)**, the same order as the search losses, against a pool that
+reads 264 to 266 whatever the pack adds.
+
 **Then the lane spent five arms finding nothing, and found a bug instead.** Five renderings of that one sentence —
 itself, plus a neutral clause, a true citation, a false citation, and the sentence with its second operation
 ablated — were bought at 274 games each for **¥9.43**. They span **212 to 223 wins**, eleven games and 4.0 pp, and

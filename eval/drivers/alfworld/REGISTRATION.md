@@ -2767,3 +2767,148 @@ arm whose `bank_digest` equals the other arm's, `parser` not `any-line`, `max_st
 published size (134 held out, 140 seen).
 
 **Price ≈ ¥3.00**, four jobs (two arms, both sections), off-peak band.
+
+## R188, amendment 1 — bought, inert, and the class it targeted was a draw rather than a game
+
+Four dispatches, **548 games, two arms**, `--gate-kind true`, `any-line`, cap 50, off-peak in all eight summaries: run
+`44975674858` + `44975691007` (treatment, 134 + 140) and `44975707582` + `44975723871` (placebo, 134 + 140).
+
+| arm | pack | pooled | unseen 134 | seen 140 | thoughts a game | heavy (≥20) | steps a game |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| **`turn@kind+anyline`** | 814 ch, 2 entries | **264/274 (96.35%)** | 131/134 (97.76%) | 133/140 (95.00%) | **3.54** | **4** | 16.64 |
+| `turnplacebo@kind+anyline` | 814 ch, 2 entries | **266/274 (97.08%)** | 131/134 (97.76%) | 135/140 (96.43%) | **3.65** | **2** | 16.15 |
+| `scope@kind+anyline` (R186) | 551 ch, 1 entry | 264/274 (96.35%) | 133/134 (99.25%) | 131/140 (93.57%) | 4.20 | 5 | 16.81 |
+
+**The treatment is not better than its own placebo, and the arm that won is the one that says nothing.** Paired
+`turn` − `turnplacebo` = **−0.73 pp** [−3.28, +1.82], exact McNemar on 5 + 7 discordant games p = 0.66, mde 3.54 pp.
+Against R186 the two arms are a wash in opposite directions: `turn` **7 gained, 7 lost** (p = 1.00), `turnplacebo`
+**7 gained, 5 lost** (p = 0.77). 259 characters of instruction and the same 259 characters permuted are the same arm.
+
+### The five games it was written for re-ran, and four of them won
+
+This is the round's actual result, and it is not about the entry.
+
+| game | kind | R186 | `turn` | `turnplacebo` |
+| --- | --- | --- | --- | --- |
+| 1 | `heat` | 34 thoughts, **lost** | 1 thought, **won** | 5 thoughts, **won** |
+| 2 | `heat` | 44 thoughts, **lost** | 4 thoughts, **won** | 4 thoughts, **won** |
+| 3 | `examine` | 27 thoughts, **lost** | 2 thoughts, **won** | 10 thoughts, **won** |
+| 4 | `put` | 46 thoughts, **lost** | 1 thought, **won** | 1 thought, **won** |
+| 5 | `examine` | 24 thoughts, **lost** | 23 thoughts, **lost** | 3 thoughts, **won** |
+
+**Four of five in the treatment and five of five in the placebo, on byte-different prompts and the same corpus.** So the
+rumination loop is a **state the model enters on a draw**, not a property of the game and not a gap in the pack's
+coverage: the same game, the same kind, the same instruction set, and the loop either happens or it does not. R186's
+sentence "the five thought-heavy games are what the pack failed to reach" was a statement about one draw dressed as a
+statement about five games.
+
+The same reasoning applies to the other family, which the round also re-ran: R186's five search-heavy losses went
+**3 won / 2 lost** in the treatment and **2 won / 3 lost** in the placebo. **Ten losses became eight and ten, and only
+three of the twenty game-slots stayed lost.** The pool is stable — 264, 264, 266 across three packs — and the identity
+of the lost games is not.
+
+### Reading 3 could not have been read, and the round measured why
+
+The registration asked for "thoughts a game fall by at least 0.5 in the treatment against the placebo". The same-prompt
+band is **five times that**:
+
+| comparison | games on byte-identical packs | thoughts a game |
+| --- | --- | --- |
+| R186 | 148 | **3.68** |
+| R187 | 148 | **4.80** |
+
+Two draws of one prompt, **1.12 thoughts a game apart**, against a registered threshold of 0.5 and an observed
+treatment–placebo difference of 0.11. The pooled means (4.20 / 3.54 / 3.65) are three samples of one quantity, and the
+"drop" from R186 to either R188 arm is inside the band. This is the same defect the round caught in R187 for wins
+(±5 games) one level down: **a cell needs a band before it can be a reading**, and a mean over a rare, heavy-tailed
+event has a wider band than a count of wins does.
+
+### Verdicts, one row each
+
+| # | registered | read | verdict |
+| --- | --- | --- | --- |
+| 1 | `thought_heavy` ≤ 2 of 274 in the treatment | **4** (placebo **2**) | **failed** — and the placebo met it, which is the finding |
+| 2 | treatment ≥ placebo + 4 games | **264 vs 266** | **failed**, and in the wrong direction |
+| 3 | thoughts a game fall ≥ 0.5 against the placebo | **3.54 vs 3.65** (0.11) | **failed** — the band is 1.12, so nothing was readable |
+| 4 | treatment ≥ 264; `invalid_actions` per call ≤ placebo | **264** held; **0.1332 vs 0.0988** | **half held** — the pool held and the invalid rate did not |
+| 5 | 814 chars, 2 entries, one `bank_digest` per arm, two `pack_digest` at 215:59 | 814 ×274, 2 ×274, `22dbe9f7` / `084688d7`, **215:59 in both arms** | **held** |
+
+### Void: nothing fired
+
+`pack_chars` 814 and `pack_entries` 2 in all 548 games; `parser` `any-line` in all 548; `max_steps` 50 in all eight
+summaries; one `bank_digest` per arm (`22dbe9f7`, `084688d7`) and the two arms' digests differ; `pack_digest` 215:59 in
+**both** arms, and per section 110:24 and 105:35 in each, which is the partition the tags imply; sections tiled
+134 + 140 twice; `refused_actions` 0, `truncated` 0.
+
+### Spend
+
+**¥3.03 against ¥3.00 quoted** ($0.4209, 8,983 calls, off-peak in all eight summaries): treatment $0.2135 on 4,558
+calls, placebo $0.2074 on 4,425. The quote was exact because the round moved one entry and no cap.
+
+### What this retires, and what it leaves
+
+1. **The entry does not go into the bank.** `bank-putscope-2.json` remains the published one and `bank-turnbudget-1`
+   is kept as a measured inert control, in the same category as the four-rule bank of `44754440122`.
+2. **The "8 of 10 losses are search" premise is retired with its parent.** Both families reversed on a redraw (4/5 and
+   5/5 for rumination, 3/5 and 2/5 for search), so a plan aimed at *those* games would be a plan aimed at a draw.
+   The stable statements are the rates: **11 thought-heavy losses over 822 game-draws = 1.34%**, and roughly the same
+   number of search losses, against a pool that reads 264 to 266 whatever the pack says.
+3. **The next round is therefore a state, not a game.** A read-time guard that fires only when the previous reply
+   carried no command — one injected line, no extra call — targets the loop where it happens, costs nothing on the 98.7%
+   of turns that are not loops, and does not need to predict which game will enter one. That is the SEU shape of the
+   literature (`COMPETITIVE.md`, the admission family) applied at the only place this lane can apply it: the turn.
+
+## R189 — the guard at the state, not at the game: one changed answer for the turn that carried no command
+
+R188 established two facts that decide this round. The rumination loop is **transient** — the same five games lost to it
+in R186 were won 4 of 5 and 5 of 5 when re-run — and it is **expensive**: 11 thought-heavy losses over 822 game-draws,
+**1.34%**, each one a game. A bank entry cannot reach it (R188 bought that answer for ¥3.03), because the entry is a
+constant in front of every turn and the loop is a rare state inside one.
+
+The driver already answers a commandless reply with a fixed string, `OK.`, which is the competitor's own no-op. The guard
+changes **that string and nothing else**:
+
+| | without the guard | with the guard |
+| --- | --- | --- |
+| reply carries no command | answered `OK.` | answered `OK. Reply with one command only.` |
+| reply carries a command | unaffected | **unaffected** |
+| turn count, call count, pack | — | unchanged |
+
+That is the whole mechanism, and its shape is what makes it measurable: it is a function of the state the episode is in,
+so it **cannot fire in a game that never enters the state**. The round records `guard_fires` per episode, so the join can
+prove engagement rather than assume it — a guard arm with zero fires is a no-op wearing a treatment's name (R174.2).
+
+### Registered readings
+
+Two arms on the published bank (`banks/bank-putscope-2.json`), `--gate-kind true`, `any-line`, cap 50, 274 games each,
+four jobs, the guard the only variable:
+
+1. **The guard arm's `thought_heavy` count is at most 1 of 274** (three draws of the unguarded pack read 5, 4, 2;
+   per-draw rate 1.34%). The mechanism cell, and the one this round is actually powered for: a loop that is interrupted
+   cannot recur in the same episode.
+2. **The pool is at or above 266 of 274**, paired against the unguarded arm. Stated as a floor and not as a delta
+   because the round's power is 3.5 pp: what it can show is "not worse", and the count above is what shows the mechanism.
+3. **`guard_fires` is between 20 and 120 over 274 games**, and every firing is followed by a reply that carries a
+   command within one turn. A guard that fires on 90% of turns is a different treatment (it would be a permanent
+   instruction, which R188 measured as inert); one that never fires did not run.
+4. **The pack is unchanged**: `pack_chars` 551 and `pack_entries` 1 in all 274 games, the same `bank_digest` as R186's
+   arm, `parser` `any-line`, `max_steps` 50, sections 134 + 140.
+5. **The per-turn cost of the guard is under 2% of the arm's prompt**: `prompt_chars` delta against the unguarded arm,
+   divided by turns.
+
+### Refutation
+
+**Fewer than 20 fires, or a `thought_heavy` count of 3 or more in the guarded arm.** The first says the loop is not
+entered at a rate the guard can see — the 1.34% is an artefact of counting losses rather than turns, and the mechanism is
+not a state the driver can interrupt. The second says an interrupted reply is not a recovered turn: the model re-enters
+the loop on the next call, and the guard becomes a slower way to lose the same game. Either way the lane stops treating
+rumination as reachable and the remaining work is the **utility score** of the admission family — predicting which
+entries hurt, which is the project's own question in the form the literature can score.
+
+### Void
+
+Any game whose `pack_chars` is not 551 or `pack_entries` is not 1, a `bank_digest` that differs between the arms, a
+guarded episode with no `guard_fires` field, `parser` not `any-line`, `max_steps` not 50, or a section short of its
+published size.
+
+**Price ≈ ¥3.00**, four jobs, off-peak band.

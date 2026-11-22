@@ -2081,3 +2081,14 @@ other) and its **abstractness** (the normalized perplexity of its similarity dis
 only the skill and the task descriptions, no rollout, and the paper reports that neither property predicts success alone
 while their product does. It is the first published candidate for the question this project has been answering by
 measurement — *which entries will hurt* — and the scope tags of R186 to R188 are the hand-built approximation of it.
+
+**Transient class** — A set of losses that looks like a mechanism and is a property of one draw. R186's five thought-heavy
+games were read as a coverage gap; R188 re-ran them under two packs and four of five won under the instruction and five
+of five under a permutation of it, at 1 to 10 thoughts. The pool stayed at 264 to 266 across three packs while only
+three of the twenty game-slots stayed lost. What is plannable is a **rate** — 11 thought-heavy losses per 822
+game-draws, 1.34% — and what is not is the identity of the games.
+
+**Length control** — An arm whose pack carries the same characters as the treatment's with the words permuted inside
+themselves. R188's placebo (`266/274`) scored at least as well as its treatment (`264/274`), which is what an inert entry
+looks like when the round can tell inert from harmful. Without it, the round would have reported a 0.66-thought "effect"
+that is inside the same-prompt band of 1.12.

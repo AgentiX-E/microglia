@@ -5332,3 +5332,24 @@ model turns, so a reply with no command spends a turn and changes nothing in the
 What the counter has shown so far is the opposite of the intuitive story. A pack does not make the model chatty — it
 **halves** the chatter (9.23 → 4.2 thoughts a game) because an instruction that names the next action leaves less to
 deliberate about. What is left over is the part of the corpus the instruction did not cover.
+
+### 32.30 Before planning against a class, redraw it
+
+R186 lost ten games and half of them looked like a coverage gap: 24 to 46 thoughts, almost no environment steps. R188
+wrote a sentence for exactly that and it did nothing — and the five games it was written for **won four and five of five
+on a redraw**, at 1 to 10 thoughts. Four rules come out of that, and the first one is the whole of it:
+
+1. **A class defined by one draw is a hypothesis.** Games do not carry their failure mode; a draw does. Before writing
+   anything for "the ten losses", re-run them — R188 re-ran ten and three stayed lost.
+2. **Use counts for rare events, means for dense ones.** On 148 games with byte-identical packs, thoughts a game read
+   3.68 and then 4.80: a band of **1.12** on one prompt. A mean over a heavy-tailed event is not a sensitive instrument;
+   a count of games above a threshold is, which is why `rumination` prints both.
+3. **A length-matched placebo is mandatory for any entry.** R188's permuted sentence scored **266/274** against the
+   instruction's 264. Without the placebo, the instruction would have been reported as a +0.0 pp entry with a −0.66
+   thought effect, and the second number is noise.
+4. **Rates are plannable, games are not.** The stable statement is 11 thought-heavy losses per 822 game-draws = 1.34%.
+   Anything phrased as "the eight losses are search" is a sentence about one afternoon.
+
+What the round leaves is a distinction the lane did not have before: a memory can be **inert** (R188: two arms, one
+placebo, no difference), **harmful through reach** (R185, R187) or **helpful through reach** (R186), and the three are
+separable only if the round carries its own length control.

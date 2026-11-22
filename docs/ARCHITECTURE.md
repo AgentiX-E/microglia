@@ -2913,3 +2913,41 @@ So `aggregate.py` prints `rumination <arm> <mean> per game, <n> heavy vs <arm> .
 9.23 thoughts a game become 4.2. The remaining thought-heavy games are the ones the pack did not reach, which is a
 statement about the entry's coverage and not about its harm. That is why the next round is a sentence aimed at the class
 rather than at the score.
+
+### 8.51 A class defined by one draw is a hypothesis, and R188 bought the refutation
+
+R186 lost ten games, and 8.50 read five of them as a coverage failure: 24 to 46 thoughts, 4 to 26 environment steps, and
+the pack had not reached them. R188 wrote the sentence that should reach them, gave it to all six kinds untagged, and
+bought a **length-matched placebo** — the same 259 characters with their own words permuted — because the previous three
+rounds had established that an entry's *presence* can matter as much as its content.
+
+The result is a clean negative and a much better finding behind it:
+
+| arm | pack | pooled | unseen | thoughts a game | heavy |
+| --- | --- | --- | --- | --- | --- |
+| `turn` | 814 ch, 2 entries | 264/274 | 131/134 | 3.54 | 4 |
+| `turnplacebo` | 814 ch, 2 entries | **266/274** | 131/134 | 3.65 | **2** |
+| R186 | 551 ch, 1 entry | 264/274 | 133/134 | 4.20 | 5 |
+
+Instruction and permutation are the same arm (paired −0.73 pp, p = 0.66), so **the entry is inert**. But the five games it
+was written for were **re-run**: four of five won under the instruction and **five of five** under the permutation, at
+1 to 10 thoughts each. The loop is a **state the model enters on a draw**, not a property of a game and not a coverage
+gap: same game, same kind, same pack, different draw, no loop. The same happened to the other family — R186's five
+search losses went 3/5 and 2/5 — so **ten losses became eight and ten, and only three of twenty game-slots stayed lost**
+while the pool stayed at 264 to 266.
+
+Two numbers make the lesson portable:
+
+1. **The pool is stable and the membership is not.** Three packs, three draws, 264 / 264 / 266 — and the games that make
+   up the 8 to 10 losses are almost disjoint. Any plan aimed at "the ten games" is a plan aimed at a draw; only rates
+   are plannable, and the rate here is **11 thought-heavy losses per 822 game-draws = 1.34%**.
+2. **A mean over a rare event has a wide band, and the round measured it.** On the 148 games whose packs were
+   byte-identical between R186 and R187, thoughts a game read **3.68** and **4.80** — a **1.12** swing on one prompt.
+   The registered threshold for this round's rumination reading was 0.5 and the observed difference was 0.11, so that
+   cell was unreadable before it was bought. The lesson is R187's, one level down: a cell needs a band, and the band of a
+   mean over a heavy-tailed event is not the band of a win count.
+
+**What survives is the state, and it is the thing the next round acts on.** A read-time guard that changes the driver's
+fixed answer to a commandless reply — `OK.` becomes `OK. Reply with one command only.` — is conditional on the state, so
+it cannot touch the 98.7% of turns that are not loops, and it does not need to predict which game will enter one. That
+is the admission family's read-time decision (SEU) at the only place this lane can make it: the turn.
