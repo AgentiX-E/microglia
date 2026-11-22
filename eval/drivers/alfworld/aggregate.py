@@ -206,6 +206,21 @@ def load_slices(
                 # reads a different entry, so grouping on the pack would refuse the very round the guard exists for.
                 episode.setdefault("bank_digest", bank)
                 episode.setdefault("max_steps", cap)
+        # The header's own claim about the guard, held to its episodes. Both are written by one flag in one process, so
+        # a disagreement is a file that was merged, resumed across a change, or edited -- and joining it would report an
+        # arm under a state its own games did not run in. The lane's precedent is a bank swapped under an unchanged
+        # label, which no field in the artefact could see either (AUDIT 34.269).
+        claimed = summary.get("guard_commandless")
+        if claimed is not None:
+            if not isinstance(claimed, bool):
+                fail(f"{path}: summary.guard_commandless is {claimed!r}, which is not a flag")
+            for episode in episodes:
+                if isinstance(episode, dict) and "guard" in episode and bool(episode.get("guard")) != claimed:
+                    fail(
+                        f"{path}: summary.guard_commandless={claimed} contradicts {episode.get('gamefile')}, which "
+                        f"records guard={episode.get('guard')}; the header is a claim and the episodes are the fact, so "
+                        "this file is joined by neither"
+                    )
         grouped.setdefault(label, []).extend(episodes)
     # A join across sections is legal and sometimes the point — a second section is the only place this lane can
     # buy resolution — but it is never silent. Two sections in one reading is a different claim from a reading on

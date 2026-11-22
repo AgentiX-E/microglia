@@ -1887,6 +1887,38 @@ class CommandGuardReportTest(unittest.TestCase):
         self.assertIn("2 fires, 0 relapsed of 2 checked", lines[0])
         self.assertIn("always-in not counted", lines[0])
 
+    def test_a_summary_that_contradicts_its_own_episodes_is_refused(self):
+        # The header is a claim and the episodes are the fact, and the two are written by one flag in one process. A file
+        # where they disagree is a file somebody merged, resumed across a change, or edited -- and joining it would put
+        # an arm in the report under a state its games did not run. The lane has one precedent for exactly this shape:
+        # a bank swapped under an unchanged label (AUDIT 34.269).
+        arm = self.write(
+            "guard-contradiction.json",
+            {
+                "summary": summary("always-in", guard_commandless=True, arm_label="always-in@guard"),
+                "episodes": [episode("g1", True, guard=False, guard_fires=0)],
+            },
+        )
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed), self.assertRaises(SystemExit):
+            aggregate.load_slices([arm], expect_guard=("on",))
+        self.assertIn("contradicts", printed.getvalue())
+
+    def test_a_guard_flag_that_is_not_a_flag_is_refused(self):
+        # `"true"` is what a workflow input is before the driver parses it, and an artefact that carried the string would
+        # be read as armed by a truthiness test that a later line could invert. Refused as a type rather than coerced.
+        arm = self.write(
+            "guard-string.json",
+            {
+                "summary": summary("always-in", guard_commandless="true"),
+                "episodes": [episode("g1", True, guard=True, guard_fires=1, guard_checked=1)],
+            },
+        )
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed), self.assertRaises(SystemExit):
+            aggregate.load_slices([arm])
+        self.assertIn("not a flag", printed.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
