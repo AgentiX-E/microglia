@@ -641,8 +641,8 @@ skeleton is the competitor's own, transliterated: the system line, the two-examp
 split into alternating turns, and the parser's four branches — so an arm changes what sits *above* the transcript
 and nothing else. Three zero-cost readings hold it in place: `--policy seed` reproduces `floor.py` game for game
 (same wins, steps, action digests, observation fingerprints) and the `agreement` job fails on a single field;
-**678 unit tests at 99.1% line-and-branch coverage, every module at or above 95%** (`agent.py` and `aggregate.py`
-at 99.8%, the offline scorer at 100%), cover the parser, the split,
+**705 unit tests at 99.1% line-and-branch coverage, every module at or above 95%** (`agent.py` and `aggregate.py`
+at 99.5%, the offline scorer at 100%), cover the parser, the split,
 the shard arithmetic, the bill and the loop itself; and a test asserts that `none` and `always-in` differ at
 exactly one message index. A second **channel** — `--parser any-line`, which executes the command the first-line rule
 refuses — is a field in every episode, a token in every label and a span `aggregate.py` refuses to pool until it is
@@ -651,6 +651,14 @@ reply that carried no command with one line naming the requirement instead of `O
 a three-counter ledger (`fires` / `checked` / `relapsed`) in every episode, so an arm that was armed and never fired can
 be told from one that was never armed — a guarded arm costs **$0.1946 against its control's $0.2152** and wins **8 of
 the 10 games** the control loses to narration.
+
+The **state ledger** (`--state-ledger`) is the second answer-side knob and the guard's sibling: on a turn whose command
+moved nothing — the world answered `Nothing happens.`, or the action was not admitted — the observation is followed by
+one line naming the last three commands already tried, repeats collapsed. It fires on a different turn than the guard
+does (a command that failed rather than a reply that carried none), so it carries its own token (`always-in@anyline+guard+ledger`)
+and its own two counters (`ledger_fires`, `ledger_chars`), and `aggregate.py` refuses to pool the two states until a join
+names them with `--expect-ledger`. The line is conditional by construction: a game whose actions all land carries no
+extra character, which is what keeps a search repair inside the price of a pass.
 
 The one component that is scored **before** anything is bought is `scripts/score_bank.py`, which reads a bank and
 returns the literature's admission score for the pack each task type would render — specificity x abstractness, with no

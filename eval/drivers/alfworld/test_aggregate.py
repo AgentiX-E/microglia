@@ -1920,5 +1920,203 @@ class CommandGuardReportTest(unittest.TestCase):
         self.assertIn("not a flag", printed.getvalue())
 
 
+class StateLedgerReportTest(unittest.TestCase):
+    """The join's reading of the ledger: engagement, price, and the three ways a slice can lie about being armed.
+
+    R191's treatment is one line on the turns that moved nothing, and the round is read from two numbers: `fires` (did
+    it reach the model) and `chars` (what did it cost). Both are per-episode fields, so both survive the join the same
+    way the guard's ledger does -- and for the same reason, an armed arm that never fired is indistinguishable from a
+    control by its score.
+    """
+
+    def setUp(self):
+        self.paths = []
+
+    def tearDown(self):
+        for path in self.paths:
+            path.unlink(missing_ok=True)
+
+    def write(self, name: str, payload: dict) -> Path:
+        path = HERE / name
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        self.paths.append(path)
+        return path
+
+    def run_main(self, argv):
+        original = sys.argv
+        sys.argv = ["aggregate.py"] + argv
+        try:
+            return aggregate.main()
+        finally:
+            sys.argv = original
+
+    def armed(self, name: str, episodes=None):
+        return self.write(
+            name,
+            {
+                "summary": summary("always-in", state_ledger=True, arm_label="always-in@ledger"),
+                "episodes": episodes or [episode("g1", True, ledger=True, ledger_fires=2, ledger_chars=74)],
+            },
+        )
+
+    def plain(self, name: str, episodes=None):
+        return self.write(
+            name,
+            {
+                "summary": summary("always-in"),
+                "episodes": episodes or [episode("g1", False, ledger=False, ledger_fires=0, ledger_chars=0)],
+            },
+        )
+
+    def test_the_fires_and_the_characters_are_summed_per_arm(self):
+        # Two numbers, one of them the treatment's own price. A `chars` that was not recorded per episode could only be
+        # recovered by differencing two prompts that also differ by their pack, which is the arithmetic that made R188's
+        # price unreadable.
+        counts = aggregate.refusals(
+            [
+                episode("g1", True, ledger=True, ledger_fires=2, ledger_chars=74),
+                episode("g2", False, ledger=True, ledger_fires=5, ledger_chars=150),
+            ],
+            labels=("arm", "other"),
+        )["arm"]
+        self.assertEqual(counts["ledger_fires"], 7)
+        self.assertEqual(counts["ledger_chars"], 224)
+        self.assertTrue(counts["ledger_counted"])
+
+    def test_an_arm_that_predates_the_ledger_says_not_counted(self):
+        # Every arm before R191 has no field at all, and a zero read as "did not fire" would make an unarmed arm look
+        # like an armed one that never engaged -- the same ambiguity `guard_counted` exists to remove.
+        counts = aggregate.refusals([episode("g1", True)], labels=("arm", "other"))["arm"]
+        self.assertFalse(counts["ledger_counted"])
+        self.assertEqual(counts["ledger_fires"], 0)
+
+    def test_an_armed_episode_without_the_counters_is_refused(self):
+        # The void condition of the registration: an episode that says it carried the ledger but does not say how often
+        # cannot be joined, because the round's first reading is computed from that number.
+        arm = self.write(
+            "ledger-void.json",
+            {"summary": summary("always-in", state_ledger=True), "episodes": [episode("g1", True, ledger=True)]},
+        )
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed), self.assertRaises(SystemExit):
+            aggregate.load_slices([arm])
+        self.assertIn("ledger_fires", printed.getvalue())
+
+    def test_one_label_cannot_span_two_ledger_states(self):
+        first = self.write(
+            "ledger-mix-a.json",
+            {
+                "summary": summary("always-in", state_ledger=False),
+                "episodes": [episode("g1", True, ledger=False, ledger_fires=0)],
+            },
+        )
+        second = self.write(
+            "ledger-mix-b.json",
+            {
+                "summary": summary("always-in", state_ledger=True),
+                "episodes": [episode("g2", True, ledger=True, ledger_fires=1)],
+            },
+        )
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed), self.assertRaises(SystemExit):
+            aggregate.load_slices([first, second], expect_ledger=("on", "off"))
+        self.assertIn("one arm cannot span two ledger states", printed.getvalue())
+
+    def test_a_join_across_ledger_states_is_refused_until_it_names_them(self):
+        # R191's comparison *is* a join across the two states, so the refusal has to be liftable by naming them -- and
+        # the named join has to group them separately, or the delta would be an arm against itself.
+        armed, plain = self.armed("ledger-on.json"), self.plain("ledger-off.json")
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed), self.assertRaises(SystemExit):
+            aggregate.load_slices([armed, plain])
+        self.assertIn("--expect-ledger", printed.getvalue())
+        grouped = aggregate.load_slices([armed, plain], expect_ledger=("on", "off"))
+        self.assertEqual(aggregate.ledgers(grouped), {"always-in@ledger": "on", "always-in": "off"})
+
+    def test_a_declaration_that_does_not_match_the_slices_is_refused(self):
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed), self.assertRaises(SystemExit):
+            aggregate.load_slices([self.armed("ledger-on2.json")], expect_ledger=("on", "off"))
+        self.assertIn("--expect-ledger", printed.getvalue())
+
+    def test_the_report_prints_the_fires_and_the_price(self):
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            self.assertEqual(
+                self.run_main(
+                    [
+                        "--input", str(self.armed("ledger-print-a.json")),
+                        "--input", str(self.plain("ledger-print-b.json")),
+                        "--compare", "always-in@ledger,always-in",
+                        "--expect-ledger", "on,off", "--rounds", "50",
+                    ]
+                ),
+                0,
+            )
+        lines = [line for line in printed.getvalue().splitlines() if line.strip().startswith("ledger")]
+        self.assertEqual(len(lines), 1, printed.getvalue())
+        self.assertIn("always-in@ledger 2 fires, 74 chars added", lines[0])
+        self.assertIn("always-in 0 fires, 0 chars added", lines[0])
+
+    def test_a_ledger_state_that_is_not_a_state_is_refused_before_the_slices_are_read(self):
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed), self.assertRaises(SystemExit):
+            self.run_main(["--input", str(self.armed("ledger-typo.json")), "--expect-ledger", "onn"])
+        self.assertIn("not a ledger state", printed.getvalue())
+
+    def test_the_report_says_not_counted_for_the_arm_that_predates_the_ledger(self):
+        # One arm counted and one did not is the shape of the first reading against a round before it: the old file is
+        # `not counted` rather than `0 fires`, because a zero over an arm that never counted is not a measurement.
+        old = self.write(
+            "ledger-half.json",
+            {"summary": summary("always-in"), "episodes": [episode("g1", False)]},
+        )
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            self.assertEqual(
+                self.run_main(
+                    [
+                        "--input", str(self.armed("ledger-half-a.json")), "--input", str(old),
+                        "--compare", "always-in@ledger,always-in",
+                        "--expect-ledger", "on,off", "--rounds", "50",
+                    ]
+                ),
+                0,
+            )
+        lines = [line for line in printed.getvalue().splitlines() if line.strip().startswith("ledger")]
+        self.assertIn("2 fires, 74 chars added", lines[0])
+        self.assertIn("always-in not counted", lines[0])
+
+    def test_a_summary_that_contradicts_its_own_episodes_is_refused(self):
+        # The header is a claim and the episodes are the fact. A file where they disagree would put an arm in the report
+        # under a state its games did not run -- the shape AUDIT 34.269 recorded for a bank swapped under one label.
+        arm = self.write(
+            "ledger-contradiction.json",
+            {
+                "summary": summary("always-in", state_ledger=True, arm_label="always-in@ledger"),
+                "episodes": [episode("g1", True, ledger=False, ledger_fires=0)],
+            },
+        )
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed), self.assertRaises(SystemExit):
+            aggregate.load_slices([arm], expect_ledger=("on",))
+        self.assertIn("contradicts", printed.getvalue())
+
+    def test_a_ledger_flag_that_is_not_a_flag_is_refused(self):
+        # `"true"` is what a workflow input is before the driver parses it; an artefact carrying the string would be read
+        # as armed by a truthiness test that a later line could invert. Refused as a type rather than coerced.
+        arm = self.write(
+            "ledger-string.json",
+            {
+                "summary": summary("always-in", state_ledger="true"),
+                "episodes": [episode("g1", True, ledger=True, ledger_fires=1)],
+            },
+        )
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed), self.assertRaises(SystemExit):
+            aggregate.load_slices([arm])
+        self.assertIn("not a flag", printed.getvalue())
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

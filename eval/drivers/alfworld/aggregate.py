@@ -90,6 +90,7 @@ def load_slices(
     expect_parsers: "tuple[str, ...]" = (),
     expect_caps: "tuple[int, ...]" = (),
     expect_guard: "tuple[str, ...]" = (),
+    expect_ledger: "tuple[str, ...]" = (),
 ) -> "dict[str, list[dict]]":
     """Every episode of every slice, grouped by the arm that drove it.
 
@@ -221,6 +222,20 @@ def load_slices(
                         f"records guard={episode.get('guard')}; the header is a claim and the episodes are the fact, so "
                         "this file is joined by neither"
                     )
+        # The ledger's claim, held to its episodes by the same rule and for the same reason: R191's two arms differ by
+        # one flag that is invisible in the pack, the channel and the cap, and a file whose header and episodes disagree
+        # about it is an arm that ran as neither of the two that were registered (R191).
+        claimed_ledger = summary.get("state_ledger")
+        if claimed_ledger is not None:
+            if not isinstance(claimed_ledger, bool):
+                fail(f"{path}: summary.state_ledger is {claimed_ledger!r}, which is not a flag")
+            for episode in episodes:
+                if isinstance(episode, dict) and "ledger" in episode and bool(episode.get("ledger")) != claimed_ledger:
+                    fail(
+                        f"{path}: summary.state_ledger={claimed_ledger} contradicts {episode.get('gamefile')}, which "
+                        f"records ledger={episode.get('ledger')}; the header is a claim and the episodes are the fact, so "
+                        "this file is joined by neither"
+                    )
         grouped.setdefault(label, []).extend(episodes)
     # A join across sections is legal and sometimes the point — a second section is the only place this lane can
     # buy resolution — but it is never silent. Two sections in one reading is a different claim from a reading on
@@ -318,6 +333,37 @@ def load_slices(
         )
     if expect_guard and driven_states != set(expect_guard):
         fail(f"--expect-guard {sorted(expect_guard)} but the slices were driven {sorted(driven_states)}")
+    # The ledger is the fifth knob and is the guard's sibling in everything but the turn it fires on: it answers a
+    # command that moved nothing rather than a reply that carried none, and R191 compares armed against unarmed at one
+    # pack, one channel, one cap and one guard. So it is refused and graded exactly as the guard is -- one label at two
+    # ledger states is two treatments, and an armed episode with no `ledger_fires` is an episode that claims to have
+    # been given a state line and does not say how often, which is the number the round's first reading is (R191).
+    ledger_of = ledgers(grouped)
+    ledger_span = sorted(label for label, state in ledger_of.items() if "+" in state)
+    if ledger_span:
+        listed = ", ".join(f"{label}: {ledger_of[label]}" for label in ledger_span)
+        fail(
+            f"one arm cannot span two ledger states ({listed}); a label is one driver, so re-drive the slice or label "
+            "it after the ledger rather than averaging two treatments into one rate"
+        )
+    for label, episodes in grouped.items():
+        for episode in episodes:
+            if episode.get("ledger") is True and "ledger_fires" not in episode:
+                fail(
+                    f"{label}: {episode.get('gamefile')} carried the ledger but records no ledger_fires, so the round's "
+                    "first reading cannot be computed from it; re-drive the slice rather than joining an arm whose "
+                    "engagement is unknown"
+                )
+    ledger_states = {"on" if state == "on" else "off" for state in ledger_of.values()}
+    if len(ledger_states) > 1 and not expect_ledger:
+        listed = ", ".join(f"{label}: {state}" for label, state in sorted(ledger_of.items()))
+        fail(
+            f"this join mixes ledger states ({listed}); name them with --expect-ledger to compare them, because an arm "
+            "given the tried-commands line and one given the observation alone are two treatments and their average is "
+            "neither"
+        )
+    if expect_ledger and ledger_states != set(expect_ledger):
+        fail(f"--expect-ledger {sorted(expect_ledger)} but the slices were driven {sorted(ledger_states)}")
     # And the pack is the harness too. The rule is the channel's and the cap's with one difference: a treatment and
     # its control are always two packs (the control renders none), so a join across labels is the normal case and
     # only *one label* spanning two banks is illegal. R185 is the first round to swap a bank under an unchanged label
@@ -699,6 +745,26 @@ def guards(grouped: "dict[str, list[dict]]") -> "dict[str, str]":
     return states
 
 
+def ledgers(grouped: "dict[str, list[dict]]") -> "dict[str, str]":
+    """Whether each arm answered a turn that moved nothing with the tried-commands line, from the episodes.
+
+    The fifth harness knob and the guard's sibling: R191's two arms are one family, one bank, one channel, one cap and
+    one guard, so this token is the whole difference between them. `absent` is the pre-R191 state and is said rather than
+    defaulted, for the reason `guards` says it: an episode that predates the field made no claim about the ledger, while
+    an arm written after it claims `off` explicitly.
+    """
+    states: "dict[str, str]" = {}
+    for arm, episodes in grouped.items():
+        seen = set()
+        for episode in episodes:
+            if "ledger" not in episode:
+                seen.add("absent")
+            else:
+                seen.add("on" if episode.get("ledger") else "off")
+        states[arm] = "+".join(sorted(seen))
+    return states
+
+
 def banks(grouped: "dict[str, list[dict]]") -> "dict[str, str]":
     """Which pack each arm rendered, from the episodes rather than from the labels.
 
@@ -754,6 +820,14 @@ def refusals(left: "list[dict]", right: "list[dict] | None" = None, labels: "tup
         guard_checked = sum(int(episode.get("guard_checked") or 0) for episode in episodes)
         guard_relapsed = sum(int(episode.get("guard_relapsed") or 0) for episode in episodes)
         guard_counted = any("guard_fires" in episode for episode in episodes)
+        # The ledger's engagement and its price. `fires` is the number of turns whose answer carried the tried-commands
+        # line and `chars` the characters those lines added, so the cost reading is a measurement of the treatment's own
+        # text rather than a difference between two prompts that also differ by their pack -- the arithmetic that made
+        # R188's price unreadable. Counted only when a file has the field, for the reason `dropped` is: a zero over an
+        # arm that never counted is not a measurement (R191).
+        ledger_fires = sum(int(episode.get("ledger_fires") or 0) for episode in episodes)
+        ledger_chars = sum(int(episode.get("ledger_chars") or 0) for episode in episodes)
+        ledger_counted = any("ledger_fires" in episode for episode in episodes)
         return {
             "games": len(episodes),
             "calls": calls,
@@ -771,6 +845,9 @@ def refusals(left: "list[dict]", right: "list[dict] | None" = None, labels: "tup
             "guard_checked": guard_checked,
             "guard_relapsed": guard_relapsed,
             "guard_counted": guard_counted,
+            "ledger_fires": ledger_fires,
+            "ledger_chars": ledger_chars,
+            "ledger_counted": ledger_counted,
             # A rate over no games is undefined rather than zero, for the reason the call rates below are: a slice
             # that recorded no episode did not think nothing, it did not happen.
             "thoughts_per_game": round(thoughts / len(episodes), 2) if episodes else None,
@@ -897,6 +974,14 @@ def main() -> int:
         "line and `off` with `OK.`. A span is refused until it is named here, because an armed arm and an unarmed one "
         "are two treatments and their average is neither (R189)",
     )
+    parser.add_argument(
+        "--expect-ledger",
+        default="",
+        help="the ledger states this join compares, comma separated: `on` answers a turn that moved nothing with the "
+        "observation plus the last three commands tried, `off` with the observation alone. A span is refused until it "
+        "is named here, because an arm given the state line and one without are two treatments and their average is "
+        "neither (R191)",
+    )
     parser.add_argument("--rounds", type=int, default=10000)
     parser.add_argument("--seed", type=int, default=20261120)
     parser.add_argument("--out", default="")
@@ -926,8 +1011,24 @@ def main() -> int:
         if item not in ("on", "off"):
             fail(f"--expect-guard {item!r} is not a guard state; say on or off")
         declared_guard.append(item)
+    declared_ledger = []
+    for item in arguments.expect_ledger.split(","):
+        item = item.strip()
+        if not item:
+            continue
+        # Refused here for the guard's reason: `--expect-ledger onn` would otherwise read as a declaration that matched
+        # nothing rather than as a typo, and the failure would be reported against the slices.
+        if item not in ("on", "off"):
+            fail(f"--expect-ledger {item!r} is not a ledger state; say on or off")
+        declared_ledger.append(item)
     grouped = load_slices(
-        paths, arguments.relabel, declared, declared_parsers, declared_caps, tuple(declared_guard)
+        paths,
+        arguments.relabel,
+        declared,
+        declared_parsers,
+        declared_caps,
+        tuple(declared_guard),
+        tuple(declared_ledger),
     )
     # Printed rather than implied: a reading that crosses dispatches is the one kind of reading whose
     # provenance a reader cannot recover from the arms' names in the report.
@@ -1126,6 +1227,17 @@ def main() -> int:
             print(
                 f"  guard           {treatment} {guard_cell(left_counts)} "
                 f"vs {control} {guard_cell(right_counts)}"
+            )
+
+        def ledger_cell(counts: dict) -> str:
+            if not counts["ledger_counted"]:
+                return "not counted"
+            return f"{counts['ledger_fires']} fires, {counts['ledger_chars']} chars added"
+
+        if left_counts["ledger_counted"] or right_counts["ledger_counted"]:
+            print(
+                f"  ledger          {treatment} {ledger_cell(left_counts)} "
+                f"vs {control} {ledger_cell(right_counts)}"
             )
     print(f"  bill            ${payload['bill']['usd']} over {payload['bill']['calls']} calls")
     if arguments.out:

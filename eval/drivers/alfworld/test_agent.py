@@ -640,9 +640,15 @@ class FakeWorld:
         self,
         gamefile="json_2.1.1/valid_unseen/pick_and_place_simple-Apple-None-Cabinet-1/trial_t/game.tw-pddl",
         never_ends=False,
+        nothing_happens=False,
     ):
         self.gamefile = gamefile
         self.never_ends = never_ends
+        # Textworld answers a command it will not perform with `Nothing happens.`, and an action can be admitted and
+        # still change nothing (`look` always is). The switch is off by default so that every test written before R191
+        # drives the world it was written against; the ledger tests turn it on because a driver that is asked to answer
+        # a no-op needs a world that produces one.
+        self.nothing_happens = nothing_happens
         self.holding = None
         self.over = False
         self.won = False
@@ -687,6 +693,7 @@ class FakeWorld:
     def step(self, actions):
         action = actions[0].strip().lower()
         self.steps += 1
+        before = (self.holding, self.opened, self.won)
         # Only the apple that is actually here can be taken. A world that took anything would let an
         # invalid action succeed and make the invalid-action count a count of something else.
         if action.startswith("take") and "apple 1" in action:
@@ -696,6 +703,14 @@ class FakeWorld:
         elif action.startswith("put") and self.holding and not self.never_ends:
             self.won = True
             self.over = True
+        # The world's own no-op answer, with the trajectory's rule holding: the environment's text is what the model
+        # hears, so a world that answered `Nothing happens.` and then reported a different observation would make the
+        # ledger's test a test of the fake rather than of the driver.
+        if self.nothing_happens and (self.holding, self.opened, self.won) == before and not self.over:
+            return [agent.NO_OP + "\n"], [0.0], [False], {
+                "won": [False],
+                "admissible_commands": [self.admissible()],
+            }
         return [self.observation()], [1.0 if self.won else 0.0], [self.over], {
             "won": [self.won],
             "admissible_commands": [self.admissible()],
@@ -2863,6 +2878,236 @@ class CommandGuardTest(unittest.TestCase):
         self.assertEqual(summary["guard_relapsed"], 0)
         self.assertFalse(payload["episodes"][0]["guard"] is None)
 
+
+class StateLedgerTest(unittest.TestCase):
+    """The ledger at the state: the turn that moved nothing is answered with what has already been tried.
+
+    R189 removed the narration and lost four games its own control won, all four at the 50-step cap. Those are search
+    failures -- the model is at the environment and not finding the object -- and no sentence about the task reaches
+    them. What the driver already holds is the episode's own history, so R191's treatment is a renderer: one line, on
+    the turns whose command moved nothing, naming the last three commands tried.
+
+    The tests below hold the treatment to three things at once. It has to *fire* (a renderer nobody triggers is a bank
+    wearing a flag's name, R174.2); it has to fire only on that state (a line on every turn is R188's inert constant
+    with a new name); and it has to leave the world's own measurements alone (an instrument that counted the driver's
+    hint as an observation would make two arms' environments differ when the environments are identical).
+    """
+
+    def setUp(self):
+        self.examples = agent.load_examples()
+        self.original = agent.chat
+
+    def tearDown(self):
+        agent.chat = self.original
+
+    def drive(self, replies, ledger=True, world=None, parser="any-line", max_steps=50):
+        seen = []
+        script = list(replies)
+
+        def chat(messages, model, api_key, timeout):
+            seen.append([message["content"] for message in messages])
+            return script.pop(0), {"prompt_tokens": 10, "completion_tokens": 1}, 0
+
+        agent.chat = chat
+        episode = agent.run_episode(
+            world or FakeWorld(nothing_happens=True), "none", "model", self.examples, [], agent.Draw(1), max_steps, 3,
+            "deepseek-flash", "k", 1.0, parser=parser, state_ledger=ledger,
+        )
+        return episode, seen
+
+    def test_the_line_names_the_last_three_commands_in_the_order_they_were_tried(self):
+        # Order is the content: a set of three commands says what has been tried, a sequence says what the episode has
+        # just been doing, which is the thing a model stuck on an object needs to see.
+        line = agent.ledger_line(
+            ["look", "take apple 1 from countertop 1", "go to cabinet 1", "open cabinet 1"]
+        )
+        self.assertEqual(
+            line,
+            "Already tried this episode: take apple 1 from countertop 1; go to cabinet 1; open cabinet 1.",
+        )
+        self.assertNotIn("\n", line)
+
+    def test_a_command_tried_three_times_is_named_once(self):
+        # The window is three commands, and three copies of one command is one fact about the state. Collapsing is what
+        # makes the line worth its characters on exactly the turns it fires: a model looping on one object writes the
+        # same `take`, and the useful answer is that it is the same `take`.
+        self.assertEqual(agent.ledger_line(["look", "look", "look", "look"]), "Already tried this episode: look.")
+        self.assertEqual(
+            agent.ledger_line(["take apple 1", "look", "take apple 1"]),
+            "Already tried this episode: look; take apple 1.",
+        )
+
+    def test_a_history_with_nothing_in_it_has_no_line(self):
+        # A header with nothing after it is prompt paid for a claim with no referent, and the caller then sends the
+        # observation alone -- which is the control's turn, exactly.
+        self.assertEqual(agent.ledger_line([]), "")
+        self.assertEqual(agent.ledger_line(["  ", ""]), "")
+
+    def test_moved_nothing_reads_the_last_line_rather_than_the_whole_observation(self):
+        # Textworld sometimes prefixes the answer with the room it happened in. A test for equality would miss every one
+        # of those turns and quietly under-count the treatment, which is the failure mode a `fires` counter exists to
+        # make impossible.
+        self.assertTrue(agent.moved_nothing("Nothing happens."))
+        self.assertTrue(agent.moved_nothing("Nothing happens.\n"))
+        self.assertTrue(agent.moved_nothing("You are in the kitchen.\nNothing happens."))
+        self.assertFalse(agent.moved_nothing("You put the apple 1 in/on the cabinet 1.\n"))
+        self.assertFalse(agent.moved_nothing(""))
+
+    def test_a_turn_that_moved_nothing_is_answered_with_the_observation_and_then_the_line(self):
+        # `look` is admitted by the world and moves nothing, so this is the admitted-but-inert path. The model hears the
+        # world's own text first and the line second: the observation is the fact and the line is the hint, and a hint
+        # that came first would read as the world having said it.
+        episode, seen = self.drive(["> look", "> take apple 1 from countertop 1", "> put apple 1 in/on cabinet 1"])
+        self.assertEqual(
+            seen[1][-1], "Nothing happens.\nAlready tried this episode: look."
+        )
+        self.assertEqual(episode["ledger_fires"], 1)
+        self.assertEqual(episode["ledger_chars"], len("Already tried this episode: look.") + 1)
+        self.assertTrue(episode["won"])
+
+    def test_a_command_the_world_refuses_is_the_same_event(self):
+        # The other path: the action is not in this turn's admissible set. It is refused before it moves anything, which
+        # is a fact about the action rather than about the observation, and the treatment has to read both or it would
+        # fire on `look` and stay silent on the mistake that actually costs a game.
+        episode, seen = self.drive(
+            ["> take apple 1 from countertop 1", "> take apple 1 from countertop 1", "> put apple 1 in/on cabinet 1"]
+        )
+        self.assertEqual(
+            seen[2][-1],
+            "Nothing happens.\nAlready tried this episode: take apple 1 from countertop 1.",
+        )
+        self.assertEqual(episode["ledger_fires"], 1)
+        self.assertEqual(episode["invalid_actions"], 1)
+
+    def test_both_paths_in_one_episode_named_once_each(self):
+        # A game can walk both: `look` (admitted, inert) and then a second `take` (refused). The window is the last three
+        # commands *tried*, so the second line names both -- deduplicated, because the two `take`s are one command.
+        episode, seen = self.drive(
+            [
+                "> look",
+                "> take apple 1 from countertop 1",
+                "> take apple 1 from countertop 1",
+                "> put apple 1 in/on cabinet 1",
+            ]
+        )
+        self.assertEqual(episode["ledger_fires"], 2)
+        self.assertEqual(
+            seen[3][-1],
+            "Nothing happens.\nAlready tried this episode: look; take apple 1 from countertop 1.",
+        )
+
+    def test_a_turn_that_moved_something_carries_no_line(self):
+        # The control's turn, byte for byte. A treatment that also widened a winning turn would be two changes, and the
+        # round could not say which of them the delta was about.
+        replies = ["> take apple 1 from countertop 1", "> put apple 1 in/on cabinet 1"]
+        treated, treated_seen = self.drive(replies, ledger=True)
+        control, control_seen = self.drive(replies, ledger=False)
+        self.assertEqual(treated["ledger_fires"], 0)
+        self.assertEqual(treated_seen, control_seen)
+        self.assertEqual(treated["prompt_chars"], control["prompt_chars"])
+
+    def test_the_world_s_own_measurements_are_the_same_on_both_arms(self):
+        # `observe_chars`, its fingerprint and the action digest are the instrument every earlier round was read with.
+        # A ledger that changed them would make the two arms' environments look different when the environments are the
+        # same, and the next round's readback would be a readback of the renderer.
+        replies = ["> look", "> take apple 1 from countertop 1", "> put apple 1 in/on cabinet 1"]
+        treated, _ = self.drive(replies, ledger=True)
+        control, _ = self.drive(replies, ledger=False)
+        for field in ("observe_chars", "observe_fingerprint", "digest", "actions", "invalid_actions", "steps"):
+            self.assertEqual(treated[field], control[field], field)
+        self.assertEqual(treated["won"], control["won"])
+
+    def test_a_refused_command_is_a_command_that_moved_nothing(self):
+        # The reference channel drops the command under a thought and answers `Nothing happens.`. That turn is the same
+        # event the ledger exists for, so it gets the same line -- and the refused command joins the history without
+        # joining `actions`, because the action digest is a published field that must keep meaning what it meant.
+        replies = [
+            "> think: I need the apple\n> take apple 1 from countertop 1",
+            "> take apple 1 from countertop 1",
+            "> put apple 1 in/on cabinet 1",
+        ]
+        treated, treated_seen = self.drive(replies, ledger=True, parser="reference")
+        control, control_seen = self.drive(replies, ledger=False, parser="reference")
+        self.assertEqual(
+            treated_seen[1][-1],
+            "Nothing happens.\nAlready tried this episode: take apple 1 from countertop 1.",
+        )
+        self.assertEqual(control_seen[1][-1], agent.NO_OP)
+        self.assertEqual(treated["refused_actions"], 1)
+        self.assertEqual(treated["ledger_fires"], 1)
+        self.assertEqual(treated["digest"], control["digest"])
+        self.assertEqual(treated["actions"], control["actions"])
+
+    def test_a_line_the_episode_never_reads_is_not_a_fire(self):
+        # The `not done` condition. An environment that ends on a no-op answer -- which this fake can produce and
+        # textworld cannot -- would otherwise buy a line after the last turn, and a `fires` counter that counted prompt
+        # nobody read would report engagement the model never saw.
+        class EndsOnNoOp(FakeWorld):
+            def step(self, actions):
+                observation, scores, _dones, info = super().step(actions)
+                return [agent.NO_OP + "\n"], scores, [True], info
+
+        episode, seen = self.drive(["> look"], world=EndsOnNoOp(nothing_happens=True))
+        self.assertEqual(episode["ledger_fires"], 0)
+        self.assertFalse(any("Already tried" in content for turn in seen for content in turn))
+
+    def test_the_control_records_the_flag_off_and_the_treatment_on(self):
+        # Recorded on both arms, for the reason the guard's flag is: a field that is absent from the control cannot be
+        # told apart from a control that was never armed (AUDIT 34.259).
+        replies = ["> look", "> take apple 1 from countertop 1", "> put apple 1 in/on cabinet 1"]
+        treated, _ = self.drive(replies)
+        control, _ = self.drive(replies, ledger=False)
+        self.assertTrue(treated["ledger"])
+        self.assertFalse(control["ledger"])
+        self.assertEqual(control["ledger_fires"], 0)
+
+    def test_the_label_carries_the_ledger_token_and_nothing_else_moves(self):
+        # The label is the join's unit. R191's two arms are one family, one bank, one channel, one cap and one guard, so
+        # this token is the whole difference between them and a join that could not read it would pool two treatments.
+        self.assertEqual(
+            agent.arm_label("always-in", 3, 0.0, False, agent.ANY_LINE_PARSER, True, True),
+            "always-in@anyline+guard+ledger",
+        )
+        self.assertEqual(
+            agent.arm_label("always-in", 3, 0.0, False, agent.ANY_LINE_PARSER, True, False),
+            "always-in@anyline+guard",
+        )
+        self.assertEqual(agent.arm_label("none", 3, 0.0), "none")
+
+    def test_the_flag_reaches_the_summary_and_the_episodes(self):
+        # The same end-to-end shape the guard's test takes: a flag that reached only the driver would leave the artefact
+        # indistinguishable from an unarmed pass with the same score. The world here admits only `look`, so the `first`
+        # policy stands still for the whole budget and the line is sent on every turn -- which is what makes the
+        # summary's count a sum of real fires rather than a zero that would read the same if the field were dropped.
+        class StandsStill(FakeWorld):
+            def admissible(self):
+                return ["look", "inventory"]
+
+        original_build = agent.build_env
+        original_argv = sys.argv
+        out = HERE / "ledger-under-test.json"
+        agent.build_env = lambda batch_size=1, train_eval="eval_out_of_distribution": (
+            StandsStill(nothing_happens=True), 1
+        )
+        try:
+            sys.argv = [
+                "agent.py", "--arm", "none", "--policy", "first", "--games", "1",
+                "--state-ledger", "--out", str(out),
+            ]
+            self.assertEqual(agent.main(), 0)
+            payload = json.loads(out.read_text(encoding="utf-8"))
+        finally:
+            agent.build_env = original_build
+            sys.argv = original_argv
+            out.unlink(missing_ok=True)
+        summary = payload["summary"]
+        self.assertTrue(summary["state_ledger"])
+        self.assertEqual(summary["arm_label"], "none@ledger")
+        self.assertEqual(summary["ledger_fires"], 50)
+        self.assertEqual(summary["ledger_fires"], payload["episodes"][0]["ledger_fires"])
+        self.assertGreater(summary["ledger_chars"], 0)
+        self.assertTrue(payload["episodes"][0]["ledger"])
+        self.assertFalse(payload["episodes"][0]["won"])
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

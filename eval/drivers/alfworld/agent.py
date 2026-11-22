@@ -144,6 +144,17 @@ NO_OP = "Nothing happens."
 # It is a function of the state the episode is in -- the previous reply carried no command -- so it cannot fire in a
 # game that never enters the state, and `guard_fires` is recorded per episode so a join can prove it engaged.
 COMMAND_GUARD = "OK. Reply with one command only."
+# The state ledger, and the whole of R191. R189's guard removed the narration and lost four games its own control won,
+# all four at the environment's 50-step cap: they are *search* failures, and no sentence about the task can help a
+# model that is at the environment and not finding the object. What the model lacks on those turns is not knowledge
+# but its own history -- which command it has already tried, in which room, and what came back. The driver holds that
+# history in `actions`, so the treatment is a renderer: when a turn moves nothing, the observation for that turn gains
+# one line naming the commands already tried. Conditional by construction -- a game whose actions all land carries no
+# extra character -- which is what keeps it inside the price of a pass instead of paying on every turn.
+LEDGER_HEADER = "Already tried this episode:"
+# How many commands the line names. Three is what a model can hold against a room's contents in one glance; the whole
+# list would grow with the cap and turn a hint into a transcript, which is the failure R188 already priced.
+LEDGER_SAMPLES = 3
 # How many refused commands an episode quotes back beside the count. Three is enough to name the shape of a
 # model's mistake in an arm file and small enough that a 274-game pass does not become a transcript.
 REFUSED_SAMPLES = 3
@@ -403,6 +414,52 @@ def refused_command(reply: str) -> "str | None":
     return None
 
 
+def moved_nothing(observation: str) -> bool:
+    """Whether the world's answer says the command changed nothing.
+
+    The corpus answers a command it will not perform with `Nothing happens.`, which is the same string `NO_OP` uses for
+    a refused turn -- deliberately, so that a model which has learned one has learned the other. Read on the *last* line
+    rather than as equality with the whole observation: textworld sometimes prefixes the message with the room it
+    happens in, and a test for equality would then miss every one of those turns and quietly under-count the treatment.
+
+    An empty observation is not a no-op: an episode that ended owes the model no comment, and calling that a failed
+    command would be the driver inventing an event.
+    """
+    lines = str(observation).strip().splitlines()
+    return bool(lines) and lines[-1].strip() == NO_OP
+
+
+def ledger_line(commands: "list[str]", limit: int = LEDGER_SAMPLES) -> str:
+    """One line naming what an episode has already tried, for the turn that moved nothing.
+
+    The literature's answer to a search failure is a per-episode *state* rather than another sentence of corpus
+    prior: what has been tried, where, and what it returned. This file already holds the first two -- `actions` is
+    every command the episode handed to the world, in order -- so the treatment is a renderer and not a component.
+
+    The last `limit` commands, in the order they were tried, with repeats collapsed. Collapsing is the part that
+    makes the line worth its characters: a model stuck on one object writes the same `take` four times, and four
+    copies of one command is one fact about the state. A window that is three copies therefore renders as one
+    command, which is exactly the message that turn needs and is shorter than the window it came from.
+
+    The command that just failed is *in* the list. It was tried, the world answered, and the answer is on the line
+    above; dropping it would make the ledger a list of everything except the thing the model is currently doing.
+
+    Empty is returned for an empty history rather than a header with nothing after it: a line with no content is
+    prompt paid for a claim that has no referent, and the caller then sends the observation alone.
+    """
+    recent: "list[str]" = []
+    for command in reversed(commands):
+        text = str(command).strip()
+        if not text or text in recent:
+            continue
+        recent.append(text)
+        if len(recent) >= limit:
+            break
+    if not recent:
+        return ""
+    return f"{LEDGER_HEADER} " + "; ".join(reversed(recent)) + "."
+
+
 def words_of(text: str) -> "set[str]":
     """Lowercased alphanumeric words. The anchor's whole vocabulary, and deliberately a small one."""
     return set(re.findall(r"[a-z0-9]+", text.lower()))
@@ -453,6 +510,7 @@ def arm_label(
     gate_kind: bool = False,
     parser: str = REFERENCE_PARSER,
     guard_commandless: bool = False,
+    state_ledger: bool = False,
 ) -> str:
     """The arm's identity, including only the knobs that were moved off their registered values.
 
@@ -480,6 +538,11 @@ def arm_label(
     the prompt or the reader, so it travels in the label for the same reason the channel does: R189's two arms are one
     family, one bank, one channel and one cap, and this token is the entire difference between them. A join that
     grouped them would refuse the doubled games only after both were paid for.
+
+    `state_ledger` is the fifth and the second of the answer-side knobs, and it is in the label for the same reason and
+    with one extra: it fires on a *different* turn than the guard does -- the guard answers a turn that carried no
+    command, the ledger a turn whose command moved nothing -- so two arms that differ by it are two treatments whose
+    difference is invisible in the pack, the channel, the cap and the budget (R191).
     """
     moved = []
     if arm == "retrieved":
@@ -493,6 +556,8 @@ def arm_label(
         moved.append(PARSER_TOKENS.get(parser, parser.replace("-", "")))
     if guard_commandless:
         moved.append("guard")
+    if state_ledger:
+        moved.append("ledger")
     return f"{arm}@{'+'.join(moved)}" if moved else arm
 
 
@@ -704,6 +769,7 @@ def run_episode(
     gate_kind: bool = False,
     parser: str = REFERENCE_PARSER,
     guard_commandless: bool = False,
+    state_ledger: bool = False,
 ) -> dict:
     """One game, driven by one arm. Returns the episode record; never a partly-filled one.
 
@@ -747,6 +813,15 @@ def run_episode(
     guard_checked = 0
     guard_relapsed = 0
     guard_pending = False
+    # The ledger's two counters and its history. `fires` is the number of turns whose answer carried the line and
+    # `chars` the characters it added, so the cost reading is a sum of the treatment's own characters rather than a
+    # difference between two prompts that also differ by their pack. `attempted` is the history the line is rendered
+    # from: every command the driver tried to hand the world, in order, including the ones a channel refused and the
+    # one the current turn is about. It is separate from `actions` because `actions` is the record's field and its
+    # digest is published -- a refusal is not an action and must not enter it.
+    ledger_fires = 0
+    ledger_chars = 0
+    attempted: "list[str]" = []
     pack_entries: "int | None" = None
     # The rendered pack's length, as opposed to the prefix's. `prefix_chars` is the whole fixed prompt — examples,
     # system instruction and pack — so two arms of different lengths differ by a number that also contains the
@@ -875,6 +950,17 @@ def run_episode(
                     refused_samples.append(refused_here)
             if refused_here is not None:
                 answer = NO_OP
+                if state_ledger:
+                    # A refused command is a command that did not move the world, so it is the same event the ledger
+                    # answers on the other side of the parser: the model asked for something and got nothing. The
+                    # refused command joins the history *without* joining `actions` -- it was never executed, and the
+                    # action digest is a published field that must keep meaning what it has always meant.
+                    attempted.append(refused_here)
+                    line = ledger_line(attempted)
+                    if line:
+                        answer = f"{NO_OP}\n{line}"
+                        ledger_fires += 1
+                        ledger_chars += len(line) + 1
             elif guard_commandless:
                 # The registered change, and the whole of it: the same answer, with the requirement named. The pack,
                 # the reader, the cap and the call count are untouched, so anything this arm moves is the loop being
@@ -894,19 +980,37 @@ def run_episode(
             # Every turn went on a thought. The episode ends where the budget ends, which is a verdict the
             # arm records rather than an infrastructure failure that hides it.
             break
-        if action not in admissible:
+        actions.append(action)
+        attempted.append(action)
+        # A command the world does not admit is refused before it moves anything, and it is one of the two ways a turn
+        # can move nothing: the other is an admitted command that the world answers with `Nothing happens.`. Both are
+        # read after the step, because the world's answer is the fact and the admissibility set is this turn's snapshot
+        # of it (R191).
+        refused_by_world = action not in admissible
+        if refused_by_world:
             invalid += 1
             if re.match(ACTION_VERB_PATTERN, action) is None:
                 off_space += 1
-        actions.append(action)
         observation, _scores, dones, info = env.step([action])
         steps += 1
         done = bool(dones[0])
         last = str(observation[0])
         observe_chars.append(len(last))
         won = bool(info.get("won", [False])[0])
-        messages.append({"role": "user", "content": last})
-        trajectory.append(last.strip())
+        # What the model hears. `last` stays the world's own text because three fields measure it -- `observe_chars`,
+        # `observe_fingerprint` and `last_line` -- and an instrument that counted the driver's own hint as an
+        # observation would make two arms' environments look different when the environments are identical.
+        heard = last
+        # `not done` is part of the condition rather than an optimisation: a line appended after the episode's last
+        # answer is a line no turn reads, so counting it as a fire would report engagement the model never saw.
+        if state_ledger and not done and (refused_by_world or moved_nothing(last)):
+            line = ledger_line(attempted)
+            if line:
+                heard = f"{last.rstrip()}\n{line}"
+                ledger_fires += 1
+                ledger_chars += len(line) + 1
+        messages.append({"role": "user", "content": heard})
+        trajectory.append(heard.strip())
 
     record = {
         "gamefile": gamefile,
@@ -945,6 +1049,13 @@ def run_episode(
         "guard_fires": guard_fires,
         "guard_checked": guard_checked,
         "guard_relapsed": guard_relapsed,
+        # The ledger, per episode, and the flag beside the counters for the same reason the guard's is: a field that is
+        # absent from the control cannot be told apart from a control that was never armed. `ledger_chars` is the
+        # treatment's own prompt cost, summed here so the round's cost reading is a measurement rather than a
+        # difference between two prompts that also differ by their pack (R191).
+        "ledger": bool(state_ledger),
+        "ledger_fires": ledger_fires,
+        "ledger_chars": ledger_chars,
         # Which reader drove this game. In the record and not only in the summary, because a join that pooled two
         # channels would otherwise be undetectable per episode (AUDIT 34.262).
         "parser": parser,
@@ -1079,6 +1190,7 @@ def pass_header(arguments, rules: "list[str]", total: int, kinds: "list[list[str
             bool(arguments.gate_kind),
             arguments.parser,
             bool(arguments.guard_commandless),
+            bool(arguments.state_ledger),
         ),
         # The channel travels in the header as well as in every episode: a reader opening the file sees which reader
         # drove it before seeing a single score (AUDIT 34.262).
@@ -1086,6 +1198,9 @@ def pass_header(arguments, rules: "list[str]", total: int, kinds: "list[list[str
         # And the guard, for the same reason: two dispatches of one arm that differ by this flag are two treatments,
         # and a reader of the summary has to be able to say which one this file is without opening an episode.
         "guard_commandless": bool(arguments.guard_commandless),
+        # The ledger's claim about this file, written by the same flag that wrote every episode's `ledger`, so the
+        # header and the episodes can be held against each other instead of trusted separately (R191).
+        "state_ledger": bool(arguments.state_ledger),
         "rules_in_bank": len(rules),
         # R185 swaps a bank under an unchanged label at an unchanged length. Without this field the two artefacts
         # differ only by run id, and a join of them would print one rate over two prompts.
@@ -1137,6 +1252,10 @@ def pass_summary(
             "guard_fires": sum(episode.get("guard_fires", 0) for episode in episodes),
             "guard_checked": sum(episode.get("guard_checked", 0) for episode in episodes),
             "guard_relapsed": sum(episode.get("guard_relapsed", 0) for episode in episodes),
+            # The ledger's engagement and its price, summed the same way. A pass that was not armed records zeros,
+            # which is the true count of lines it sent and of characters it added.
+            "ledger_fires": sum(episode.get("ledger_fires", 0) for episode in episodes),
+            "ledger_chars": sum(episode.get("ledger_chars", 0) for episode in episodes),
             "off_space_actions": sum(episode["off_space_actions"] for episode in episodes),
             "usage": usage,
             "cache_hit_rate": round(usage["cache_hit_tokens"] / usage["prompt_tokens"], 4) if usage["prompt_tokens"] else None,
@@ -1221,6 +1340,13 @@ def main() -> int:
         action="store_true",
         help="answer a reply that carried no command with `OK. Reply with one command only.` instead of `OK.`; the "
         "registered change of R189, recorded per episode as `guard_fires` so a join can prove it engaged",
+    )
+    parser.add_argument(
+        "--state-ledger",
+        action="store_true",
+        help="answer a turn that moved nothing (`Nothing happens.`, or a command the world does not admit) with the "
+        "observation plus one line naming the last three commands already tried; the registered change of R191, "
+        "recorded per episode as `ledger_fires` and `ledger_chars` so a join can prove both engagement and price",
     )
     parser.add_argument("--seed", type=int, default=20261120)
     parser.add_argument("--model", default=os.environ.get("ALFWORLD_MODEL", DEFAULT_MODEL))
@@ -1332,6 +1458,7 @@ def main() -> int:
             arguments.gate_kind,
             arguments.parser,
             arguments.guard_commandless,
+            arguments.state_ledger,
         )
         # Checked before the write, so a file on disk never holds one game twice: the checkpoint is the
         # evidence, and evidence that has to be re-checked before it can be trusted is not evidence.
@@ -1405,6 +1532,8 @@ def main() -> int:
         f"  guard           {summary['guard_fires']} fires, {summary['guard_relapsed']} relapsed of "
         f"{summary['guard_checked']} checked"
     )
+    # And the ledger's, on both arms for the same reason: `0 fires` is the statement that the control was not armed.
+    print(f"  ledger          {summary['ledger_fires']} fires, {summary['ledger_chars']} chars added")
     print(f"  cache hit rate  {summary['cache_hit_rate']}")
     print(f"  prefix chars    {summary['prefix_chars_mean']}")
     print(f"  bill            ${bill['usd']} ({bill['band']}); other band ${bill['usd_in_other_band']}")

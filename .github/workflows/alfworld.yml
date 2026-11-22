@@ -87,6 +87,10 @@ on:
         description: 'true answers a reply that carried no command with one line naming the requirement instead of `OK.`; R189 changes this string and nothing else, so every arm in the dispatch moves together'
         required: false
         default: ''
+      state_ledger:
+        description: 'true answers a turn that moved nothing with the observation plus one line naming the last three commands already tried; R191 adds this line and nothing else, so every arm in the dispatch moves together'
+        required: false
+        default: ''
       train_shards:
         description: 'which training slices to drive, as a JSON list; ["1"] re-drives only the slice that failed'
         required: false
@@ -463,6 +467,7 @@ jobs:
           SPLIT: ${{ inputs.split }}
           PARSER: ${{ inputs.parser }}
           GUARD: ${{ inputs.guard_commandless }}
+          LEDGER: ${{ inputs.state_ledger }}
         run: |
           set -euo pipefail
           if [ -z "${DEEPSEEK_API_KEY}" ]; then
@@ -488,6 +493,10 @@ jobs:
           # reason: two arms of one dispatch driven under different answers to a thought would be a comparison of two
           # drivers wearing one label (R189).
           if [ -n "${GUARD}" ]; then args+=(--guard-commandless); fi
+          # The ledger moves with the guard and for the same reason: `agent.py` puts it in the label and in every
+          # episode, so a dispatch that armed one arm and not the other would leave the join refusing a pairing after
+          # the money (R191).
+          if [ -n "${LEDGER}" ]; then args+=(--state-ledger); fi
           if [ -n "${RULES}" ]; then args+=(--rules "${RULES}"); fi
           python eval/drivers/alfworld/agent.py "${args[@]}" \
             --out "$RUNNER_TEMP/arm.json" | tee "$RUNNER_TEMP/arm.log"
@@ -799,6 +808,7 @@ jobs:
           SPLIT: ${{ inputs.split }}
           SPLIT_GAMES: ${{ inputs.split_games }}
           GUARD: ${{ inputs.guard_commandless }}
+          LEDGER: ${{ inputs.state_ledger }}
         run: |
           set -euo pipefail
           if [ -z "${DEEPSEEK_API_KEY}" ]; then
@@ -832,6 +842,9 @@ jobs:
           # The guard, for the channel's reason and one more: `agent.py` puts it in the label and in every episode, so
           # a dispatch that armed one arm and not the other would leave the join refusing a pairing after the money.
           if [ -n "${GUARD}" ]; then args+=(--guard-commandless); fi
+          # The ledger, for the guard's reason: it is in the label and in every episode, so it moves for the whole
+          # matrix or not at all (R191).
+          if [ -n "${LEDGER}" ]; then args+=(--state-ledger); fi
           # The retrieval budget is an input because AMD measured k=1 as the global optimum and this lane's
           # default is 3; a contrast that has to be edited into a file is a contrast nobody runs twice.
           args+=(--top-k "${TOP_K:-3}")

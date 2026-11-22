@@ -186,6 +186,18 @@ class RefusalTest(unittest.TestCase):
         # no such step, so the input would be dropped in silence and the dispatch would not be the one it says.
         self.assertIn("needs a pass to change", self.refused("--guard-commandless"))
 
+    def test_the_state_ledger_travels_with_the_dispatch(self):
+        # R191's two arms are one family, one bank, one channel, one cap and one guard, so this input is the whole
+        # difference between them. A payload that dropped it would buy two unarmed runs at twice the price and the
+        # round would read as a null that lives in this file rather than in the driver.
+        self.assertEqual(lane.payload(arguments("--sweep", "true", "--state-ledger"))["state_ledger"], "true")
+        self.assertNotIn("state_ledger", lane.payload(arguments("--sweep", "true")))
+
+    def test_a_state_ledger_with_no_pass_to_change_is_refused(self):
+        # The guard's refusal, for the guard's reason: no games means no step reads the flag, so the buyer would believe
+        # a treatment was bought while nothing was armed.
+        self.assertIn("needs a pass to change", self.refused("--state-ledger"))
+
     def test_a_kind_gate_without_a_bank_is_refused(self):
         self.assertIn("tagged bank", self.refused("--arm", "always-in", "--gate-kind", "true", "--games", "134"))
 

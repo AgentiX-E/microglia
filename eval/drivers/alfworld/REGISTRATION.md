@@ -3125,3 +3125,62 @@ record measures.
 
 **Next: R191 — instance state, the one family the pack cannot reach.** The four games R189's guard lost all ended at the
 environment's 50-step cap: search failures with the loop already removed. ¥4.2, registered in `ROADMAP.md`.
+
+## R191 — the state the pack cannot reach: one line on the turn that moved nothing
+
+R189 removed the narration and **lost four games its own control won**, and all four ended at the environment's 50-step
+cap with fewer thoughts than the control: `cool` (3 thoughts), `examine` (5), `puttwo` (11 against 20), `clean` (5). They
+are not narration failures. They are **search** failures: the model is at the environment, issuing commands, and not
+finding the object, and no sentence about the task can help it.
+
+The literature's answer is a per-episode **state** rather than another corpus prior — what has been tried, where, and what
+it returned. This driver already holds the first and the third: `actions` is every command the episode handed the world,
+in order. So the treatment is a **renderer**, not a component:
+
+| | without the ledger | with the ledger |
+| --- | --- | --- |
+| a turn whose command moved nothing | the observation alone | the observation, then `Already tried this episode: …` |
+| a turn whose command landed | the observation | **unchanged** |
+| the pack, the channel, the cap, the guard | — | unchanged |
+
+The line names the last **three** commands tried, in the order they were tried, with repeats collapsed: three copies of
+one `take` is one fact about the state, and a window of three copies therefore renders as one command — shorter than the
+window it came from, and exactly the message a model looping on one object needs. It fires on both sides of the parser:
+an action the world does not admit is refused before it moves anything, and an admitted `look` moves nothing because there
+is nothing to move. A turn that ends the episode gets no line, because a line no later turn reads is not engagement.
+
+### Registered readings
+
+Two arms on the published bank (`banks/bank-putscope-2.json`), `--gate-kind true`, `any-line`, cap 50, **274 games each**,
+`--guard-commandless` on both, `--state-ledger` on the treatment only, four jobs:
+
+1. **Engagement**: `ledger_fires` is **20 to 200 per arm**, and non-zero in **at least 3 of the 4 named cap-loss games**
+   (`cool`, `examine`, `puttwo`, `clean` — named here from the fields R189 recorded, before the round, not selected after
+   it). A treatment that never fired on the games it was built for is a bank wearing a flag's name (R174.2).
+2. **The cell**: **at least 2 of those 4 games win** under the ledger. Four games cannot reach significance; what they can
+   do is show the mechanism reaching the failures it was aimed at.
+3. **No harm**: the paired pooled delta over 274 games is **≥ −2.0 pp**. The round's power is 3.5 pp, so this is a
+   "not worse" floor rather than a win — the count above is what shows the mechanism.
+4. **Instrument**: `pack_chars` 551 and `pack_entries` 1 in all 548 games, one `bank_digest`, `parser` `any-line`,
+   `max_steps` 50, `guard` true on both arms, `ledger` true on the treatment and false on the control, and the token
+   `ledger` in the treatment's label (`always-in@anyline+guard+ledger` against `always-in@anyline+guard`).
+5. **Cost**: total spend **≤ ¥3.4**, and the treatment's `prompt_chars` total **≤ 6% above** the control's. The line is
+   conditional on a failed action, and R189's trajectories say that is one to three turns a game.
+
+### Refutation
+
+**Fewer than 20 fires in total, or non-zero in fewer than 2 of the 4 named games.** The state never reached the model, and
+the round says nothing about search — the cap-losses are then not a missing-state problem either, and the family closes.
+
+**A pooled delta < −2.0 pp with an interval excluding 0.** The ledger hurts. The search family closes rather than queues,
+because the only mechanism the literature offers for a search failure has now been bought and it went the wrong way.
+
+### Void
+
+Any arm whose episodes carry no `ledger_fires`; any pass whose `pack_chars`, `pack_entries`, `max_steps`, `parser`, `guard`
+or `bank_digest` differs from the tiling above; any game outside the 274.
+
+**Price ≈ ¥3.00**, four jobs, off-peak band.
+
+**Next after this round: R192 — the release distribution.** 265, 264, 264, 258 on the same 274 games: the published
+number is a draw, and four more dispatches (≈ ¥6.0) buy the interval instead of the point.
