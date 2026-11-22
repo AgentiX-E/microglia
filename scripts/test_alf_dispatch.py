@@ -211,7 +211,7 @@ class RefusalTest(unittest.TestCase):
         )
         self.assertNotIn("state_admissible", lane.payload(arguments("--sweep", "true")))
         # It is a renderer of the same state rather than a mode of the list, so it does not drag `state_ledger` with it:
-        # the arm the driver builds is `@ledger-admissible`, which is neither the list nor the count.
+        # the arm the driver builds is `@ledger-admissible-task`, which is neither the list nor the count.
         self.assertNotIn("state_ledger", lane.payload(arguments("--sweep", "true", "--state-admissible")))
 
     def test_an_admissible_renderer_with_no_pass_to_change_is_refused(self):

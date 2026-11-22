@@ -3129,3 +3129,32 @@ failure this lane has now made twice: a price that was never a written-down mult
 cost is a function of the size of the admissible set, which had never been recorded, so the round could not be priced from
 artefacts already paid for. A field costs nothing; a wrong estimate cost R193 half its registered budget in the other
 direction and R192 a day of dispatch arithmetic.
+
+### 8.57 The command record, and the example that has to be a command
+
+Two changes, both prompted by reading R194 back: the episode records **what the agent asked for**, and the admissible
+renderer may no longer name a command that does nothing.
+
+**The record.** Every episode carries `commands` — the ordered history the state renderers read, including the commands
+the world refused and the ones the parser dropped — and `fire_turns`, the index of the command each line answered. Both
+cost no call and no prompt character; the only cost is bytes (about 1.5 KB per 50-turn episode). The reason is that the
+artefacts kept a *consequence* of the history (a fire count, a character total) and never the history itself, so the
+question the next round needs — *would a line that named a cycle have fired where the list did not?* — could not be
+answered from 822 games already paid for, and had to become an instrument (AUDIT 34.285).
+
+`commands` is `attempted` rather than `actions`: the difference is the parser-dropped commands, which never reached the
+world and are still part of what the model tried. The invariant `len(commands) == actions + refused_actions` is asserted in
+the driver's tests, and `len(fire_turns) == ledger_fires` is the one that keeps the record from drifting away from the
+renderer it exists to explain.
+
+**The example.** R194's rule was "the shortest command sharing the refused verb, else the world's first". In 248 firing
+games it produced `help` **220 times (88.7%)**, another meta command once, a movement command 26 times, and a command with
+a task verb **once** (AUDIT 34.286) — because `help` is four characters and textworld lists it first, so both branches
+pointed at it whenever the refused verb was absent from the set, which is exactly the turn the renderer answers.
+
+R195's rule is structural: **the example must carry a task verb** (`take`, `put`, `clean`, `heat`, `cool`, `examine`),
+preferring one that shares the refused verb and the shortest among those; if the set has no such command the line carries
+**the count alone**, which is still true and costs nine characters. Three counters record what each line carried —
+`admissible_task_fires`, `admissible_meta_fires`, `admissible_exampleless_fires` — and they sum to `ledger_fires`, which
+the join checks before it will quote a share. The label token moved to `@ledger-admissible-task` because the content rule
+is part of the treatment: R194's artefacts carry the old token and must not be pooled with these.

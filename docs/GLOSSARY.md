@@ -2157,3 +2157,20 @@ game-draws, 1.34% — and what is not is the identity of the games.
 themselves. R188's placebo (`266/274`) scored at least as well as its treatment (`264/274`), which is what an inert entry
 looks like when the round can tell inert from harmful. Without it, the round would have reported a 0.66-thought "effect"
 that is inside the same-prompt band of 1.12.
+
+**Command record** — The two per-episode fields `commands` and `fire_turns`: the ordered commands the state renderers
+read (including the ones the world refused and the ones the parser dropped), and the index of the command each rendered
+line answered. The record exists because every artefact before it kept a *consequence* of the history — a fire count, a
+character total — and no question about the history could be asked of it; the invariant `len(commands) == actions +
+refused_actions` ties it to the counters that already existed, and `len(fire_turns) == ledger_fires` ties it to the
+renderer.
+
+**Fire turn** — An entry of `fire_turns`: the position, in `commands`, of the command whose answer carried a line. The
+window the line was rendered from is `commands[:index + 1]`, so a cycle-aware renderer can be replayed offline against a
+recorded arm — the question R193's gate asked and could not answer from its own artefacts.
+
+**Task-verb example** — The rule the admissible renderer's example now follows: it must carry one of `take`, `put`,
+`clean`, `heat`, `cool`, `examine`, so that naming a command cannot degenerate into naming `help`. The first version of
+the renderer chose the shortest command in the set, which in ALFWorld is `help` in 88.7% of fires; the rule is structural
+rather than a blacklist, and when the set has no task command the line carries the count alone. Counted per episode as
+`admissible_task_fires` / `admissible_meta_fires` / `admissible_exampleless_fires`, which sum to `ledger_fires`.

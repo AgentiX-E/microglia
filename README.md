@@ -670,12 +670,17 @@ window is the one the previous line named. It **lost**: 263/274, the maximum lin
 counted line gives the same-window condition nothing to compare against. The flag stays in the driver as a measured
 negative; the state family's version is the plain list.
 
-The third renderer is **`--state-admissible`** (R194, built and instrumented, not yet dispatched): on the same turn, the
-line names **what the world admits** — how many commands, and one of them — because AUDIT 34.284 read the 822 armed games
-of R191 and R193 together and found `ledger_fires` equal to `invalid_actions` in every one of them. The list was never a
-search repair; it was an admissibility repair. This renderer carries the label token `@ledger-admissible`, the same two
-fire counters, and three instrument fields (`admissible_mean`, `admissible_max`, `admissible_sample`) so that the round's
-price is a measurement of the world's admissible set rather than an estimate.
+The third renderer is **`--state-admissible`**: on the same turn, the line names **what the world admits** — how many
+commands, and one of them — because AUDIT 34.284 read the 822 armed games of R191 and R193 together and found
+`ledger_fires` equal to `invalid_actions` in every one of them. The list was never a search repair; it was an
+admissibility repair. It has been dispatched once (R194, **265/274**, −0.73 pp against the list, **half the characters**)
+and the read found the example was `help` in **88.7%** of its fires, so the rule is now structural: the example must carry
+a task verb, or the line is the count alone, behind the token `@ledger-admissible-task`, counted by
+`admissible_task_fires` / `admissible_meta_fires` / `admissible_exampleless_fires` (R195, registered).
+
+Every episode also carries **`commands`** and **`fire_turns`** — the ordered history the renderers read and the index of
+the command each line answered — so that a cycle-aware renderer can be replayed against an arm already paid for instead of
+being dispatched to answer a question that costs nothing to ask offline.
 
 The published number for the arm is a **band**, not a point: five draws of one arm on one 274-game pool landed on 267,
 268, 265, 268 and 270 — a **1.82 pp** range with no treatment applied — so the record quotes **1,338/1,370 = 97.66%

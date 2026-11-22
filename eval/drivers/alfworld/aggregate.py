@@ -258,6 +258,29 @@ def load_slices(
                         f"which records state_admissible={episode.get('state_admissible')}; the header is a claim and the "
                         "episodes are the fact, so this file is joined by neither"
                     )
+        if claimed_admissible:
+            # R195's invariant, checked where the join can afford to refuse: the three counters are one per fire, so a
+            # slice whose counters do not sum to its own `ledger_fires` is a slice whose shares mean nothing -- and the
+            # failure is silent in a table, because every share is still a number between 0 and 1.
+            counted = [episode for episode in episodes if isinstance(episode, dict) and "admissible_task_fires" in episode]
+            if counted and len(counted) != len(episodes):
+                fail(
+                    f"{path}: {len(counted)} of {len(episodes)} episodes carry the R195 counters; a file where some do "
+                    "cannot report a share over the arm, because the remainder is neither zero nor counted"
+                )
+            for episode in counted:
+                parts = sum(
+                    int(episode.get(key) or 0)
+                    for key in ("admissible_task_fires", "admissible_meta_fires", "admissible_exampleless_fires")
+                )
+                fires = int(episode.get("ledger_fires") or 0)
+                if parts != fires:
+                    fail(
+                        f"{path}: {episode.get('gamefile')} counts {parts} classified lines and {fires} fires "
+                        f"({episode.get('admissible_task_fires')} task, {episode.get('admissible_meta_fires')} meta, "
+                        f"{episode.get('admissible_exampleless_fires')} count-only); the counters do not sum to the "
+                        "fires, so no share over them can be quoted (R195)"
+                    )
         claimed_ledger = summary.get("state_ledger")
         if claimed_ledger is not None:
             if not isinstance(claimed_ledger, bool):
@@ -868,6 +891,13 @@ def refusals(left: "list[dict]", right: "list[dict] | None" = None, labels: "tup
         # in which 250 never refused is a mean of zeroes and the round's price is about the turns that did (R194).
         admissible_games = [int(episode.get("admissible_mean") or 0) for episode in episodes if episode.get("admissible_mean")]
         admissible_counted = any("admissible_mean" in episode for episode in episodes)
+        # R195's content counters. Counted only when a file has them, for the reason `dropped` and `guard` are: R194's
+        # slices carry the instrument and no counters, and a zero over an arm that never counted is not a measurement of
+        # what it sent (AUDIT 34.286).
+        task_fires = sum(int(episode.get("admissible_task_fires") or 0) for episode in episodes)
+        meta_fires = sum(int(episode.get("admissible_meta_fires") or 0) for episode in episodes)
+        exampleless_fires = sum(int(episode.get("admissible_exampleless_fires") or 0) for episode in episodes)
+        examples_counted = any("admissible_task_fires" in episode for episode in episodes)
         return {
             "games": len(episodes),
             "calls": calls,
@@ -893,6 +923,10 @@ def refusals(left: "list[dict]", right: "list[dict] | None" = None, labels: "tup
             "admissible_games": len(admissible_games),
             "admissible_mean": round(sum(admissible_games) / len(admissible_games)) if admissible_games else 0,
             "admissible_max": max((int(episode.get("admissible_max") or 0) for episode in episodes), default=0),
+            "admissible_task_fires": task_fires,
+            "admissible_meta_fires": meta_fires,
+            "admissible_exampleless_fires": exampleless_fires,
+            "admissible_examples_counted": examples_counted,
             # A rate over no games is undefined rather than zero, for the reason the call rates below are: a slice
             # that recorded no episode did not think nothing, it did not happen.
             "thoughts_per_game": round(thoughts / len(episodes), 2) if episodes else None,
@@ -1295,6 +1329,28 @@ def main() -> int:
                 f"{counts['admissible_games']} games refused, mean set {counts['admissible_mean']}, "
                 f"max {counts['admissible_max']}"
             )
+
+        def example_cell(counts: dict) -> str:
+            """What the lines carried, as a share rather than a sample.
+
+            R194 could only quote one `admissible_sample` per episode, and that sample is the reason the round's example
+            was visible to be wrong at all; a share is what a table can cite, and it can only be read when the three
+            counters sum to the arm's own fire count -- which `load_slices` refuses when they do not.
+            """
+            if not counts["admissible_examples_counted"]:
+                return "examples not counted"
+            fires = counts["ledger_fires"]
+            if not fires:
+                return "no lines sent"
+            task = counts["admissible_task_fires"]
+            return (
+                f"{task} of {fires} lines carried a task command "
+                f"({100 * task / fires:.1f}%; {counts['admissible_meta_fires']} meta, "
+                f"{counts['admissible_exampleless_fires']} count-only)"
+            )
+
+        if left_counts["admissible_examples_counted"] or right_counts["admissible_examples_counted"]:
+            print(f"  examples        {treatment} {example_cell(left_counts)} vs {control} {example_cell(right_counts)}")
 
         if left_counts["admissible_counted"] or right_counts["admissible_counted"]:
             print(

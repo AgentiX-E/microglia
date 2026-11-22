@@ -129,6 +129,10 @@ PACK_HEADER = (
 THINK_PATTERN = r"(?i)(?:>|)\s*think(?::|)"
 CARET_PATTERN = r"(?i)>\s*"
 ACTION_VERB_PATTERN = r"(?i)(?:go to|open|take|put|use|heat|cool|look|clean|inventory)"
+# The verbs that move a task forward, as opposed to the ones that only move the model. R195's renderer will not name a
+# command outside this set: `help`, `look` and `inventory` are admitted everywhere and were the example in 89% of R194's
+# fires, and `go to …` was another 10.5%. Kept as a tuple rather than a regex because it is read as a membership test.
+TASK_VERBS = ("take", "put", "clean", "heat", "cool", "examine")
 
 # What the model hears when the turn it wrote did not reach the world. `OK.` is the examples' own token for
 # a thought that was only a thought (`react_put_0` answers four of them that way), and it is a true answer to
@@ -496,18 +500,39 @@ def ledger_window(commands: "list[str]", limit: int = LEDGER_SAMPLES) -> "tuple[
 
 
 def admissible_example(commands: "list[str]", refused: str) -> str:
-    """One command from the world's own admissible set, chosen so that one state always yields one line.
+    """One command from the world's admissible set that *does something*, or no example at all.
 
-    The refusal names a verb the model wanted (`take apple 9`), so the example keeps that verb when the world has such a
-    command — it answers the turn in the vocabulary the model just used — and among those candidates the shortest wins,
-    because the line is paid for on every refused turn and the shortest command carries the same information. Ties go to
-    the world's own order, which makes the choice a function of the state rather than of a sampler.
+    R194's rule was "the shortest command sharing the refused verb, else the world's first", and the fallback is what
+    almost every fire took: `help` is four characters, it is admitted in every room, and textworld lists it first, so
+    220 of 248 fires showed a count followed by `e.g. help` (AUDIT 34.286). The rule was deterministic
+    and uninformative, and no registered reading could see it because none of them read the line.
+
+    R195's rule is structural rather than a blacklist of the three commands that hurt: the example has to be a command
+    that carries a **task verb** (`take`, `put`, `clean`, `heat`, `cool`, `examine`), preferring one that shares the
+    refused verb, shortest first, and **if there is no such command the line carries the count alone**. A set whose
+    only members are `help` and movement is a set that says where the model may go, not what it may do, and the count
+    is the part of the line that stays true either way.
     """
     if not commands:
         return ""
+    usable = [command for command in commands if command.split() and command.split()[0].lower() in TASK_VERBS]
+    if not usable:
+        return ""
     verb = refused.split()[0].lower() if refused.split() else ""
-    sharing = [command for command in commands if command.split() and command.split()[0].lower() == verb]
-    return min(sharing or list(commands), key=len)
+    sharing = [command for command in usable if command.split()[0].lower() == verb]
+    return min(sharing or usable, key=len)
+
+
+def example_kind(sample: str) -> str:
+    """Which of R195's three counters a line belongs in: `task`, `meta`, or `none` for a count-only line.
+
+    A classification rather than a predicate, because the counters have to sum to the fires: a reader that had to infer
+    the remainder would be doing the arithmetic the instrument exists to do. "Meta" here means *not a task command* —
+    a movement command lands there too, which is what R194's 10.5% of `go to …` examples were.
+    """
+    if not sample:
+        return "none"
+    return "task" if sample.split()[0].lower() in TASK_VERBS else "meta"
 
 
 def admissible_line(count: int, sample: str) -> str:
@@ -621,7 +646,11 @@ def arm_label(
     if state_admissible:
         # The third renderer of one state (R194): the set the world *admits* rather than the set that has been tried.
         # Its own token for the reason the counted one has one -- three renderers, three treatments, three labels.
-        moved.append("ledger-admissible")
+        #
+        # R195 changed what the example may be, and a renderer whose *content rule* changed is a second treatment: the
+        # token carries the version so that R194's artefacts (`@ledger-admissible`, at `5e22a136`) and R195's cannot be
+        # pooled by a join that was told nothing. The flag is unchanged, because the family and the trigger are.
+        moved.append("ledger-admissible-task")
     elif state_ledger:
         # One token per renderer: R191's list and R193's counted list are two treatments, and a label that named both
         # `ledger` would make the join pool them into one rate -- the defect every other harness knob is labelled for.
@@ -892,6 +921,11 @@ def run_episode(
     ledger_fires = 0
     ledger_chars = 0
     attempted: "list[str]" = []
+    # R195's instrument: the index of the command each line was sent for. `attempted` is the history the renderers
+    # read, so recording it costs nothing the loop did not already hold; the one thing it does not record is *when*
+    # a renderer fired, and a cycle detector cannot ask "would a line have fired here" without that. One integer per
+    # fire, and `len(fire_turns) == ledger_fires` is the invariant that keeps the two counts from drifting.
+    fire_turns: "list[int]" = []
     # The window the last line named, so a turn whose history has not changed carries no line: a line repeated without a
     # change is a constant, and a constant in front of every turn is what R188 measured as inert (R193, AUDIT 34.279).
     ledger_window_seen: "tuple[str, ...] | None" = None
@@ -902,6 +936,11 @@ def run_episode(
     # written down is an estimate, which this lane has been wrong about twice in five rounds (AUDIT 34.282).
     admitted_sizes: "list[int]" = []
     admissible_sample = ""
+    # R195's content counters: what each line carried, classified at the moment it is sent. They sum to `ledger_fires`,
+    # which is the invariant that lets the ablation table quote a share instead of a sample (AUDIT 34.286).
+    admissible_task_fires = 0
+    admissible_meta_fires = 0
+    admissible_exampleless_fires = 0
     pack_entries: "int | None" = None
     # The rendered pack's length, as opposed to the prefix's. `prefix_chars` is the whole fixed prompt — examples,
     # system instruction and pack — so two arms of different lengths differ by a number that also contains the
@@ -1035,12 +1074,21 @@ def run_episode(
                     # so its admissible set is what the model needs, and `attempted` is not consulted at all. R194.
                     attempted.append(refused_here)
                     admitted_sizes.append(len(admissible))
+                    sample = admissible_example(admissible, refused_here)
                     if not admissible_sample:
-                        admissible_sample = admissible_example(admissible, refused_here)
-                    line = admissible_line(len(admissible), admissible_example(admissible, refused_here))
+                        admissible_sample = sample
+                    line = admissible_line(len(admissible), sample)
                     answer = f"{NO_OP}\n{line}"
                     ledger_fires += 1
                     ledger_chars += len(line) + 1
+                    fire_turns.append(len(attempted) - 1)
+                    # Counted with three boolean sums rather than a three-way branch: the rule cannot produce a meta
+                    # example any more, and a branch that cannot be taken is a branch no pass can test. The classifier
+                    # still distinguishes the case, so the counter would move if the rule ever regressed.
+                    kind_of_sample = example_kind(sample)
+                    admissible_task_fires += kind_of_sample == "task"
+                    admissible_meta_fires += kind_of_sample == "meta"
+                    admissible_exampleless_fires += kind_of_sample == "none"
                 elif state_ledger:
                     # A refused command is a command that did not move the world, so it is the same event the ledger
                     # answers on the other side of the parser: the model asked for something and got nothing. The
@@ -1057,6 +1105,7 @@ def run_episode(
                             ledger_fires += 1
                             ledger_chars += len(line) + 1
                             ledger_window_seen = window
+                            fire_turns.append(len(attempted) - 1)
             elif guard_commandless:
                 # The registered change, and the whole of it: the same answer, with the requirement named. The pack,
                 # the reader, the cap and the call count are untouched, so anything this arm moves is the loop being
@@ -1105,12 +1154,18 @@ def run_episode(
             # the condition coincide -- `ledger_fires` equals `invalid_actions` in all 822 armed games (AUDIT 34.284) --
             # and naming the admissible set is informative on either half, because the set is what would work here.
             admitted_sizes.append(len(admissible))
+            sample = admissible_example(admissible, action)
             if not admissible_sample:
-                admissible_sample = admissible_example(admissible, action)
-            line = admissible_line(len(admissible), admissible_example(admissible, action))
+                admissible_sample = sample
+            line = admissible_line(len(admissible), sample)
             heard = f"{last.rstrip()}\n{line}"
             ledger_fires += 1
             ledger_chars += len(line) + 1
+            fire_turns.append(len(attempted) - 1)
+            kind_of_sample = example_kind(sample)
+            admissible_task_fires += kind_of_sample == "task"
+            admissible_meta_fires += kind_of_sample == "meta"
+            admissible_exampleless_fires += kind_of_sample == "none"
         elif state_ledger and not done and (refused_by_world or moved_nothing(last)):
             window = ledger_window(attempted)
             if window and window == ledger_window_seen and ledger_counts:
@@ -1124,6 +1179,7 @@ def run_episode(
                     ledger_fires += 1
                     ledger_chars += len(line) + 1
                     ledger_window_seen = window
+                    fire_turns.append(len(attempted) - 1)
         messages.append({"role": "user", "content": heard})
         trajectory.append(heard.strip())
 
@@ -1148,6 +1204,11 @@ def run_episode(
         "thoughts": thoughts,
         "stalls": stalls,
         "actions": len(actions),
+        # The command history the renderers read, and the turn each line answered (R195). Both are recorded on every
+        # arm: the control's `fire_turns` is empty, and an empty list is a fact a join can check where a missing key
+        # would be a fact nobody can.
+        "commands": list(attempted),
+        "fire_turns": fire_turns,
         "invalid_actions": invalid,
         "off_space_actions": off_space,
         # A command the parser refused because the reply opened with a thought. Recorded beside the invalid
@@ -1186,6 +1247,10 @@ def run_episode(
         "admissible_mean": admissible_mean,
         "admissible_max": admissible_max,
         "admissible_sample": admissible_sample,
+        # R195's three counters, one per fire, summing to `ledger_fires`.
+        "admissible_task_fires": admissible_task_fires,
+        "admissible_meta_fires": admissible_meta_fires,
+        "admissible_exampleless_fires": admissible_exampleless_fires,
         # Which reader drove this game. In the record and not only in the summary, because a join that pooled two
         # channels would otherwise be undetectable per episode (AUDIT 34.262).
         "parser": parser,
@@ -1400,6 +1465,9 @@ def pass_summary(
                 / max(1, sum(1 for episode in episodes if episode.get("admissible_mean")))
             ),
             "admissible_max": max((episode.get("admissible_max", 0) for episode in episodes), default=0),
+            "admissible_task_fires": sum(episode.get("admissible_task_fires", 0) for episode in episodes),
+            "admissible_meta_fires": sum(episode.get("admissible_meta_fires", 0) for episode in episodes),
+            "admissible_exampleless_fires": sum(episode.get("admissible_exampleless_fires", 0) for episode in episodes),
             "off_space_actions": sum(episode["off_space_actions"] for episode in episodes),
             "usage": usage,
             "cache_hit_rate": round(usage["cache_hit_tokens"] / usage["prompt_tokens"], 4) if usage["prompt_tokens"] else None,
@@ -1711,6 +1779,12 @@ def main() -> int:
         print(
             f"  admissible      {summary['admissible_games']} games refused a command, mean set "
             f"{summary['admissible_mean']}, max {summary['admissible_max']}"
+        )
+        # R195's content reading, printed where the line is rendered rather than only in the join: a run whose examples
+        # were all `help` looked healthy in every other number this pass prints (AUDIT 34.286).
+        print(
+            f"  examples        {summary['admissible_task_fires']} of {summary['ledger_fires']} lines carried a task "
+            f"command ({summary['admissible_meta_fires']} meta, {summary['admissible_exampleless_fires']} count-only)"
         )
     print(f"  cache hit rate  {summary['cache_hit_rate']}")
     print(f"  prefix chars    {summary['prefix_chars_mean']}")

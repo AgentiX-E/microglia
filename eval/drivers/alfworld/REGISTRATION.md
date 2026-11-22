@@ -3531,3 +3531,54 @@ fallback, registered here so that a smaller arm is not a new round.
 R191's tiling; any game outside the 274.
 
 **Price ≈ ¥1.4**, two dispatches, off-peak, plus ¥0.00 for the instrument.
+
+## R195 — the example has to be a command, and the fallback R194 named is now a reading
+
+**What R194's own registration already said.** Its last clause: *"If the mean admissible set is larger than 20 commands,
+the line is unaffordable as written and the count-only form is the fallback, registered here so that a smaller arm is not
+a new round."* The measured mean is **26.4** (median 29, max 61), so the clause fired. But the round's own numbers refute
+its premise: the line cost **45 characters against the list's 103.7** — it was not unaffordable, it was *uninformative*.
+`help` appeared in **220 of 248** fires (88.7%), a task-verb command in **one** (AUDIT 34.286). The clause named the right
+direction for the wrong reason.
+
+**Treatment, one arm, one rule changed.** The trigger, the counters, the token's family and the economics are R194's. What
+changes is which command may be the example: **it must carry a task verb** (`take`, `put`, `clean`, `heat`, `cool`,
+`examine`), preferring one that shares the refused verb and the shortest among those; **if the set has no such command the
+line is the count alone**. No meta command and no movement-only command can be selected by construction. Labelled
+`@ledger-admissible-task`; R194's `@ledger-admissible` is a different content rule and the two are never pooled.
+
+```
+Admissible here: 29 commands.
+Admissible here: 29 commands, e.g. `take apple 1 from countertop 1`.
+```
+
+**Three counters, one per fire.** `admissible_task_fires`, `admissible_meta_fires`, `admissible_exampleless_fires`, per
+episode, summing to `ledger_fires`. `aggregate.py` refuses a slice where they do not sum, and prints the share as
+`examples <n> of <fires> lines carried a task command`. The counters are the reading R194 lacked: five readings measured
+lines, rate, characters and named games, and **none of them read the line**.
+
+**The record, at ¥0.00, in the same commit.** Every episode now carries `commands` and `fire_turns` (AUDIT 34.285), so the
+cycle question can be asked offline against an arm already paid for: at a fire, the window is `commands[:index + 1]`, and
+the games where a k-gram cycle exists but no line fired are a subtraction rather than a dispatch.
+
+**Registered readings, and for the first time a tiling accept/reject.**
+
+1. **The content is what it claims**: ≥ **80%** of fires carry a task-verb example (`admissible_task_fires / ledger_fires`),
+   and **0** fires carry a meta command. R194 read 88.7% meta.
+2. **The named games**: of `Laptop-328`, `Statue-216`, `Bowl-308`, **at least 2 win** *or* **at least 2 halve their
+   `invalid_actions`**. `≥ 2` accepts; `≤ 0` rejects; **1 of 3 is reported as undecided and closes nothing** — the region
+   R194's registration left undefined, where its acceptance needed 2 of 3 to win and its refutation needed 3 of 3 to lose.
+3. **No harm**: pooled rate **≥ 96.6%** (R192's band floor minus 1.0 pp, unchanged from R194 so the two are comparable).
+4. **Cost**: `ledger_chars` ≤ **31,370** (1.5× R194's 20,913) and `calls` ≤ **4,457** (R194's 4,245 × 1.05).
+5. **Everything else unchanged**: pack 551 ch × 274, bank `349213e8`, `any-line`, cap 50, `guard` on, the three counters
+   present in every episode and summing to `ledger_fires`, and `commands`/`fire_turns` in every episode.
+
+**Refutation.** **≤ 0 of 3** named games improve *and* pooled **< 96.6%** → the search-and-state family closes entirely:
+three renderers of one state, one trigger, none of them moved a cap-loss. A single-arm result inside R192's band is not a
+win however the counters read, and reading 1 failing means the arm did not render the registered treatment — which is a
+void, not a loss.
+
+**Void.** Any arm whose episodes carry no `admissible_task_fires`; any pass whose pack, channel, cap, guard or bank differs
+from R191's tiling; any game outside the 274; any episode whose counters do not sum to its `ledger_fires`.
+
+**Price ≈ ¥1.4**, two dispatches, off-peak, plus ¥0.00 for the counters and the record.

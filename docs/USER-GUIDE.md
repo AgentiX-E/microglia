@@ -5577,3 +5577,58 @@ admissible      always-in@kind+anyline+guard+ledger-admissible 134 games refused
 
 An armed episode without the instrument, a header that claims the renderer while its episodes say otherwise, and a header
 whose flag is not a flag are all refused — the same three refusals the other two renderers carry.
+
+### 32.38 What the arm asked for: `commands` and `fire_turns` on every episode
+
+Every episode written from this version on carries two fields that no reading in this lane had before:
+
+```
+"commands":   ["look", "take apple 1 from countertop 1", "take apple 3 from countertop 1", ...],
+"fire_turns": [0, 2, 3]
+```
+
+`commands` is the ordered history the state renderers read — every command the model produced that reached the driver,
+including the ones the world refused and the ones the parser dropped on the reference channel. `fire_turns` indexes it:
+entry `i` means the line sent on that turn answered `commands[i]`, so `len(fire_turns) == ledger_fires` and the window a
+line was rendered from is `commands[:index + 1]`.
+
+**Why they exist.** The next question this lane has to answer is whether a line that names the *cycle* — the repeated
+pair of commands, not the last three — would fire on games the current renderers leave alone. That question needs the
+commands, and the artefacts had none; answering it from a fresh dispatch would have cost a round for a question that is
+¥0.00 to ask offline once the record exists (AUDIT 34.285).
+
+**How to read them.** Nothing in the score depends on them, and an arm with no renderer still records both (`fire_turns`
+is empty). Two checks are worth running on any slice:
+
+- `len(commands) == actions + refused_actions` — the record agrees with the two counters that already existed;
+- `len(fire_turns) == ledger_fires` — the record agrees with the renderer it is supposed to explain.
+
+Both are asserted in `test_agent.py`, and a slice where either fails is a slice whose history and whose counters were
+written by different code.
+
+### 32.39 `@ledger-admissible-task`: the example has to be a command
+
+The admissible renderer's first version named the shortest command in the set, and the shortest command in an ALFWorld
+room is `help` — so 220 of 248 lines read `Admissible here: 29 commands, e.g. \`help\``. The rule is now **structural**:
+the example must carry a task verb (`take`, `put`, `clean`, `heat`, `cool`, `examine`); if the set has none, the line is
+the count alone.
+
+```
+Nothing happens.
+Admissible here: 29 commands.                       # no task command in the set: count only
+Admissible here: 29 commands, e.g. `take apple 1 from countertop 1`.
+```
+
+Three counters make the difference readable without opening an episode: `admissible_task_fires`,
+`admissible_meta_fires` and `admissible_exampleless_fires`, which sum to `ledger_fires`. `aggregate.py` prints them as a
+share and refuses a slice where they do not add up:
+
+```
+examples        always-in@…-admissible-task <task> of <fires> lines carried a task command (<share>%; <meta> meta, <count-only> count-only)
+```
+
+The three numbers are per arm and printed before any verdict, so a run whose lines were all count-only says so in the log
+rather than in a paragraph somebody has to reconstruct later.
+
+The label token is `@ledger-admissible-task`; R194's `@ledger-admissible` is a different content rule and the two are
+never pooled.

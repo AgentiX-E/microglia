@@ -3309,10 +3309,40 @@ class AdmissibleHintTest(unittest.TestCase):
         commands = ["open cabinet 1", "take apple 1 from countertop 1", "take apple 1", "look"]
         self.assertEqual(agent.admissible_example(commands, "take apple 9 from countertop 1"), "take apple 1")
 
-    def test_without_a_shared_verb_the_first_command_in_the_world_order_is_named(self):
-        commands = ["look", "inventory", "open cabinet 1"]
-        self.assertEqual(agent.admissible_example(commands, "go to shelf 2"), "look")
+    def test_without_a_task_verb_there_is_no_example_at_all(self):
+        # R194's fallback named the shortest command in the set, and `help` is four characters and first in the world's
+        # order: 220 of 248 fires in that round showed `help` (AUDIT 34.286). A fallback that is deterministic and
+        # uninformative is worse than no example, because the count is still true and the example costs characters.
+        commands = ["help", "look", "inventory", "go to shelf 2"]
+        self.assertEqual(agent.admissible_example(commands, "go to shelf 2"), "")
+        self.assertEqual(agent.admissible_example(commands, "take apple 9 from countertop 1"), "")
         self.assertEqual(agent.admissible_example([], "go to shelf 2"), "")
+
+    def test_a_meta_command_is_never_the_example_even_when_it_is_the_only_short_one(self):
+        # The exclusion is structural rather than a blacklist: the rule is "a command that carries a task verb", so a
+        # world with nothing else gets the count alone instead of `look`.
+        commands = ["help", "look", "inventory", "open cabinet 1"]
+        self.assertEqual(agent.admissible_example(commands, "help"), "")
+
+    def test_the_verb_match_wins_over_being_short(self):
+        self.assertEqual(
+            agent.admissible_example(["take apple 1 from countertop 1", "clean apple 1"], "clean apple 9"),
+            "clean apple 1",
+        )
+
+    def test_the_classifier_separates_a_task_command_from_everything_else(self):
+        # The three counters are sums of this classifier, so its three answers are what makes them sum to the fires.
+        # `help` is the case R194 rendered 220 times; it has to land in `meta` even though no rule now produces it.
+        self.assertEqual(agent.example_kind("take apple 1 from countertop 1"), "task")
+        self.assertEqual(agent.example_kind("help"), "meta")
+        self.assertEqual(agent.example_kind("go to bed 1"), "meta")
+        self.assertEqual(agent.example_kind(""), "none")
+
+    def test_the_task_verb_rule_covers_every_kind_the_split_publishes(self):
+        # `put`, `clean`, `heat`, `cool`, `examine` and `take` are the six kinds; a rule that only knew `take` would
+        # render an example for one game in six and the counter would still say it fired.
+        for verb in ("take", "put", "clean", "heat", "cool", "examine"):
+            self.assertEqual(agent.admissible_example([f"{verb} apple 1"], "go to shelf 1"), f"{verb} apple 1")
 
     def test_the_line_reaches_the_model_on_a_refused_turn_and_not_on_an_admitted_one(self):
         # The refusal is scripted: `take apple 9` is not in this world's admissible set, so the turn moves nothing and the
@@ -3344,12 +3374,12 @@ class AdmissibleHintTest(unittest.TestCase):
         self.assertEqual(episode["admissible_sample"], "")
 
     def test_the_flag_sets_its_own_label_token(self):
-        self.assertIn("ledger-admissible", agent.arm_label(
+        self.assertIn("ledger-admissible-task", agent.arm_label(
             "always-in", agent.DEFAULT_TOP_K, 0.0, gate_kind=True, parser="any-line",
             guard_commandless=True, state_admissible=True))
         self.assertEqual(
             agent.arm_label("always-in", agent.DEFAULT_TOP_K, 0.0, parser="any-line", state_admissible=True),
-            "always-in@anyline+ledger-admissible",
+            "always-in@anyline+ledger-admissible-task",
         )
         # And it is not the list's token: three renderers, three labels, or a join pools a treatment with its ablation.
         self.assertEqual(
@@ -3393,13 +3423,24 @@ class AdmissibleHintTest(unittest.TestCase):
             out.unlink(missing_ok=True)
         summary = payload["summary"]
         self.assertTrue(summary["state_admissible"])
-        self.assertEqual(summary["arm_label"], "none@ledger-admissible")
+        self.assertEqual(summary["arm_label"], "none@ledger-admissible-task")
         self.assertGreater(summary["ledger_fires"], 0)
         # The first turn's set is the world's opening one (four commands); every later turn's is the two the fake
         # reports after a step. Max sees the first, the mean sees the rest -- and both are the world's numbers.
         self.assertEqual(summary["admissible_max"], 4)
         self.assertEqual(summary["admissible_mean"], 2)
         self.assertTrue(payload["episodes"][0]["state_admissible"])
+        # R195's counters reach the header and sum to the fires. This world's opening set carries `take apple 1`, so the
+        # first fire renders a task example; every set after a step is `look`/`inventory`, so the rest are count-only.
+        # The split is the point: one arm can carry both kinds, and only a counter per kind can say how many of each.
+        self.assertEqual(summary["admissible_task_fires"], 1)
+        self.assertEqual(summary["admissible_meta_fires"], 0)
+        self.assertGreater(summary["admissible_exampleless_fires"], 0)
+        self.assertEqual(
+            summary["admissible_task_fires"] + summary["admissible_meta_fires"] + summary["admissible_exampleless_fires"],
+            summary["ledger_fires"],
+        )
+        self.assertEqual(payload["episodes"][0]["admissible_sample"], "take apple 1 from countertop 1")
 
     def test_the_flag_cannot_be_stacked_on_the_ledger_it_replaces(self):
         # Two renderers on one turn would send two lines for one event and make the arm unreadable against either. The
@@ -3412,6 +3453,222 @@ class AdmissibleHintTest(unittest.TestCase):
                 agent.main()
         finally:
             sys.argv = original_argv
+
+
+class CommandRecordTest(unittest.TestCase):
+    """The episode's command list, recorded so that a cycle can be counted from an artefact already paid for.
+
+    R193's gate met its condition 2 times in 479 fires, and the reading that depended on it was therefore a one-sided
+    test that passed on two events (AUDIT 34.281). The loops this driver meets are cycles over several commands, and
+    the artefacts could not tell a cycle from a repeat: the record kept `ledger_fires` and `observe_chars` per turn but
+    never the commands themselves (AUDIT 34.285). Recording them costs no call and no prompt character, and it is what
+    makes the next question -- *would a cycle-aware line have fired where the list did not?* -- answerable offline.
+
+    Two fields rather than one. `commands` is the history the renderers read (`attempted`), in order, including the
+    commands the world refused and the ones the parser dropped; `fire_turns` is the index of the command each line was
+    sent for, so a window at a fire is `commands[:index + 1]` with no inference about which turn it was.
+
+    What is asserted here: the record is order-preserving and complete, it agrees with the counters that already exist,
+    it indexes the command the line was rendered from, and it is empty rather than absent on an arm that sends no line
+    -- an instrument that is missing when it has nothing to say is an instrument a join cannot check.
+    """
+
+    def setUp(self):
+        self.examples = agent.load_examples()
+        self.original = agent.chat
+
+    def tearDown(self):
+        agent.chat = self.original
+
+    def drive(self, replies, ledger=True, world=None, parser="any-line", max_steps=50):
+        seen = []
+        script = list(replies)
+
+        def chat(messages, model, api_key, timeout):
+            seen.append([message["content"] for message in messages])
+            return script.pop(0), {"prompt_tokens": 10, "completion_tokens": 1}, 0
+
+        agent.chat = chat
+        episode = agent.run_episode(
+            world or FakeWorld(nothing_happens=True), "none", "model", self.examples, [], agent.Draw(1), max_steps, 3,
+            "deepseek-flash", "k", 1.0, parser=parser, state_ledger=ledger,
+        )
+        return episode, seen
+
+    def test_every_command_the_model_asked_for_is_recorded_in_order(self):
+        # Order is the content: the same three commands in another order is a different episode, and a set would lose
+        # exactly the signal a cycle detector reads.
+        episode, _seen = self.drive(
+            ["> look", "> take apple 1 from countertop 1", "> put apple 1 in/on cabinet 1"]
+        )
+        self.assertEqual(episode["commands"], ["look", "take apple 1 from countertop 1", "put apple 1 in/on cabinet 1"])
+
+    def test_a_command_the_world_refused_is_in_the_record_and_the_counters_still_add_up(self):
+        # `actions` counts a command handed to the world, which includes one the world then refuses: that refusal is
+        # `invalid_actions`, a fact about the action rather than about whether it was attempted. The record has to agree
+        # with both counters at once -- commands = actions + the ones the *parser* dropped -- or it is a third account
+        # of one episode.
+        episode, _seen = self.drive(
+            ["> take apple 1 from countertop 1", "> take apple 1 from countertop 1", "> put apple 1 in/on cabinet 1"]
+        )
+        self.assertEqual(len(episode["commands"]), 3)
+        self.assertEqual(episode["actions"], 3)
+        self.assertEqual(episode["invalid_actions"], 1)
+        self.assertEqual(len(episode["commands"]), episode["actions"] + episode["refused_actions"])
+
+    def test_a_command_the_parser_dropped_is_in_the_record_without_being_an_action(self):
+        # The other side of the same arithmetic: on the reference channel a reply whose first line is a thought has its
+        # command dropped, and the model was still answered for it. The ledger's window includes it (it is a command
+        # that was tried), and `actions` does not, which is why the record is `attempted` rather than `actions`.
+        episode, _seen = self.drive(
+            ["> think: I need the apple\n> take apple 1 from countertop 1", "> take apple 1 from countertop 1",
+             "> put apple 1 in/on cabinet 1"],
+            parser="reference",
+        )
+        self.assertEqual(episode["refused_actions"], 1)
+        self.assertEqual(episode["commands"][0], "take apple 1 from countertop 1")
+        self.assertEqual(len(episode["commands"]), episode["actions"] + episode["refused_actions"])
+
+    def test_the_index_names_the_command_the_line_was_rendered_from(self):
+        # The fire happened on `look` -- admitted, inert -- and the index is where that command sits. A reader that had
+        # to infer the turn from `observe_chars` would be inferring an index from an observation about a different thing.
+        episode, seen = self.drive(["> look", "> take apple 1 from countertop 1", "> put apple 1 in/on cabinet 1"])
+        self.assertEqual(episode["fire_turns"], [0])
+        self.assertEqual(episode["commands"][episode["fire_turns"][0]], "look")
+        self.assertIn("Already tried this episode: look.", seen[1][-1])
+
+    def test_the_line_names_the_window_the_index_points_at(self):
+        # The cross-check between the instrument and the renderer: at a fire, the line has to be a rendering of the
+        # commands the record says were tried up to that index, or the two are describing different histories.
+        episode, seen = self.drive(
+            [
+                "> look",
+                "> inventory",
+                "> take apple 1 from countertop 1",
+                "> take apple 1 from countertop 1",
+                "> put apple 1 in/on cabinet 1",
+            ]
+        )
+        index = episode["fire_turns"][-1]
+        expected = agent.ledger_line(episode["commands"][: index + 1])
+        self.assertIn(expected, seen[index + 1][-1])
+
+    def test_one_index_per_line(self):
+        # `fire_turns` is a second view of `ledger_fires`, so a disagreement means one of them counts an event the other
+        # does not -- the defect that makes a counter unusable as a denominator.
+        episode, _seen = self.drive(
+            ["> take apple 1 from countertop 1", "> take apple 1 from countertop 1", "> put apple 1 in/on cabinet 1"]
+        )
+        self.assertEqual(len(episode["fire_turns"]), episode["ledger_fires"])
+
+    def test_an_arm_that_sends_no_line_records_no_index_and_still_records_its_commands(self):
+        # The record is not the treatment: it is what the treatment is measured against, so it exists on both arms and
+        # only the index is empty. An absent key would make the join refuse a pairing it should accept.
+        episode, _seen = self.drive(
+            ["> look", "> take apple 1 from countertop 1", "> put apple 1 in/on cabinet 1"], ledger=False
+        )
+        self.assertEqual(episode["ledger_fires"], 0)
+        self.assertEqual(episode["fire_turns"], [])
+        self.assertEqual(episode["commands"][0], "look")
+
+    def test_the_record_cannot_outgrow_the_step_budget(self):
+        # One turn is at most one command, so a record longer than the cap would mean a turn was counted twice. This is
+        # the arithmetic that lets a release quote the artefact's size without measuring it.
+        episode, _seen = self.drive(
+            ["> look"] * 8, max_steps=3
+        )
+        self.assertEqual(episode["steps"], 3)
+        self.assertLessEqual(len(episode["commands"]), 3)
+
+    def test_the_record_does_not_change_what_the_model_reads(self):
+        # The one way a passive instrument can still be a treatment: if recording changed a message, the arm would be a
+        # different arm. The last message is the one the record could plausibly touch, so it is the one compared.
+        with_record, seen = self.drive(["> look", "> take apple 1 from countertop 1", "> put apple 1 in/on cabinet 1"])
+        self.assertEqual(seen[1][-1], "Nothing happens.\nAlready tried this episode: look.")
+        self.assertTrue(with_record["won"])
+
+
+
+class AdmissibleCountersTest(unittest.TestCase):
+    """R195's content counters: what the line actually carried, counted where it is sent.
+
+    R194 could not read its own renderer. The five registered readings measured lines, rate, characters and named games,
+    and the one field that would have shown the example was `help` in 89% of fires was an instrument added for pricing
+    rather than for content (AUDIT 34.286). Three counters make the next round's content reading a subtraction rather
+    than an inference, and they sum to `ledger_fires` so a distribution that does not add up is a test failure rather
+    than a paragraph somebody has to notice.
+    """
+
+    class MetaOnlyWorld(FakeWorld):
+        """A world whose admissible set is meta commands only -- the state R194's fallback rendered as `help`."""
+
+        def admissible(self):
+            return ["help", "look", "inventory"]
+
+    def setUp(self):
+        self.examples = agent.load_examples()
+        self.original = agent.chat
+
+    def tearDown(self):
+        agent.chat = self.original
+
+    def drive(self, replies, world=None):
+        script = list(replies)
+
+        def chat(messages, model, api_key, timeout):
+            return script.pop(0), {"prompt_tokens": 10, "completion_tokens": 1}, 0
+
+        agent.chat = chat
+        return agent.run_episode(
+            world or FakeWorld(), "none", "model", self.examples, [], agent.Draw(1), len(replies), 3,
+            "deepseek-flash", "k", 1.0, parser="any-line", state_admissible=True,
+        )
+
+    def test_the_three_counters_sum_to_the_fires(self):
+        episode = self.drive(
+            ["> take apple 9 from countertop 1", "> take apple 1 from countertop 1", "> put apple 1 in/on cabinet 1"]
+        )
+        total = (
+            episode["admissible_task_fires"]
+            + episode["admissible_meta_fires"]
+            + episode["admissible_exampleless_fires"]
+        )
+        self.assertGreater(episode["ledger_fires"], 0)
+        self.assertEqual(total, episode["ledger_fires"])
+
+    def test_a_world_with_a_task_command_renders_a_task_example(self):
+        # `take apple 9` is refused, the set holds `take apple 1 from countertop 1`, and the example keeps the verb.
+        episode = self.drive(
+            ["> take apple 9 from countertop 1", "> take apple 1 from countertop 1", "> put apple 1 in/on cabinet 1"]
+        )
+        self.assertEqual(episode["admissible_task_fires"], 1)
+        self.assertEqual(episode["admissible_meta_fires"], 0)
+        self.assertEqual(episode["admissible_exampleless_fires"], 0)
+
+    def test_a_world_with_no_task_command_renders_the_count_alone(self):
+        # The counter that would have caught R194: the same fire, classified as an example-less line rather than as a
+        # line carrying `help`. Neither counter increments -- the point is that no example was sent.
+        episode = self.drive(["> take apple 9 from countertop 1", "> take apple 9 from countertop 1"],
+                             world=self.MetaOnlyWorld())
+        self.assertGreater(episode["admissible_exampleless_fires"], 0)
+        self.assertEqual(episode["admissible_task_fires"], 0)
+        self.assertEqual(episode["admissible_meta_fires"], 0)
+
+    def test_an_arm_without_the_renderer_counts_nothing(self):
+        # The counters are the treatment's, not the episode's: a control that inherited a non-zero value would make the
+        # ablation table read as if it had been sent lines it never saw.
+        def chat(messages, model, api_key, timeout):
+            return "> take apple 1 from countertop 1", {"prompt_tokens": 10, "completion_tokens": 1}, 0
+
+        agent.chat = chat
+        episode = agent.run_episode(
+            FakeWorld(), "none", "model", self.examples, [], agent.Draw(1), 2, 3,
+            "deepseek-flash", "k", 1.0, parser="any-line",
+        )
+        self.assertEqual(episode["admissible_task_fires"], 0)
+        self.assertEqual(episode["admissible_meta_fires"], 0)
+        self.assertEqual(episode["admissible_exampleless_fires"], 0)
+
 
 
 if __name__ == "__main__":

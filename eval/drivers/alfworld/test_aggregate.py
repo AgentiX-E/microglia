@@ -2296,5 +2296,109 @@ class AdmissibleReportTest(unittest.TestCase):
         self.assertIn("contradicts", buffer.getvalue())
 
 
+class AdmissibleContentReportTest(unittest.TestCase):
+    """R195's content reading: what the line carried, summed at the counter rather than inferred from a sample.
+
+    R194 shipped `admissible_sample` — one sting per episode — and that field is the only reason the round's example was
+    visible to be wrong (AUDIT 34.286). A single sample cannot be a denominator, so R195 records three counters per
+    episode and this join refuses a slice where they do not add up to its own fire count: a distribution that does not
+    sum is a distribution whose shares mean nothing.
+    """
+
+    def setUp(self):
+        self.paths = []
+
+    def tearDown(self):
+        for path in self.paths:
+            path.unlink(missing_ok=True)
+
+    def write(self, name: str, payload: dict) -> Path:
+        path = HERE / name
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        self.paths.append(path)
+        return path
+
+    def run_main(self, argv):
+        original = sys.argv
+        sys.argv = ["aggregate.py"] + argv
+        try:
+            return aggregate.main()
+        finally:
+            sys.argv = original
+
+    def slice_of(self, name: str, task: int, meta: int, exampleless: int, fires: int) -> Path:
+        return self.write(
+            name,
+            {
+                "summary": summary("always-in", state_admissible=True, arm_label="always-in@ledger-admissible"),
+                "episodes": [
+                    episode(
+                        "g1", True, state_admissible=True, admissible_mean=6, admissible_max=9,
+                        admissible_sample="take apple 1", ledger=True, ledger_fires=fires, ledger_chars=120,
+                        admissible_task_fires=task, admissible_meta_fires=meta,
+                        admissible_exampleless_fires=exampleless,
+                    )
+                ],
+            },
+        )
+
+    def control(self, name: str) -> Path:
+        """The other half of the pair: `--compare` names two arms, and a one-arm join is refused before any reading."""
+        return self.write(
+            name,
+            {
+                "summary": summary("always-in", arm_label="always-in@ledger", state_ledger=True),
+                "episodes": [episode("g1", True, ledger=True, ledger_fires=2, ledger_chars=74)],
+            },
+        )
+
+    def test_the_share_of_lines_that_carried_a_task_command_is_printed(self):
+        left = self.slice_of("content-left.json", task=2, meta=0, exampleless=1, fires=3)
+        right = self.control("content-left-control.json")
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            self.run_main([
+                "--input", str(left), "--input", str(right), "--expect", "0",
+                "--compare", "always-in@ledger-admissible,always-in@ledger", "--expect-ledger", "on,on",
+            ])
+        printed = buffer.getvalue()
+        self.assertIn("task", printed)
+        self.assertIn("2 of 3", printed)
+
+    def test_counters_that_do_not_sum_to_the_fires_are_refused(self):
+        left = self.slice_of("content-short.json", task=1, meta=0, exampleless=0, fires=3)
+        right = self.control("content-short-control.json")
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer), self.assertRaises(SystemExit):
+            self.run_main([
+                "--input", str(left), "--input", str(right), "--expect", "0",
+                "--compare", "always-in@ledger-admissible,always-in@ledger", "--expect-ledger", "on,on",
+            ])
+        self.assertIn("do not sum to", buffer.getvalue())
+
+    def test_an_arm_written_before_the_counters_is_not_read_as_zero(self):
+        # R194's slices carry the instrument and no counters. Reading them as "0 task lines" would publish a share over
+        # an arm that never counted, which is the failure `refused_counted` and `guard_counted` exist to prevent.
+        left = self.write(
+            "content-old.json",
+            {
+                "summary": summary("always-in", state_admissible=True, arm_label="always-in@ledger-admissible"),
+                "episodes": [
+                    episode("g1", True, state_admissible=True, admissible_mean=6, admissible_max=9,
+                            admissible_sample="help", ledger=True, ledger_fires=2, ledger_chars=74)
+                ],
+            },
+        )
+        right = self.control("content-old-control.json")
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            self.run_main([
+                "--input", str(left), "--input", str(right), "--expect", "0",
+                "--compare", "always-in@ledger-admissible,always-in@ledger", "--expect-ledger", "on,on",
+            ])
+        self.assertIn("not counted", buffer.getvalue())
+
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
