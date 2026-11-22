@@ -2081,6 +2081,25 @@ only.` — one line, no extra call, and conditional on the state the episode is 
 enters a loop. It is a **harness** knob rather than an arm: it travels in the label (`@guard`), the header and every
 episode, and a join refuses to pool two guard states until it is told it is comparing them.
 
+**Utility score** — The admission family's offline estimate of what an entry is worth, computed with no rollout:
+specificity x abstractness (`arXiv:2608.20274`). Specificity is the share of the text that is command notation (quoted
+spans, `<placeholders>`); abstractness is the share of the words that are frame words (`if`, `before`, `every`,
+`instead`). Both are rates, so neither can be bought with length, and both are order-free, because R188 measured a
+sentence against its word-shuffled placebo and found no difference. **On this corpus the score is not a gate**: its whole
+range is 1.62x against a 9.7 pp minimum detectable effect, and the rank correlation over the three comparable banks is
++0.500 with one inversion (R190, AUDIT 34.277).
+
+**Reach** — Which task types a treatment actually touches, as distinct from which ones its words mention. Measured two
+ways in this record: by tag set (R186 versus R187 hold identical sentences and differ by 3.65 pp across two draws) and by
+mechanism (R177's entry names neither `heat` nor `clean` and gains 28.2 and 22.4 pp on them, because what it carries is a
+precondition). A lexical test — does the entry name this kind's operation — reproduces the sign on three of six kinds,
+which is why reach is printed beside a score and never folded into one.
+
+**Quantity (of a delta)** — What a measured delta is an instance of: *bank against no bank in one dispatch*, *bank against
+its own word-permuted placebo*, and so on. Two deltas are only points on one axis if they are the same quantity, and a
+rank correlation is computed inside one. R190's first registration mixed them and included a row from a run that drove no
+games; `measured-effects.json` now carries `quantity` per row and the scorer refuses a row without it (AUDIT 34.276).
+
 **Engagement ledger** — The three counters that make a conditional intervention checkable: `guard_fires` (the line sent),
 `guard_checked` (fires a later reply answered), `guard_relapsed` (checked fires answered by another commandless reply).
 R189 read **826 / 825 / 0**: the model answered every fire with a command, which is the mechanism clause; the effect is a

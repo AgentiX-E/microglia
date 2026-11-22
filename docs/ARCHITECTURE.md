@@ -2994,3 +2994,38 @@ command every time it is asked — and the effect clause is a separate number: t
    than the control: they are search failures, and the guard spends the turns it saves on a world that does not contain
    the object. The format channel took the parser's refusals (8.45), the guard took the loop, and search is what is left
    for an instance-state mechanism to reach.
+
+### 8.53 The offline admission scorer: an instrument whose range is checked before it is trusted
+
+The lane's harness components have all been scored by buying games. R190 adds the one component that is scored **before**
+anything is bought: `scripts/score_bank.py`, which reads a bank and returns the literature's admission score for the pack
+each task type would render.
+
+**The unit is the pack, and the selection is imported.** A bank is a set of entries; a pack is what one game reads — the
+entries whose `kinds` admit that game's task type, under the untagged ones — and the scorer calls `agent.applicable` and
+`agent.render_pack` to build it rather than re-implementing either. That is not tidiness: the rendered lengths it
+reproduces (551, 814, 489, 324–1,318) are the only evidence that it is scoring the text the model was shown.
+
+| factor | what it measures | why it is a rate |
+| --- | --- | --- |
+| **specificity** | the share of the text inside quoted commands and `<placeholders>` | so a longer sentence cannot buy it |
+| **abstractness** | the share of the words that are frame words (`if`, `before`, `every`, `instead`, …) | so padding cannot buy it either |
+| **utility** | the product | either factor can zero the score, for its own reason |
+
+**Both factors are order-free, and that is a constraint rather than a simplification.** R188 measured a sentence against
+its own word-shuffled placebo and read the difference as null, so a scorer that separated them would be reporting a
+signal the corpus denies. The suite pins this: the placebo is first verified to be a permutation of the same bag, and
+then the score is required to be identical to nine decimals. A test that passes because two texts are unrelated would
+prove nothing.
+
+**Reach is printed beside the score and is not part of it.** `covers(text, kind)` asks a lexical question — does the entry
+name the operation this task type ends on — and R177's per-kind table shows it reproducing the sign on three of six
+cells. `heat` and `clean` gain 28.2 and 22.4 pp while the entry names neither, because its mechanism is *open the
+container before taking* and not a word it uses. So the column exists to be read and not to be gated on: reach is a
+property of the treatment, and the treatment includes the tag set.
+
+**What the scorer refuses, and why each refusal is a defect this record has had.** A bank with no entries (a bank that
+renders nothing is not a treatment); an entry that is blank (an empty string scores zero, and a missing entry was not
+read); an effects table row without the comparison it is (the first registration compared a bank-vs-control delta with a
+bank-vs-placebo delta and a row that belonged to a run which drove no games); and the correlation itself below three
+points (two points give ±1 by arithmetic).

@@ -5407,3 +5407,61 @@ So when you read a loss after this round, ask three questions in order:
    and `guard_relapsed` says whether the model listened.
 3. **Did it end at the cap with almost no thoughts?** Then it is neither — it is a game whose admissible set did not
    contain the answer the model was looking for, and the honest label is a corpus limit rather than a memory failure.
+
+### 32.33 Scoring a bank before you buy it: `scripts/score_bank.py`
+
+A pass costs money and a score does not, so the cheapest experiment in this repository is the one that reads a bank and
+tells you what the literature's admission score thinks of it.
+
+```bash
+python3 scripts/score_bank.py eval/drivers/alfworld/banks/*.json
+python3 scripts/score_bank.py --verbose eval/drivers/alfworld/banks/bank-putscope-2.json
+python3 scripts/score_bank.py --effects eval/drivers/alfworld/measured-effects.json <banks...>
+```
+
+**What it prints, and the unit it prints it for.** One row per bank: the mean of the specificity, abstractness and utility
+of the **packs** its six task types would render, the rendered lengths, and which task types read anything at all. A pack
+is the unit because a pack is the treatment — the bank's entries selected by their `kinds`, rendered by the driver's own
+function, so `--verbose` shows one line per entry beneath the row.
+
+**How to read the two factors.**
+
+- **specificity** — the share of the text inside quoted commands (`"put"`, `"move <object> to <receptacle>"`) and
+  `<placeholders>`. It is a rate, so padding a sentence lowers it. A general instruction scores **zero**, which is the
+  honest reading of a sentence that names no command.
+- **abstractness** — the share of the words that are frame words. A bare imperative states an incident and scores zero; a
+  conditional states a rule and does not.
+- **utility** — their product. Either factor can zero it, for its own reason.
+
+**What the score is not.** It is not a gate, and R190 is the round that says why. Over the three banks this record has
+measured against a control in one dispatch, the rank correlation is **+0.500** against a registered 0.6, with one
+inversion; and the score's entire range on this corpus is **1.62x** against a minimum detectable effect of **9.7 pp**, so
+the hypothesis is being tested below the resolution of the ruler. Do not admit on this number. Use it to see whether two
+candidates are even distinguishable.
+
+**Reach is the column that matters, and it is not a score.** `covers` asks whether the entry names the operation a task
+type ends on. On this corpus it agrees with the measured sign three times out of six: `heat` and `clean` gained 28.2 and
+22.4 pp from an entry that names neither, because what it carries is a precondition rather than a vocabulary. If you are
+choosing between two banks, read the per-kind deltas in `measured-effects.json` — not the `covers` column, which exists
+to show you where a lexical test breaks.
+
+**If you add a bank to the effects table**, every row needs `quantity` and `comparison`: what kind of delta it is, and the
+sentence that says which two things were compared. The scorer refuses a row without them, because R190's first
+registration correlated a bank-against-control delta with a bank-against-placebo delta and a row from a run that drove no
+games, which is a correlation over nothing.
+
+### 32.34 The three things a bank can be wrong about, and which one a score can see
+
+After R190 you can classify a bank's failure before paying for it, in this order:
+
+1. **It names no command.** `specificity` is zero. R188's turn-budget sentence is the example: 259 characters, read as
+   inert by 274 games against its own word-shuffled placebo at p = 0.66. This is the one failure a score catches.
+2. **It names a command its games do not need.** `covers` is false for the task types carrying the entry, and the
+   mechanism does not reach them either. R177's `examine` cell is the example: −12.9 pp on 31 games, twice.
+3. **Its tags reach too far.** The entry is right and the tag set is wrong, so every game in the tag set carries a
+   treatment written for one kind. R187 is the example: the same two sentences as R186, a moved boundary, and 254 wins
+   against 264. **No score that reads only the text can see this one** — and it is the failure that costs the most,
+   because the entry looks excellent in every textual test.
+
+The scorer sees (1) and half of (2). It cannot see (3), and (3) is why `--gate-kind` and the per-kind table are part of
+the instrument rather than of the report.

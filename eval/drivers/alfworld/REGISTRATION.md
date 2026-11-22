@@ -3031,3 +3031,97 @@ off-peak in all sixteen summaries. The guard is **cheaper than the control it is
 **Next: R190 — the utility score, offline.** No purchase. The admission family's other half: predict *which* entry hurts,
 using the four banks this lane has already measured (551 ch with 5 heavy and 10 losses, 814 ch inert, 659 ch, 197 ch).
 That is the project's own question — memory that helps and memory that hurts — on data already paid for.
+
+## R190, amendment 1 — the score is undetermined at the resolution this lane can afford, and its reach variant is already refuted
+
+No dispatch. **Twenty-one banks scored offline, 0 model calls, ¥0.00.** `scripts/score_bank.py` implements the
+literature's admission score (`arXiv:2608.20274`: utility = specificity x abstractness, no rollout) over the **pack the
+driver renders**, importing `applicable` and `render_pack` rather than re-deriving them, and
+`eval/drivers/alfworld/measured-effects.json` holds every measured delta with the comparison it is.
+
+**The instrument reproduces the record before it is used.** Rendered lengths come out of the scorer exactly as the lane
+published them: 551 characters for `bank-putscope-2` on all six kinds, 814 for `bank-turnbudget-1`, 489 for
+`bank-putmove-1`, 1,312–1,318 for the four-entry banks. A score over a text nobody was shown is a score of nothing, so
+the test that pins this is the first one in the suite.
+
+| # | registered | read | verdict |
+| --- | --- | --- | --- |
+| 1 | rho >= 0.6 over four banks, the score computed blind | **rho = +0.500 over three banks**; the fourth row had no measured delta at all | **failed**, on a table that was not four rows |
+| 2 | the 551-character bank scores above the 814-character one on specificity | **0.0708 against 0.0479**, a gap of 32.4% where the extra sentence is 31.8% of the pack | **held** |
+| 3 | permuting an entry's words moves the score by <= 0.05 | **0.000**, to nine decimals, on a placebo verified to be a permutation of the same bag | **held**, non-vacuously |
+
+**Refutation clause: not triggered.** rho < 0.3 was the clause and rho is +0.500. The reading above it (>= 0.6) also
+failed. The round is therefore neither a confirmation nor a refutation, and the reason is arithmetic rather than
+rhetorical — see below.
+
+### Reading 1's table was three quantities and one artefact
+
+The registration named four banks. Three of them have a delta that can be compared, and they are **three different
+quantities**:
+
+| bank | delta | what the delta is | round |
+| --- | --- | --- | --- |
+| `bank-putscope-2` | **+24.45 pp** | bank against `none`, one dispatch, 274 games | R186 |
+| `bank-putmove-1` | **+21.90 pp** | bank against `none`, one dispatch, 274 games | R177 |
+| `bank-perkind-6` | **+6.72 pp** | bank against `none`, one dispatch, **134** games | R175 |
+| `bank-turnbudget-1` | **-0.73 pp** | bank against **its own word-permuted placebo**, 274 games | R188 |
+| `bank-crosskind-44774801298` | **—** | the file is an **artefact of a run that drove no games**: `calls: 4`, no episodes, and 1,166 rendered characters against the 659 the registration quotes | R177 fixture |
+
+So the correlation runs over the three rows where one quantity varies, and the fourth is reported beside it as the
+one-point experiment it is. `measured-effects.json` now carries `quantity` per row and `score_bank.py` refuses a row
+without it, because a correlation over a table of mixed deltas is a correlation over nothing (AUDIT 34.276).
+
+### rho = +0.500 and why it cannot be bought up
+
+The inversion is one adjacent pair: `bank-putmove-1` scores **0.00818** and measured +21.90, `bank-putscope-2` scores
+**0.00601** and measured +24.45. A 36% higher score and 2.55 pp lower.
+
+That pair also shows why the registration's 0.6 was not reachable at any affordable price. **The score's whole range on
+this corpus is 1.62x** — 0.00544 (`bank-putmove-line-1`) to 0.00881 (`bank-putprecond-1`) among the single-entry
+551-character banks — while this lane's minimum detectable effect on one dispatch is **9.7 pp**. Two banks a factor of
+1.6 apart on the score cannot be ordered by a measurement whose resolution is 9.7 pp, and no bank in the corpus sits
+further apart than that, because they all name a command. **The statistic is not refuted; it is unfalsifiable at this
+resolution**, and a gate that cannot be validated is not shippable (AUDIT 34.277).
+
+### The reach variant is refuted, and R177's own table does it
+
+The score reads content. The half of admission that decides the sign in this record is **reach**, so the scorer also
+computes a lexical reach column — does the entry name the kind's own terminal operation — and R177's per-kind table is
+the test:
+
+| kind | the sentence, 274 games | entry names it | |
+| --- | --- | --- | --- |
+| `cool` | 43/46, **+30.4 pp** | no | **disagrees** |
+| `heat` | 38/39, **+28.2 pp** | no | **disagrees** |
+| `put` | 24/59, +27.1 pp | yes | agrees |
+| `puttwo` | 38/41, +24.4 pp | yes | agrees |
+| `clean` | 53/58, **+22.4 pp** | no | **disagrees** |
+| `examine` | 27/31, **-12.9 pp** | no | agrees |
+
+**Three of six.** The entry names neither `heat` nor `clean` and gains 28.2 and 22.4 pp on them, because the mechanism
+it carries is *open the container before taking anything out of it* — a precondition that `heat` and `clean` games need
+and that the entry's vocabulary never mentions. `examine` is the cell where the two agree, and it agrees for the reason
+R177 gave: an `examine` game has no placement step for the repair to reach.
+
+So a vocabulary test cannot be the gate. The lesson R181 paid ¥2.24 to learn — *an entry pays where its referent is the
+failing step* — is now measured a second way, offline, and it says the same thing: **reach is a mechanism, not a word
+list.**
+
+### The counterexample the round found for free
+
+`bank-putscope-2` and `bank-putscope-3` hold the same two sentences **byte for byte** and differ only in which kinds each
+is tagged to. Their entry scores are therefore identical to the digit (0.01271 and 0.02141). Their pack means are not:
+**0.00601 against 0.00769, +28.0%**, because a pack is a selection and the tags select. The record's two readings of
+those banks run 3.65 pp the other way, 264 against 254 — inside the five-game band this lane has measured between draws,
+so it is recorded rather than claimed.
+
+That is the finding in one pair of files: the only variation the score can see between two content-identical treatments
+is tag-driven, the score has no way to know it, and the reading it does produce is not corroborated by anything the
+record measures.
+
+### Cost
+
+**¥0.00.** No dispatch, no model call, no embedding. The round is 41 tests and a table.
+
+**Next: R191 — instance state, the one family the pack cannot reach.** The four games R189's guard lost all ended at the
+environment's 50-step cap: search failures with the loop already removed. ¥4.2, registered in `ROADMAP.md`.

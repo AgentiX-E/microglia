@@ -641,8 +641,8 @@ skeleton is the competitor's own, transliterated: the system line, the two-examp
 split into alternating turns, and the parser's four branches — so an arm changes what sits *above* the transcript
 and nothing else. Three zero-cost readings hold it in place: `--policy seed` reproduces `floor.py` game for game
 (same wins, steps, action digests, observation fingerprints) and the `agreement` job fails on a single field;
-**637 unit tests at 99.1% line-and-branch coverage, every module at or above 95%** (`agent.py` and `aggregate.py`
-at 99.8%), cover the parser, the split,
+**678 unit tests at 99.1% line-and-branch coverage, every module at or above 95%** (`agent.py` and `aggregate.py`
+at 99.8%, the offline scorer at 100%), cover the parser, the split,
 the shard arithmetic, the bill and the loop itself; and a test asserts that `none` and `always-in` differ at
 exactly one message index. A second **channel** — `--parser any-line`, which executes the command the first-line rule
 refuses — is a field in every episode, a token in every label and a span `aggregate.py` refuses to pool until it is
@@ -650,7 +650,14 @@ named, because a harness is not an arm. The same is true of the **turn guard** (
 reply that carried no command with one line naming the requirement instead of `OK.`: it carries `@guard` in the label and
 a three-counter ledger (`fires` / `checked` / `relapsed`) in every episode, so an arm that was armed and never fired can
 be told from one that was never armed — a guarded arm costs **$0.1946 against its control's $0.2152** and wins **8 of
-the 10 games** the control loses to narration. A model reply that
+the 10 games** the control loses to narration.
+
+The one component that is scored **before** anything is bought is `scripts/score_bank.py`, which reads a bank and
+returns the literature's admission score for the pack each task type would render — specificity x abstractness, with no
+model call. It reproduces every rendered length this record has published, and R190 is what it says about its own
+usefulness: over the three banks measured against a control in one dispatch the rank correlation is **+0.500** against a
+registered 0.6, because the score's whole range on this corpus (1.62x) sits below the lane's 9.7 pp resolution. Use it to
+see whether two candidates are distinguishable; do not admit on it. A model reply that
 never produces an action fails the run rather than scoring zero — a zero would be a number about the prompt's
 syntax wearing the costume of a number about memory.
 
