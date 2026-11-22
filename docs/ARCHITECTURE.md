@@ -3177,8 +3177,10 @@ assumption. It refuses a slice where that fails (a fire that is not a refusal ma
 record, or where a game appears in two shards. Each of those failures would otherwise produce a number rather than an
 error.
 
-**What the first read decided.** Over R195's 274 games: 195 accepted repeats in 146 games, but in only **3 of the 8
-losses**; five losses end at 49–50 commands with no repeat at all. The mechanism's ceiling is therefore +3 games = **1.09
+**What the first read decided.** Over R195's 274 games: 195 accepted repeats, of which **177 are loops** (a repeat of an
+already-accepted command) in 136 games and 18 are retries — a command refused at a distance and accepted after walking
+over, which is progress rather than a cycle. Only **3 of the 8 losses** carry a loop; five end at 49–50 commands with no
+repetition at all. The mechanism's ceiling is therefore +3 games = **1.09
 pp** against a paired **mde of 2.29 pp**, so the dispatch it was built to justify was not bought (AUDIT 34.288). The
 reader is the lane's first **ceiling instrument**: it prices a treatment before the treatment is paid for, in the same way
 `score_bank.py` prices a bank and `--state-admissible`'s instrument priced a line.

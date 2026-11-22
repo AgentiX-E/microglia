@@ -25,7 +25,8 @@ a fact about the renderer that a fire count alone would have hidden.
 
 **Three measures, because "a repeat" is not one thing.** A *repeat* is any turn whose command appeared
 earlier; an *accepted repeat* is one the world did not refuse, which is the only kind a refusal-triggered
-line cannot see. A *chain* is the same command `k` turns apart for consecutive turns (`go to countertop 1`,
+line cannot see -- and of those, a **loop** repeats a command the world had already admitted while a **retry**
+repeats one it had refused until now, and only the loop is the event a line should name. A *chain* is the same command `k` turns apart for consecutive turns (`go to countertop 1`,
 `look`, `go to countertop 1`, `look`), which is the shape a two-room loop takes and which a repeat count
 undercounts. The price is the rendered line's characters, summed, because the whole family is priced per
 character and an unpriced proposal is the failure AUDIT 34.282 records twice.
@@ -74,18 +75,23 @@ def refused_turns(episode: dict) -> "set[int]":
     return set(episode["fire_turns"])
 
 
-def accepted_repeats(commands: "list[str]", refused: "set[int]") -> "list[tuple[int, int]]":
-    """Every turn that re-issued an accepted command, with the occurrence number of that command.
+def accepted_repeats(commands: "list[str]", refused: "set[int]") -> "list[tuple[int, int, str]]":
+    """Every turn that re-issued an accepted command: its occurrence number, and whether it is a loop.
 
-    A repeat whose *earlier* occurrence was refused is excluded for free: the world's verdict on a command
-    does not depend on when it is asked, so such a turn is refused too and therefore is in `refused`.
+    A **loop** repeats a command the world had already *accepted* -- the model did something, nothing moved,
+    and it did it again. A **retry** repeats a command whose earlier attempts were all *refused*: the
+    admissibility of a command is state-dependent (a `take` refused at a distance is accepted after walking
+    over), so a retry that lands is progress rather than a cycle, and a line that called it a repetition
+    would be wrong about the one thing it names. The two are counted separately because only the loop is the
+    event a refusal trigger cannot see.
     """
     seen: "dict[str, int]" = {}
     repeats = []
     for turn, command in enumerate(commands):
         seen[command] = seen.get(command, 0) + 1
         if seen[command] > 1 and turn not in refused:
-            repeats.append((turn, seen[command]))
+            earlier = [index for index, other in enumerate(commands[:turn]) if other == command]
+            repeats.append((turn, seen[command], "retry" if all(index in refused for index in earlier) else "loop"))
     return repeats
 
 
@@ -160,6 +166,7 @@ def read(episodes: "list[dict]") -> dict:
         commands = commands_of(episode)
         refused = refused_turns(episode)
         repeats = accepted_repeats(commands, refused)
+        loops = [item for item in repeats if item[2] == "loop"]
         rows.append(
             {
                 "game": episode.get("gamefile", "?"),
@@ -167,17 +174,20 @@ def read(episodes: "list[dict]") -> dict:
                 "commands": len(commands),
                 "refused": len(refused),
                 "accepted_repeats": len(repeats),
-                "chars": sum(len(line_for(commands[turn], count)) + 1 for turn, count in repeats),
+                "looped": len(loops),
+                "retried": len(repeats) - len(loops),
+                "chars": sum(len(line_for(commands[turn], count)) + 1 for turn, count, _ in loops),
                 "period_two": longest_run(commands, 2),
                 "period_three": longest_run(commands, 3),
                 "most_repeated": max([commands.count(command) for command in set(commands)] or [0]),
-                "sample": line_for(commands[repeats[0][0]], repeats[0][1]) if repeats else "",
+                "sample": line_for(commands[loops[0][0]], loops[0][1]) if loops else "",
             }
         )
 
     repeats = sum(row["accepted_repeats"] for row in rows)
+    loops = sum(row["looped"] for row in rows)
     lost = [row for row in rows if not row["won"]]
-    lost_with = [row for row in lost if row["accepted_repeats"]]
+    lost_with = [row for row in lost if row["looped"]]
     return {
         "episodes": len(rows),
         "won": len(rows) - len(lost),
@@ -185,12 +195,14 @@ def read(episodes: "list[dict]") -> dict:
         "commands": sum(row["commands"] for row in rows),
         "refused": sum(row["refused"] for row in rows),
         "accepted_repeats": repeats,
-        "games_with_repeat": len([row for row in rows if row["accepted_repeats"]]),
+        "looped": loops,
+        "retried": repeats - loops,
+        "games_with_repeat": len([row for row in rows if row["looped"]]),
         "lost_with_repeat": len(lost_with),
         "repeat_share": 100.0 * repeats / sum(row["commands"] for row in rows) if rows else 0.0,
         "headroom": 100.0 * len(lost_with) / len(lost) if lost else 0.0,
         "chars": sum(row["chars"] for row in rows),
-        "chars_per_line": sum(row["chars"] for row in rows) / repeats if repeats else 0.0,
+        "chars_per_line": sum(row["chars"] for row in rows) / loops if loops else 0.0,
         "longest_period_two": max([row["period_two"] for row in rows] or [0]),
         "longest_period_three": max([row["period_three"] for row in rows] or [0]),
         "most_repeated": max([row["most_repeated"] for row in rows] or [0]),
@@ -218,12 +230,12 @@ def report(reading: dict) -> "list[str]":
     lines = [
         f"episodes {reading['episodes']:,}  won {reading['won']:,}  lost {reading['lost']:,}",
         f"commands {reading['commands']:,}  refusals {reading['refused']:,}",
-        f"accepted repeats {reading['accepted_repeats']:,} ({reading['repeat_share']:.2f}% of commands)  "
+        f"accepted repeats {reading['accepted_repeats']:,} -- {reading['looped']:,} loops, {reading['retried']:,} retries  "
         f"games with one {reading['games_with_repeat']:,} ({100.0 * reading['games_with_repeat'] / reading['episodes']:.1f}%)",
         f"headroom {reading['lost_with_repeat']:,} of {reading['lost']:,} losses "
-        f"({reading['headroom']:.1f}%) carried an accepted repeat",
+        f"({reading['headroom']:.1f}%) carried a loop",
         f"price {reading['chars']:,} characters over "
-        f"{reading['accepted_repeats']:,} lines ({reading['chars_per_line']:.1f} chars/line)",
+        f"{reading['looped']:,} lines ({reading['chars_per_line']:.1f} chars/line)",
         f"chains {reading['longest_period_two']} turns repeating two back, "
         f"{reading['longest_period_three']} three back, most repeated {reading['most_repeated']}",
     ]
@@ -235,12 +247,12 @@ def report(reading: dict) -> "list[str]":
 def detail(reading: dict) -> "list[str]":
     """One row per game that repeated an accepted command, worst first: the corpus's own shortlist."""
     rows = [row for row in reading["rows"] if row["accepted_repeats"]]
-    rows.sort(key=lambda row: (-row["accepted_repeats"], row["game"]))
+    rows.sort(key=lambda row: (-row["looped"], -row["retried"], row["game"]))
     return [
-        f"{'game':<56} {'won':>3} {'cmds':>4} {'rep':>3} {'p2':>3} {'p3':>3} {'chars':>5}"
+        f"{'game':<56} {'won':>3} {'cmds':>4} {'loop':>4} {'retry':>5} {'p2':>3} {'p3':>3} {'chars':>5}"
     ] + [
-        f"{row['game'][-56:]:<56} {str(row['won']):>3} {row['commands']:>4} {row['accepted_repeats']:>3} "
-        f"{row['period_two']:>3} {row['period_three']:>3} {row['chars']:>5}"
+        f"{row['game'][-56:]:<56} {str(row['won']):>3} {row['commands']:>4} {row['looped']:>4} "
+        f"{row['retried']:>5} {row['period_two']:>3} {row['period_three']:>3} {row['chars']:>5}"
         for row in rows
     ]
 

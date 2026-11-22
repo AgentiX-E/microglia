@@ -641,7 +641,7 @@ skeleton is the competitor's own, transliterated: the system line, the two-examp
 split into alternating turns, and the parser's four branches — so an arm changes what sits *above* the transcript
 and nothing else. Three zero-cost readings hold it in place: `--policy seed` reproduces `floor.py` game for game
 (same wins, steps, action digests, observation fingerprints) and the `agreement` job fails on a single field;
-**794 unit tests at 99.1% line-and-branch coverage, every module at or above 95%** (`agent.py` 99.9% of lines and
+**798 unit tests at 99.1% line-and-branch coverage, every module at or above 95%** (`agent.py` 99.9% of lines and
 98.5% of branches, `aggregate.py` 99.5% / 98.1%, `cycles.py` 99.1% / 97.7%, the offline scorer at 100%), cover the
 parser, the split, the shard arithmetic, the bill, the cycle reader and the loop itself; and a test asserts that `none` and `always-in` differ at
 exactly one message index. A second **channel** — `--parser any-line`, which executes the command the first-line rule
@@ -686,9 +686,10 @@ rate and 0.0 pp of success on this corpus, which is the negative-effect finding 
 Every episode also carries **`commands`** and **`fire_turns`** — the ordered history the renderers read and the index of
 the command each line answered — so that a cycle-aware renderer can be replayed against an arm already paid for instead of
 being dispatched to answer a question that costs nothing to ask offline. `eval/drivers/alfworld/cycles.py` is that
-reader, and its first run closed the family: over R195's 274 games there are **195** turns that re-issued a command the
-world had **accepted** (in 146 games), but only **3 of the 8 losses** contain one, and five losses contain no repeat at
-all — 49 to 50 commands that never looped. Three games is **+1.09 pp** on a split that resolves **2.29 pp**, so the
+reader, and its first run closed the family: over R195's 274 games there are **177 loops** — turns that re-issued a
+command the world had already **accepted** — in 136 games, plus 18 retries where a command refused at a distance was
+accepted after walking over. Only **3 of the 8 losses** contain a loop, and five contain none: 49 to 50 commands that
+never repeated. Three games is **+1.09 pp** on a split that resolves **2.29 pp**, so the
 dispatch that was going to be bought for it was cancelled by arithmetic rather than by opinion, at ¥0.00.
 
 The published number for the arm is a **band**, not a point: five draws of one arm on one 274-game pool landed on 267,

@@ -5646,12 +5646,18 @@ python eval/drivers/alfworld/cycles.py /workspace/run45023848248/arm-*.json /wor
 ```
 episodes 274  won 266  lost 8
 commands 3,511  refusals 383
-accepted repeats 195 (5.55% of commands)  games with one 146 (53.3%)
-headroom 3 of 8 losses (37.5%) carried an accepted repeat
-price 7,288 characters over 195 lines (37.4 chars/line)
+accepted repeats 195 -- 177 loops, 18 retries  games with one 136 (49.6%)
+headroom 3 of 8 losses (37.5%) carried a loop
+price 6,619 characters over 177 lines (37.4 chars/line)
 chains 1 turns repeating two back, 2 three back, most repeated 4
 sample line Again: "go to desk 1" (2nd time).
 ```
+
+**A loop and a retry are not the same event, and only one of them is a cycle.** A *loop* re-issues a command the world
+had already **accepted** — the model did something, nothing moved, and it did it again. A *retry* re-issues a command whose
+earlier attempts were all **refused**: admissibility is state-dependent (a `take` refused at a distance is accepted after
+walking over), so a retry that lands is progress, and a line that called it a repetition would be wrong about the turn it
+names. `headroom` and `price` count loops only.
 
 `--detail` adds one row per game that repeated something, worst first; `--json` prints the same numbers without the rows.
 The reading is the **ceiling** of a cycle-aware line: `headroom` is how many of the losses the mechanism can reach at all,
@@ -5665,6 +5671,7 @@ appearing in two shards. Each refusal names the episode and the two numbers that
 
 | reading | if it is high | if it is low |
 | --- | --- | --- |
-| `accepted repeats` | the model loops on admitted commands, and no refusal trigger can see it | the residual losses are search or capability failures, not loops |
+| `loops` | the model repeats admitted commands, and no refusal trigger can see it | the residual losses are search or capability failures, not loops |
+| `retries` | refusals were state-dependent and the model corrected itself by moving | the refusals were permanent, which is what a state line is for |
 | `headroom` | a cycle line has something to reach | it does not, whatever the mechanism is worth elsewhere |
 | `price` | the line is long relative to its reach | — compare with `ledger_chars` of the same pass before pricing a dispatch |

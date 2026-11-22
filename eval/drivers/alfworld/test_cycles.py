@@ -72,22 +72,30 @@ class OrdinalTest(unittest.TestCase):
 
 
 class AcceptedRepeatTest(unittest.TestCase):
-    def test_a_second_accepted_command_is_one_repeat(self):
-        self.assertEqual(cycles.accepted_repeats(["a", "b", "a"], set()), [(2, 2)])
+    def test_a_second_accepted_command_is_one_loop(self):
+        self.assertEqual(cycles.accepted_repeats(["a", "b", "a"], set()), [(2, 2, "loop")])
 
     def test_a_repeat_the_world_refused_is_not_seen_by_a_refusal_trigger(self):
         # The turn was answered, so a refusal-triggered line already fired on it and it is not new information.
         self.assertEqual(cycles.accepted_repeats(["a", "b", "a"], {2}), [])
 
     def test_each_occurrence_carries_its_own_number(self):
-        self.assertEqual(cycles.accepted_repeats(["a", "a", "a"], set()), [(1, 2), (2, 3)])
+        self.assertEqual(cycles.accepted_repeats(["a", "a", "a"], set()), [(1, 2, "loop"), (2, 3, "loop")])
 
     def test_a_refused_repeat_stays_refused(self):
         # A command the world refuses once is refused again; excluding the first occurrence excludes the chain.
         self.assertEqual(cycles.accepted_repeats(["a", "a"], {0, 1}), [])
 
-    def test_two_different_commands_are_two_repeats(self):
-        self.assertEqual(cycles.accepted_repeats(["a", "b", "a", "b"], set()), [(2, 2), (3, 2)])
+    def test_two_different_commands_are_two_loops(self):
+        self.assertEqual(cycles.accepted_repeats(["a", "b", "a", "b"], set()), [(2, 2, "loop"), (3, 2, "loop")])
+
+    def test_a_repeat_after_a_refusal_is_a_retry_and_not_a_loop(self):
+        # Admissibility is state-dependent: a `take` refused at a distance is accepted after walking over, so
+        # the second attempt is progress and a line that called it a repetition would be wrong about the turn.
+        self.assertEqual(cycles.accepted_repeats(["a", "a"], {0}), [(1, 2, "retry")])
+
+    def test_a_retry_then_a_loop_are_counted_separately(self):
+        self.assertEqual(cycles.accepted_repeats(["a", "a", "a"], {0}), [(1, 2, "retry"), (2, 3, "loop")])
 
 
 class ChainTest(unittest.TestCase):
@@ -150,6 +158,22 @@ class ReadTest(unittest.TestCase):
         self.assertEqual(reading["sample"], "")
         self.assertEqual(reading["most_repeated"], 1)
 
+    def test_a_retry_is_not_headroom_and_is_not_priced(self):
+        reading = self.reading(episode(commands=["a", "a"], refused=[0]))
+        self.assertEqual(reading["accepted_repeats"], 1)
+        self.assertEqual(reading["looped"], 0)
+        self.assertEqual(reading["retried"], 1)
+        self.assertEqual(reading["headroom"], 0.0)
+        self.assertEqual(reading["chars"], 0.0)
+        self.assertEqual(reading["sample"], "")
+
+    def test_a_loop_is_headroom_and_is_priced(self):
+        reading = self.reading(episode(commands=["a", "a"], refused=[]))
+        self.assertEqual(reading["looped"], 1)
+        self.assertEqual(reading["retried"], 0)
+        self.assertEqual(reading["headroom"], 100.0)
+        self.assertEqual(reading["chars"], len('Again: "a" (2nd time).') + 1)
+
     def test_the_worst_game_is_the_most_repeated(self):
         reading = self.reading(
             episode("quiet", commands=["a", "b", "a"]),
@@ -157,6 +181,7 @@ class ReadTest(unittest.TestCase):
         )
         self.assertEqual(reading["longest_period_two"], 4)
         self.assertEqual(reading["most_repeated"], 3)
+        self.assertEqual(reading["looped"], 5)  # four in `loud`, one in `quiet`
         self.assertEqual(len(reading["rows"]), 2)
 
     def test_the_report_states_every_number_once(self):

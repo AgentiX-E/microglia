@@ -2178,7 +2178,9 @@ rather than a blacklist, and when the set has no task command the line carries t
 **Accepted repeat** — A turn whose command had been issued before *and* which the world did not refuse. It is the only
 kind of repetition a refusal-triggered line cannot see: the world said yes, nothing moved, and the state renderers stay
 silent because their trigger is the world's verdict. Read by `cycles.py` from `commands` and `fire_turns`; over R195's 274
-games there are 195 of them, in 146 games.
+games there are 195 of them, in 146 games, and they split into **loops** (177: the command had already been accepted) and
+**retries** (18: every earlier attempt was refused, and the world admits it now that the agent has moved — progress
+rather than a cycle, which is why only a loop is headroom).
 
 **Chain** — A stretch of consecutive turns that each repeat the command `k` turns earlier (`go to countertop 1`, `look`,
 `go to countertop 1`, `look`), reported as **confirmations** rather than as the window's length: a period-2 chain of 2
