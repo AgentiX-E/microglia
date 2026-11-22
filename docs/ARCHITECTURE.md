@@ -3063,6 +3063,38 @@ the episode handed the world. `ledger_line()` takes the last three, drops repeat
 four named cap-loss games won — and a tail where one game received **40** lines and still ended at the cap. That tail is
 the design's own failure mode stated architecturally: **the line is a function of the episode's history, and a history
 that does not change reproduces the same line, which is a constant.** R188 measured a constant in front of every turn as
-inert; the ledger can become one on the games where the model is stuck in a loop, which is the state it was built for. The
-repair is a renderer change — a repeat count instead of a repeat, and no line when the history did not change — and it is
-registered rather than assumed.
+inert; the ledger can become one on the games where the model is stuck in a loop, which is the state it was built for.
+
+**The repair was built, measured, and retired.** `--state-ledger-counts` renders `take apple 1 (4 times)` instead of four
+copies and silences a fire whose three-command window is the one the previous line named. R193 bought it and it went the
+wrong way: **263/274** against 267, the maximum a game received rose from 40 to **42**, characters added rose from
+42,845 to **48,179**, and the gate silenced **2 of 479** fires. The reason is structural rather than incidental: **the
+window is a function of the commands, and the count lives in the rendering, so counting does not change the state the
+gate compares — and a fixed-point loop, one command issued until the cap, would have met the condition on every fire
+after the first, so 2 in 479 says the loops this driver meets are cycles over several commands rather than repetitions of
+one.** A gate on "the state did not change" cannot see a cycle. The counted renderer stays in the driver as a measured
+negative; the state family's version is the plain list of §8.54, with its 40-line tail known and priced.
+
+### 8.55 The release distribution: a draw is not a measurement, and the pool says so itself
+
+Every pool number this record published before R192 was **one draw** of one arm on one 274-game pool, and the lane had
+never drawn the same arm twice on purpose. R192 drew it five times. The arm, the bank, the pack, the channel, the cap and
+the guard state were held fixed; only the sampling moved, because the model re-samples even at prompts it has already
+answered (AUDIT 34.280 measured that inside a single round).
+
+| | pooled | unseen 134 | seen 140 | lines sent |
+| --- | --- | --- | --- | --- |
+| five draws | 267, 268, 265, 268, 270 | 134, 133, 133, 134, 134 | 133, 135, 132, 134, 136 | 413, 392, 441, 410, 391 |
+| spread | **5 games = 1.82 pp** (s.d. 1.82) | **1 game** | **4 games** | 50 |
+
+Three consequences are now architecture rather than commentary.
+
+1. **The publication unit is the pooled interval.** Five draws, 1,370 games: **97.66% [96.72, 98.34]**. A single draw's
+   point estimate overstates precision by a factor the reader cannot see.
+2. **Two draws may not be differenced.** The range between two draws (1.82 pp) exceeds the effect the last four rounds
+   could resolve; two independent draws of 274 games can see 3.74 pp at 80% power. Only a paired design inside one
+   dispatch can see 0.73 pp, and R192 is the arithmetic of why that is not a stylistic preference.
+3. **The board quotes the stable half, which is the half that cannot move.** The unseen section varies by one game across
+   five draws and is at **99.70% pooled** — saturated. The seen section varies by four and sits at 95.71%. A two-section
+   claim therefore has one section that can carry an effect and one that cannot, and the section that is published is the
+   saturated one.

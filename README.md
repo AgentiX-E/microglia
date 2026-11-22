@@ -661,8 +661,16 @@ names them with `--expect-ledger`. The line is conditional by construction: a ga
 extra character, which is what keeps a search repair inside the price of a pass. R191 bought it: **267/274 against the
 guard's 265/274**, +0.73 pp (p = 0.597, mde 2.89 pp), all **four** games the guard alone lost won, **413 fires** and
 42,845 characters — 2.28% of the arm's prompt — for **¥2.69**, with 76 fewer calls than the control it beat. `--state-ledger-counts` is the
-counted renderer registered for R193: `take apple 1 (4 times)` instead of a copy of the copy, and no line at all when the
-window is the one the previous line named, because a line that repeats is the constant R188 measured as inert.
+counted renderer R193 measured: `take apple 1 (4 times)` instead of a copy of the copy, and no line at all when the
+window is the one the previous line named. It **lost**: 263/274, the maximum lines a game received rose from 40 to
+**42**, the characters added rose from 42,845 to **48,179**, and the change gate silenced **2 of 479** fires because a
+counted line gives the same-window condition nothing to compare against. The flag stays in the driver as a measured
+negative; the state family's version is the plain list.
+
+The published number for the arm is a **band**, not a point: five draws of one arm on one 274-game pool landed on 267,
+268, 265, 268 and 270 — a **1.82 pp** range with no treatment applied — so the record quotes **1,338/1,370 = 97.66%
+[96.72, 98.34]** and never differences two draws as if the difference were an effect (R192). The unseen section moves by
+one game across all five draws (99.70% pooled); the seen section moves by four (95.71%).
 
 The one component that is scored **before** anything is bought is `scripts/score_bank.py`, which reads a bank and
 returns the literature's admission score for the pack each task type would render — specificity x abstractness, with no

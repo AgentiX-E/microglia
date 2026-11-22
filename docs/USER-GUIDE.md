@@ -5506,3 +5506,34 @@ worse" and not much else; `ledger_fires` is what says whether the treatment ever
 - **A line that repeats is a constant.** The same round's worst games received 16 and 40 lines and lost at the cap: by the
   third repetition the model is being told the same thing every turn, which is the shape R188 measured as inert. If you
   see a high fire count on a losing game, the treatment has become narration.
+
+### 32.36 `--state-ledger-counts` is a measured negative, and how to read a draw
+
+`--state-ledger-counts` is the counted renderer: `Already tried this episode: take apple 1 (4 times).` instead of the
+same command four times, and **no line at all** when the three commands a line would name are the ones the previous line
+named. It implies `--state-ledger`, adds `-counts` to the label (`always-in@kind+anyline+guard+ledger-counts`), and puts
+three fields in every episode — `ledger_counts`, and `ledger_suppressed` beside the two the plain flag already writes:
+
+```bash
+python eval/drivers/alfworld/agent.py ... --state-ledger-counts --out arm-ledger-counts.json
+python eval/drivers/alfworld/aggregate.py \
+  --input logs/counts/*.json --input logs/ledger/*.json \
+  --compare "always-in@kind+anyline+guard+ledger-counts,always-in@kind+anyline+guard+ledger" \
+  --expect-parsers any-line --expect-caps 50 --expect-guard on --expect-ledger on
+```
+
+**It lost, and the two numbers that say so are `ledger_fires` and `ledger_suppressed`.** The counted arm sent **479**
+lines against the plain list's 413, added 48,179 characters against 42,845, raised the worst game from **40** lines to
+**42**, and sent two of the four games the plain list had won back to the 50-step cap. The gate silenced **2 of 479**
+fires: the condition is "the same three commands as the last line", and a count gives the line a new number without
+changing the window the gate compares, so a fixed-point loop would meet the condition on every fire and the loops this
+driver meets evidently do not. Use the flag to reproduce the negative; do not use it as the plain list's replacement.
+
+**And read the number you get as a draw.** The same arm on the same 274 games, five times: 267, 268, 265, 268, 270. The
+range is **1.82 pp** with no treatment applied, the unseen section moves by one game and the seen section by four, and two
+independent draws of this size can only see a 3.74 pp effect at 80% power. So:
+
+- quote the **pooled** figure — 1,338/1,370 = **97.66% [96.72, 98.34]** — or say "one draw of five";
+- never subtract one draw from another and call the difference a treatment effect; a paired join inside one dispatch is
+  the only design here that can see less than 2 pp;
+- treat `ledger_fires` the same way: 391 to 441 across the five draws, so a 20-fire difference between two arms is noise.

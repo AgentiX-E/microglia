@@ -3274,6 +3274,73 @@ named games, four wins, for ¥2.69. The next purchase is not another sentence an
 **distribution** (R192), because the published number is now one draw of a pool whose own draws span seven games.
 
 
+## R192 — the release distribution: five draws of one arm on one bank
+
+This round buys no treatment. It buys the **error bar on every number this project has quoted**, because each of them
+was one draw of one arm on one 274-game pool, and the project had never drawn the same arm twice on purpose. The
+registration lives in `ROADMAP.md` §R192 and was written before the purchase: four draws at **≈ ¥5.4**, eight dispatches,
+"and what is published afterwards is the interval rather than the point". R191's own dispatch is the fifth draw.
+
+One draw is one pass of 274 games and two dispatches, because the driver loads one `--split` at a time. All five carry
+one label, one `bank_digest` (`349213e8`), one pack (551 characters, 1 entry), one channel (`any-line`), one cap (50),
+one guard state (on), and off-peak in every summary — the join refuses anything else.
+
+| draw | runs (unseen + seen) | commit | pooled | unseen 134 | seen 140 | lines sent | calls |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 (R191) | `44998336698` + `44998433515` | `43ac25b0` | 267/274 (97.45%) | 134 | 133 | 413 | 4,140 |
+| 2 | `45002745603` + `45002776635` | `7c8f6497` | 268/274 (97.81%) | 133 | 135 | 392 | 4,205 |
+| 3 | `45002800354` + `45002824780` | `7c8f6497` | 265/274 (96.72%) | 133 | 132 | 441 | 4,184 |
+| 4 | `45002924115` + `45002949307` | `7c8f6497` | 268/274 (97.81%) | 134 | 134 | 410 | 4,085 |
+| 5 | `45002970589` + `45002989631` | `7c8f6497` | 270/274 (98.54%) | 134 | 136 | 391 | 4,103 |
+
+### The distribution
+
+**min 265, max 270, range 5 games = 1.82 pp; mean 267.6, s.d. 1.82 games (0.66 pp).** Pooled over the five draws and
+1,370 games: **1,338/1,370 = 97.66%, Wilson [96.72, 98.34]**.
+
+### Where the variance lives, which is the round's finding
+
+| section | draws | pooled | moves |
+| --- | --- | --- | --- |
+| unseen (134) | 134, 133, 133, 134, 134 | 668/670 = 99.70% | **1 game** |
+| seen (140) | 133, 135, 132, 134, 136 | 670/700 = 95.71% | **4 games** |
+
+The unseen section is very nearly a constant and the seen section carries the whole spread. The board quotes the unseen
+number, which is the stable half, and it happens to be the half that is already at its ceiling — 134 of 134 is a
+saturated section, and a saturated section cannot show a treatment effect in either direction. The half that can move is
+the half the board does not quote.
+
+### What the numbers license, and what they do not
+
+| quantity | value |
+| --- | --- |
+| one draw to the next (range of five) | **1.82 pp** |
+| two independent draws of 274 each, 80% power | **3.74 pp** |
+| R191's paired effect | **0.73 pp** |
+| five draws pooled, 95% half-width | **0.81 pp** |
+
+The third line is smaller than the second: **a comparison between two draws on this pool cannot see the effect this
+project reports.** That is not a defect of the pool; it is the reason the paired design exists, and the reason R191's
++0.73 pp is reported with an interval that contains zero rather than as a win. What follows for the release is narrow
+and firm: **the published number is 97.66% [96.72, 98.34] over five draws**, the unseen section is quoted as
+`134/134` with the note that one of five draws gave 133, and no two draws are ever differenced as if the difference were
+a treatment effect.
+
+### Cost
+
+**$0.742 ≈ ¥5.35 for the four new draws** (4 × 274 games, 16,577 calls), against the registered ¥5.4 — the first
+estimate in this lane's recent record to come in within 1% of its own arithmetic. Five draws in total: **$0.928 ≈
+¥6.68**.
+
+**What it changes about the plan.** Every prior claim keeps its value and loses its precision: `265`, `264`, `264`, `258`,
+`267` were five draws of arms at different commits, and after this round the honest statement about the published arm is
+a band, not a number. A second thing falls out of the timing: **draws 2 to 5 share a commit** (`7c8f6497`), so R193's
+counted arm — dispatched at `248031f6`, whose only difference from `7c8f6497` is the counted renderer and the gate, both
+inert without `--state-ledger-counts` — has **four commit-matched control draws** rather than one. R191's own draw is the
+registered control because it is the same arm the registration named; the four newer draws are the cross-check that the
+commit did not move the pool.
+
+
 ## R193 — the line that stops repeating itself: a count instead of a copy, and a gate on the state
 
 R191's mechanism worked (four named games, four wins) and its tail is the same disease it was built to cure: **a line that
@@ -3321,3 +3388,95 @@ Any arm whose episodes carry no `ledger_fires` or no `ledger_suppressed`; any pa
 this round carries: R191's arm was driven at `43ac25b0` and this one at its own head, so the pool delta is subject to the
 re-sampling R191 measured (14 of 27 untreated games took a different path). The mechanism readings are per game and do
 not depend on it.
+
+## R193, amendment 1 — the tail widened, two named games went back to the cap, and the gate met its condition twice in 479 chances
+
+Two dispatches, **274 games, one arm**, `any-line`, cap 50, `guard` on, `--state-ledger-counts` on, off-peak in all eight
+summaries: `45005032066` (unseen, 134) + `45005048910` (seen, 140), both at `248031f6`. The control is R191's own
+`guard+ledger` arm from `44998336698` + `44998433515` — the arm the registration named — and the four draws of that same
+arm at `7c8f6497` (R192) serve as the commit-matched reference.
+
+| arm | pack | pooled | unseen 134 | seen 140 | lines sent | chars added | calls |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `always-in@kind+anyline+guard+ledger-counts` | 551 ch, 1 entry | **263/274 (95.99%)** | 133/134 | 130/140 | **479** | **48,179** | 4,255 |
+| `always-in@kind+anyline+guard+ledger` (R191) | 551 ch, 1 entry | 267/274 (97.45%) | 134/134 | 133/140 | 413 | 42,845 | 4,140 |
+
+Paired **−1.46 pp** [−3.28, +0.00], exact McNemar on **1 + 5** discordant games, p = 0.129, mde 2.50 pp; engagement
+24.8% of games changed course, and on those the delta is **−5.88 pp** (5 harmed, 1 helped).
+
+### The verdict is the refutation clause, and it fires on three of the four readings
+
+| # | registered | read | verdict |
+| --- | --- | --- | --- |
+| 1 | no game receives more than **8** lines | **42**; six games past eight against three | **failed** |
+| 2 | all four R191 named games carry a line and **all four win** | **two of four lost**, both back at the 50-step cap | **failed** |
+| 3 | paired pooled delta ≥ **−2.0 pp** | **−1.46 pp** [−3.28, +0.00] | **held, at its bound** |
+| 4 | total `ledger_chars` **below** R191's 42,845 | **48,179 (+12.4%)** | **failed** |
+| 5 | `ledger_suppressed` non-zero and `ledger_fires` **below** 413 | **2 suppressed**, 479 fires | **failed** on the second clause, hollow on the first |
+| 6 | spend ≤ ¥3.4 | **$0.1895 ≈ ¥1.36** | **held**, at half the registered estimate |
+
+**The refutation's own words close the family**: "a game still receiving more than 8 lines, or any of the four named games
+losing → the repetition is not the mechanism and the state family closes at R191's version." Both halves fired. The
+counted line is not a shorter spelling of the list, it is a different treatment that did not inherit the list's cell, and
+the state family's last version is R191's.
+
+### The named games, three renders each
+
+| game | kind | guard | R191's list | the count |
+| --- | --- | --- | --- | --- |
+| `pick_clean_then_place_in_recep-Spatula-None-DiningTable-4` | `clean` | won, 12 | won, 11 | **won, 28** |
+| `pick_two_obj_and_place-Box-None-CoffeeTable-213` | `puttwo` | lost, 50 | won, 40 | **won, 47** |
+| `look_at_obj_in_light-Bowl-None-DeskLamp-301` | `examine` | lost, 50 | won, 36 | **lost, 50** |
+| `pick_cool_then_place_in_recep-Plate-None-CounterTop-1` | `cool` | lost, 50 | won, 11 | **lost, 50** |
+
+Two went back to the cap and the two that survived took 17 and 7 more steps. Reading 2 is not a near miss: the counted
+arm lost the two games R191's mechanism was adopted *for*.
+
+### The tail widened rather than closed
+
+| lines a game received | 0 | 1 | 2 | 3 | 4–5 | 6–7 | 8–15 | 16+ |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| R191's list | 27 | 182 | 44 | 7 | 10 | 1 | 1 | 2 |
+| the count | 25 | 177 | **50** | 4 | 11 | 1 | **3** | **3** |
+
+Total **479 lines against 413 (+16.0%)**, **48,179 characters against 42,845 (+12.4%)**, per-line cost down from 103.7 to
+100.6 characters. The count moved the middle — 50 games at two lines against 44 — and made the far tail worse: the
+maximum is **42 against 40**, and `look_at_obj_in_light-AlarmClock-None-DeskLamp-323`, the game that took 40 lines under
+R191, took **0 and won in 5 steps**, while `look_at_obj_in_light-Statue-None-DeskLamp-216` went from **0 lines to 35 and
+lost at the cap**. Counting changed *which* games loop; it did not reduce the looping.
+
+### The gate met its condition twice in 479 chances, and the reading that depended on it was hollow
+
+`ledger_suppressed = 2` across 274 games — 0.4% of the fires that could have been silenced, against R191's arm which had
+no gate at all. The gate silences a fire whose three-command window is the one the previous line named, and a counted line
+gives the window no reason to repeat: the count lives in the *rendering*, not in the window, so the arm produced 477
+fresh windows and 2 repeats. **A registered reading whose condition the arm cannot reach is not a reading** — it is a
+one-sided test that passes on a single event. AUDIT 34.281.
+
+### The pool: not claimed as harm, and placed rather than judged
+
+One draw cannot carry a harm claim, and this round does not make one. What the draw can carry is its placement: **263 sits
+below all five draws of R191's arm** (267, 268, 265, 268, 270). Against the four draws at the counts arm's own commit
+(`7c8f6497`: 268, 265, 268, 270, mean 267.75, s.d. 2.06) it is **2.3 s.d. down**, a t-test on four draws giving
+**p = 0.131** — which lands on top of the registered paired test's **p = 0.129**. Two designs, one answer: the pool
+difference is inside the draw-to-draw spread that R192 measured at 1.82 pp.
+
+### Cost, and where it went
+
+| | the count | R191's list |
+| --- | --- | --- |
+| calls | 4,255 | 4,140 |
+| prompt tokens | 9,572,272 | 9,197,401 (**+4.1%**) |
+| prompt characters | 1,895,852 | 1,881,410 |
+| of which the line | **48,179 characters, 2.54% of the arm's prompt** | 42,845 (2.28%) |
+| bill | **$0.1895 ≈ ¥1.36** | $0.1855 ≈ ¥1.34 |
+
+The registered price was ¥2.70 for the round; the actual is **¥1.36, half of it**, because the estimate carried R191's
+two-arm dispatch across to a one-arm round. Same error class as the fires band in R191's reading 1 (AUDIT 34.278), in the
+other direction and for the third round running: **an estimate is a multiplication, and the multiplication was not
+written down.**
+
+**What it changes about the plan.** The state family **closes at R191's version** (`--state-ledger`, the plain list), with
+its mechanism cell intact and its tail known and priced: 40 lines on one game, 2.28% of the prompt, and no gate that can
+find it. `--state-ledger-counts` stays in the driver as a **measured negative** — the second renderer of the same state
+and the one the ablation table will cite when it says the state's value is in the *list*, not in its length.

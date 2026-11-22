@@ -2090,6 +2090,20 @@ game whose actions all land carries no extra character. Conditional by construct
 **413 fires / 42,845 characters** and won all four games it was registered for; its failure mode is that a line which
 repeats is a constant, and one game received forty of them and still lost at the cap (AUDIT 34.279).
 
+**Counted ledger** — The state ledger's second renderer (`--state-ledger-counts`): `take apple 1 (4 times)` instead of a
+copy of the copy, plus a gate that silences a line whose three-command window is the one the previous line named
+(`ledger_suppressed`). Labelled `@ledger-counts` and a separate treatment in every join. **Measured negative** (R193):
+263/274 against the plain list's 267, 479 lines against 413, a 42-line worst game against 40, and **2 silences in 479
+chances** — a count changes the line's text without changing the window the gate compares, so the gate sees no repeat
+(AUDIT 34.281). The family's version is the plain list.
+
+**Release distribution** — The spread of one arm's pool number across repeated draws on the same games, bought in R192 so
+that the published figure is an interval rather than a point. Five draws of the ledger arm: 267, 268, 265, 268, 270 of
+274 — **1.82 pp** range, s.d. 1.82 games — pooled **97.66% [96.72, 98.34]** over 1,370 games. The unseen section moves by
+one game across all five and the seen section by four, so the stable half of a two-section claim is also the saturated
+half. Two independent draws of 274 games can resolve **3.74 pp** at 80% power, which is larger than every paired effect
+this lane has reported; only a within-dispatch paired join can see a 0.73 pp difference.
+
 **Utility score** — The admission family's offline estimate of what an entry is worth, computed with no rollout:
 specificity x abstractness (`arXiv:2608.20274`). Specificity is the share of the text that is command notation (quoted
 spans, `<placeholders>`); abstractness is the share of the words that are frame words (`if`, `before`, `every`,
