@@ -5481,7 +5481,9 @@ python eval/drivers/alfworld/agent.py \
 ```
 
 The arm's label becomes `always-in@kind+anyline+guard+ledger`, and each episode carries `ledger: true`, `ledger_fires`
-and `ledger_chars`. A join that puts that label beside `always-in@kind+anyline+guard` needs one declaration:
+and `ledger_chars`. **Read `ledger_fires` beside `invalid_actions`**: in this corpus the two are equal in every game ever
+run (413 = 413 and 479 = 479 over 822 armed games), because the admissible set at a state is the set of commands that do
+something — so the line is an admissibility hint in practice, whatever the two-trigger docstring says (AUDIT 34.284). A join that puts that label beside `always-in@kind+anyline+guard` needs one declaration:
 
 ```bash
 python eval/drivers/alfworld/aggregate.py \
@@ -5537,3 +5539,41 @@ independent draws of this size can only see a 3.74 pp effect at 80% power. So:
 - never subtract one draw from another and call the difference a treatment effect; a paired join inside one dispatch is
   the only design here that can see less than 2 pp;
 - treat `ledger_fires` the same way: 391 to 441 across the five draws, so a 20-fire difference between two arms is noise.
+
+### 32.37 `--state-admissible`: the third renderer, and the instrument that prices it
+
+AUDIT 34.284 read R191 and R193 together and found that `ledger_fires` equals `invalid_actions` in **every** one of 822
+armed games: each line the state family ever sent answered a command the world had refused, and the worst games are 42,
+35 and 27 consecutive refused commands. The list of what has been tried is one remove from what would help, so R194's
+renderer names the other set:
+
+```bash
+python eval/drivers/alfworld/agent.py --arm always-in --policy model --split eval_out_of_distribution \
+  --rules eval/drivers/alfworld/banks/bank-putscope-2.json --gate-kind true \
+  --parser any-line --guard-commandless --state-admissible --out arm-admissible.json
+```
+
+On a turn that moved nothing the model reads
+
+```
+Nothing happens.
+Admissible here: 7 commands, e.g. `take apple 1 from countertop 1`.
+```
+
+The label becomes `always-in@kind+anyline+guard+ledger-admissible`; the episode carries `state_admissible`, the usual
+`ledger_fires`/`ledger_chars`, and three instrument fields. **Read the instrument before the score:**
+
+- `admissible_mean` is the mean size of the world's admissible set over the turns that fired — the number that decides
+  whether the count-only form is the affordable one;
+- `admissible_max` is the worst single state, and the one the price has to survive;
+- `admissible_sample` is the example that was rendered, so a reader can check the selection rule against the game.
+
+The flag replaces the other two renderers rather than stacking on them (`--state-admissible` beside `--state-ledger` is
+refused at the argument), and `aggregate.py` prints the instrument beside the ledger line:
+
+```
+admissible      always-in@kind+anyline+guard+ledger-admissible 134 games refused, mean set 6, max 11 vs ... not counted
+```
+
+An armed episode without the instrument, a header that claims the renderer while its episodes say otherwise, and a header
+whose flag is not a flag are all refused — the same three refusals the other two renderers carry.

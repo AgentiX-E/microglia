@@ -2752,7 +2752,8 @@ class CommandGuardTest(unittest.TestCase):
 
         agent.chat = chat
         episode = agent.run_episode(
-            world or FakeWorld(), "none", "model", self.examples, [], agent.Draw(1), max_steps, 3,
+            world or FakeWorld(), "none", "model", self.examples, [], agent.Draw(1),
+            max_steps if max_steps is not None else len(replies), 3,
             "deepseek-flash", "k", 1.0, parser=parser, guard_commandless=guard,
         )
         return episode, seen
@@ -3254,6 +3255,164 @@ class StateLedgerTest(unittest.TestCase):
         self.assertGreater(summary["ledger_chars"], 0)
         self.assertTrue(payload["episodes"][0]["ledger"])
         self.assertFalse(payload["episodes"][0]["won"])
+
+class AdmissibleHintTest(unittest.TestCase):
+    """R194's instrument and renderer: on a refused command, the world names what *is* admissible.
+
+    AUDIT 34.284 read the two state arms together and found `ledger_fires` equal to `invalid_actions` in all 822 games:
+    every line the family ever sent answered a command the world had refused, and the tail games are 42, 35 and 27
+    consecutive refused commands. The list of what has been tried is one remove from what would help, so the renderer
+    under test names the size of the admissible set and one command in it.
+
+    These tests are written before the renderer exists, and they hold four things: the line's arithmetic (count and
+    singular), its selection rule (deterministic, verb first, then the world's own order), its condition (a refused turn
+    and nothing else), and the instrument that prices the round (`admissible_mean`, `admissible_max`, `admissible_sample`)
+    because the round cannot be registered until the size of the set is known from a pass that cost nothing.
+    """
+
+    def setUp(self):
+        self.examples = agent.load_examples()
+        self.original = agent.chat
+
+    def tearDown(self):
+        agent.chat = self.original
+
+    def drive(self, replies, admissible=True, world=None, max_steps=None, parser="any-line"):
+        seen = []
+        script = list(replies)
+
+        def chat(messages, model, api_key, timeout):
+            seen.append([message["content"] for message in messages])
+            return script.pop(0), {"prompt_tokens": 10, "completion_tokens": 1}, 0
+
+        agent.chat = chat
+        episode = agent.run_episode(
+            world or FakeWorld(), "none", "model", self.examples, [], agent.Draw(1),
+            len(replies) if max_steps is None else max_steps, 3,
+            "deepseek-flash", "k", 1.0, parser=parser, state_admissible=admissible,
+        )
+        return episode, seen
+
+    def test_the_line_counts_the_set_and_names_one_command(self):
+        self.assertEqual(
+            agent.admissible_line(7, "take apple 1 from countertop 1"),
+            "Admissible here: 7 commands, e.g. `take apple 1 from countertop 1`.",
+        )
+
+    def test_one_command_is_singular_and_zero_names_none(self):
+        self.assertEqual(agent.admissible_line(1, "look"), "Admissible here: 1 command, e.g. `look`.")
+        self.assertEqual(agent.admissible_line(0, ""), "Admissible here: 0 commands.")
+
+    def test_the_example_prefers_the_shortest_command_sharing_the_refused_verb(self):
+        # The selection rule has to be deterministic and legible: the model named a verb it wanted, so the example keeps
+        # that verb, and among the candidates the shortest is the one that costs least prompt for the same information.
+        commands = ["open cabinet 1", "take apple 1 from countertop 1", "take apple 1", "look"]
+        self.assertEqual(agent.admissible_example(commands, "take apple 9 from countertop 1"), "take apple 1")
+
+    def test_without_a_shared_verb_the_first_command_in_the_world_order_is_named(self):
+        commands = ["look", "inventory", "open cabinet 1"]
+        self.assertEqual(agent.admissible_example(commands, "go to shelf 2"), "look")
+        self.assertEqual(agent.admissible_example([], "go to shelf 2"), "")
+
+    def test_the_line_reaches_the_model_on_a_refused_turn_and_not_on_an_admitted_one(self):
+        # The refusal is scripted: `take apple 9` is not in this world's admissible set, so the turn moves nothing and the
+        # line answers it. The second turn is admissible and carries no line, which is what keeps the treatment
+        # conditional rather than a constant (R188's finding, restated as a test).
+        episode, seen = self.drive([
+            "> take apple 9 from countertop 1",
+            "> take apple 1 from countertop 1",
+            "> put apple 1 in/on cabinet 1",
+        ])
+        self.assertEqual(episode["ledger_fires"], 1)
+        self.assertIn("Admissible here: 4 commands", seen[1][-1])
+        self.assertNotIn("Admissible here", seen[2][-1])
+
+    def test_the_instrument_records_the_size_of_the_set_it_answered_with(self):
+        episode, _ = self.drive(["> take apple 9 from countertop 1", "> go to shelf 2", "> take apple 1 from countertop 1"])
+        self.assertTrue(episode["state_admissible"])
+        # Two turns moved nothing, and the set is the same four commands both times: the instrument is a measurement of
+        # the world, so a mean that moved between two identical states would be a measurement of the driver.
+        self.assertEqual(episode["admissible_max"], 4)
+        self.assertEqual(episode["admissible_mean"], 4)
+        self.assertEqual(episode["ledger_fires"], 2)
+
+    def test_an_episode_with_no_refusal_records_zeroes_and_an_empty_sample(self):
+        episode, _ = self.drive(["> take apple 1 from countertop 1", "> put apple 1 in/on cabinet 1"])
+        self.assertTrue(episode["won"])
+        self.assertEqual(episode["ledger_fires"], 0)
+        self.assertEqual(episode["admissible_max"], 0)
+        self.assertEqual(episode["admissible_sample"], "")
+
+    def test_the_flag_sets_its_own_label_token(self):
+        self.assertIn("ledger-admissible", agent.arm_label(
+            "always-in", agent.DEFAULT_TOP_K, 0.0, gate_kind=True, parser="any-line",
+            guard_commandless=True, state_admissible=True))
+        self.assertEqual(
+            agent.arm_label("always-in", agent.DEFAULT_TOP_K, 0.0, parser="any-line", state_admissible=True),
+            "always-in@anyline+ledger-admissible",
+        )
+        # And it is not the list's token: three renderers, three labels, or a join pools a treatment with its ablation.
+        self.assertEqual(
+            agent.arm_label("always-in", agent.DEFAULT_TOP_K, 0.0, parser="any-line", state_ledger=True),
+            "always-in@anyline+ledger",
+        )
+
+    def test_the_reference_reader_gets_the_same_line_on_its_own_refusal(self):
+        # The ledger answers on both sides of the parser, so this renderer does too: under the first-line rule the
+        # command under a thought is refused and never executed, and the turn still gets the admissible line. Two
+        # channels, one treatment -- otherwise an arm's effect would be a fact about the reader (AUDIT 34.262).
+        episode, seen = self.drive(
+            ["> think: take the apple\n> take apple 9 from countertop 1", "> take apple 1 from countertop 1"],
+            parser="reference",
+        )
+        self.assertEqual(episode["ledger_fires"], 1)
+        self.assertIn("Admissible here: 4 commands", seen[1][-1])
+        self.assertEqual(episode["admissible_max"], 4)
+
+    def test_the_instrument_reaches_the_summary_and_the_episodes(self):
+        class RefusesEverything(FakeWorld):
+            def step(self, actions):
+                self.steps += 1
+                return [agent.NO_OP + "\n"], [0.0], [False], {
+                    "won": [False],
+                    "admissible_commands": [["look", "inventory"]],
+                }
+
+        original_build = agent.build_env
+        original_argv = sys.argv
+        out = HERE / "admissible-under-test.json"
+        agent.build_env = lambda batch_size=1, train_eval="eval_out_of_distribution": (RefusesEverything(), 1)
+        try:
+            sys.argv = ["agent.py", "--arm", "none", "--policy", "first", "--games", "1",
+                        "--state-admissible", "--out", str(out)]
+            self.assertEqual(agent.main(), 0)
+            payload = json.loads(out.read_text(encoding="utf-8"))
+        finally:
+            agent.build_env = original_build
+            sys.argv = original_argv
+            out.unlink(missing_ok=True)
+        summary = payload["summary"]
+        self.assertTrue(summary["state_admissible"])
+        self.assertEqual(summary["arm_label"], "none@ledger-admissible")
+        self.assertGreater(summary["ledger_fires"], 0)
+        # The first turn's set is the world's opening one (four commands); every later turn's is the two the fake
+        # reports after a step. Max sees the first, the mean sees the rest -- and both are the world's numbers.
+        self.assertEqual(summary["admissible_max"], 4)
+        self.assertEqual(summary["admissible_mean"], 2)
+        self.assertTrue(payload["episodes"][0]["state_admissible"])
+
+    def test_the_flag_cannot_be_stacked_on_the_ledger_it_replaces(self):
+        # Two renderers on one turn would send two lines for one event and make the arm unreadable against either. The
+        # refusal is at the argument, not in the loop, so a dispatch that tries it fails before it spends a call.
+        original_argv = sys.argv
+        try:
+            sys.argv = ["agent.py", "--arm", "none", "--policy", "first", "--games", "1",
+                        "--state-ledger", "--state-admissible", "--out", str(HERE / "never.json")]
+            with self.assertRaises(SystemExit):
+                agent.main()
+        finally:
+            sys.argv = original_argv
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

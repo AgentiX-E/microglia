@@ -3480,3 +3480,54 @@ written down.**
 its mechanism cell intact and its tail known and priced: 40 lines on one game, 2.28% of the prompt, and no gate that can
 find it. `--state-ledger-counts` stays in the driver as a **measured negative** — the second renderer of the same state
 and the one the ablation table will cite when it says the state's value is in the *list*, not in its length.
+
+## R194 — the hint that names what is admissible, because every line this family ever sent answered a refused command
+
+R191 and R193 are 822 armed games, and AUDIT 34.284 reads them together: **`ledger_fires` equals `invalid_actions` in
+every one of them** (413/413, 479/479), so the state renderer has only ever answered commands the world refused. The tail
+games are the proof of what the failure is: `Laptop-328` spent **42** consecutive turns proposing commands that do not
+exist, `Statue-216` **35**, `Bowl-308` **27**, and all three ended at the cap. The list of what has been tried is one
+remove from the thing that would have helped — **a command that is admissible, right now, in this state**.
+
+**Treatment, one arm, one line.** On the ledger's own trigger — a turn whose command moved nothing, which in this corpus
+is always a command the world refused (AUDIT 34.284) — the observation gains one line:
+
+```
+Admissible here: 7 commands, e.g. `take apple 1 from countertop`.
+```
+
+- the **count** is the size of the world's own admissible set at that state, so the model learns the shape of the space;
+- the **example** is chosen deterministically from that set: the shortest command sharing a verb with the refused one, and
+  the first in the world's order otherwise. No sampling, no model call, nothing stored across turns.
+- everything else — pack, channel, cap, guard, bank — unchanged; the line is conditional on a refusal, as the plain
+  ledger is.
+
+**Step 1 is an instrument and costs ¥0.00**, and it is built (this commit). The admissible set's **size** has never been
+recorded, so the price of the line cannot be computed from artefacts already paid for: if the typical set is three
+commands the line is 60 characters; if it is sixty the count alone is the affordable form. The driver gains, per episode,
+`admissible_mean` and `admissible_max` over the turns it answered, and one `admissible_sample`; the `--state-admissible`
+flag renders the line behind its own label token (`@ledger-admissible`), and the fire counters are the same
+`ledger_fires`/`ledger_chars` the other two renderers use — one event, one price, one place to disagree. `aggregate.py`
+refuses an armed episode that carries no instrument, a header that claims the renderer while its episodes do not, and a
+header whose `state_admissible` is not a flag.
+
+**Registered readings**, over 274 games, one arm, and **against R192's five-draw band rather than against a draw** — that
+is what the band was bought for (265 to 270, pooled 97.66% [96.72, 98.34]):
+
+1. **The tail closes**: no game receives more than **8** lines, and the three named tail games are no longer cap-losses.
+2. **The mechanism names a game**: **at least 2 of those 3** win, and their `invalid_actions` fall by **half or more**.
+3. **No harm**: the pooled rate is inside the band's lower bound minus 1.0 pp, i.e. **≥ 96.6%** — a band comparison, not
+   a paired one, and any difference inside the band is not claimed.
+4. **Cost**: `ledger_chars` ≤ **2× 42,845** (the line is longer than a list of commands), spend ≤ **¥1.6** for the arm.
+5. **Instrument**: every episode carries `admissible_mean`/`admissible_max` and a non-zero `ledger_fires`; the label carries
+   `@ledger-admissible`; `pack_chars`, `pack_entries`, `parser`, `max_steps`, `guard` and `bank_digest` unchanged.
+
+**Refutation.** If the three named tail games still lose, the admissibility hypothesis is wrong and **the search-and-state
+family closes entirely** — three renderers of one state will have been bought and none of them moved a cap-loss. If the
+mean admissible set is larger than 20 commands, the line is unaffordable as written and the count-only form is the
+fallback, registered here so that a smaller arm is not a new round.
+
+**Void.** Any arm whose episodes carry no `admissible_mean`; any pass whose pack, channel, cap, guard or bank differs from
+R191's tiling; any game outside the 274.
+
+**Price ≈ ¥1.4**, two dispatches, off-peak, plus ¥0.00 for the instrument.

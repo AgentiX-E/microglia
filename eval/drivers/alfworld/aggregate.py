@@ -236,6 +236,28 @@ def load_slices(
                         f"which records ledger_counts={episode.get('ledger_counts')}; the two renderers are two "
                         "treatments and a file that cannot say which one it drove is joined by neither (R193)"
                     )
+        # R194's claim, held to the episodes the same way. The state renderer is now three treatments -- the list, the
+        # counted list, and the admissible set -- and an arm whose header says which one it drove while its episodes
+        # cannot is an arm that a join can neither place nor price (R194).
+        claimed_admissible = summary.get("state_admissible")
+        if claimed_admissible is not None:
+            if not isinstance(claimed_admissible, bool):
+                fail(f"{path}: summary.state_admissible is {claimed_admissible!r}, which is not a flag")
+            for episode in episodes:
+                if isinstance(episode, dict) and claimed_admissible:
+                    missing = [key for key in ("admissible_mean", "admissible_max", "admissible_sample") if key not in episode]
+                    if missing:
+                        fail(
+                            f"{path}: {episode.get('gamefile')} was driven with the admissible renderer and carries no "
+                            f"{', '.join(missing)}; an armed episode without its instrument is a round that cannot be "
+                            "priced from its own artefacts (R194)"
+                        )
+                if isinstance(episode, dict) and "state_admissible" in episode and bool(episode.get("state_admissible")) != claimed_admissible:
+                    fail(
+                        f"{path}: summary.state_admissible={claimed_admissible} contradicts {episode.get('gamefile')}, "
+                        f"which records state_admissible={episode.get('state_admissible')}; the header is a claim and the "
+                        "episodes are the fact, so this file is joined by neither"
+                    )
         claimed_ledger = summary.get("state_ledger")
         if claimed_ledger is not None:
             if not isinstance(claimed_ledger, bool):
@@ -842,6 +864,10 @@ def refusals(left: "list[dict]", right: "list[dict] | None" = None, labels: "tup
         # The turns R193's change gate silenced. Reported beside the fires rather than folded into them: a counted arm
         # with 400 fires and 0 silences did not run the gate, and an arm with many silences spent its tail on one state.
         ledger_suppressed = sum(int(episode.get("ledger_suppressed") or 0) for episode in episodes)
+        # R194's instrument. The mean is over the games that actually refused a command, because a mean over 274 games
+        # in which 250 never refused is a mean of zeroes and the round's price is about the turns that did (R194).
+        admissible_games = [int(episode.get("admissible_mean") or 0) for episode in episodes if episode.get("admissible_mean")]
+        admissible_counted = any("admissible_mean" in episode for episode in episodes)
         return {
             "games": len(episodes),
             "calls": calls,
@@ -863,6 +889,10 @@ def refusals(left: "list[dict]", right: "list[dict] | None" = None, labels: "tup
             "ledger_chars": ledger_chars,
             "ledger_counted": ledger_counted,
             "ledger_suppressed": ledger_suppressed,
+            "admissible_counted": admissible_counted,
+            "admissible_games": len(admissible_games),
+            "admissible_mean": round(sum(admissible_games) / len(admissible_games)) if admissible_games else 0,
+            "admissible_max": max((int(episode.get("admissible_max") or 0) for episode in episodes), default=0),
             # A rate over no games is undefined rather than zero, for the reason the call rates below are: a slice
             # that recorded no episode did not think nothing, it did not happen.
             "thoughts_per_game": round(thoughts / len(episodes), 2) if episodes else None,
@@ -1256,6 +1286,20 @@ def main() -> int:
             print(
                 f"  ledger          {treatment} {ledger_cell(left_counts)} "
                 f"vs {control} {ledger_cell(right_counts)}"
+            )
+
+        def admissible_cell(counts: dict) -> str:
+            if not counts["admissible_counted"]:
+                return "not counted"
+            return (
+                f"{counts['admissible_games']} games refused, mean set {counts['admissible_mean']}, "
+                f"max {counts['admissible_max']}"
+            )
+
+        if left_counts["admissible_counted"] or right_counts["admissible_counted"]:
+            print(
+                f"  admissible      {treatment} {admissible_cell(left_counts)} "
+                f"vs {control} {admissible_cell(right_counts)}"
             )
     print(f"  bill            ${payload['bill']['usd']} over {payload['bill']['calls']} calls")
     if arguments.out:

@@ -2086,7 +2086,10 @@ sibling on the other side of a failed turn: the world said `Nothing happens.`, o
 observation is followed by one line naming the last three commands already tried with repeats collapsed. It is a
 **renderer over the episode's own history**, not a memory: nothing is written back, nothing survives the episode, and a
 game whose actions all land carries no extra character. Conditional by construction, recorded per episode
-(`ledger_fires`, `ledger_chars`), labelled (`@ledger`), and refused in a join that does not name both states. R191 read
+(`ledger_fires`, `ledger_chars`), labelled (`@ledger`), and refused in a join that does not name both states. Its two
+triggers are **nested in this corpus**: the admissible set is the set of commands that do something, so a refused command
+is also a no-op, and over 822 armed games `ledger_fires` equals `invalid_actions` exactly — the renderer is an
+admissibility repair in practice (AUDIT 34.284). R191 read
 **413 fires / 42,845 characters** and won all four games it was registered for; its failure mode is that a line which
 repeats is a constant, and one game received forty of them and still lost at the cap (AUDIT 34.279).
 
@@ -2096,6 +2099,13 @@ copy of the copy, plus a gate that silences a line whose three-command window is
 263/274 against the plain list's 267, 479 lines against 413, a 42-line worst game against 40, and **2 silences in 479
 chances** — a count changes the line's text without changing the window the gate compares, so the gate sees no repeat
 (AUDIT 34.281). The family's version is the plain list.
+
+**Admissible hint** — The state ledger's third renderer (`--state-admissible`, R194): on the turn that moved nothing, one
+line naming **how many commands the world admits** at that state and one of them, chosen deterministically (shortest
+command sharing the refused verb, else the first in the world's order). Labelled `@ledger-admissible`; recorded with the
+shared fire counters and three instrument fields (`admissible_mean`, `admissible_max`, `admissible_sample`). It exists
+because AUDIT 34.284 found that every line the other two renderers ever sent answered a **refused** command — the family
+is an admissibility repair, and this names the set that would work rather than the set that did not.
 
 **Release distribution** — The spread of one arm's pool number across repeated draws on the same games, bought in R192 so
 that the published figure is an interval rather than a point. Five draws of the ledger arm: 267, 268, 265, 268, 270 of

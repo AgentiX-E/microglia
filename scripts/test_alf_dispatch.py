@@ -202,6 +202,21 @@ class RefusalTest(unittest.TestCase):
         # It implies the ledger on the driver's side, so a payload that named only the mode is still a legal purchase.
         self.assertNotIn("state_ledger", lane.payload(arguments("--sweep", "true", "--state-ledger-counts")))
 
+    def test_the_admissible_renderer_travels_with_the_dispatch(self):
+        # R194's third renderer: the same turn, the other half of the truth. Its own input, its own label token, and a
+        # payload that names it only when it was asked for -- a dispatch that always carried it would arm a treatment
+        # nobody registered.
+        self.assertEqual(
+            lane.payload(arguments("--sweep", "true", "--state-admissible"))["state_admissible"], "true"
+        )
+        self.assertNotIn("state_admissible", lane.payload(arguments("--sweep", "true")))
+        # It is a renderer of the same state rather than a mode of the list, so it does not drag `state_ledger` with it:
+        # the arm the driver builds is `@ledger-admissible`, which is neither the list nor the count.
+        self.assertNotIn("state_ledger", lane.payload(arguments("--sweep", "true", "--state-admissible")))
+
+    def test_an_admissible_renderer_with_no_pass_to_change_is_refused(self):
+        self.assertIn("needs a pass to change", self.refused("--state-admissible"))
+
     def test_a_counted_ledger_with_no_pass_to_change_is_refused(self):
         self.assertIn("needs a pass to change", self.refused("--state-ledger-counts"))
 

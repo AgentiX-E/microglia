@@ -106,6 +106,9 @@ def parser():
     # The counted renderer, which is a mode of the ledger rather than a second knob: R193 sends a count instead of a
     # repeat and silences a line whose window did not change.
     result.add_argument("--state-ledger-counts", dest="ledger_counts", action="store_true")
+    # R194's renderer: the same turn, the other half of the truth -- the set the world admits here rather than the set
+    # that has been tried. Its own flag because it is its own label token: three renderers of one state are three arms.
+    result.add_argument("--state-admissible", dest="state_admissible", action="store_true")
     # The comparison this sweep is half of, when the other half was bought in an earlier dispatch. A two-treatment
     # comparison is the one this lane trusts — the control moves eight to eleven wins between dispatches, the
     # treatments repeat — and a sweep that can only buy a control it does not need pays for a band (AUDIT 34.232).
@@ -287,6 +290,9 @@ def check(arguments, tree=None):
         # dispatch that names neither a sweep nor a calibration has no such step. Refused here rather than dropped,
         # because a payload that says `guard` and a run that is not armed is the one failure this flag can produce.
         raise Refused("--guard-commandless changes what the driver answers, so it needs a pass to change: name --sweep or --games")
+    if arguments.state_admissible and not (arguments.sweep or arguments.games):
+        # The same refusal as the other two renderers: a flag that reaches no job is a flag nobody bought.
+        raise Refused("--state-admissible changes what the driver answers, so it needs a pass to change: name --sweep or --games")
     if arguments.ledger_counts and not (arguments.sweep or arguments.games):
         # The counted renderer is read by the same step the ledger is, so it gets the same refusal rather than a silent
         # drop that would leave the buyer believing a mode was bought.
@@ -351,6 +357,7 @@ def payload(arguments):
         ("guard_commandless", "true" if arguments.guard_commandless else ""),
         ("state_ledger", "true" if arguments.state_ledger else ""),
         ("state_ledger_counts", "true" if arguments.ledger_counts else ""),
+        ("state_admissible", "true" if arguments.state_admissible else ""),
         ("split", arguments.split),
         # The size travels with the section, because the workflow's join tiles to it and a section without its
         # published size is a sweep whose twelve jobs drive one number and whose reading checks another.

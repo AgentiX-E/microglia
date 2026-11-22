@@ -3036,6 +3036,12 @@ R189's guard answers the turn that carried **no command**. R191 adds the sibling
 whose command **moved nothing**. The world answers `Nothing happens.`, or the action is not in the turn's admissible set —
 both are the same event from the model's side, and neither is reachable by a sentence in front of the episode.
 
+**The two triggers are nested, and only one of them occurs.** `admissible_commands` in this corpus is the set of commands
+that *do* something, so a refused command also returns `Nothing happens.`; over 822 armed games `ledger_fires` equals
+`invalid_actions` exactly (413/413 and 479/479) and the admitted-but-ineffective branch never fired once. That makes the
+renderer an **admissibility repair**: what it tells the model is that the object it just named does not exist here, and
+that is the failure the tail games are made of (AUDIT 34.284).
+
 **The history already exists, so the treatment is a renderer.** `run_episode` holds `actions`, in order, for every command
 the episode handed the world. `ledger_line()` takes the last three, drops repeats, and returns one line:
 
@@ -3098,3 +3104,28 @@ Three consequences are now architecture rather than commentary.
    five draws and is at **99.70% pooled** — saturated. The seen section varies by four and sits at 95.71%. A two-section
    claim therefore has one section that can carry an effect and one that cannot, and the section that is published is the
    saturated one.
+
+### 8.56 The third renderer: what the world admits, and an instrument that exists because an estimate did not
+
+R191's line and R193's counted line are two renderings of the same state — what the episode has tried. AUDIT 34.284
+measured what that state was ever *about*: across 822 armed games `ledger_fires` equals `invalid_actions` exactly
+(413/413, 479/479), because the admissible set in this corpus is the set of commands that do something. The renderer was
+an admissibility repair all along, and the repair it never attempted is to name **the set that works**.
+
+`--state-admissible` renders, on the ledger's own trigger:
+
+```
+Admissible here: 7 commands, e.g. `take apple 1 from countertop 1`.
+```
+
+**Four properties, each a test.** The count is the world's own set size, so it generalises past the string; the example is
+chosen deterministically (shortest command sharing the refused verb, else first in the world's order), so one state always
+yields one line; the token `@ledger-admissible` makes it a third arm in every join; and the two fire counters are shared
+with the other renderers, because it is the same event measured the same way.
+
+**The instrument is part of the design, not an afterthought.** `admissible_mean`, `admissible_max` and
+`admissible_sample` are per-episode fields, and the join refuses an armed episode without them. The reason is a specific
+failure this lane has now made twice: a price that was never a written-down multiplication (AUDIT 34.282). The line's
+cost is a function of the size of the admissible set, which had never been recorded, so the round could not be priced from
+artefacts already paid for. A field costs nothing; a wrong estimate cost R193 half its registered budget in the other
+direction and R192 a day of dispatch arithmetic.

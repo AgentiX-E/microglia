@@ -138,6 +138,9 @@ ACTION_VERB_PATTERN = r"(?i)(?:go to|open|take|put|use|heat|cool|look|clean|inve
 # the string a rejected action gets -- so that is the string a refused turn gets, and it is the string the
 # model already knows the meaning of (AUDIT 34.259).
 NO_OP = "Nothing happens."
+# R194 renders the set the world admits rather than the set that has been tried: the count generalises, the example is
+# usable, and both are functions of the state the refusal happened in.
+ADMISSIBLE_HEADER = "Admissible here:"
 # The guard's line, and the whole of R189. `OK.` answers a thought truthfully and that is exactly the problem: a model
 # that has started narrating is told, once per turn, that narrating is a fine thing to do. This answer says the same
 # `OK.` and then names the requirement, which is the one sentence a loop turn can be interrupted by without a second
@@ -492,6 +495,31 @@ def ledger_window(commands: "list[str]", limit: int = LEDGER_SAMPLES) -> "tuple[
     return tuple(reversed(recent))
 
 
+def admissible_example(commands: "list[str]", refused: str) -> str:
+    """One command from the world's own admissible set, chosen so that one state always yields one line.
+
+    The refusal names a verb the model wanted (`take apple 9`), so the example keeps that verb when the world has such a
+    command — it answers the turn in the vocabulary the model just used — and among those candidates the shortest wins,
+    because the line is paid for on every refused turn and the shortest command carries the same information. Ties go to
+    the world's own order, which makes the choice a function of the state rather than of a sampler.
+    """
+    if not commands:
+        return ""
+    verb = refused.split()[0].lower() if refused.split() else ""
+    sharing = [command for command in commands if command.split() and command.split()[0].lower() == verb]
+    return min(sharing or list(commands), key=len)
+
+
+def admissible_line(count: int, sample: str) -> str:
+    """The line R194 renders: how large the admissible set is, and one command in it.
+
+    The count is the part that generalises — a model told that seven commands exist where it has been inventing objects
+    learns something about the state, not about a string — and the example is the part that is immediately usable.
+    """
+    body = f"{count} command" if count == 1 else f"{count} commands"
+    return f"{ADMISSIBLE_HEADER} {body}, e.g. `{sample}`." if sample else f"{ADMISSIBLE_HEADER} {body}."
+
+
 def words_of(text: str) -> "set[str]":
     """Lowercased alphanumeric words. The anchor's whole vocabulary, and deliberately a small one."""
     return set(re.findall(r"[a-z0-9]+", text.lower()))
@@ -544,8 +572,9 @@ def arm_label(
     guard_commandless: bool = False,
     state_ledger: bool = False,
     ledger_counts: bool = False,
+    state_admissible: bool = False,
 ) -> str:
-    """The arm's identity, including only the knobs that were moved off their registered values.
+    """The arm's identity, including only the knobs that were moved off its registered values.
 
     `retrieved` at k=3 and `retrieved` at k=1 are two treatments with one name, and so are the ungated and the gated
     one. Their artefacts carry `arm=retrieved` either way, so a sweep that dispatched both would leave the reading
@@ -589,7 +618,11 @@ def arm_label(
         moved.append(PARSER_TOKENS.get(parser, parser.replace("-", "")))
     if guard_commandless:
         moved.append("guard")
-    if state_ledger:
+    if state_admissible:
+        # The third renderer of one state (R194): the set the world *admits* rather than the set that has been tried.
+        # Its own token for the reason the counted one has one -- three renderers, three treatments, three labels.
+        moved.append("ledger-admissible")
+    elif state_ledger:
         # One token per renderer: R191's list and R193's counted list are two treatments, and a label that named both
         # `ledger` would make the join pool them into one rate -- the defect every other harness knob is labelled for.
         moved.append("ledger-counts" if ledger_counts else "ledger")
@@ -806,6 +839,7 @@ def run_episode(
     guard_commandless: bool = False,
     state_ledger: bool = False,
     ledger_counts: bool = False,
+    state_admissible: bool = False,
 ) -> dict:
     """One game, driven by one arm. Returns the episode record; never a partly-filled one.
 
@@ -862,6 +896,12 @@ def run_episode(
     # change is a constant, and a constant in front of every turn is what R188 measured as inert (R193, AUDIT 34.279).
     ledger_window_seen: "tuple[str, ...] | None" = None
     ledger_suppressed = 0
+    # R194's instrument: the size of the world's admissible set on every turn it answered a refusal with, and one example.
+    # Recorded because the round cannot be priced from artefacts already paid for -- if the typical set is three commands
+    # the line costs 60 characters and if it is sixty only the count is affordable -- and because a mean that is never
+    # written down is an estimate, which this lane has been wrong about twice in five rounds (AUDIT 34.282).
+    admitted_sizes: "list[int]" = []
+    admissible_sample = ""
     pack_entries: "int | None" = None
     # The rendered pack's length, as opposed to the prefix's. `prefix_chars` is the whole fixed prompt — examples,
     # system instruction and pack — so two arms of different lengths differ by a number that also contains the
@@ -990,7 +1030,18 @@ def run_episode(
                     refused_samples.append(refused_here)
             if refused_here is not None:
                 answer = NO_OP
-                if state_ledger:
+                if state_admissible:
+                    # The same turn the ledger answers, with the other half of the truth: the world refused this command,
+                    # so its admissible set is what the model needs, and `attempted` is not consulted at all. R194.
+                    attempted.append(refused_here)
+                    admitted_sizes.append(len(admissible))
+                    if not admissible_sample:
+                        admissible_sample = admissible_example(admissible, refused_here)
+                    line = admissible_line(len(admissible), admissible_example(admissible, refused_here))
+                    answer = f"{NO_OP}\n{line}"
+                    ledger_fires += 1
+                    ledger_chars += len(line) + 1
+                elif state_ledger:
                     # A refused command is a command that did not move the world, so it is the same event the ledger
                     # answers on the other side of the parser: the model asked for something and got nothing. The
                     # refused command joins the history *without* joining `actions` -- it was never executed, and the
@@ -1048,7 +1099,19 @@ def run_episode(
         heard = last
         # `not done` is part of the condition rather than an optimisation: a line appended after the episode's last
         # answer is a line no turn reads, so counting it as a fire would report engagement the model never saw.
-        if state_ledger and not done and (refused_by_world or moved_nothing(last)):
+        if state_admissible and not done and (refused_by_world or moved_nothing(last)):
+            # The ledger's own trigger, and deliberately not a narrower one: the difference between this renderer and
+            # R191's is the *content* of the line, so the two arms are one knob apart. In this corpus the two halves of
+            # the condition coincide -- `ledger_fires` equals `invalid_actions` in all 822 armed games (AUDIT 34.284) --
+            # and naming the admissible set is informative on either half, because the set is what would work here.
+            admitted_sizes.append(len(admissible))
+            if not admissible_sample:
+                admissible_sample = admissible_example(admissible, action)
+            line = admissible_line(len(admissible), admissible_example(admissible, action))
+            heard = f"{last.rstrip()}\n{line}"
+            ledger_fires += 1
+            ledger_chars += len(line) + 1
+        elif state_ledger and not done and (refused_by_world or moved_nothing(last)):
             window = ledger_window(attempted)
             if window and window == ledger_window_seen and ledger_counts:
                 # The same state as the last line named. Sending it again is the constant, and the model already has it
@@ -1064,6 +1127,8 @@ def run_episode(
         messages.append({"role": "user", "content": heard})
         trajectory.append(heard.strip())
 
+    admissible_mean = round(sum(admitted_sizes) / len(admitted_sizes)) if admitted_sizes else 0
+    admissible_max = max(admitted_sizes) if admitted_sizes else 0
     record = {
         "gamefile": gamefile,
         "task_kind": kind,
@@ -1114,6 +1179,13 @@ def run_episode(
         # The turns the change-gate silenced. A zero here on a counted arm says the gate never had to fire, which is a
         # different statement from a zero that was never counted.
         "ledger_suppressed": ledger_suppressed,
+        # R194's instrument, in every episode of an armed pass: the size of the admissible set on the turns it answered a
+        # refusal with, and one example. `admissible_mean` is rounded to a whole command because a mean of 6.7 commands
+        # would be a precision the world does not have.
+        "state_admissible": bool(state_admissible),
+        "admissible_mean": admissible_mean,
+        "admissible_max": admissible_max,
+        "admissible_sample": admissible_sample,
         # Which reader drove this game. In the record and not only in the summary, because a join that pooled two
         # channels would otherwise be undetectable per episode (AUDIT 34.262).
         "parser": parser,
@@ -1250,6 +1322,7 @@ def pass_header(arguments, rules: "list[str]", total: int, kinds: "list[list[str
             bool(arguments.guard_commandless),
             bool(arguments.state_ledger),
             bool(arguments.ledger_counts),
+            bool(arguments.state_admissible),
         ),
         # The channel travels in the header as well as in every episode: a reader opening the file sees which reader
         # drove it before seeing a single score (AUDIT 34.262).
@@ -1261,6 +1334,8 @@ def pass_header(arguments, rules: "list[str]", total: int, kinds: "list[list[str
         # header and the episodes can be held against each other instead of trusted separately (R191).
         "state_ledger": bool(arguments.state_ledger),
         "state_ledger_counts": bool(arguments.state_ledger and arguments.ledger_counts),
+        # R194's claim about this file, beside the episodes' own `state_admissible` for the reason the ledger's is.
+        "state_admissible": bool(arguments.state_admissible),
         "rules_in_bank": len(rules),
         # R185 swaps a bank under an unchanged label at an unchanged length. Without this field the two artefacts
         # differ only by run id, and a join of them would print one rate over two prompts.
@@ -1317,6 +1392,14 @@ def pass_summary(
             "ledger_fires": sum(episode.get("ledger_fires", 0) for episode in episodes),
             "ledger_chars": sum(episode.get("ledger_chars", 0) for episode in episodes),
             "ledger_suppressed": sum(episode.get("ledger_suppressed", 0) for episode in episodes),
+            # R194's instrument, over the games that actually carried a refusal: a mean over 274 games where 250 never
+            # refused would report the zeroes rather than the state, and the round's price is about the refused turns.
+            "admissible_games": sum(1 for episode in episodes if episode.get("admissible_mean")),
+            "admissible_mean": round(
+                sum(episode.get("admissible_mean", 0) for episode in episodes if episode.get("admissible_mean"))
+                / max(1, sum(1 for episode in episodes if episode.get("admissible_mean")))
+            ),
+            "admissible_max": max((episode.get("admissible_max", 0) for episode in episodes), default=0),
             "off_space_actions": sum(episode["off_space_actions"] for episode in episodes),
             "usage": usage,
             "cache_hit_rate": round(usage["cache_hit_tokens"] / usage["prompt_tokens"], 4) if usage["prompt_tokens"] else None,
@@ -1416,6 +1499,15 @@ def main() -> int:
         help="the counted ledger of R193: each named command carries how many times the episode tried it, and a turn "
         "whose history is unchanged by the last line is answered with the observation alone; implies --state-ledger",
     )
+    parser.add_argument(
+        "--state-admissible",
+        dest="state_admissible",
+        action="store_true",
+        help="R194's renderer: on a turn whose command the world refused, answer with the observation plus one line "
+        "naming how many commands are admissible at this state and one of them; recorded per episode as "
+        "`admissible_mean`, `admissible_max` and `admissible_sample`, with the same `ledger_fires`/`ledger_chars` the "
+        "other renderers use",
+    )
     parser.add_argument("--seed", type=int, default=20261120)
     parser.add_argument("--model", default=os.environ.get("ALFWORLD_MODEL", DEFAULT_MODEL))
     parser.add_argument("--timeout", type=float, default=120.0)
@@ -1437,6 +1529,10 @@ def main() -> int:
     # ledger off would be a flag that changed nothing while naming itself in the header.
     if arguments.ledger_counts:
         arguments.state_ledger = True
+    # One renderer per arm. Two of them would answer one refused turn with two lines and leave the artefact readable
+    # against neither, so the refusal is at the argument rather than in the loop (R194).
+    if arguments.state_admissible and (arguments.state_ledger or arguments.ledger_counts):
+        fail("--state-admissible replaces the state line rather than stacking on it; give one renderer per arm")
 
     if arguments.arm != "none" and not arguments.rules:
         fail(f"--arm {arguments.arm} needs --rules; an empty bank is a different arm and is not assumed")
@@ -1532,6 +1628,7 @@ def main() -> int:
             arguments.guard_commandless,
             arguments.state_ledger,
             arguments.ledger_counts,
+            arguments.state_admissible,
         )
         # Checked before the write, so a file on disk never holds one game twice: the checkpoint is the
         # evidence, and evidence that has to be re-checked before it can be trusted is not evidence.
@@ -1610,6 +1707,11 @@ def main() -> int:
         f"  ledger          {summary['ledger_fires']} fires, {summary['ledger_chars']} chars added, "
         f"{summary['ledger_suppressed']} silenced by the change gate"
     )
+    if summary.get("state_admissible"):
+        print(
+            f"  admissible      {summary['admissible_games']} games refused a command, mean set "
+            f"{summary['admissible_mean']}, max {summary['admissible_max']}"
+        )
     print(f"  cache hit rate  {summary['cache_hit_rate']}")
     print(f"  prefix chars    {summary['prefix_chars_mean']}")
     print(f"  bill            ${bill['usd']} ({bill['band']}); other band ${bill['usd_in_other_band']}")

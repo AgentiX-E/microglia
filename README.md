@@ -654,7 +654,10 @@ the 10 games** the control loses to narration.
 
 The **state ledger** (`--state-ledger`) is the second answer-side knob and the guard's sibling: on a turn whose command
 moved nothing — the world answered `Nothing happens.`, or the action was not admitted — the observation is followed by
-one line naming the last three commands already tried, repeats collapsed. It fires on a different turn than the guard
+one line naming the last three commands already tried, repeats collapsed. **The two triggers are nested in this corpus and
+only one has ever fired**: across 822 armed games `ledger_fires` equals `invalid_actions` exactly (413/413, 479/479), so
+every line the treatment rendered answered a command the world had already refused, and the state family is an
+**admissibility repair** rather than a search repair (AUDIT 34.284). It fires on a different turn than the guard
 does (a command that failed rather than a reply that carried none), so it carries its own token (`always-in@anyline+guard+ledger`)
 and its own two counters (`ledger_fires`, `ledger_chars`), and `aggregate.py` refuses to pool the two states until a join
 names them with `--expect-ledger`. The line is conditional by construction: a game whose actions all land carries no
@@ -666,6 +669,13 @@ window is the one the previous line named. It **lost**: 263/274, the maximum lin
 **42**, the characters added rose from 42,845 to **48,179**, and the change gate silenced **2 of 479** fires because a
 counted line gives the same-window condition nothing to compare against. The flag stays in the driver as a measured
 negative; the state family's version is the plain list.
+
+The third renderer is **`--state-admissible`** (R194, built and instrumented, not yet dispatched): on the same turn, the
+line names **what the world admits** — how many commands, and one of them — because AUDIT 34.284 read the 822 armed games
+of R191 and R193 together and found `ledger_fires` equal to `invalid_actions` in every one of them. The list was never a
+search repair; it was an admissibility repair. This renderer carries the label token `@ledger-admissible`, the same two
+fire counters, and three instrument fields (`admissible_mean`, `admissible_max`, `admissible_sample`) so that the round's
+price is a measurement of the world's admissible set rather than an estimate.
 
 The published number for the arm is a **band**, not a point: five draws of one arm on one 274-game pool landed on 267,
 268, 265, 268 and 270 — a **1.82 pp** range with no treatment applied — so the record quotes **1,338/1,370 = 97.66%

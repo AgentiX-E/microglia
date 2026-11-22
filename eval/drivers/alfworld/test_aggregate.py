@@ -2179,5 +2179,122 @@ class StateLedgerReportTest(unittest.TestCase):
         self.assertIn("not a flag", printed.getvalue())
 
 
+class AdmissibleReportTest(unittest.TestCase):
+    """The join's reading of R194's renderer: the instrument, and the two ways a slice can lie about carrying it.
+
+    The round cannot be priced without the size of the admissible set, so the join has to refuse an armed episode that
+    carries no instrument -- otherwise the one number the round is bought for would be missing from exactly the slice
+    that needed it, and the reading would be an average over the games that happened to record it.
+    """
+
+    def setUp(self):
+        self.paths = []
+
+    def tearDown(self):
+        for path in self.paths:
+            path.unlink(missing_ok=True)
+
+    def write(self, name: str, payload: dict) -> Path:
+        path = HERE / name
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        self.paths.append(path)
+        return path
+
+    def run_main(self, argv):
+        original = sys.argv
+        sys.argv = ["aggregate.py"] + argv
+        try:
+            return aggregate.main()
+        finally:
+            sys.argv = original
+
+    def armed(self, name: str, episodes=None, **summary_overrides):
+        payload = {"state_admissible": True, "arm_label": "always-in@ledger-admissible"}
+        payload.update(summary_overrides)
+        return self.write(
+            name,
+            {
+                "summary": summary("always-in", **payload),
+                "episodes": episodes
+                or [
+                    episode("g1", True, state_admissible=True, admissible_mean=6, admissible_max=9, admissible_sample="look",
+                            ledger=True, ledger_fires=2, ledger_chars=74),
+                    episode("g2", False, state_admissible=True, admissible_mean=4, admissible_max=4, admissible_sample="look",
+                            ledger=True, ledger_fires=3, ledger_chars=101),
+                ],
+            },
+        )
+
+    def test_the_mean_is_over_the_games_that_refused_and_the_max_over_all_of_them(self):
+        # A mean over 274 games where 250 never refused would be a mean of zeroes. The max is over every game because a
+        # single expensive state is what the price has to survive.
+        counts = aggregate.refusals(
+            [
+                episode("g1", True, admissible_mean=6, admissible_max=9),
+                episode("g2", False, admissible_mean=4, admissible_max=4),
+                episode("g3", True, admissible_mean=0, admissible_max=0),
+            ],
+            labels=("arm", "other"),
+        )["arm"]
+        self.assertEqual(counts["admissible_games"], 2)
+        self.assertEqual(counts["admissible_mean"], 5)
+        self.assertEqual(counts["admissible_max"], 9)
+
+    def test_the_instrument_is_printed_beside_the_ledger_line(self):
+        left = self.armed("adm-left.json")
+        right = self.write(
+            "adm-right.json",
+            {"summary": summary("always-in", arm_label="always-in@ledger"),
+             "episodes": [episode("g1", True, ledger=True, ledger_fires=2, ledger_chars=74),
+                          episode("g2", False, ledger=True, ledger_fires=3, ledger_chars=101)]},
+        )
+        original = sys.stdout
+        buffer = io.StringIO()
+        try:
+            sys.stdout = buffer
+            self.run_main([
+                "--input", str(left), "--input", str(right),
+                "--compare", "always-in@ledger-admissible,always-in@ledger", "--expect", "0",
+                "--expect-ledger", "on",
+            ])
+        finally:
+            sys.stdout = original
+        printed = buffer.getvalue()
+        self.assertIn("admissible", printed)
+        self.assertIn("2 games refused, mean set 5, max 9", printed)
+
+    def test_an_armed_episode_without_its_instrument_is_refused(self):
+        left = self.armed("adm-broken.json", episodes=[episode("g1", True, state_admissible=True, ledger_fires=2)])
+        right = self.write(
+            "adm-control.json",
+            {"summary": summary("always-in", arm_label="always-in@ledger"),
+             "episodes": [episode("g1", True, ledger=True, ledger_fires=2, ledger_chars=74)]},
+        )
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer), self.assertRaises(SystemExit):
+            self.run_main([
+                "--input", str(left), "--input", str(right),
+                "--compare", "always-in@ledger-admissible,always-in@ledger", "--expect", "0",
+            ])
+        self.assertIn("carries no admissible_mean", buffer.getvalue())
+
+    def test_a_header_that_claims_a_flag_it_is_not_is_refused(self):
+        left = self.armed("adm-flag.json", state_admissible="yes")
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer), self.assertRaises(SystemExit):
+            self.run_main(["--input", str(left), "--compare", "always-in,always-in", "--expect", "0"])
+        self.assertIn("which is not a flag", buffer.getvalue())
+
+    def test_a_header_and_its_episodes_that_disagree_are_refused(self):
+        left = self.armed(
+            "adm-disagree.json",
+            episodes=[episode("g1", True, state_admissible=False, admissible_mean=6, admissible_max=9, admissible_sample="")],
+        )
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer), self.assertRaises(SystemExit):
+            self.run_main(["--input", str(left), "--compare", "always-in,always-in", "--expect", "0"])
+        self.assertIn("contradicts", buffer.getvalue())
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

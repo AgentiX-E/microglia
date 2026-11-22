@@ -95,6 +95,10 @@ on:
         description: 'true is R193''s renderer: each named command carries how many times the episode tried it, and a turn whose history is unchanged by the last line is answered with the observation alone'
         required: false
         default: ''
+      state_admissible:
+        description: 'true is R194''s renderer: a turn that moved nothing is answered with how many commands the world admits here and one of them; recorded as admissible_mean, admissible_max and admissible_sample'
+        required: false
+        default: ''
       train_shards:
         description: 'which training slices to drive, as a JSON list; ["1"] re-drives only the slice that failed'
         required: false
@@ -473,6 +477,7 @@ jobs:
           GUARD: ${{ inputs.guard_commandless }}
           LEDGER: ${{ inputs.state_ledger }}
           LEDGER_COUNTS: ${{ inputs.state_ledger_counts }}
+          ADMISSIBLE: ${{ inputs.state_admissible }}
         run: |
           set -euo pipefail
           if [ -z "${DEEPSEEK_API_KEY}" ]; then
@@ -504,6 +509,7 @@ jobs:
           if [ -n "${LEDGER}" ]; then args+=(--state-ledger); fi
           # The counted renderer implies the ledger, so the workflow passes the mode and lets the driver decide.
           if [ -n "${LEDGER_COUNTS}" ]; then args+=(--state-ledger-counts); fi
+          if [ -n "${ADMISSIBLE}" ]; then args+=(--state-admissible); fi
           if [ -n "${RULES}" ]; then args+=(--rules "${RULES}"); fi
           python eval/drivers/alfworld/agent.py "${args[@]}" \
             --out "$RUNNER_TEMP/arm.json" | tee "$RUNNER_TEMP/arm.log"
@@ -817,6 +823,7 @@ jobs:
           GUARD: ${{ inputs.guard_commandless }}
           LEDGER: ${{ inputs.state_ledger }}
           LEDGER_COUNTS: ${{ inputs.state_ledger_counts }}
+          ADMISSIBLE: ${{ inputs.state_admissible }}
         run: |
           set -euo pipefail
           if [ -z "${DEEPSEEK_API_KEY}" ]; then
@@ -855,6 +862,7 @@ jobs:
           if [ -n "${LEDGER}" ]; then args+=(--state-ledger); fi
           # The counted renderer implies the ledger, so the workflow passes the mode and lets the driver decide.
           if [ -n "${LEDGER_COUNTS}" ]; then args+=(--state-ledger-counts); fi
+          if [ -n "${ADMISSIBLE}" ]; then args+=(--state-admissible); fi
           # The retrieval budget is an input because AMD measured k=1 as the global optimum and this lane's
           # default is 3; a contrast that has to be edited into a file is a contrast nobody runs twice.
           args+=(--top-k "${TOP_K:-3}")
