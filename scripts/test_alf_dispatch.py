@@ -193,6 +193,18 @@ class RefusalTest(unittest.TestCase):
         self.assertEqual(lane.payload(arguments("--sweep", "true", "--state-ledger"))["state_ledger"], "true")
         self.assertNotIn("state_ledger", lane.payload(arguments("--sweep", "true")))
 
+    def test_the_counted_renderer_travels_with_the_dispatch(self):
+        # R193's mode is a different treatment from R191's list, and the payload is where that difference is carried.
+        self.assertEqual(
+            lane.payload(arguments("--sweep", "true", "--state-ledger-counts"))["state_ledger_counts"], "true"
+        )
+        self.assertNotIn("state_ledger_counts", lane.payload(arguments("--sweep", "true")))
+        # It implies the ledger on the driver's side, so a payload that named only the mode is still a legal purchase.
+        self.assertNotIn("state_ledger", lane.payload(arguments("--sweep", "true", "--state-ledger-counts")))
+
+    def test_a_counted_ledger_with_no_pass_to_change_is_refused(self):
+        self.assertIn("needs a pass to change", self.refused("--state-ledger-counts"))
+
     def test_a_state_ledger_with_no_pass_to_change_is_refused(self):
         # The guard's refusal, for the guard's reason: no games means no step reads the flag, so the buyer would believe
         # a treatment was bought while nothing was armed.

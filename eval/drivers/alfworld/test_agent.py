@@ -2900,7 +2900,7 @@ class StateLedgerTest(unittest.TestCase):
     def tearDown(self):
         agent.chat = self.original
 
-    def drive(self, replies, ledger=True, world=None, parser="any-line", max_steps=50):
+    def drive(self, replies, ledger=True, world=None, parser="any-line", max_steps=50, counts=False):
         seen = []
         script = list(replies)
 
@@ -2911,7 +2911,7 @@ class StateLedgerTest(unittest.TestCase):
         agent.chat = chat
         episode = agent.run_episode(
             world or FakeWorld(nothing_happens=True), "none", "model", self.examples, [], agent.Draw(1), max_steps, 3,
-            "deepseek-flash", "k", 1.0, parser=parser, state_ledger=ledger,
+            "deepseek-flash", "k", 1.0, parser=parser, state_ledger=ledger, ledger_counts=counts,
         )
         return episode, seen
 
@@ -3073,6 +3073,152 @@ class StateLedgerTest(unittest.TestCase):
             "always-in@anyline+guard",
         )
         self.assertEqual(agent.arm_label("none", 3, 0.0), "none")
+
+    def test_the_counted_renderer_names_the_fact_the_collapse_throws_away(self):
+        # R193's first half. Three copies of one command is one fact about the state, and the count is the fact: "four
+        # times" is shorter than four copies and says what the fourth copy cannot.
+        self.assertEqual(
+            agent.ledger_line(["look", "look", "look", "look"], counts=True),
+            "Already tried this episode: look (4 times).",
+        )
+        self.assertEqual(
+            agent.ledger_line(["take apple 1", "look", "take apple 1"], counts=True),
+            "Already tried this episode: look; take apple 1 (2 times).",
+        )
+        # A command tried once carries no count: `(1 times)` is characters that say nothing.
+        self.assertEqual(
+            agent.ledger_line(["look", "take apple 1"], counts=True),
+            "Already tried this episode: look; take apple 1.",
+        )
+        # And the list renderer is unchanged, because R191's arm has to stay reproducible from its own flag.
+        self.assertEqual(
+            agent.ledger_line(["look", "look", "look", "look"]),
+            "Already tried this episode: look.",
+        )
+
+    def test_the_counted_renderer_is_a_label_of_its_own(self):
+        # Two renderers under one token would be two treatments pooled by the join -- the defect every other harness knob
+        # is labelled for, one knob later.
+        self.assertEqual(
+            agent.arm_label("always-in", 3, 0.0, False, agent.ANY_LINE_PARSER, True, True, True),
+            "always-in@anyline+guard+ledger-counts",
+        )
+        self.assertEqual(
+            agent.arm_label("always-in", 3, 0.0, False, agent.ANY_LINE_PARSER, True, True, False),
+            "always-in@anyline+guard+ledger",
+        )
+
+    def test_a_line_whose_window_did_not_change_is_not_sent_again(self):
+        # R193's second half, and the repair for the round's own tail (AUDIT 34.279). `look` fails three times in a row,
+        # so the window is `("look",)` on all three turns: the first line names it, the next two are answered the way the
+        # control answers them. A line that repeats without a change is a constant.
+        episode, seen = self.drive(
+            ["> look", "> look", "> look", "> take apple 1 from countertop 1", "> put apple 1 in/on cabinet 1"],
+            counts=True,
+        )
+        self.assertEqual(episode["ledger_fires"], 1)
+        self.assertEqual(episode["ledger_suppressed"], 2)
+        # The first line names `look` with no count, because at that moment it had been tried once.
+        self.assertEqual(seen[1][-1], "Nothing happens.\nAlready tried this episode: look.")
+        # The next two turns carry the observation alone: the window was already reported.
+        self.assertEqual(seen[2][-1], agent.NO_OP + "\n")
+        self.assertEqual(seen[3][-1], agent.NO_OP + "\n")
+        self.assertTrue(episode["won"])
+
+    def test_a_changed_window_earns_a_new_line(self):
+        # The gate is about the *window*, not about the fire count: a second, different failure is news and is sent, and
+        # the same failure twice more is not. `seen[k]` is the message list before call k+1, so the answer to turn k is
+        # the last message of `seen[k + 1]`.
+        episode, seen = self.drive(
+            ["> look", "> take apple 1 from countertop 1", "> take apple 1 from countertop 1",
+             "> take apple 1 from countertop 1", "> put apple 1 in/on cabinet 1"],
+            counts=True,
+        )
+        self.assertEqual(episode["ledger_fires"], 2)
+        self.assertEqual(episode["ledger_suppressed"], 1)
+        self.assertEqual(seen[1][-1], "Nothing happens.\nAlready tried this episode: look.")
+        # Turn 2 is the second `take`: it moved nothing, the window changed, and the count is on the line.
+        self.assertEqual(seen[3][-1],
+                         "Nothing happens.\nAlready tried this episode: look; take apple 1 from countertop 1 (2 times).")
+        # Turn 3 is the same failure again: no line.
+        self.assertEqual(seen[4][-1], agent.NO_OP + "\n")
+
+    def test_the_list_renderer_keeps_sending_every_time(self):
+        # The gate belongs to the counted renderer. R191's arm sent a line on every failed turn and its record is read
+        # from that behaviour, so the old flag cannot silently start behaving like the new one.
+        episode, _seen = self.drive(
+            ["> look", "> look", "> look", "> take apple 1 from countertop 1", "> put apple 1 in/on cabinet 1"],
+        )
+        self.assertEqual(episode["ledger_fires"], 3)
+        self.assertEqual(episode["ledger_suppressed"], 0)
+        self.assertFalse(episode["ledger_counts"])
+
+    def test_the_window_is_capped_at_three_however_long_the_history(self):
+        # The cap in `ledger_window`. Four distinct failing commands are tried, so the window has to stop at three and the
+        # line names the last three in order -- the state, not the log.
+        episode, seen = self.drive(
+            ["> look", "> inventory", "> go to countertop 1",
+             "> take apple 1 from countertop 1", "> put apple 1 in/on cabinet 1"],
+        )
+        self.assertEqual(episode["ledger_fires"], 3)
+        self.assertEqual(
+            seen[3][-1],
+            "Nothing happens.\nAlready tried this episode: look; inventory; go to countertop 1.",
+        )
+        self.assertTrue(episode["won"])
+
+    def test_the_change_gate_also_silences_a_repeated_refusal(self):
+        # The same gate on the other side of the parser. A refused command is appended to the history without joining
+        # `actions`, so a second identical refusal leaves the window unchanged and earns no line.
+        episode, seen = self.drive(
+            [
+                "> think: I need the apple\n> take apple 1 from countertop 1",
+                "> think: I need the apple\n> take apple 1 from countertop 1",
+                "> take apple 1 from countertop 1",
+                "> put apple 1 in/on cabinet 1",
+            ],
+            parser="reference",
+            counts=True,
+        )
+        self.assertEqual(episode["refused_actions"], 2)
+        self.assertEqual(episode["ledger_fires"], 1)
+        self.assertEqual(episode["ledger_suppressed"], 1)
+        self.assertEqual(seen[1][-1],
+                         "Nothing happens.\nAlready tried this episode: take apple 1 from countertop 1.")
+        self.assertEqual(seen[2][-1], agent.NO_OP)
+
+    def test_the_counted_flag_reaches_the_summary_and_the_episodes(self):
+        # End to end, and the header's claim held to the episodes by the same field: a pass that recorded the mode in one
+        # place and not the other is a file a join cannot grade.
+        class StandsStill(FakeWorld):
+            def admissible(self):
+                return ["look", "inventory"]
+
+        original_build = agent.build_env
+        original_argv = sys.argv
+        out = HERE / "ledger-counts-under-test.json"
+        agent.build_env = lambda batch_size=1, train_eval="eval_out_of_distribution": (
+            StandsStill(nothing_happens=True), 1
+        )
+        try:
+            sys.argv = [
+                "agent.py", "--arm", "none", "--policy", "first", "--games", "1",
+                "--state-ledger-counts", "--out", str(out),
+            ]
+            self.assertEqual(agent.main(), 0)
+            payload = json.loads(out.read_text(encoding="utf-8"))
+        finally:
+            agent.build_env = original_build
+            sys.argv = original_argv
+            out.unlink(missing_ok=True)
+        summary = payload["summary"]
+        self.assertTrue(summary["state_ledger"])
+        self.assertTrue(summary["state_ledger_counts"])
+        self.assertEqual(summary["arm_label"], "none@ledger-counts")
+        # Fifty turns of the same `look`: one line, forty-nine silenced. That is the tail R191 could not close, closed.
+        self.assertEqual(summary["ledger_fires"], 1)
+        self.assertEqual(summary["ledger_suppressed"], 49)
+        self.assertTrue(payload["episodes"][0]["ledger_counts"])
 
     def test_the_flag_reaches_the_summary_and_the_episodes(self):
         # The same end-to-end shape the guard's test takes: a flag that reached only the driver would leave the artefact

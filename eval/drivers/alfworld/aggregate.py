@@ -225,6 +225,17 @@ def load_slices(
         # The ledger's claim, held to its episodes by the same rule and for the same reason: R191's two arms differ by
         # one flag that is invisible in the pack, the channel and the cap, and a file whose header and episodes disagree
         # about it is an arm that ran as neither of the two that were registered (R191).
+        claimed_counts = summary.get("state_ledger_counts")
+        if claimed_counts is not None:
+            if not isinstance(claimed_counts, bool):
+                fail(f"{path}: summary.state_ledger_counts is {claimed_counts!r}, which is not a flag")
+            for episode in episodes:
+                if isinstance(episode, dict) and "ledger_counts" in episode and bool(episode.get("ledger_counts")) != claimed_counts:
+                    fail(
+                        f"{path}: summary.state_ledger_counts={claimed_counts} contradicts {episode.get('gamefile')}, "
+                        f"which records ledger_counts={episode.get('ledger_counts')}; the two renderers are two "
+                        "treatments and a file that cannot say which one it drove is joined by neither (R193)"
+                    )
         claimed_ledger = summary.get("state_ledger")
         if claimed_ledger is not None:
             if not isinstance(claimed_ledger, bool):
@@ -828,6 +839,9 @@ def refusals(left: "list[dict]", right: "list[dict] | None" = None, labels: "tup
         ledger_fires = sum(int(episode.get("ledger_fires") or 0) for episode in episodes)
         ledger_chars = sum(int(episode.get("ledger_chars") or 0) for episode in episodes)
         ledger_counted = any("ledger_fires" in episode for episode in episodes)
+        # The turns R193's change gate silenced. Reported beside the fires rather than folded into them: a counted arm
+        # with 400 fires and 0 silences did not run the gate, and an arm with many silences spent its tail on one state.
+        ledger_suppressed = sum(int(episode.get("ledger_suppressed") or 0) for episode in episodes)
         return {
             "games": len(episodes),
             "calls": calls,
@@ -848,6 +862,7 @@ def refusals(left: "list[dict]", right: "list[dict] | None" = None, labels: "tup
             "ledger_fires": ledger_fires,
             "ledger_chars": ledger_chars,
             "ledger_counted": ledger_counted,
+            "ledger_suppressed": ledger_suppressed,
             # A rate over no games is undefined rather than zero, for the reason the call rates below are: a slice
             # that recorded no episode did not think nothing, it did not happen.
             "thoughts_per_game": round(thoughts / len(episodes), 2) if episodes else None,
@@ -1232,7 +1247,10 @@ def main() -> int:
         def ledger_cell(counts: dict) -> str:
             if not counts["ledger_counted"]:
                 return "not counted"
-            return f"{counts['ledger_fires']} fires, {counts['ledger_chars']} chars added"
+            cell = f"{counts['ledger_fires']} fires, {counts['ledger_chars']} chars added"
+            if counts["ledger_suppressed"]:
+                cell += f", {counts['ledger_suppressed']} silenced"
+            return cell
 
         if left_counts["ledger_counted"] or right_counts["ledger_counted"]:
             print(

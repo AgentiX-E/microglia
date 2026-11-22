@@ -59,6 +59,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -429,7 +430,7 @@ def moved_nothing(observation: str) -> bool:
     return bool(lines) and lines[-1].strip() == NO_OP
 
 
-def ledger_line(commands: "list[str]", limit: int = LEDGER_SAMPLES) -> str:
+def ledger_line(commands: "list[str]", limit: int = LEDGER_SAMPLES, counts: bool = False) -> str:
     """One line naming what an episode has already tried, for the turn that moved nothing.
 
     The literature's answer to a search failure is a per-episode *state* rather than another sentence of corpus
@@ -457,7 +458,38 @@ def ledger_line(commands: "list[str]", limit: int = LEDGER_SAMPLES) -> str:
             break
     if not recent:
         return ""
-    return f"{LEDGER_HEADER} " + "; ".join(reversed(recent)) + "."
+    if not counts:
+        return f"{LEDGER_HEADER} " + "; ".join(reversed(recent)) + "."
+    # R193's half of the repair, and it says the fact the collapse throws away: `take apple 1 (4 times)` is shorter than
+    # four copies and tells the model something the fourth copy cannot -- that it has been here before. The tally is over
+    # the whole episode rather than over the window, because "four times" is a statement about the game and not about the
+    # last three turns.
+    tally = Counter(str(command).strip() for command in commands)
+    parts = [
+        f"{command} ({tally[command]} times)" if tally[command] > 1 else command
+        for command in reversed(recent)
+    ]
+    return f"{LEDGER_HEADER} " + "; ".join(parts) + "."
+
+
+def ledger_window(commands: "list[str]", limit: int = LEDGER_SAMPLES) -> "tuple[str, ...]":
+    """The commands a line would name, oldest first — the *state* the line reports, as a value.
+
+    Returned separately from the rendering because R193 needs to compare two turns' states: a line whose window is the
+    one the previous fire sent is not a state, it is a constant, and a constant in front of every turn is what R188
+    measured as inert (AUDIT 34.279). The window is the last `limit` distinct commands, so a model that issues the same
+    `take` four times has a one-command window and the comparison is about the command rather than about how often the
+    model wrote it.
+    """
+    recent: "list[str]" = []
+    for command in reversed(commands):
+        text = str(command).strip()
+        if not text or text in recent:
+            continue
+        recent.append(text)
+        if len(recent) >= limit:
+            break
+    return tuple(reversed(recent))
 
 
 def words_of(text: str) -> "set[str]":
@@ -511,6 +543,7 @@ def arm_label(
     parser: str = REFERENCE_PARSER,
     guard_commandless: bool = False,
     state_ledger: bool = False,
+    ledger_counts: bool = False,
 ) -> str:
     """The arm's identity, including only the knobs that were moved off their registered values.
 
@@ -557,7 +590,9 @@ def arm_label(
     if guard_commandless:
         moved.append("guard")
     if state_ledger:
-        moved.append("ledger")
+        # One token per renderer: R191's list and R193's counted list are two treatments, and a label that named both
+        # `ledger` would make the join pool them into one rate -- the defect every other harness knob is labelled for.
+        moved.append("ledger-counts" if ledger_counts else "ledger")
     return f"{arm}@{'+'.join(moved)}" if moved else arm
 
 
@@ -770,6 +805,7 @@ def run_episode(
     parser: str = REFERENCE_PARSER,
     guard_commandless: bool = False,
     state_ledger: bool = False,
+    ledger_counts: bool = False,
 ) -> dict:
     """One game, driven by one arm. Returns the episode record; never a partly-filled one.
 
@@ -822,6 +858,10 @@ def run_episode(
     ledger_fires = 0
     ledger_chars = 0
     attempted: "list[str]" = []
+    # The window the last line named, so a turn whose history has not changed carries no line: a line repeated without a
+    # change is a constant, and a constant in front of every turn is what R188 measured as inert (R193, AUDIT 34.279).
+    ledger_window_seen: "tuple[str, ...] | None" = None
+    ledger_suppressed = 0
     pack_entries: "int | None" = None
     # The rendered pack's length, as opposed to the prefix's. `prefix_chars` is the whole fixed prompt — examples,
     # system instruction and pack — so two arms of different lengths differ by a number that also contains the
@@ -956,11 +996,16 @@ def run_episode(
                     # refused command joins the history *without* joining `actions` -- it was never executed, and the
                     # action digest is a published field that must keep meaning what it has always meant.
                     attempted.append(refused_here)
-                    line = ledger_line(attempted)
-                    if line:
-                        answer = f"{NO_OP}\n{line}"
-                        ledger_fires += 1
-                        ledger_chars += len(line) + 1
+                    window = ledger_window(attempted)
+                    if window and window == ledger_window_seen and ledger_counts:
+                        ledger_suppressed += 1
+                    else:
+                        line = ledger_line(attempted, counts=ledger_counts)
+                        if line:
+                            answer = f"{NO_OP}\n{line}"
+                            ledger_fires += 1
+                            ledger_chars += len(line) + 1
+                            ledger_window_seen = window
             elif guard_commandless:
                 # The registered change, and the whole of it: the same answer, with the requirement named. The pack,
                 # the reader, the cap and the call count are untouched, so anything this arm moves is the loop being
@@ -1004,11 +1049,18 @@ def run_episode(
         # `not done` is part of the condition rather than an optimisation: a line appended after the episode's last
         # answer is a line no turn reads, so counting it as a fire would report engagement the model never saw.
         if state_ledger and not done and (refused_by_world or moved_nothing(last)):
-            line = ledger_line(attempted)
-            if line:
-                heard = f"{last.rstrip()}\n{line}"
-                ledger_fires += 1
-                ledger_chars += len(line) + 1
+            window = ledger_window(attempted)
+            if window and window == ledger_window_seen and ledger_counts:
+                # The same state as the last line named. Sending it again is the constant, and the model already has it
+                # one turn above; the turn is answered with the observation alone, exactly as the control answers it.
+                ledger_suppressed += 1
+            else:
+                line = ledger_line(attempted, counts=ledger_counts)
+                if line:
+                    heard = f"{last.rstrip()}\n{line}"
+                    ledger_fires += 1
+                    ledger_chars += len(line) + 1
+                    ledger_window_seen = window
         messages.append({"role": "user", "content": heard})
         trajectory.append(heard.strip())
 
@@ -1054,8 +1106,14 @@ def run_episode(
         # treatment's own prompt cost, summed here so the round's cost reading is a measurement rather than a
         # difference between two prompts that also differ by their pack (R191).
         "ledger": bool(state_ledger),
+        # Which renderer ran, in every episode for the reason the channel is: two treatments under one field would be
+        # pooled by a join that could not see the difference (AUDIT 34.266's lesson, one knob later).
+        "ledger_counts": bool(state_ledger and ledger_counts),
         "ledger_fires": ledger_fires,
         "ledger_chars": ledger_chars,
+        # The turns the change-gate silenced. A zero here on a counted arm says the gate never had to fire, which is a
+        # different statement from a zero that was never counted.
+        "ledger_suppressed": ledger_suppressed,
         # Which reader drove this game. In the record and not only in the summary, because a join that pooled two
         # channels would otherwise be undetectable per episode (AUDIT 34.262).
         "parser": parser,
@@ -1191,6 +1249,7 @@ def pass_header(arguments, rules: "list[str]", total: int, kinds: "list[list[str
             arguments.parser,
             bool(arguments.guard_commandless),
             bool(arguments.state_ledger),
+            bool(arguments.ledger_counts),
         ),
         # The channel travels in the header as well as in every episode: a reader opening the file sees which reader
         # drove it before seeing a single score (AUDIT 34.262).
@@ -1201,6 +1260,7 @@ def pass_header(arguments, rules: "list[str]", total: int, kinds: "list[list[str
         # The ledger's claim about this file, written by the same flag that wrote every episode's `ledger`, so the
         # header and the episodes can be held against each other instead of trusted separately (R191).
         "state_ledger": bool(arguments.state_ledger),
+        "state_ledger_counts": bool(arguments.state_ledger and arguments.ledger_counts),
         "rules_in_bank": len(rules),
         # R185 swaps a bank under an unchanged label at an unchanged length. Without this field the two artefacts
         # differ only by run id, and a join of them would print one rate over two prompts.
@@ -1256,6 +1316,7 @@ def pass_summary(
             # which is the true count of lines it sent and of characters it added.
             "ledger_fires": sum(episode.get("ledger_fires", 0) for episode in episodes),
             "ledger_chars": sum(episode.get("ledger_chars", 0) for episode in episodes),
+            "ledger_suppressed": sum(episode.get("ledger_suppressed", 0) for episode in episodes),
             "off_space_actions": sum(episode["off_space_actions"] for episode in episodes),
             "usage": usage,
             "cache_hit_rate": round(usage["cache_hit_tokens"] / usage["prompt_tokens"], 4) if usage["prompt_tokens"] else None,
@@ -1348,6 +1409,13 @@ def main() -> int:
         "observation plus one line naming the last three commands already tried; the registered change of R191, "
         "recorded per episode as `ledger_fires` and `ledger_chars` so a join can prove both engagement and price",
     )
+    parser.add_argument(
+        "--state-ledger-counts",
+        dest="ledger_counts",
+        action="store_true",
+        help="the counted ledger of R193: each named command carries how many times the episode tried it, and a turn "
+        "whose history is unchanged by the last line is answered with the observation alone; implies --state-ledger",
+    )
     parser.add_argument("--seed", type=int, default=20261120)
     parser.add_argument("--model", default=os.environ.get("ALFWORLD_MODEL", DEFAULT_MODEL))
     parser.add_argument("--timeout", type=float, default=120.0)
@@ -1365,6 +1433,10 @@ def main() -> int:
         help="continue the pass `--out` already holds rather than starting it again; the file is written after every episode",
     )
     arguments = parser.parse_args()
+    # The counted renderer is a mode of the ledger rather than a second knob: a `--state-ledger-counts` pass that left the
+    # ledger off would be a flag that changed nothing while naming itself in the header.
+    if arguments.ledger_counts:
+        arguments.state_ledger = True
 
     if arguments.arm != "none" and not arguments.rules:
         fail(f"--arm {arguments.arm} needs --rules; an empty bank is a different arm and is not assumed")
@@ -1459,6 +1531,7 @@ def main() -> int:
             arguments.parser,
             arguments.guard_commandless,
             arguments.state_ledger,
+            arguments.ledger_counts,
         )
         # Checked before the write, so a file on disk never holds one game twice: the checkpoint is the
         # evidence, and evidence that has to be re-checked before it can be trusted is not evidence.
@@ -1533,7 +1606,10 @@ def main() -> int:
         f"{summary['guard_checked']} checked"
     )
     # And the ledger's, on both arms for the same reason: `0 fires` is the statement that the control was not armed.
-    print(f"  ledger          {summary['ledger_fires']} fires, {summary['ledger_chars']} chars added")
+    print(
+        f"  ledger          {summary['ledger_fires']} fires, {summary['ledger_chars']} chars added, "
+        f"{summary['ledger_suppressed']} silenced by the change gate"
+    )
     print(f"  cache hit rate  {summary['cache_hit_rate']}")
     print(f"  prefix chars    {summary['prefix_chars_mean']}")
     print(f"  bill            ${bill['usd']} ({bill['band']}); other band ${bill['usd_in_other_band']}")

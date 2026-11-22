@@ -91,6 +91,10 @@ on:
         description: 'true answers a turn that moved nothing with the observation plus one line naming the last three commands already tried; R191 adds this line and nothing else, so every arm in the dispatch moves together'
         required: false
         default: ''
+      state_ledger_counts:
+        description: 'true is R193''s renderer: each named command carries how many times the episode tried it, and a turn whose history is unchanged by the last line is answered with the observation alone'
+        required: false
+        default: ''
       train_shards:
         description: 'which training slices to drive, as a JSON list; ["1"] re-drives only the slice that failed'
         required: false
@@ -468,6 +472,7 @@ jobs:
           PARSER: ${{ inputs.parser }}
           GUARD: ${{ inputs.guard_commandless }}
           LEDGER: ${{ inputs.state_ledger }}
+          LEDGER_COUNTS: ${{ inputs.state_ledger_counts }}
         run: |
           set -euo pipefail
           if [ -z "${DEEPSEEK_API_KEY}" ]; then
@@ -497,6 +502,8 @@ jobs:
           # episode, so a dispatch that armed one arm and not the other would leave the join refusing a pairing after
           # the money (R191).
           if [ -n "${LEDGER}" ]; then args+=(--state-ledger); fi
+          # The counted renderer implies the ledger, so the workflow passes the mode and lets the driver decide.
+          if [ -n "${LEDGER_COUNTS}" ]; then args+=(--state-ledger-counts); fi
           if [ -n "${RULES}" ]; then args+=(--rules "${RULES}"); fi
           python eval/drivers/alfworld/agent.py "${args[@]}" \
             --out "$RUNNER_TEMP/arm.json" | tee "$RUNNER_TEMP/arm.log"
@@ -809,6 +816,7 @@ jobs:
           SPLIT_GAMES: ${{ inputs.split_games }}
           GUARD: ${{ inputs.guard_commandless }}
           LEDGER: ${{ inputs.state_ledger }}
+          LEDGER_COUNTS: ${{ inputs.state_ledger_counts }}
         run: |
           set -euo pipefail
           if [ -z "${DEEPSEEK_API_KEY}" ]; then
@@ -845,6 +853,8 @@ jobs:
           # The ledger, for the guard's reason: it is in the label and in every episode, so it moves for the whole
           # matrix or not at all (R191).
           if [ -n "${LEDGER}" ]; then args+=(--state-ledger); fi
+          # The counted renderer implies the ledger, so the workflow passes the mode and lets the driver decide.
+          if [ -n "${LEDGER_COUNTS}" ]; then args+=(--state-ledger-counts); fi
           # The retrieval budget is an input because AMD measured k=1 as the global optimum and this lane's
           # default is 3; a contrast that has to be edited into a file is a contrast nobody runs twice.
           args+=(--top-k "${TOP_K:-3}")

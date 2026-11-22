@@ -2058,6 +2058,67 @@ class StateLedgerReportTest(unittest.TestCase):
         self.assertIn("always-in@ledger 2 fires, 74 chars added", lines[0])
         self.assertIn("always-in 0 fires, 0 chars added", lines[0])
 
+    def test_the_change_gate_is_summed_and_printed(self):
+        # R193's second half. `silenced` is the number of turns the gate removed, and it is reported only when an arm
+        # counted it -- a zero over an arm that never ran the gate is not a measurement.
+        counts = aggregate.refusals(
+            [episode("g1", True, ledger=True, ledger_counts=True, ledger_fires=1, ledger_chars=40, ledger_suppressed=9)],
+            labels=("arm", "other"),
+        )["arm"]
+        self.assertEqual(counts["ledger_suppressed"], 9)
+        arm = self.write(
+            "ledger-counts-a.json",
+            {
+                "summary": summary("always-in", state_ledger=True, state_ledger_counts=True,
+                                   arm_label="always-in@ledger-counts"),
+                "episodes": [episode("g1", True, ledger=True, ledger_counts=True, ledger_fires=1,
+                                     ledger_chars=40, ledger_suppressed=9)],
+            },
+        )
+        plain = self.plain("ledger-counts-b.json", [episode("g1", False, ledger=False, ledger_fires=0, ledger_chars=0)])
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            self.assertEqual(
+                self.run_main(
+                    [
+                        "--input", str(arm), "--input", str(plain),
+                        "--compare", "always-in@ledger-counts,always-in",
+                        "--expect-ledger", "on,off", "--rounds", "50",
+                    ]
+                ),
+                0,
+            )
+        lines = [line for line in printed.getvalue().splitlines() if line.strip().startswith("ledger")]
+        self.assertIn("1 fires, 40 chars added, 9 silenced", lines[0])
+
+    def test_a_counts_summary_that_contradicts_its_episodes_is_refused(self):
+        # The two renderers are two treatments. A file whose header and games disagree about which one ran is a file
+        # nobody can place, and the refusal names the field rather than the score.
+        arm = self.write(
+            "ledger-counts-contradiction.json",
+            {
+                "summary": summary("always-in", state_ledger=True, state_ledger_counts=True),
+                "episodes": [episode("g1", True, ledger=True, ledger_counts=False, ledger_fires=1)],
+            },
+        )
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed), self.assertRaises(SystemExit):
+            aggregate.load_slices([arm])
+        self.assertIn("ledger_counts", printed.getvalue())
+
+    def test_a_counts_flag_that_is_not_a_flag_is_refused(self):
+        arm = self.write(
+            "ledger-counts-string.json",
+            {
+                "summary": summary("always-in", state_ledger=True, state_ledger_counts="true"),
+                "episodes": [episode("g1", True, ledger=True, ledger_counts=True, ledger_fires=1)],
+            },
+        )
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed), self.assertRaises(SystemExit):
+            aggregate.load_slices([arm])
+        self.assertIn("state_ledger_counts", printed.getvalue())
+
     def test_a_ledger_state_that_is_not_a_state_is_refused_before_the_slices_are_read(self):
         printed = io.StringIO()
         with contextlib.redirect_stdout(printed), self.assertRaises(SystemExit):

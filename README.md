@@ -641,8 +641,8 @@ skeleton is the competitor's own, transliterated: the system line, the two-examp
 split into alternating turns, and the parser's four branches — so an arm changes what sits *above* the transcript
 and nothing else. Three zero-cost readings hold it in place: `--policy seed` reproduces `floor.py` game for game
 (same wins, steps, action digests, observation fingerprints) and the `agreement` job fails on a single field;
-**705 unit tests at 99.1% line-and-branch coverage, every module at or above 95%** (`agent.py` and `aggregate.py`
-at 99.5%, the offline scorer at 100%), cover the parser, the split,
+**718 unit tests at 99.1% line-and-branch coverage, every module at or above 95%** (`agent.py` and `aggregate.py`
+at 99.3% and 99.5%, the offline scorer at 100%), cover the parser, the split,
 the shard arithmetic, the bill and the loop itself; and a test asserts that `none` and `always-in` differ at
 exactly one message index. A second **channel** — `--parser any-line`, which executes the command the first-line rule
 refuses — is a field in every episode, a token in every label and a span `aggregate.py` refuses to pool until it is
@@ -660,7 +660,9 @@ and its own two counters (`ledger_fires`, `ledger_chars`), and `aggregate.py` re
 names them with `--expect-ledger`. The line is conditional by construction: a game whose actions all land carries no
 extra character, which is what keeps a search repair inside the price of a pass. R191 bought it: **267/274 against the
 guard's 265/274**, +0.73 pp (p = 0.597, mde 2.89 pp), all **four** games the guard alone lost won, **413 fires** and
-42,845 characters — 2.28% of the arm's prompt — for **¥2.69**, with 76 fewer calls than the control it beat.
+42,845 characters — 2.28% of the arm's prompt — for **¥2.69**, with 76 fewer calls than the control it beat. `--state-ledger-counts` is the
+counted renderer registered for R193: `take apple 1 (4 times)` instead of a copy of the copy, and no line at all when the
+window is the one the previous line named, because a line that repeats is the constant R188 measured as inert.
 
 The one component that is scored **before** anything is bought is `scripts/score_bank.py`, which reads a bank and
 returns the literature's admission score for the pack each task type would render — specificity x abstractness, with no

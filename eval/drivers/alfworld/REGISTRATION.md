@@ -3273,3 +3273,51 @@ registered ¥3.4 ceiling by 21%.
 named games, four wins, for ¥2.69. The next purchase is not another sentence and not another state — it is the
 **distribution** (R192), because the published number is now one draw of a pool whose own draws span seven games.
 
+
+## R193 — the line that stops repeating itself: a count instead of a copy, and a gate on the state
+
+R191's mechanism worked (four named games, four wins) and its tail is the same disease it was built to cure: **a line that
+repeats is a constant**, and R188 already bought the answer that a constant in front of every turn is inert (AUDIT
+34.279). Two `examine` games received **16** and **40** lines in R191 and both lost at the cap; 182 games received exactly
+one.
+
+The treatment is two lines of code, both in the renderer:
+
+| | R191's `--state-ledger` | R193's `--state-ledger-counts` |
+| --- | --- | --- |
+| a command tried four times | `take apple 1` | `take apple 1 (4 times)` |
+| a turn whose window is the one the last line named | a line again | **the observation alone** (silenced, counted) |
+| a turn whose window changed | a line | a line |
+| everything else — pack, channel, cap, guard, bank | — | unchanged |
+
+**`--state-ledger-counts` is its own label token** (`always-in@kind+anyline+guard+ledger-counts`) and its own episode
+field (`ledger_counts`), because R191's list and R193's counted list are two treatments and a label that named both
+`ledger` would let a join pool them into one rate — the defect every other harness knob is labelled for.
+
+### Registered readings
+
+Two passes per arm are not bought: the control is **R191's own ledger arm**, already paid for (267/274), which is what
+`--against` exists for. One new arm, **274 games, four dispatches, ≈ ¥2.7**:
+
+1. **The tail is closed**: no game receives more than **8** lines, against R191's maximum of **40**, and the arm's total
+   `ledger_chars` is **below R191's 42,845**.
+2. **The mechanism survives**: all four of R191's named games carry at least one line and **all four win**.
+3. **No harm**: the paired pooled delta against R191's arm is **≥ −2.0 pp** over the same 274 games.
+4. **The gate engages**: `ledger_suppressed` is **non-zero** (a gate that never fired cannot have closed the tail), and
+   the arm's `ledger_fires` is **below** R191's 413.
+
+### Refutation
+
+**A game still receiving more than 8 lines**, or any of the four named games losing → repetition is not the mechanism and
+the state family closes at R191's version. **Zero `ledger_suppressed`** → the gate never ran and reading 1 is a claim
+about the renderer that was not exercised.
+
+### Void
+
+Any arm whose episodes carry no `ledger_fires` or no `ledger_suppressed`; any pass whose `pack_chars`, `pack_entries`,
+`parser`, `max_steps`, `guard` or `bank_digest` differs from R191's tiling; any game outside the 274.
+
+**Price ≈ ¥2.70**, four dispatches, off-peak. **The control is a draw from an earlier commit**, which is the one caveat
+this round carries: R191's arm was driven at `43ac25b0` and this one at its own head, so the pool delta is subject to the
+re-sampling R191 measured (14 of 27 untreated games took a different path). The mechanism readings are per game and do
+not depend on it.
