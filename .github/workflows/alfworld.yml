@@ -162,6 +162,7 @@ jobs:
         run: |
           python eval/drivers/alfworld/test_agent.py
           python eval/drivers/alfworld/test_aggregate.py
+          python eval/drivers/alfworld/test_cycles.py
           python eval/drivers/alfworld/test_distill.py
           python eval/drivers/alfworld/test_wait.py
 
