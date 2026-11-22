@@ -1,6 +1,10 @@
 node_modules/
 dist/
 coverage/
+# The Python lane's measured artefacts. They are rewritten by every local gate run, and a repository that
+# carries them is a repository whose diff says "nothing changed" while a number it publishes moves.
+.coverage
+coverage-python.json
 *.tsbuildinfo
 __pycache__/
 *.pyc

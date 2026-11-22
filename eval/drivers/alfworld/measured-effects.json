@@ -1,0 +1,60 @@
+{
+  "schema": "microglia.alfworld-measured-effects/1",
+  "note": "Every measured delta this lane has read, with the comparison it is. R190's first registration named four banks and one delta each, and the deltas turned out to be three different quantities plus one row that belonged to a run which drove no games; a correlation over that table is a correlation over nothing. So each row here carries a `quantity`, which is what a rank correlation is allowed to vary one of, and a `comparison`, which is the sentence a reader needs. `score_bank.py --effects` refuses a row without either. Only deltas read in a single dispatch against a control drawn in that dispatch are admitted: a difference between two rounds is a difference of two draws, and this lane has measured draw-to-draw movement at five games on 274.",
+  "banks": [
+    {
+      "bank": "eval/drivers/alfworld/banks/bank-putscope-2.json",
+      "rendered_chars": 551,
+      "delta_pp": 24.45,
+      "quantity": "bank vs no bank, one dispatch",
+      "comparison": "the scoped bank against `none`, R186, 274 games, 72 wins against 5 losses, p < 0.001",
+      "round": "R186",
+      "games": 274,
+      "p": 0.0
+    },
+    {
+      "bank": "eval/drivers/alfworld/banks/bank-putmove-1.json",
+      "rendered_chars": 489,
+      "delta_pp": 21.9,
+      "quantity": "bank vs no bank, one dispatch",
+      "comparison": "the single 489-character sentence against `none`, R177, 274 games, 223 against 163, p < 0.001",
+      "round": "R177",
+      "games": 274,
+      "p": 0.0
+    },
+    {
+      "bank": "eval/drivers/alfworld/banks/bank-perkind-6.json",
+      "rendered_chars": 324,
+      "delta_pp": 6.72,
+      "quantity": "bank vs no bank, one dispatch",
+      "comparison": "the six-sentence store against its own `none`, R175, 134 games, 100 against 91",
+      "round": "R175",
+      "games": 134,
+      "p": 0.11
+    },
+    {
+      "bank": "eval/drivers/alfworld/banks/bank-turnbudget-1.json",
+      "rendered_chars": 814,
+      "delta_pp": -0.73,
+      "quantity": "bank vs its word-permuted placebo, one dispatch",
+      "comparison": "the turn-budget sentence against the same sentence with its words shuffled, R188, 274 games, 264 against 266, p = 0.66",
+      "round": "R188",
+      "games": 274,
+      "p": 0.66
+    }
+  ],
+  "kinds": {
+    "note": "R177's per-kind table for the one 489-character sentence, which is the only cell in this record where one entry's effect was read on all six kinds in one dispatch. It is here because it is the counterexample a vocabulary-based admission rule has to survive: the entry names neither `heat` nor `clean`, and it won 28.2 and 22.4 pp on them.",
+    "bank": "eval/drivers/alfworld/banks/bank-putmove-1.json",
+    "round": "R177",
+    "games": 274,
+    "cells": [
+      {"kind": "cool", "delta_pp": 30.4, "won": 43, "of": 46, "control": 29},
+      {"kind": "heat", "delta_pp": 28.2, "won": 38, "of": 39, "control": 27},
+      {"kind": "put", "delta_pp": 27.1, "won": 24, "of": 59, "control": 8},
+      {"kind": "puttwo", "delta_pp": 24.4, "won": 38, "of": 41, "control": 28},
+      {"kind": "clean", "delta_pp": 22.4, "won": 53, "of": 58, "control": 40},
+      {"kind": "examine", "delta_pp": -12.9, "won": 27, "of": 31, "control": 31}
+    ]
+  }
+}

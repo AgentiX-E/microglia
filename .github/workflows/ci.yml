@@ -82,6 +82,10 @@ jobs:
           # here rather than in a dispatch whose denominator silently moved (AUDIT 34.251).
           echo "== test_check_split_sizes"
           python3 scripts/test_check_split_sizes.py
+          # The offline admission scorer. It spends nothing, which is exactly why it needs a suite: a defect
+          # in a free experiment is a wrong answer that no bill ever contradicts (R190).
+          echo "== test_score_bank"
+          python3 scripts/test_score_bank.py
           python3 scripts/check-workflows.py --self-test
 
       # The same suites again, measured. Until this step existed the Python lane had a coverage *number* in the
@@ -102,9 +106,12 @@ jobs:
           # The second script under the same floor: it is the one that reads the corpus and decides whether the
           # lane's table of section sizes is still true, so it is code and not a convenience.
           python3 -m coverage run --append --branch scripts/test_check_split_sizes.py
+          # The scorer the round after this one will read: a module under the same floor as the drivers, because
+          # "it only computes numbers" is how a number nobody re-derived ends up in a report (R190).
+          python3 -m coverage run --append --branch scripts/test_score_bank.py
           python3 -m coverage json -o coverage-python.json
           python3 scripts/check-python-coverage.py --self-test
-          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 9
+          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 10
 
       - name: Repository audit (source rules, manifests, published dependencies)
         run: pnpm audit:repo
