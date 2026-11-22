@@ -5353,3 +5353,57 @@ on a redraw**, at 1 to 10 thoughts. Four rules come out of that, and the first o
 What the round leaves is a distinction the lane did not have before: a memory can be **inert** (R188: two arms, one
 placebo, no difference), **harmful through reach** (R185, R187) or **helpful through reach** (R186), and the three are
 separable only if the round carries its own length control.
+
+### 32.31 Answering a commandless turn: `--guard-commandless` and the ledger that proves it fired
+
+The driver answers a reply that carried no command with `OK.`. That is truthful and it is also a reward signal: a model
+that has started narrating is told, once per turn, that narrating is fine. R189 changes **that one string**:
+
+| the reply | without the flag | with it |
+| --- | --- | --- |
+| carries no command | `OK.` | `OK. Reply with one command only.` |
+| carries a command under a thought, on the `any-line` channel | the command is executed | **unchanged** |
+| carries a command on its first line | executed | **unchanged** |
+
+```bash
+python eval/drivers/alfworld/agent.py --arm always-in --policy model --games 274 \
+  --rules eval/drivers/alfworld/banks/bank-putscope-2.json --gate-kind --parser any-line \
+  --guard-commandless --out arm-guard.json
+```
+
+Three things to know before you run it.
+
+**It is a harness knob, not an arm.** `--guard-commandless` goes into the label (`always-in@kind+anyline+guard`), into
+the header (`guard_commandless`), and into every episode (`guard`, `guard_fires`, `guard_checked`, `guard_relapsed`).
+That is deliberate: two dispatches of one arm that differ only by this flag are two treatments, and a join that could not
+see the difference would average them. `aggregate.py --expect-guard on,off` is how you tell it that you know you are
+comparing two.
+
+**The ledger is engagement, not a score.** A guard arm with zero fires is an unguarded arm wearing a treatment's name.
+Check `guard_fires` first, then `guard_relapsed / guard_checked` — the share of fires the model answered with another
+commandless reply. Over 274 games the R189 arms read 826 fires, 825 checked, **0 relapsed**: the model does what the
+line asks, every time it is asked. `aggregate.py` prints the three numbers beside `rumination`, and prints `not counted`
+for a file written before the field existed — a zero there is not a measurement.
+
+**A fire happens on every thought, not only in loops.** 826 fires is 3.01 a game, because that is how often the model
+narrates; it is 20% of turns, not 90%. So do not register a count of fires as if it were a rate over the rare event the
+guard is aimed at (AUDIT 34.275), and do read the effect where it shows: thoughts a game **4.96 → 3.01**, heavy games
+**10 → 2**, and eight of the ten losses recovered at one to four thoughts.
+
+Cost is not a concern: the arm's **total prompt is 1.03% smaller** than the unguarded arm's (533 fewer thought turns
+outweigh 826 short lines), it makes 204 fewer calls, and it bills **$0.1946 against $0.2152**.
+
+### 32.32 What the guard does not fix, and how to read a loss once the loop is gone
+
+R189's guarded arm lost nine games of 274 and four of them were games its own control won. All four ended at the
+environment's **50-step cap** with *fewer* thoughts than the control: they are search failures, and the guard made them
+slightly worse by spending the turns it saved on a world that did not contain the object.
+
+So when you read a loss after this round, ask three questions in order:
+
+1. **Did it end at the cap with thoughts to spare?** Then it is search: the arm acted and did not find. Neither the pack
+   nor the guard reaches this.
+2. **Did it spend the turn budget on thoughts?** Then it is the loop, and `guard_fires` says whether the guard was armed
+   and `guard_relapsed` says whether the model listened.
+3. **Did it end at the cap with almost no thoughts?** Then it is neither — it is a game whose admissible set did not
+   contain the answer the model was looking for, and the honest label is a corpus limit rather than a memory failure.

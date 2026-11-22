@@ -2912,3 +2912,122 @@ guarded episode with no `guard_fires` field, `parser` not `any-line`, `max_steps
 published size.
 
 **Price ≈ ¥3.00**, four jobs, off-peak band.
+
+## R189, amendment 1 — the guard recovers 8 of the 10 games narration was costing, and it wins the held-out split
+
+Four dispatches, **548 games, two arms on one bank**, `--gate-kind true`, `any-line`, cap 50, off-peak in all sixteen
+summaries: run `44984243200` (guard, 134) + `44984376250` (guard, 140) and `44984214371` (plain, 134) + `44984351342`
+(plain, 140).
+
+| arm | pack | pooled | unseen 134 | seen 140 | thoughts a game | heavy (≥20) | steps a game | calls |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| **`always-in@kind+anyline+guard`** | 551 ch, 1 entry | **265/274 (96.72%)** | **134/134 (100.00%)** | 131/140 (93.57%) | **3.01** | **2** | **15.87** | 4,348 |
+| `always-in@kind+anyline` | 551 ch, 1 entry | 258/274 (94.16%) | 131/134 (97.76%) | 127/140 (90.71%) | 4.96 | 10 | 17.28 | 4,736 |
+| `scope@kind+anyline` (R186, other draw) | 551 ch, 1 entry | 264/274 (96.35%) | 133/134 (99.25%) | 131/140 (93.57%) | 4.20 | 5 | 16.81 | — |
+
+**Paired +2.55 pp** [+0.00, +5.47], exact McNemar on **11 + 4** discordant games, p = 0.080, mde 3.96 pp; engagement
+36.5% of games changed course, and on those the delta is +0.07. **The arm won all 134 held-out games** — the first clean
+sweep of that split in this lane, and above the 99.25% R186 published.
+
+### The ten games narration was costing, and what the guard did to them
+
+The mechanism cell is the round's result, and it is not the pooled delta.
+
+| game | kind | plain | guard | verdict |
+| --- | --- | --- | --- | --- |
+| 1 | `put` | 49 thoughts, lost (50 steps) | **1**, won (13) | recovered |
+| 2 | `put` | 45 thoughts, lost | **1**, won (8) | recovered |
+| 3 | `put` | 44 thoughts, lost | **1**, won (6) | recovered |
+| 4 | `heat` | 43 thoughts, lost | **2**, won (10) | recovered |
+| 5 | `heat` | 43 thoughts, lost | **2**, won (11) | recovered |
+| 6 | `heat` | 42 thoughts, lost | **2**, won (11) | recovered |
+| 7 | `heat` | 34 thoughts, lost | **4**, won (22) | recovered |
+| 8 | `cool` | 33 thoughts, lost | **3**, won (39) | recovered |
+| 9 | `examine` | 24 thoughts, lost | **2**, won (8) | recovered |
+| 10 | `examine` | 38 thoughts, lost | 23, lost | not recovered |
+
+**Eight of ten, at one to four thoughts instead of 33 to 49.** The two exceptions are the informative ones: one game
+(`examine`, 38 → 23) keeps narrating and loses, which is the refutation's own shape one game wide; the other
+(`cool`, 33 → 39) is a plain win that went heavy under the guard, so it is a line crossed rather than a game lost to
+narration.
+
+**And the four games the guard lost were all lost at the world's 50 steps, not to narration**: `cool` (3 thoughts, 50
+steps), `examine` (5, 50), `puttwo` (11 → 20, 50), `clean` (5, 50). The guard spends the turn budget on the world
+instead of on the transcript, which is what it was built to do, and on those four the world was not found within fifty
+steps either way. Steps a game fell **17.28 → 15.87** while thoughts fell **4.96 → 3.01**: the arm is not doing more,
+it is narrating less.
+
+### Reading 3's band was drawn on the wrong denominator, and the mechanism clause held exactly
+
+The registration asked for `guard_fires` between **20 and 120 over 274 games**. The arm fired **826 times over 274
+games** — once for every thought it wrote, and the plain arm wrote 1,359 of them.
+
+| quantity | registration's implicit value | measured |
+| --- | --- | --- |
+| rate the band was built from | 1.34% **of turns** (a rate over *games*, applied to turns) | — |
+| thoughts a game | 0.07 to 0.44 (implied by 20–120 fires) | **4.96** |
+| fires a game | 0.07 to 0.44 | **3.01** |
+
+The 1.34% is a **game** rate (11 thought-heavy games over 822 game-draws). Multiplying it by turns a game produces the
+20–120 band; the quantity it actually bounds is thoughts, and a model that wrote 0.07 thoughts a game would be one that
+never narrates. **The band was arithmetic about a population that does not exist**, and it is the fifth member of the
+family this record keeps: a number computed over the wrong denominator (`34.268`, `34.270`, `34.272`, `34.275`).
+
+What the band was *for* — "a guard that fires on 90% of turns is a different treatment" — is decided by the ratio and
+not by the count: **826 fires over ~4,100 turns is 20%**, and the guard is a function of the state (the previous reply
+carried no command), not a permanent instruction. **825 of 826 fires were answered, and 0 of 825 were answered with
+another commandless reply.** The model does what the line asks, every time it is asked.
+
+### Reading 5, read on the quantity that costs
+
+The registration compared `prompt_chars` per turn against a 2% threshold. The guard arm's **total prompt is lower**:
+1,849,028 characters against 1,868,344 over the same 274 games (**−1.03%**), because 533 fewer thought turns cost more
+characters than 826 guard lines add. Per turn the ratio rises 420.8 → 457.6 (+8.7%) for the reason the mechanism is
+real: the same episode's later turns are now world observations (~200 characters each) rather than `OK.`-answered
+thoughts, so an arm that thinks less has a longer average turn. The guard's own characters are 826 × 25 = 20,650,
+**1.1% of its arm's prompt** — the reading's number, read on the thing it names.
+
+### Verdicts, one row each
+
+| # | registered | read | verdict |
+| --- | --- | --- | --- |
+| 1 | `thought_heavy` ≤ 1 of 274 | **2** | **failed by one** — 10 → 2 is an 80% reduction, and both survivors are the two the mechanism could not reach |
+| 2 | pool ≥ 266 of 274 | **265** | **failed by one**, paired against a control that read 258 |
+| 3 | `guard_fires` 20–120 and every fire answered | **826**, 825 checked, **0 relapsed** | **band failed** (impossible as drawn); **mechanism clause held exactly** |
+| 4 | pack 551 chars, 1 entry, same `bank_digest`, sections 134 + 140 | 551 ×274, 1 ×274, `349213e8` in both arms, 134 + 140 twice | **held** |
+| 5 | guard cost < 2% of the arm's prompt | **1.1%** of the arm's characters, total prompt **−1.03%** | **held** |
+
+**Not refuted.** The registered refutation was "fewer than 20 fires, or `thought_heavy` ≥ 3": the arm fired 826 times and
+counted 2. Two of five readings missed their thresholds by one game each, and both misses are inside the ±5 games of
+draw-to-draw movement R188 measured for a pool.
+
+### Void: nothing fired
+
+`pack_chars` 551 and `pack_entries` 1 in all 548 games; one `bank_digest` per arm and it is R186's `349213e8` in both;
+`parser` `any-line` in all 548; `max_steps` 50 in all sixteen summaries; sections tiled 134 + 140 twice; `refused_actions`
+0, `truncated` 0; every guarded episode carries `guard: true` and a ledger, every plain episode `guard: false`.
+
+### Spend
+
+**$0.4098 over 9,084 calls ≈ ¥2.95 against ¥3.00 quoted** (guard **$0.1946** on 4,348 calls, plain **$0.2152** on 4,736),
+off-peak in all sixteen summaries. The guard is **cheaper than the control it is compared to**: fewer turns, fewer calls.
+
+### What this establishes, and what it leaves
+
+1. **Rumination is reachable at the turn**, and the reach is large: 8 of 10 games, at one to four thoughts where the
+   control spent 33 to 49. This is the strongest mechanism cell this lane has recorded, and it is a *state* cell like
+   the ones the literature names (`COMPETITIVE.md`, SEU read-time gating).
+2. **The board moves.** Unseen **134/134**, pooled 265/274. The published bank is unchanged, so the level is the bank's
+   plus the guard's.
+3. **The guard is not a memory.** It carries no knowledge about tasks, and it is the only arm in this record whose gain
+   comes from the driver's answer rather than from what the model reads. That is a fact the whitepaper has to state
+   plainly: the experience-reuse number this project competes on is 133/134 from the bank **plus** 1 game from a
+   turn-economy rule that any harness can adopt.
+4. **What is left is the seen section.** 131/140 under the guard, 127/140 without: the low cell of the two, and the
+   only one the guard did not move past R186's level. The remaining 9 losses are 4 at the world's step cap and 5
+   elsewhere; the read-time channel (`any-line`) and the guard have taken the format and the loop, so what is left is
+   search — and search is where a location prior (R190) or a fixed budget rule has to be bought next.
+
+**Next: R190 — the utility score, offline.** No purchase. The admission family's other half: predict *which* entry hurts,
+using the four banks this lane has already measured (551 ch with 5 heavy and 10 losses, 814 ch inert, 659 ch, 197 ch).
+That is the project's own question — memory that helps and memory that hurts — on data already paid for.

@@ -2072,8 +2072,21 @@ thought against 49 or 50 environment steps; no won game in 264 has twenty. The j
 
 **Turn economy** — How much of the fixed turn budget reaches the world. A pack raises it here: 9.23 thoughts a game in
 the control against 4.2 with the scoped bank, because a sentence that names the next action leaves less to deliberate
-about. The five thought-heavy losses are the part of the corpus no sentence in the bank covers, which is why they are
-read as a coverage failure rather than as harm.
+about. R189 raised it again without touching the pack: thoughts a game **4.96 → 3.01** under the guard, and steps a game
+17.28 → 15.87, so the arm is not doing more, it is narrating less.
+
+**Turn guard** — The driver's answer to a reply that carried no command (`--guard-commandless`). Off, it is `OK.`, the
+competitor's own no-op, which is truthful and also a per-turn reward for narrating. On, it is `OK. Reply with one command
+only.` — one line, no extra call, and conditional on the state the episode is in, so it cannot fire in a game that never
+enters a loop. It is a **harness** knob rather than an arm: it travels in the label (`@guard`), the header and every
+episode, and a join refuses to pool two guard states until it is told it is comparing them.
+
+**Engagement ledger** — The three counters that make a conditional intervention checkable: `guard_fires` (the line sent),
+`guard_checked` (fires a later reply answered), `guard_relapsed` (checked fires answered by another commandless reply).
+R189 read **826 / 825 / 0**: the model answered every fire with a command, which is the mechanism clause; the effect is a
+separate number, and an arm that fired zero times is the control with a treatment's name. A count of fires is **not** a
+rate over the rare event a guard targets — fires happen once per thought, 20% of turns, while the loop is 1.34% of
+games — which is the fifth wrong-denominator defect this record has had to retire (AUDIT 34.275).
 
 **Skill utility score** — The execution-free diagnostic from *Break It Down, Pass It On* (arXiv 2608.20274): the product
 of a skill's **specificity** (the probability that it is closer to its nearest task than two random tasks are to each

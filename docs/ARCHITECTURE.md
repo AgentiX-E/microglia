@@ -2951,3 +2951,46 @@ Two numbers make the lesson portable:
 fixed answer to a commandless reply — `OK.` becomes `OK. Reply with one command only.` — is conditional on the state, so
 it cannot touch the 98.7% of turns that are not loops, and it does not need to predict which game will enter one. That
 is the admission family's read-time decision (SEU) at the only place this lane can make it: the turn.
+
+### 8.52 The guard is a driver-level intervention, and its ledger is engagement rather than effect
+
+8.51 left one lever: the driver's fixed answer to a reply that carried no command. R189 moves it, and the shape of the
+change is what makes it measurable.
+
+**The mechanism is one string.** `OK.` → `OK. Reply with one command only.`, in the branch that answers a thought. The
+pack, the reader, the step cap, the call pattern and the turn accounting are untouched: a guarded game and an unguarded
+one differ by 25 characters on the turns that carried no command, and by nothing else. That is a function of the
+*state* the episode is in, so it cannot fire in a game that never enters it, and it needs no knowledge about tasks.
+
+**It is the fourth harness component, and it is treated like the other three.** `--guard-commandless` appears in the
+label (`@guard`), in the header (`guard_commandless`), and in every episode (`guard`, `guard_fires`, `guard_checked`,
+`guard_relapsed`). The join refuses a span over two guard states until `--expect-guard on,off` says it is comparing
+them, refuses one label over two states outright, and refuses a slice whose header contradicts its own episodes
+(8.45–8.47 are the same rule for the reader, the cap and the bank).
+
+**The ledger separates engagement from effect, and needs three counters to do it.**
+
+| counter | what it counts | why it is not the others |
+| --- | --- | --- |
+| `guard_fires` | the line sent | a guarded arm with zero fires is an unguarded arm with a treatment's name |
+| `guard_checked` | fires a later reply answered | a fire on the last turn of a pass has no outcome to read; counting it either way invents one |
+| `guard_relapsed` | checked fires answered by another commandless reply | the numerator: the model re-entering the loop at once |
+
+R189 read **826 / 825 / 0** over 274 games. The mechanism clause is therefore exact — the model answers the line with a
+command every time it is asked — and the effect clause is a separate number: thoughts a game 4.96 → 3.01, heavy games
+10 → 2, pooled wins 258 → 265, unseen 131 → **134 of 134**.
+
+**Three consequences for the harness, not for the arm.**
+
+1. **The guard's cost is negative in the aggregate.** Its own characters are 826 × 25 = 20,650 (1.1% of its arm's
+   prompt), but 533 fewer thought turns remove more than that: the arm's total prompt is **1.03% smaller** and it makes
+   **204 fewer calls** ($0.1946 against $0.2152). Per *turn* the ratio rises 8.7%, because a game that narrates less
+   spends its turns on ~200-character observations instead of on `OK.`-answered thoughts — a ratio over turns is the
+   wrong denominator for a cost that is paid per episode.
+2. **A count of fires is not a rate over the event the guard targets.** Fires happen once per thought (3.01 a game,
+   20% of turns), while the loop is 1.34% of *games*. The registration's band of 20–120 fires was the game rate applied
+   to turns, and no arm could have met it (AUDIT 34.275).
+3. **The remaining losses change family.** All four games the guard lost ended at the 50-step cap with fewer thoughts
+   than the control: they are search failures, and the guard spends the turns it saves on a world that does not contain
+   the object. The format channel took the parser's refusals (8.45), the guard took the loop, and search is what is left
+   for an instance-state mechanism to reach.
