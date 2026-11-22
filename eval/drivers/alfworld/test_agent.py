@@ -3311,7 +3311,7 @@ class AdmissibleHintTest(unittest.TestCase):
 
     def test_without_a_task_verb_there_is_no_example_at_all(self):
         # R194's fallback named the shortest command in the set, and `help` is four characters and first in the world's
-        # order: 220 of 248 fires in that round showed `help` (AUDIT 34.286). A fallback that is deterministic and
+        # order: the first line of 220 of that round's 248 firing games was `help` (AUDIT 34.286). A fallback that is deterministic and
         # uninformative is worse than no example, because the count is still true and the example costs characters.
         commands = ["help", "look", "inventory", "go to shelf 2"]
         self.assertEqual(agent.admissible_example(commands, "go to shelf 2"), "")

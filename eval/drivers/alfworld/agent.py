@@ -504,7 +504,7 @@ def admissible_example(commands: "list[str]", refused: str) -> str:
 
     R194's rule was "the shortest command sharing the refused verb, else the world's first", and the fallback is what
     almost every fire took: `help` is four characters, it is admitted in every room, and textworld lists it first, so
-    220 of 248 fires showed a count followed by `e.g. help` (AUDIT 34.286). The rule was deterministic
+    the first line of 220 of the 248 firing games showed a count followed by `e.g. help` (AUDIT 34.286). The rule was deterministic
     and uninformative, and no registered reading could see it because none of them read the line.
 
     R195's rule is structural rather than a blacklist of the three commands that hurt: the example has to be a command

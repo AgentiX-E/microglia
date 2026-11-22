@@ -5609,7 +5609,7 @@ written by different code.
 ### 32.39 `@ledger-admissible-task`: the example has to be a command
 
 The admissible renderer's first version named the shortest command in the set, and the shortest command in an ALFWorld
-room is `help` — so 220 of 248 lines read `Admissible here: 29 commands, e.g. \`help\``. The rule is now **structural**:
+room is `help` — so the first line of 220 of the 248 games that fired read `Admissible here: 29 commands, e.g. \`help\``. The rule is now **structural**:
 the example must carry a task verb (`take`, `put`, `clean`, `heat`, `cool`, `examine`); if the set has none, the line is
 the count alone.
 

@@ -674,7 +674,7 @@ The third renderer is **`--state-admissible`**: on the same turn, the line names
 commands, and one of them — because AUDIT 34.284 read the 822 armed games of R191 and R193 together and found
 `ledger_fires` equal to `invalid_actions` in every one of them. The list was never a search repair; it was an
 admissibility repair. It has been dispatched once (R194, **265/274**, −0.73 pp against the list, **half the characters**)
-and the read found the example was `help` in **88.7%** of its fires, so the rule is now structural: the example must carry
+and the read found the example was `help` in **88.7%** of the games it fired on, so the rule is now structural: the example must carry
 a task verb, or the line is the count alone, behind the token `@ledger-admissible-task`, counted by
 `admissible_task_fires` / `admissible_meta_fires` / `admissible_exampleless_fires` (R195, registered).
 

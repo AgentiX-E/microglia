@@ -2171,6 +2171,6 @@ recorded arm — the question R193's gate asked and could not answer from its ow
 
 **Task-verb example** — The rule the admissible renderer's example now follows: it must carry one of `take`, `put`,
 `clean`, `heat`, `cool`, `examine`, so that naming a command cannot degenerate into naming `help`. The first version of
-the renderer chose the shortest command in the set, which in ALFWorld is `help` in 88.7% of fires; the rule is structural
+the renderer chose the shortest command in the set, which in ALFWorld was `help` in 88.7% of the games it fired on; the rule is structural
 rather than a blacklist, and when the set has no task command the line carries the count alone. Counted per episode as
 `admissible_task_fires` / `admissible_meta_fires` / `admissible_exampleless_fires`, which sum to `ledger_fires`.

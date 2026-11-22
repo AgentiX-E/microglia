@@ -3538,7 +3538,7 @@ R191's tiling; any game outside the 274.
 the line is unaffordable as written and the count-only form is the fallback, registered here so that a smaller arm is not
 a new round."* The measured mean is **26.4** (median 29, max 61), so the clause fired. But the round's own numbers refute
 its premise: the line cost **45 characters against the list's 103.7** — it was not unaffordable, it was *uninformative*.
-`help` appeared in **220 of 248** fires (88.7%), a task-verb command in **one** (AUDIT 34.286). The clause named the right
+the first line of **220 of the 248** firing games was `help` (88.7%), a task-verb command in **one** (AUDIT 34.286). The clause named the right
 direction for the wrong reason.
 
 **Treatment, one arm, one rule changed.** The trigger, the counters, the token's family and the economics are R194's. What
@@ -3564,7 +3564,7 @@ the games where a k-gram cycle exists but no line fired are a subtraction rather
 **Registered readings, and for the first time a tiling accept/reject.**
 
 1. **The content is what it claims**: ≥ **80%** of fires carry a task-verb example (`admissible_task_fires / ledger_fires`),
-   and **0** fires carry a meta command. R194 read 88.7% meta.
+   and **0** fires carry a meta command. R194's first line was a meta command in 88.7% of its firing games.
 2. **The named games**: of `Laptop-328`, `Statue-216`, `Bowl-308`, **at least 2 win** *or* **at least 2 halve their
    `invalid_actions`**. `≥ 2` accepts; `≤ 0` rejects; **1 of 3 is reported as undecided and closes nothing** — the region
    R194's registration left undefined, where its acceptance needed 2 of 3 to win and its refutation needed 3 of 3 to lose.
