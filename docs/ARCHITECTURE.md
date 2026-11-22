@@ -3158,3 +3158,27 @@ preferring one that shares the refused verb and the shortest among those; if the
 `admissible_task_fires`, `admissible_meta_fires`, `admissible_exampleless_fires` — and they sum to `ledger_fires`, which
 the join checks before it will quote a share. The label token moved to `@ledger-admissible-task` because the content rule
 is part of the treatment: R194's artefacts carry the old token and must not be pooled with these.
+
+### 8.58 The cycle reader: the question a refusal trigger cannot ask, answered from artefacts already paid for
+
+The state family answers a turn the world **rejected**. A model that returns to the same receptacle, opens the same
+drawer and looks at the same shelf is never rejected, so the trigger is blind to the one failure mode the negative-effect
+literature is about — and to five of R195's eight remaining losses, which contain no refusal at all.
+
+`eval/drivers/alfworld/cycles.py` reads the command record and reports three numbers over a slice: **accepted repeats**
+(turns that re-issued a command the world did not refuse), the share of **losses** that carried one, and the characters a
+line naming them would cost. It reads `commands` and `fire_turns` and nothing else, so the reading cannot drift into a
+re-reading of the win column.
+
+**What it refuses, and why refusal is the right answer.** A turn counts as accepted when no fire answered it, so the
+reader stands on the identity `len(fire_turns) == invalid_actions` — a measured fact across 1,200+ armed games and not an
+assumption. It refuses a slice where that fails (a fire that is not a refusal makes every turn's verdict unknown), where
+`len(fire_turns) != ledger_fires`, where `len(commands) != actions + refused_actions`, where an episode predates the
+record, or where a game appears in two shards. Each of those failures would otherwise produce a number rather than an
+error.
+
+**What the first read decided.** Over R195's 274 games: 195 accepted repeats in 146 games, but in only **3 of the 8
+losses**; five losses end at 49–50 commands with no repeat at all. The mechanism's ceiling is therefore +3 games = **1.09
+pp** against a paired **mde of 2.29 pp**, so the dispatch it was built to justify was not bought (AUDIT 34.288). The
+reader is the lane's first **ceiling instrument**: it prices a treatment before the treatment is paid for, in the same way
+`score_bank.py` prices a bank and `--state-admissible`'s instrument priced a line.

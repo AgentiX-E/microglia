@@ -5632,3 +5632,39 @@ rather than in a paragraph somebody has to reconstruct later.
 
 The label token is `@ledger-admissible-task`; R194's `@ledger-admissible` is a different content rule and the two are
 never pooled.
+
+### 32.40 Reading a cycle out of a paid pass: `cycles.py`
+
+The state lines answer a turn the world refused. A model that walks back and forth between two rooms, or re-opens the
+drawer it just closed, is never refused — so before buying a renderer for that failure mode, ask it of artefacts already
+on disk. `commands` and `fire_turns` are enough:
+
+```bash
+python eval/drivers/alfworld/cycles.py /workspace/run45023848248/arm-*.json /workspace/run45023872479/arm-*.json
+```
+
+```
+episodes 274  won 266  lost 8
+commands 3,511  refusals 383
+accepted repeats 195 (5.55% of commands)  games with one 146 (53.3%)
+headroom 3 of 8 losses (37.5%) carried an accepted repeat
+price 7,288 characters over 195 lines (37.4 chars/line)
+chains 1 turns repeating two back, 2 three back, most repeated 4
+sample line Again: "go to desk 1" (2nd time).
+```
+
+`--detail` adds one row per game that repeated something, worst first; `--json` prints the same numbers without the rows.
+The reading is the **ceiling** of a cycle-aware line: `headroom` is how many of the losses the mechanism can reach at all,
+and if `headroom × 100 / games` is below the split's minimum detectable effect, the dispatch cannot produce a falsifiable
+reading and should not be bought. In the run above it is 3 games of 274 = 1.09 pp against an mde of 2.29 pp.
+
+The reader refuses a slice rather than reporting a number it cannot stand behind: an episode without `commands`, a
+`fire_turns` list that disagrees with `ledger_fires`, a fire count that is not the refusal count (`invalid_actions`), a
+command record that disagrees with `actions + refused_actions`, a fire index out of order or out of range, or a game
+appearing in two shards. Each refusal names the episode and the two numbers that disagree, and exits `2`.
+
+| reading | if it is high | if it is low |
+| --- | --- | --- |
+| `accepted repeats` | the model loops on admitted commands, and no refusal trigger can see it | the residual losses are search or capability failures, not loops |
+| `headroom` | a cycle line has something to reach | it does not, whatever the mechanism is worth elsewhere |
+| `price` | the line is long relative to its reach | — compare with `ledger_chars` of the same pass before pricing a dispatch |

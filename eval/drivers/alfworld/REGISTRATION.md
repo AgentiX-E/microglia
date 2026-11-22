@@ -3582,3 +3582,41 @@ void, not a loss.
 from R191's tiling; any game outside the 274; any episode whose counters do not sum to its `ledger_fires`.
 
 **Price ≈ ¥1.4**, two dispatches, off-peak, plus ¥0.00 for the counters and the record.
+
+## R195, read back — every reading held, and the pool did not move
+
+`45023848248` (unseen, 134) + `45023872479` (seen, 140), `d60ba627`, **$0.1857 ≈ ¥1.34** against ¥1.4 predicted.
+
+| # | registered | read | verdict |
+| --- | --- | --- | --- |
+| 1 | ≥ 80% of fires carry a task-verb example, 0 meta | **361/383 = 94.3%**, 0 meta, 22 count-only | held |
+| 2 | ≥ 2 of 3 named games win *or* halve refusals | **3 of 3 won**, one of them with **zero fires** | held, and it purchased nothing |
+| 3 | pooled ≥ 96.6% | **266/274 = 97.08%** (unseen **134/134**) | held |
+| 4 | `ledger_chars` ≤ 31,370 and `calls` ≤ 4,457 | **20,346** (−52.5% against the list) and **4,192** | held |
+| 5 | every other knob unchanged; counters sum to fires | pack 551 × 274, bank `349213e8`, `any-line`, cap 50, guard on; 361+0+22 = 383 | held |
+
+Paired against R191's list: **−0.36 pp** [−2.19, +1.09], p = 0.845, 5 discordant, mde 2.29 pp, engagement 38.7%. Paired
+against R194's `help` renderer — the example rule alone, same trigger, same label family: **+0.36 pp** [−1.09, +1.82],
+p = 0.842, engagement 35.4%, refusal rate **0.1095 → 0.0914 per call**. The control's own five identical-code draws put the
+refusal count in **391–441**; R194 sits at 465, R195 at 383.
+
+**Reading 2's defect, recorded rather than argued away (AUDIT 34.288).** `Laptop-328` was won in 3 steps with 0 fires and 0
+refusals, so the criterion was satisfied by a draw in which the treatment was absent. From this round on, a per-game
+reading counts only where `ledger_fires > 0` on that game.
+
+## R196 — not registered, because its ceiling is below the split's resolution
+
+The cycle-aware line was the family's last candidate: fire when the model re-issues a command the world **accepted**, the
+one event a refusal trigger cannot see. `cycles.py` read it from R195's artefacts at ¥0.00: **195** accepted repeats in
+**146** games, but in only **3 of the 8 losses**, and five losses contain **no repeat at all** (49–50 commands, no loop, no
+refusal). Three games = **+1.09 pp** against a paired **mde of 2.29 pp**, so the dispatch was cancelled by arithmetic.
+
+**What closes.** Two mechanisms (refusal and state) and one trigger, five readings: the guard **+2.55 pp**, the list
++0.73, the count −1.46, the admissible set −0.73, the admissible set with a command −0.36. The residual is capability-bound
+and the held-out split is at its ceiling (134/134), so no further harness arm can be resolved here. The next measurement is
+a corpus with headroom — τ² retail, on the same accuracy–cost chart — and it is registered in the internal roadmap before
+it is bought.
+
+**The reusable clause.** Every registration from here states its **ceiling** — the fraction of the pool the mechanism can
+reach — beside its price, and a ceiling below the mde is a null by construction rather than a null to be discovered at
+¥1.4 a round.

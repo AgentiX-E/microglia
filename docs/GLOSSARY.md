@@ -2174,3 +2174,21 @@ recorded arm — the question R193's gate asked and could not answer from its ow
 the renderer chose the shortest command in the set, which in ALFWorld was `help` in 88.7% of the games it fired on; the rule is structural
 rather than a blacklist, and when the set has no task command the line carries the count alone. Counted per episode as
 `admissible_task_fires` / `admissible_meta_fires` / `admissible_exampleless_fires`, which sum to `ledger_fires`.
+
+**Accepted repeat** — A turn whose command had been issued before *and* which the world did not refuse. It is the only
+kind of repetition a refusal-triggered line cannot see: the world said yes, nothing moved, and the state renderers stay
+silent because their trigger is the world's verdict. Read by `cycles.py` from `commands` and `fire_turns`; over R195's 274
+games there are 195 of them, in 146 games.
+
+**Chain** — A stretch of consecutive turns that each repeat the command `k` turns earlier (`go to countertop 1`, `look`,
+`go to countertop 1`, `look`), reported as **confirmations** rather than as the window's length: a period-2 chain of 2
+confirmations is three commands long. A stall (`a a a`) is not a chain — that is `most repeated`.
+
+**Headroom** — The share of a pass's **losses** that carry an accepted repeat, which is the ceiling of any cycle-aware
+treatment: a loss with no repetition is a loss the mechanism cannot reach. R195's eight losses contain three, so the
+ceiling is 3 games = 1.09 pp against a paired mde of 2.29 pp — a treatment that cannot produce a falsifiable reading, and
+therefore one that is not dispatched.
+
+**Ceiling instrument** — A reader that prices a treatment's *reach* before it is bought, from artefacts already paid for:
+`score_bank.py` for a bank, `admissible_mean` for a state line, and `cycles.py` for a cycle. Its output is a comparison
+between the reach and the split's minimum detectable effect; a ceiling below the mde is a null by construction.
