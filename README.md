@@ -1011,7 +1011,7 @@ moves all three — `backbone=zhipu:MODEL` — because a menu that can move the 
 menu that can spend the wrong account's money on a refusal.
 
 `pnpm bundle:size` bundles both published entry points for the browser and holds them to a ceiling:
-**3,009 B raw / 1,410 B gzipped** for the client and **43,330 B / 14,684 B gzipped** for the core. The
+**3,009 B raw / 1,411 B gzipped** for the client and **53,788 B / 18,389 B gzipped** for the core. The
 build would fail if either stopped bundling without Node builtins, which is the "no runtime dependency"
 promise measured rather than asserted. `pnpm bundle:size -- --probe` halves a ceiling and must be
 rejected — a budget that cannot be exceeded is not a gate.

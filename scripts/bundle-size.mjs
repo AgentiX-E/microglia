@@ -122,10 +122,17 @@ import { build } from 'esbuild';
  *   allocation, which is a different experiment and one this record has already priced. Measured 52,781
  *   raw and 18,006 gzip at this commit, so the raise is 219 raw and 294 gzip of headroom: a mechanism
  *   rather than a correction by this file's own rule, argued as one.
+ *
+ * Raised on 2026-11-22, 53,000 -> 54,000 raw and 18,300 -> 18,500 gzip, for one mechanism: the shipping
+ * contract. `kernel/serve-profile.ts` holds the five knobs a deployment ships plus the one function that turns
+ * them into `openMicroglia` options, and it is in the bundle because the product reads it: `createServer` spreads
+ * `serveOptions()` so a knob an arm won cannot be lost in a deployment, and the audit beside it refuses a value
+ * the record and the product disagree about. Measured 53,788 raw and 18,389 gzip at this commit, so the raise is
+ * 212 raw and 111 gzip of headroom. A mechanism rather than a correction, by this file's own rule.
  */
 const BUDGETS = [
   { name: 'browser', entry: 'packages/browser/dist/index.js', raw: 3200, gzip: 1600 },
-  { name: 'core', entry: 'packages/core/dist/index.js', raw: 53000, gzip: 18300 },
+  { name: 'core', entry: 'packages/core/dist/index.js', raw: 54000, gzip: 18500 },
 ];
 
 const probe = process.argv.includes('--probe');
