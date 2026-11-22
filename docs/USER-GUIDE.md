@@ -5274,3 +5274,37 @@ for kind in ("clean", "cool", "examine", "heat", "put", "puttwo"):
 ```
 
 Six lines, one per kind, each `1 551 <digest>` — and the two distinct digests are the whole design in one screen.
+
+### 32.28 Reading `recovered` per kind, and the shape of a counter that belongs to one stratum
+
+Every reading since R183 has printed a `recovered` line. R186 added one number to each kind's row, and the reason is that
+the pool line was misread twice:
+
+```
+    put       56/59 vs 50/59  delta +0.1017  recovered 133 vs 246 (0.1517 vs 0.2226 per call)
+    clean     58/58 vs 58/58  delta +0.0000  recovered 4 vs 5 (0.0046 vs 0.0055 per call)
+    cool      43/46 vs 43/46  delta +0.0000  recovered 28 vs 16 (0.0409 vs 0.0229 per call)
+    puttwo    41/41 vs 40/41  delta +0.0244  recovered 0 vs 0 (0.0 vs 0.0 per call)
+    heat      37/39 vs 38/39  delta -0.0256  recovered 3 vs 2 (0.0042 vs 0.0031 per call)
+    examine   29/31 vs 28/31  delta +0.0323  recovered 0 vs 0 (0.0 vs 0.0 per call)
+  recovered       always-in@kind+anyline 168 (0.0365 per call) vs none@anyline 626 (0.074 per call)
+```
+
+Read the six rows and the last line says something different from what it said before: **168 is 133 `put` plus 35
+everywhere else**, so a pool that moved by a hundred moved inside one kind. Four rules for reading it:
+
+1. **A counter that is one kind in six is that kind's counter.** If a stratum holds 90% of the events, the pool number is
+   a fact about that stratum and a rumour about the others.
+2. **Divide by the stratum's own calls.** The per-call figures above are `put`'s 133 over `put`'s calls and `clean`'s 4
+   over `clean`'s; a shared denominator reports a rate neither kind has, because the kinds differ by 8× in calls.
+3. **`0 vs 0` is a measurement; nothing printed is not.** `puttwo` and `examine` print `0 vs 0` because both files
+   carried the field and the event did not happen. An arm file from before AUDIT 34.262 prints no column at all, which
+   is the same distinction `dropped` already makes with `not counted`.
+4. **A counter about the reader cannot be evidence about the pack.** `recovered` counts replies shaped *thought, then
+   command*: the reference channel **drops** those (−9.85 pp, R183), the `any-line` channel executes them (+0.0 pp,
+   R185 and R186), and a control with no pack produces the most of all (626) because a flailing agent takes 23.8 turns a
+   game. It measures the reader, and only incidentally the memory.
+
+The general form, which is the most reusable thing this lane has learned: **before quoting a pooled number, ask what
+share of it comes from one stratum.** The three failures in this lane's record are all that question unasked — a mean
+over lost games, a counterfactual over a sampled policy, and a band over a pool.

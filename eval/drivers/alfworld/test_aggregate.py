@@ -80,6 +80,16 @@ class SliceTest(unittest.TestCase):
         self.assertEqual(sorted(grouped), ["always-in", "none"])
         self.assertEqual(len(grouped["none"]), 1)
 
+    def test_a_split_that_is_not_a_name_is_refused(self):
+        # A section recorded as a list or a number would group by a value no published size matches, and the section
+        # guard downstream would then compare a size to a type. Refused where it is read, with the field named.
+        path = self.write("s-split.json", {"summary": summary("none", split=["eval_out_of_distribution"]),
+                                          "episodes": [episode("g1", True)]})
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed), self.assertRaises(SystemExit):
+            aggregate.load_slices([path])
+        self.assertIn("not a split name", printed.getvalue())
+
     def test_a_slice_of_the_placebo_arm_can_be_joined(self):
         # `sham` is a treatment with a bank's shape and no bank's content. A join that did not know the
         # name would refuse the one arm whose whole purpose is to be compared.
@@ -331,6 +341,155 @@ class KindTest(unittest.TestCase):
         left = {"g1": {"gamefile": "g1", "won": True, "digest": "d"}}
         right = {"g1": {"gamefile": "g1", "won": False, "digest": "e"}}
         self.assertIn("unknown", aggregate.by_kind(left, right))
+
+
+class RecoveredScopeTest(unittest.TestCase):
+    """`recovered` is reported beside the kind that produces it, because the pool is not its population.
+
+    R185 read the fall from 269 to 137 as the format clause leaving the pack, and R186's own refutation clause was
+    written on that reading. The kind decomposition says the quantity is 91% `put` in both rounds — 269 = 246 + 23 and
+    137 = 132 + 5 — so the pool fell because the one pack that lost the clause belongs to the one kind that produces
+    the event at all. A pool-level counter for a kind-local event is the same class of error as a rate pooled over two
+    corpus sections or two step caps, and the repair is the same: print it where the stratum is (AUDIT 34.268).
+    """
+
+    def setUp(self):
+        self.paths = []
+
+    def tearDown(self):
+        for path in self.paths:
+            path.unlink(missing_ok=True)
+
+    def write(self, name: str, payload: dict) -> Path:
+        path = HERE / name
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        self.paths.append(path)
+        return path
+
+    def run_main(self, argv):
+        original = sys.argv
+        sys.argv = ["aggregate.py"] + argv
+        try:
+            return aggregate.main()
+        finally:
+            sys.argv = original
+
+    def test_a_kind_row_carries_its_own_recovered_count(self):
+        left = {
+            "g1": episode("g1", True, kind="put", recovered_actions=3),
+            "g2": episode("g2", True, kind="clean", recovered_actions=0),
+        }
+        right = {
+            "g1": episode("g1", False, kind="put", recovered_actions=1),
+            "g2": episode("g2", True, kind="clean", recovered_actions=0),
+        }
+        report = aggregate.by_kind(left, right)
+        self.assertEqual(report["put"]["recovered"], {"treatment": 3, "control": 1})
+        self.assertTrue(report["put"]["recovered_counted"])
+        self.assertEqual(report["clean"]["recovered"], {"treatment": 0, "control": 0})
+
+    def test_a_kind_rate_divides_by_that_kinds_own_calls(self):
+        # The reason a pool rate cannot stand in for this one: `clean` makes eight times the calls of `put` in the
+        # same split, so a shared denominator would report a rate for both that neither kind has.
+        left = {
+            "g1": episode("g1", True, kind="put", calls=10, recovered_actions=2),
+            "g2": episode("g2", True, kind="clean", calls=80, recovered_actions=0),
+        }
+        right = {
+            "g1": episode("g1", False, kind="put", calls=10, recovered_actions=0),
+            "g2": episode("g2", True, kind="clean", calls=80, recovered_actions=0),
+        }
+        report = aggregate.by_kind(left, right)
+        self.assertEqual(report["put"]["recovered_per_call"]["treatment"], 0.2)
+        self.assertEqual(report["clean"]["recovered_per_call"]["treatment"], 0.0)
+
+    def test_a_kind_whose_slices_predate_the_field_says_not_counted(self):
+        report = aggregate.by_kind({"g1": episode("g1", True)}, {"g1": episode("g1", False)})
+        self.assertFalse(report["put"]["recovered_counted"])
+
+    def test_a_kind_with_no_calls_has_no_rate_rather_than_zero(self):
+        left = {"g1": episode("g1", True, kind="put", calls=0, recovered_actions=0)}
+        right = {"g1": episode("g1", False, kind="put", calls=0, recovered_actions=0)}
+        self.assertIsNone(aggregate.by_kind(left, right)["put"]["recovered_per_call"]["treatment"])
+
+    def test_the_report_prints_recovered_on_the_kind_it_belongs_to(self):
+        games = ["g1", "g2"]
+        treatment = self.write(
+            "rec-a.json",
+            {
+                "summary": summary("always-in"),
+                "episodes": [
+                    episode("g1", True, kind="put", calls=10, recovered_actions=3),
+                    episode("g2", True, kind="clean", recovered_actions=0),
+                ],
+            },
+        )
+        control = self.write(
+            "rec-b.json",
+            {
+                "summary": summary("none"),
+                "episodes": [
+                    episode("g1", True, kind="put", calls=10, recovered_actions=1),
+                    episode("g2", True, kind="clean", recovered_actions=0),
+                ],
+            },
+        )
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            self.assertEqual(
+                self.run_main(
+                    ["--input", str(treatment), "--input", str(control), "--compare", "always-in,none", "--rounds", "50"]
+                ),
+                0,
+            )
+        lines = [line for line in printed.getvalue().splitlines() if line.strip().startswith("put ")]
+        self.assertTrue(lines, printed.getvalue())
+        self.assertIn("recovered 3 vs 1", lines[0])
+        self.assertIn("0.3 vs 0.1 per call", lines[0])
+
+    def test_one_arm_that_did_not_count_prints_not_counted_beside_one_that_did(self):
+        # A join can legitimately hold one arm from before the field and one from after it — a re-bought control is
+        # exactly that shape. The line then has to say "not counted" on one side, because a zero there would be a
+        # measurement of an event the file never recorded.
+        treatment = self.write(
+            "mix-a.json",
+            {"summary": summary("always-in"), "episodes": [episode("g1", True, calls=10, recovered_actions=2)]},
+        )
+        control = self.write("mix-b.json", {"summary": summary("none"), "episodes": [episode("g1", False, calls=10)]})
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            self.assertEqual(
+                self.run_main(
+                    ["--input", str(treatment), "--input", str(control), "--compare", "always-in,none", "--rounds", "50"]
+                ),
+                0,
+            )
+        recovered = [line for line in printed.getvalue().splitlines() if line.strip().startswith("recovered ")][-1]
+        self.assertIn("2 (0.2 per call)", recovered)
+        self.assertIn("not counted", recovered)
+
+    def test_a_slice_without_the_field_prints_no_kind_rates(self):
+        # The `games` above are the same two games; only the counter is missing, and a printed "0 vs 0" would read as
+        # a measurement of an event that never happened rather than as a field the driver never wrote.
+        treatment = self.write(
+            "old-a.json",
+            {"summary": summary("always-in"), "episodes": [episode("g1", True), episode("g2", True)]},
+        )
+        control = self.write(
+            "old-b.json",
+            {"summary": summary("none"), "episodes": [episode("g1", False), episode("g2", False)]},
+        )
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            self.assertEqual(
+                self.run_main(
+                    ["--input", str(treatment), "--input", str(control), "--compare", "always-in,none", "--rounds", "50"]
+                ),
+                0,
+            )
+        self.assertNotIn("recovered", " ".join(
+            line for line in printed.getvalue().splitlines() if line.strip().startswith("put ")
+        ))
 
 
 class RefusalTest(unittest.TestCase):
@@ -889,6 +1048,41 @@ class MainTest(unittest.TestCase):
             self.run_main(["--input", str(treatment), "--input", str(control), "--compare", "always-in,none", "--rounds", "50"]),
             0,
         )
+
+    def test_a_join_over_two_sections_prints_each_section_beside_the_pool(self):
+        # The pooled delta is an average over two populations, and the sections are the only view that says whether
+        # the effect is one of them or both. A print that existed only in the JSON would be a number a reader has to
+        # go looking for, which is the same as not printing it.
+        files = []
+        for arm, wins in (("none", {"g1": True, "h1": False}), ("always-in", {"g1": True, "h1": True})):
+            for split, game in (("eval_in_distribution", "g1"), ("eval_out_of_distribution", "h1")):
+                files += [
+                    "--input",
+                    str(
+                        self.write(
+                            f"sec-{arm}-{game}.json",
+                            {"summary": summary(arm, split=split), "episodes": [episode(game, wins[game])]},
+                        )
+                    ),
+                ]
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            self.assertEqual(
+                self.run_main(
+                    files
+                    + [
+                        "--compare", "always-in,none",
+                        "--expect", "2",
+                        "--expect-splits", "eval_in_distribution,eval_out_of_distribution",
+                        "--rounds", "50",
+                    ]
+                ),
+                0,
+            )
+        lines = [line for line in printed.getvalue().splitlines() if "by section" in line]
+        self.assertEqual(len(lines), 2, printed.getvalue())
+        self.assertIn("eval_in_distribution", " ".join(lines))
+        self.assertIn("eval_out_of_distribution", " ".join(lines))
 
     def test_one_invocation_reads_every_pair_a_dispatch_produced(self):
         # Three arms in one sweep is two questions -- always-in against none, and retrieved against

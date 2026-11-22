@@ -657,5 +657,76 @@ class ScopedBankTest(unittest.TestCase):
         lengths = {len(entry["text"]) for entry in self.payload()["entries"]}
         self.assertEqual(lengths, {354})
 
+class RegroupedBankTest(unittest.TestCase):
+    """R187's bank: the same two sentences and the same 551 characters, with the boundary moved by one kind group.
+
+    R186 scoped the precondition to `put` and the five kinds it was withheld from moved one game, which settles one
+    direction: the entry costs nothing where it is not read. The open question is the other direction, and it is not a
+    question about text -- `cool` puts an object in a fridge after changing its temperature, `heat` in a microwave,
+    `puttwo` two objects in one receptacle, so all three take from a closed container exactly as `put` does. This bank
+    gives them the precondition and leaves `clean` (a sink) and `examine` (a look) on R183's sentence **byte for byte**,
+    which means the round carries its own control inside its own bank: if `clean` and `examine` move, the movement is
+    variance, because their packs are frozen.
+    """
+
+    NAME = "bank-putscope-3.json"
+    KINDS = ("clean", "cool", "examine", "heat", "put", "puttwo")
+    TARGETED = ("put", "cool", "heat", "puttwo")
+    HELD = ("clean", "examine")
+
+    def payload(self) -> dict:
+        return payload_of(self.NAME)
+
+    def rules(self) -> "tuple[list[str], list[list[str]]]":
+        payload = self.payload()
+        return [entry["text"] for entry in payload["entries"]], [entry["kinds"] for entry in payload["entries"]]
+
+    def test_the_tags_partition_the_six_kinds(self):
+        tags = [set(entry["kinds"]) for entry in self.payload()["entries"]]
+        self.assertEqual(set().union(*tags), set(self.KINDS))
+        for left in range(len(tags)):
+            for right in range(left + 1, len(tags)):
+                with self.subTest(pair=(left, right)):
+                    self.assertEqual(tags[left] & tags[right], set())
+
+    def test_every_kind_carries_one_entry_at_551_characters(self):
+        rules, kinds = self.rules()
+        for kind in self.KINDS:
+            with self.subTest(kind=kind):
+                selected = driver.applicable(rules, kinds, kind)
+                self.assertEqual(len(selected), 1)
+                self.assertEqual(len(driver.render_pack(selected)), 551)
+
+    def test_the_four_placing_kinds_get_the_precondition(self):
+        rules, kinds = self.rules()
+        precondition = payload_of("bank-putprecond-1.json")["entries"][0]["text"]
+        for kind in self.TARGETED:
+            with self.subTest(kind=kind):
+                self.assertEqual(driver.applicable(rules, kinds, kind), [precondition])
+
+    def test_the_two_kinds_that_do_not_place_keep_r183s_sentence_byte_for_byte(self):
+        rules, kinds = self.rules()
+        r183 = payload_of("bank-putmove-line-1.json")["entries"][0]["text"]
+        for kind in self.HELD:
+            with self.subTest(kind=kind):
+                self.assertEqual(driver.applicable(rules, kinds, kind), [r183])
+
+    def test_exactly_the_boundary_moved_against_r186(self):
+        # The one-variable claim, asserted rather than described: comparing the two banks kind by kind, the packs that
+        # changed are `cool`, `heat` and `puttwo` and the packs that did not are `clean`, `examine` and `put`.
+        here = self.rules()
+        there = payload_of("bank-putscope-2.json")
+        other = ([entry["text"] for entry in there["entries"]], [entry["kinds"] for entry in there["entries"]])
+        moved = {
+            kind
+            for kind in self.KINDS
+            if driver.digest_of(driver.applicable(*here, kind)) != driver.digest_of(driver.applicable(*other, kind))
+        }
+        self.assertEqual(moved, {"cool", "heat", "puttwo"})
+
+    def test_the_two_entries_are_length_matched(self):
+        self.assertEqual({len(entry["text"]) for entry in self.payload()["entries"]}, {354})
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -2851,3 +2851,34 @@ and a pack as narrow as one line** is not a compression trick, it is the differe
 memory that leaks. A store that knows what each entry is *about* can hand a game only the entries its kind claims — and
 that is the only form in which a corpus-wide bank can be carried into a task without being a treatment on the tasks it
 was not written for.
+
+### 8.49 A pool is not a population, and `recovered` was the counter that proved it twice
+
+R186 bought the scope test §8.48 designed: two 354-character entries, disjoint kind tags, one entry and 551 rendered
+characters per game. The result is the lane's cleanest single number — **264/274 (96.35%), 133/134 (99.25%) on the unseen
+section** — and the five kinds whose packs were byte-identical to R183's moved **one game** (207 → 208). Scoping removed
+the entire −18-game cost of R185 and kept the entire +10.2 pp gain on `put`, which replicated at exactly the same
+transitions (8 gained, 2 lost, in both rounds; pooled 16 against 4, exact p = 0.0118).
+
+The instrument lesson is the one worth keeping. Two rounds read `recovered` — the count of replies shaped *thought, then
+command* — as a meter of the pack's format clause, and R186's own registration wrote a refutation clause on it. The
+per-kind decomposition says the counter is **91% `put`** in R183 (246 of 269) and **79%** in R186 (133 of 168), so the
+pool is not the population it was read as: 269 = 246 + 23 and 168 = 133 + 35. The five kinds that kept the clause went
+**up**, 23 → 35, and the pool fell 113 games inside the one kind whose clause was removed.
+
+Three consequences are now built into the harness rather than written in a report:
+
+1. **`recovered` is printed on the kind's own line**, with that kind's calls as the denominator, and prints nothing at all
+   when an arm file predates the field. A counter that exists in one stratum out of six is a stratum counter.
+2. **A band whose value is a pool is a band over one kind**, and a round cannot be refuted by a band it would have to
+   change design to satisfy. The clause is retired, and the finding it was meant to police — "the format clause is inert
+   on the `any-line` channel" — stands on its own arithmetic (246 vs 132 with the same wins).
+3. **`recovered` meters the reader, not the memory.** On the reference channel the shape is dropped and costs 9.85 pp
+   (R183); on `any-line` the same shape is executed and costs nothing (R185, R186); in the control with no pack it runs
+   at 615 events because the agent flails for 23.8 turns a game. A counter that moves with the reader cannot be evidence
+   about the pack.
+
+This is the third time the same class has been caught, and the class has a shape: **the denominator has to be fixed by the
+design, not by the outcome.** R183 caught it in a mean over *lost* games (nine became three, so the mean rose over the
+hardest survivors); R184 in a counterfactual over a *sampled* policy (a prediction, not a floor); R186 in a *pool* that is
+nine-tenths one kind. Every one of the three was a true number about a population nobody had named.

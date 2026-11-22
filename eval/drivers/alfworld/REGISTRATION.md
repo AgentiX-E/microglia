@@ -2412,3 +2412,177 @@ label spanning two `bank_digest` values, `parser` not `any-line`, `max_steps` no
 size, or a control that had to be re-bought.
 
 **Price ≈ ¥2.10**, four jobs (one arm, both sections), off-peak band.
+
+## R186, amendment 1 — bought, and scope is the whole mechanism: +19 games over R185, `put` +10.2 pp with the other five kinds moving one game
+
+Two dispatches, **274 games, one gated arm**, `any-line`, cap 50, off-peak in all eight summaries: run `44959956920`
+(134 held out) and `44959974666` (140 seen). The control is R183's `none@anyline` and the reference bank R183's
+`always-in@anyline`, both reused rather than re-bought and both declared to the join.
+
+| arm | wins | Wilson | held out | seen | paired against `none@anyline` | mde |
+| --- | --- | --- | --- | --- | --- | --- |
+| **`scope@kind+anyline` (R186)** | **264/274 (96.35%)** | [93.41, 98.01] | **133/134 (99.25%)** | 131/140 (93.57%) | **+24.45 pp** (72 gained, 5 lost) | 8.97 pp |
+| `line@anyline` (R183) | 257/274 (93.80%) | [90.3, 96.1] | 129/134 (96.27%) | 128/140 (91.43%) | +21.90 pp (78 gained) | 9.03 pp |
+| `none@anyline` (R183) | 197/274 (71.90%) | [66.3, 76.9] | 97/134 (72.39%) | 100/140 (71.43%) | — | — |
+
+**Against the bank it was built from, the round is +7 games and it cannot yet be called a gain.** Paired
+`scope@kind+anyline` − `always-in@anyline` = **+2.55 pp** [+0.00, +5.47], bootstrap p = 0.081, exact McNemar on its
+11 + 4 discordant games p = 0.119, mde at that pairing **3.96 pp**. The observed difference sits below what 274 games
+can resolve, and the honest sentence is the compositional one: the scoped bank is **not worse** than the single-entry
+bank on the pool, while the `put` gain that motivated it survives at its full size. The per-kind table below is
+therefore the reading and the pool is the summary.
+
+| kind | `scope` (R186) | `line` (R183) | Δ vs R183 | `precond` (R185) | Δ vs R185 | the five kinds' packs |
+| --- | --- | --- | --- | --- | --- | --- |
+| `put` | **56/59 (94.9%)** | 50/59 (84.7%) | **+10.2 pp** | 56/59 | 0 | R185's sentence |
+| `clean` | 58/58 (100%) | 58/58 (100%) | 0 | 45/58 | **+13 games** | byte-identical to R183 |
+| `cool` | 43/46 (93.5%) | 43/46 (93.5%) | 0 | 43/46 | 0 | byte-identical to R183 |
+| `puttwo` | 41/41 (100%) | 40/41 (97.6%) | +2.4 pp | 40/41 | +1 game | byte-identical to R183 |
+| `heat` | 37/39 (94.9%) | 38/39 (97.4%) | −2.6 pp | 35/39 | +2 games | byte-identical to R183 |
+| `examine` | 29/31 (93.5%) | 28/31 (90.3%) | +3.2 pp | 26/31 | +3 games | byte-identical to R183 |
+
+### The five kinds moved one game, which is the variance measurement the registration asked for
+
+215 games carried a pack **byte-identical** to the one R183 measured, and they went **207 → 208**. Per kind the largest
+movement is one game in either direction (`heat` −1, `examine` +1, `puttwo` +1), which is the 1.5-to-2-game band the
+registration named, and it is now measured rather than assumed. So the R185 damage was the entry and not the kind: under
+the precondition, `clean` thought **10.8** times a game and spent **23.8** turns doing it; under the R183 sentence it
+thinks **4.4** and spends **15.1**, which is R183's own 4.4 and 15.6 to one decimal, and its thirteen budget-exhausted
+games go to **zero**. Removing 197 characters from five kinds restored all thirteen games.
+
+| quantity per game | `clean` R186 | `clean` R185 | `clean` R183 |
+| --- | --- | --- | --- |
+| thoughts | 4.4 | 10.8 | 4.4 |
+| steps | 15.1 | 23.8 | 15.6 |
+| invalid actions | 1.1 | 3.3 | 1.1 |
+| `budget_exhausted` | **0** | **13** | 0 |
+
+### The `put` gain replicates: 8 gained and 2 lost, twice, on two independent samples
+
+R185 and R186 drew 59 `put` games each and both moved **exactly 8 gained and 2 lost** against R183 — two samples that
+land on the same transitions, not one sample read twice. Pooled over the 118 `put` games the two rounds drove, the
+precondition's gain is **16 gained against 4 lost, exact p = 0.0118**, and it is worth **+10.2 pp** on its own kind
+while the five kinds it was withheld from move one game. That is the round's mechanism stated as a mechanism:
+
+> The negative effect of a memory is a **scope** error — a sentence written about one task, read by six — and it is
+> repairable without giving up the gain. Delivered to its subject the same 197 characters keep all six `put` games and
+> cost nothing measurable outside.
+
+### Reading 4 failed and its refutation fired, and both were the same instrument bug
+
+`recovered` read **168** against the registered band of 250 to 320, so row 4 fails, and refutation clause 3's letter
+fires ("`recovered` below 250 while `clean` recovers"). The decomposition every round should have printed is:
+
+| | `put` | the other five | pool |
+| --- | --- | --- | --- |
+| R183, clause on every pack | **246** | 23 | 269 |
+| R185, clause replaced on every pack | 132 | 5 | 137 |
+| R186, clause on five packs, precondition on `put` | **133** | **35** | 168 |
+
+`recovered` is **91% `put`** in R183 and **79%** in R186, so the pool is not a population: 168 = 133 + 35 and
+269 = 246 + 23. The five kinds that kept the clause went **23 → 35** — they did not fall. The pool fell by 113 inside
+the one kind whose clause was removed, and by nothing anywhere else. Therefore:
+
+1. **R185's sentence "the change is not local to `put`" is retracted.** The change was 86% local to `put` (114 of 132).
+2. **Refutation clause 3's inference does not follow.** The band was written on a pool that is nine-tenths one kind; the
+   only scoped design that could hold the pool above 250 is one that keeps the clause on `put`, which is the design
+   this round was registered to test against. A band that a round cannot pass without being a different round is not a
+   refutation, and the clause that made it is retired.
+3. **What `recovered` measures is the format clause, only on `put`, and only as a channel quantity.** Put beside the
+   world's answer: 246 with the clause, 132 and 133 without it, 615 in the control that has no pack and flails for
+   23.8 turns a game. On the `any-line` channel the shape the clause forbids is executed anyway, so its 197 characters
+   buy no wins (R185, R186) — and on the reference channel the same shape is **dropped**, which is the +9.85 pp R183
+   measured. `recovered` is a meter of the reader, not of the memory.
+
+This is the **third instance of one class**, and the class is now named: R183 registered a mean over lost games, R184 a
+counterfactual over a sampled policy, R186 a band over a pool that is one kind. The denominator — or the population —
+has to be fixed by the design and not by the outcome. The harness repair is in this round rather than in the next one:
+`aggregate.py` now prints `recovered` **on the kind's own line**, with that kind's calls as the denominator, and prints
+nothing when an arm file predates the field (seven tests, `RecoveredScopeTest`).
+
+### Verdicts, one row each
+
+| # | registered | read | verdict |
+| --- | --- | --- | --- |
+| 1 | `put` 54 to 58 of 59 | **56** | **held** |
+| 2 | `clean` ≥ 57, `heat` ≥ 37, `examine` ≥ 27, `cool` ≥ 42, `puttwo` ≥ 40 | **58, 37, 29, 43, 41** | **held on all five** |
+| 3 | overall 256 to 266 | **264** | **held** |
+| 4 | `recovered` 250 to 320 | **168** | **failed** — and the failure is the instrument's, see above |
+| 5 | 551 chars, 1 entry, `any-line`, cap 50, one `bank_digest`, two `pack_digest` | 551 ×274, 1 ×274, `any-line` ×274, 50 ×8 summaries, `eed9bea6` ×8, `90c0688f` 215 + `5fb4c464` 59 | **held** |
+
+### Void: nothing fired
+
+`pack_chars` 551 in all 274 games, `pack_entries` 1 in all 274, `parser` `any-line` in all 274, `max_steps` 50 in all
+eight summaries, one `bank_digest` (`eed9bea6`) across both sections, exactly two `pack_digest` values in the
+registered 215/59 proportion, sections tiled 134 + 140, no control re-bought. `refused_actions` 0 and `truncated` 0 in
+every episode; `budget_exhausted` 8 (two in each of `heat`, `cool`, `examine`, `put`), against 34 in R185.
+
+### Spend
+
+**¥1.50 against ¥2.10 quoted** ($0.2085, 4,605 calls, off-peak in all eight summaries). Under quote because one arm ran
+instead of two and the gated pack cut the turn count: 16.81 steps a game against R183's 17.73, on 4,605 calls against
+4,857 for the same 274 games.
+
+### Where this leaves the lane
+
+The published bank is now `banks/bank-putscope-2.json`: **96.35% pooled, 99.25% on the unseen section**, one 551-character
+pack per game, 274 games, ¥1.50 a round. The three mechanisms the lane has measured to be worth something are the
+put-to-move phrasing (R182), the second reader (R183, +9.85 pp on the same bank) and the container precondition scoped
+to `put` (R185 +186, +10.2 pp on its kind, replicated); the one it has measured to be worth **negative** value is the
+same precondition **unscoped** (−18 games, R185). What is left in the ten lost games is not the pack: eight of them
+exhaust the fifty-turn budget with the grammar and the precondition both correct, which is the case for a document
+about the instance rather than a sentence about the kind.
+
+## R187 — the same entry where it is also true: does the precondition generalise past `put`?
+
+R186 settled one direction of the scope question: an entry withheld from five kinds costs those five kinds **one game**
+(207 → 208), so the price of scope is nothing. The other direction is unmeasured, and it is not a question about wording.
+Three of the six kinds are also `then_place_in_receptacle` tasks — `cool` puts an object in a fridge after changing its
+temperature, `heat` in a microwave, `puttwo` two objects in one receptacle — and all three take from a container the same
+way `put` does. Two `cool` and two `heat` games are among the eight of R186's ten losses that exhaust the fifty-turn
+budget on a take that answers `Nothing happens.`
+
+`banks/bank-putscope-3.json` holds the **same two 354-character sentences** as R186 with the boundary moved by one kind
+group, so every game still carries **one entry and 551 rendered characters**:
+
+| kinds | entry | rendered | digest |
+| --- | --- | --- | --- |
+| `put`, `cool`, `heat`, `puttwo` | R185's precondition sentence | 551 | `5fb4c464` |
+| `clean`, `examine` | R183's sentence, byte for byte | 551 | `90c0688f` |
+
+`clean` washes in a sink and `examine` only looks, so neither places anything: they keep R183's sentence unchanged, which
+means the round carries its own control inside its own bank. Their packs are frozen, so any movement there is variance
+and is readable as variance.
+
+### Registered readings
+
+One gated arm, `any-line`, cap 50, 274 games, four jobs, read against R186's own arm:
+
+1. **`put` 54 to 58 of 59** (56 in both R185 and R186). The entry's own kind must be unmoved by its neighbours carrying
+   the same sentence — a gain that only exists in isolation is a gain about a prompt length, not about a rule.
+2. **`cool` at or above 45 of 46 and `heat` at or above 38 of 39** (43 and 37 in R186). These are the two kinds whose
+   losses are the closed container, and they are the round's hypothesis: if the sentence is about placing into a
+   receptacle, they should gain; if it is about `pick_and_place_simple` in particular, they will not.
+3. **`puttwo` at or above 41 of 41, `clean` at or above 57 of 58, `examine` at or above 28 of 31.** `puttwo` is
+   targeted and already at ceiling; `clean` and `examine` are frozen and their floors are one game under their R186
+   values.
+4. **Overall 264 to 272** of 274 (R186 264).
+5. `pack_chars` **551** and `pack_entries` **1** in all 274 games, `parser` `any-line`, `max_steps` **50**, **one**
+   `bank_digest` per section and **two** `pack_digest` values in the 3:2 proportion the tags imply (164 games on
+   `5fb4c464`, 110 on `90c0688f`).
+
+### Refutation
+
+**Any of `cool`, `heat`, `puttwo` below R186 by two games or more.** The precondition is then `put`-specific: the
+sentence is not about containers but about the one kind it was written for, the entry format stops being the variable,
+and R188 becomes the **location prior** — one corpus-wide entry about where object classes live, distilled offline from
+the training transcripts — because eight of R186's ten losses are search and not wording, two of them on
+`pick_and_place_simple`, the corpus's simplest task.
+
+### Void
+
+Any game whose `pack_chars` is not 551 or whose `pack_entries` is not 1, any label spanning two `bank_digest` values,
+`parser` not `any-line`, `max_steps` not 50, a section short of its published size, or a control that had to be re-bought
+(R186's arm is the control and it is reused, not bought again).
+
+**Price ≈ ¥2.10**, four jobs (one arm, both sections), off-peak band.

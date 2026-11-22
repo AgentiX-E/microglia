@@ -1,0 +1,37 @@
+{
+  "schema": "microglia.alfworld-bank/1",
+  "cap": 20,
+  "identity": "substring",
+  "source": {
+    "kind": "two 354-character entries, tagged to disjoint sets of task kinds, so every game carries exactly one 551-character pack",
+    "matches": "entry 1 is banks/bank-putmove-line-1.json byte for byte; entry 2 is banks/bank-putprecond-1.json byte for byte -- the same two texts as R186, with the boundary moved by one kind group",
+    "note": "R187. R186 scoped the precondition to `put` and the five kinds it was withheld from moved one game, so the entry costs nothing where it is not read. The open question is the other direction: is the sentence about `put`, or about placing into a receptacle at all? Three of the six kinds are also then-place tasks -- cool puts an object in a fridge after changing its temperature, heat in a microwave, puttwo two objects in one receptacle -- and two `cool` and two `heat` games are among the eight that exhaust the fifty-turn budget on a take that answers \"Nothing happens.\". clean washes in a sink and examine only looks, so both stay on R183's sentence byte for byte, which is the control this round carries inside its own bank. One entry per game, 551 rendered characters, so the round moves the boundary and nothing else.",
+    "registration": "R187",
+    "operations_kept": [
+      "the put-to-move phrasing",
+      "one command per turn, on its own line (clean, examine)",
+      "open the container before taking from it (put, cool, heat, puttwo)"
+    ],
+    "provenance": "written after R186 measured +24.45 pp against the control, 207 -> 208 on the five byte-identical packs, and left eight of ten losses on the fifty-turn budget"
+  },
+  "entries": [
+    {
+      "text": "If a \"put\" action repeatedly fails despite being at the correct location and holding the object, try the alternative phrasing \"move <object> to <receptacle>\". Write the command alone on its own line and put nothing under it: a command that shares a line with a thought is read as part of the thought, so it never reaches the world and still costs a turn.",
+      "votes": 10,
+      "kinds": [
+        "clean",
+        "examine"
+      ]
+    },
+    {
+      "text": "If a \"put\" action repeatedly fails despite being at the correct location and holding the object, try the alternative phrasing \"move <object> to <receptacle>\". A closed container hides its contents: open the cabinet, fridge, drawer or safe before taking anything from it, or the take answers \"Nothing happens.\" and the put that follows fails the same way.",
+      "votes": 10,
+      "kinds": [
+        "put",
+        "cool",
+        "heat",
+        "puttwo"
+      ]
+    }
+  ]
+}

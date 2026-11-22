@@ -541,7 +541,22 @@ def by_field(
     table: "dict[str, dict]" = {}
     for game in shared_games(left, right):
         kind = left[game].get(field) or right[game].get(field) or "unknown"
-        row = table.setdefault(kind, {"games": 0, "wins": {treatment: 0, control: 0}, "treatment_only": 0, "control_only": 0})
+        row = table.setdefault(
+            kind,
+            {
+                "games": 0,
+                "wins": {treatment: 0, control: 0},
+                "treatment_only": 0,
+                "control_only": 0,
+                # A format event counted per stratum. `recovered` is 91% `put` in every round that has measured it,
+                # so the pooled counter says "the pack changed" when it means "the `put` pack changed" (AUDIT 34.268).
+                # Summed here rather than re-read in the print so that the number in the report and the number in the
+                # JSON are one number.
+                "recovered": {treatment: 0, control: 0},
+                "calls": {treatment: 0, control: 0},
+                "recovered_seen": 0,
+            },
+        )
         first = bool(left[game].get("won"))
         second = bool(right[game].get("won"))
         row["games"] += 1
@@ -549,9 +564,20 @@ def by_field(
         row["wins"][control] += int(second)
         row["treatment_only"] += int(first and not second)
         row["control_only"] += int(second and not first)
+        for arm, record in ((treatment, left[game]), (control, right[game])):
+            row["recovered"][arm] += int(record.get("recovered_actions") or 0)
+            row["calls"][arm] += int(record.get("calls") or 0)
+            row["recovered_seen"] += int("recovered_actions" in record)
     for row in table.values():
         row["delta"] = round((row["wins"][treatment] - row["wins"][control]) / row["games"], 4)
         row["discordant"] = row["treatment_only"] + row["control_only"]
+        # Whether either arm counted the field at all, carried through to the print so that a stratum from an arm file
+        # written before AUDIT 34.262 shows nothing rather than a zero it never measured.
+        row["recovered_counted"] = row["recovered_seen"] > 0
+        row["recovered_per_call"] = {
+            arm: round(row["recovered"][arm] / row["calls"][arm], 4) if row["calls"][arm] else None
+            for arm in (treatment, control)
+        }
     # Descending by games, then by name: the largest population first, and a stable order for a diff.
     return dict(sorted(table.items(), key=lambda item: (-item[1]["games"], item[0])))
 
@@ -903,7 +929,17 @@ def main() -> int:
             # delta is what makes that prediction checkable in the report rather than in a footnote.
             print(f"    {name:<6} {row['wins'][treatment]}/{row['games']} vs {row['wins'][control]}/{row['games']}  delta {row['delta']}")
         for kind, row in reading["kinds"].items():
-            print(f"    {kind:<9} {row['wins'][treatment]}/{row['games']} vs {row['wins'][control]}/{row['games']}  delta {row['delta']:+.4f}")
+            line = f"    {kind:<9} {row['wins'][treatment]}/{row['games']} vs {row['wins'][control]}/{row['games']}  delta {row['delta']:+.4f}"
+            # On the kind's own line, because the pooled counter was read twice as a statement about the pack when it
+            # was a statement about `put`: 269 of R183's recovered events and 246 of them are `put`, so a pool that
+            # falls by 101 while five of six packs are byte-identical is a pool whose only moving part is `put`
+            # (AUDIT 34.268). A reader who has the stratum cannot make that mistake.
+            if row.get("recovered_counted"):
+                line += (
+                    f"  recovered {row['recovered'][treatment]} vs {row['recovered'][control]}"
+                    f" ({row['recovered_per_call'][treatment]} vs {row['recovered_per_call'][control]} per call)"
+                )
+            print(line)
         # Only when the join actually spans more than one: a one-section reading would print the same numbers a
         # second time under a different heading, which is how a reader learns to skip a line.
         if len(reading["sections"]) > 1:

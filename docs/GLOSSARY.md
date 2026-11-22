@@ -2045,3 +2045,21 @@ after R185 measured +10.2 pp on the kind one entry named and −22.4 pp on a kin
 **Pack digest** (`pack_digest`) — A content hash of the entries one *game* actually read, recorded per episode. Under a
 kind gate it changes with the kind, while the run's own `bank_digest` does not: one bank, several packs. The join groups
 on the bank and reports the pack, because a rule that grouped on the pack would refuse every gated round.
+
+**Scope error** — The failure a memory bank commits when an entry written about one task kind is read by every kind: the
+sentence is true, and it is a treatment on tasks it was not written for. R185 is the measurement (+10.2 pp on `put`,
+−22.4 pp on `clean`, net −12 games from one 197-character tail read by six kinds) and R186 is the repair (the same
+characters delivered only to `put`: the gain replicates, the five other kinds move one game). It is the sharpest form of
+the question this project exists to answer, because the negative effect is not the entry being wrong — it is the entry
+being **wider than its subject**.
+
+**Kind-local meter** — A counter whose events come overwhelmingly from one task kind, so that its pooled value is a fact
+about that kind and a rumour about the rest. `recovered` is the case: 246 of R183's 269 events are `put`, and 133 of
+R186's 168. Since R186 the join prints each kind's own count and divides by that kind's own calls, and prints nothing for
+an arm file that predates the field. The general rule is to ask what share of a pooled number comes from one stratum
+before quoting it — the question three of this lane's failed readings had in common.
+
+**Instrument class** — The three readings this lane has had to retire, which are one error in three costumes: a
+denominator fixed by the outcome. R183 took a mean over **lost** games (nine became three, so the mean rose); R184 read a
+counterfactual over a **sampled** policy as a floor; R186 registered a band over a **pool** that is nine-tenths one kind.
+Each was arithmetic documented to the digit and each was a true number about a population nobody had named.

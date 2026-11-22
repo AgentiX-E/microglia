@@ -641,7 +641,7 @@ skeleton is the competitor's own, transliterated: the system line, the two-examp
 split into alternating turns, and the parser's four branches — so an arm changes what sits *above* the transcript
 and nothing else. Three zero-cost readings hold it in place: `--policy seed` reproduces `floor.py` game for game
 (same wins, steps, action digests, observation fingerprints) and the `agreement` job fails on a single field;
-**584 unit tests at 98.8% line-and-branch coverage, every module at or above 95%**, cover the parser, the split,
+**599 unit tests at 99.0% line-and-branch coverage, every module at or above 95%**, cover the parser, the split,
 the shard arithmetic, the bill and the loop itself; and a test asserts that `none` and `always-in` differ at
 exactly one message index. A second **channel** — `--parser any-line`, which executes the command the first-line rule
 refuses — is a field in every episode, a token in every label and a span `aggregate.py` refuses to pool until it is
@@ -663,7 +663,8 @@ changed rather than the sentence: on `--parser any-line`, which executes the com
 same bank reads **257/274 (93.80%)** against a re-bought control at **197/274 (71.90%)** — **+9.85 pp** for the bank arm
 and **+17.15 pp** for the control, and a memory effect of **+21.90 pp** where the reference channel says **+29.20 pp**.
 Both levels are read on a harness this lane built, and the published rows were measured on the competitor's reader, so
-the held-out figure (**129/134 = 96.27%**) is quoted on the board only with that caveat attached and beside the family it
+the held-out figure (**129/134 = 96.27%** at that bank; **133/134 = 99.25%** at the scoped bank below) is quoted on the
+board only with that caveat attached and beside the family it
 belongs to; the reference channel reads **115/134 = 85.82%**. Both readings, the
 per-kind decomposition and the two sections are in `eval/drivers/alfworld/REGISTRATION.md`; the argument for
 reading them is in `WHITEPAPER.md` §3.5 of the [docs repository](https://github.com/AgentiX-E/microglia-docs).
@@ -682,6 +683,16 @@ precondition (open a closed container before taking from it) moved `put` **50 �
 net **−12 games** over 274. The kind that lost does not act less — it thinks **4.4 → 10.8** thoughts a game with three
 times the invalid actions — so a memory entry is a treatment on every task that reads it, and the repair is scope rather
 than wording: two entries tagged to disjoint kinds, one per game, still 551 characters (`banks/bank-putscope-2.json`).
+
+**Then the same 197 characters were delivered only to the kind they were written about, and the cost went away while the
+gain stayed.** The scoped bank reads **264/274 (96.35%)** — **133/134 (99.25%)** on the unseen section — against R183's
+257 and 197. `put` holds at **56/59** (+10.2 pp over R183, and the gain replicated at exactly the same 8-gained,
+2-lost transitions in both rounds: pooled 16 against 4, p = 0.0118), `clean` returns to **58/58** from 45, and the five
+kinds whose packs are byte-identical to R183's move **one game** (207 → 208). The negative effect of R185 was therefore
+scope and not content, and it is repairable without giving up the gain. The counter that had been read as the pack's
+format clause — `recovered`, 269 → 137 — turns out to be **91% `put`** in R183 and 79% in R186: the pool fell by 113
+inside the one kind whose clause was removed while the other five rose 23 → 35, so `aggregate.py` now prints it on each
+kind's own line, with that kind's own calls as the denominator.
 
 **Then the lane spent five arms finding nothing, and found a bug instead.** Five renderings of that one sentence —
 itself, plus a neutral clause, a true citation, a false citation, and the sentence with its second operation
