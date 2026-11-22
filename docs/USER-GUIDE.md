@@ -5717,3 +5717,67 @@ finding, not a justification. In this version all five fields are `unmeasured`, 
 reading in `eval/results/serve-profile.json` beside it, run `pnpm eval:serve-profile` — a clean run prints
 `1 measured` and no drift. The gate fails in the other order, which is the point: a value without its reading is a
 default wearing a decision's clothes.
+
+### 32.42 Reading what an arm cost: three states, and which one your file is in
+
+A bill is not one number in this lane, because there are three ways a file can know one and they must never be
+confused:
+
+| state | what the artefact says | what you may conclude |
+|---|---|---|
+| **census** | `usage_absent: 0, usage_counted: 0`, plus `prompt_tokens` / `completion_tokens` / `uncached_tokens` | calls and tokens were measured by the provider; the cost axis is real |
+| **count** | `usage_absent: 0, usage_counted: 1`, `calls: <n>` | calls were recorded; **tokens are unmeasured, not zero** |
+| **silence** | `usage_absent: 1, usage_counted: 0`, `calls: 0` | nobody counted. `0` here means "unknown", never "no calls" |
+
+The note at the top of every arm artefact says which one it is in words, because a reader who sees `0` should not
+have to know the flag table:
+
+```text
+Arm bill (census): 2667 provider call(s), 1203441 prompt token(s) of which 53441 uncached, 18002 completion token(s).
+Arm bill (count only): 12 provider call(s) recorded; the artefact carries no token census, so its tokens are
+  unmeasured rather than zero.
+Arm bill: unmeasured. No census and no recorded count reached this artefact, so `calls: 0` means "nobody
+  counted", not "the arm made no calls".
+```
+
+**Where the census comes from.** A recorded results document may carry a `usage` block at the root (our phase
+summary prints one) or under `tau2.usage` (an arm artefact carries the projection); a driver run carries it in the
+record the driver exports. All three are read by one function, so the arm's bill and the arm's store cannot come
+from two different processes. A census whose numbers are not numbers is **refused** (`bad-usage`) rather than
+coerced: a `calls: "12"` would otherwise reach the estimator as `NaN` and be stored as a number you could divide by.
+
+**Pairing prices both arms at once.** `pnpm eval:l4-pair` publishes `first.calls` / `second.calls` beside each
+arm's `pass4`, read through the same reader, so one file carries the accuracy delta and both bills. That is the
+file a cost comparison should be drawn from — not two artefacts and a log line.
+
+| what you see | what it means | what to do |
+|---|---|---|
+| arm and pair disagree on `calls` | impossible after R198 for one document; if you see it, one of the two files is hand-edited | rebuild the artefact rather than reconciling the numbers |
+| `usage_absent: 1` on a run you paid for | the phase printed no census and no count reached the file | re-read the phase summary; the number exists in the workflow log, not in the artefact |
+| `count only` on an old artefact | a pre-R198 arm: calls are usable, tokens are not | use `calls` for a per-call comparison; do not compute a token premium from it |
+
+### 32.43 Reading an arm's delta from the product: `[tau2] serve:` before the first call
+
+Every τ² dispatch prints one line before it spends anything:
+
+```text
+[tau2] serve: arm = the product's profile
+[tau2] serve: arm = profile + budget 1500 (TAU_PACK_BUDGET) + speakMargin 0.05 (TAU_SPEAK_MARGIN (R123))
+```
+
+The first line is the release arm: it **is** the profile the product serves. The second is a treatment, and every
+field it moved is named with the variable or registration that named it. If a line you did not expect appears, the
+dispatch named a knob — the line is the diff, and it is printed before the run rather than reconstructed after it.
+
+Two things the mechanism refuses, and one it keeps:
+
+| line | meaning |
+|---|---|
+| `arm names 'budget' twice` | the dispatch set the same knob twice; one arm has one value |
+| `arm moves 'note' without a reason` | a knob moved and cannot say what moved it |
+| `the dispatch asked, nothing moved` | the field was named at the value the profile already ships |
+
+The third is not a refusal: "asked for the default" and "never mentioned it" are different dispatches, and only the
+first tells you the driver knows the knob exists. When you size your own deployment, the baseline arm's line is the
+configuration to reproduce — and `pnpm eval:serve-profile --print` is the same five fields, in the order the audit
+prints them.

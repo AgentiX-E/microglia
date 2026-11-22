@@ -802,7 +802,7 @@ stops being true. `pnpm eval:coupling` recomputes it from the source tree on eve
 | `core` | 48 | 10,749 | **0** |
 | `protocol` | 3 | 1,922 | **0** |
 | `sql` (the adapter) | 7 | **1,956** | 5 |
-| `eval` | 193 | 57,915 | 25, each with a written reason |
+| `eval` | 195 | 58,226 | 25, each with a written reason |
 | `browser` | 2 | 280 | 0 |
 | `node` | 6 | 1,294 | 0 |
 
@@ -1049,9 +1049,57 @@ n = 160, while the rung withheld a third of the packs). `note` has an arm that w
 never dispatched. `credit` has a mechanism check, not a rate. `budget` and `budgetBasis` have never been varied
 alone. The product ships the library defaults, and the record says so in the same words a reviewer would.
 
-What the gate does **not** bind is a lane's treatment arm: those are deliberately `profile + Δ`, and the drivers
-still set their own knobs. Binding them literally is the next step, and the record will be the place it is
-declared rather than inferred.
+What the gate does **not** bind is a lane's treatment arm — and that gap was the next defect rather than a
+footnote. `tau2-driver.ts` wrote its own `budget`, `note`, `budgetBasis` and `speakMargin` into the host call, so
+the arm and the product agreed by convention: a treatment could move two knobs, be reported as one, and nothing in
+the artefact could see the second. That is closed below.
+
+### A treatment arm is the profile plus the fields the dispatch named
+
+`armServeOf()` — [`packages/eval/src/arm-serve.ts`](packages/eval/src/arm-serve.ts) — builds an arm's host
+options by starting from `serveOptions()` and overlaying only the fields the dispatch named. The driver spreads
+the result instead of writing its own keys, so **no knob can be set outside the mechanism**, and every field that
+moved is named with the variable or reading that moved it:
+
+```text
+[tau2] serve: arm = the product's profile                       # the baseline dispatch: it IS the product
+[tau2] serve: arm = profile + budget 1500 (TAU_PACK_BUDGET) + speakMargin 0.05 (TAU_SPEAK_MARGIN (R123))
+```
+
+Three properties come from the type rather than from discipline:
+
+- a field named twice is refused — one arm has one value, and two reasons for one value is an arm that cannot say
+  what it is;
+- a moved field with no reason is refused — a knob that moved and cannot say what moved it is the drift this
+  exists to catch;
+- a field named at the value the profile already ships is kept as **named and unmoved**, because "asked for the
+  default" and "never mentioned it" are different dispatches, and the second is indistinguishable from a driver
+  too old to know the knob exists.
+
+`pnpm test` covers both ends: the module's own refusals, and the driver imported twice — once with nothing set
+(it moves zero fields) and once with `TAU_PACK_BUDGET=1500 TAU_SPEAK_MARGIN=0.05 TAU_INJECTION_NOTE=hardened` (it
+moves exactly those three, in profile order).
+
+### What an arm cost, and the three ways a file can say it
+
+The τ² lane could report accuracy for three rounds and no price, because `bin/l4.ts` wrote `calls: 0` as a
+literal while the driver had been counting provider calls since R103 and the pairing step read a different field.
+One run therefore had two answers in two files.
+
+An arm's bill is now read once, by
+[`packages/eval/src/arm-bill.ts`](packages/eval/src/arm-bill.ts), into **three states that are never spelled the
+same way**:
+
+| state | what was measured | written as |
+|---|---|---|
+| `census` | provider calls **and** tokens | `usage_absent: 0, usage_counted: 0` + `prompt_tokens` / `completion_tokens` / `uncached_tokens` |
+| `count` | provider calls only (a pre-R198 artefact) | `usage_absent: 0, usage_counted: 1` |
+| `absent` | nothing | `usage_absent: 1, usage_counted: 0` — `calls: 0` means "nobody counted", not "no calls" |
+
+The census is read from the document at the root or under `tau2.usage`, refused when a number is not a number
+(`bad-usage`), and carried into the artefact so the arm and the pair report the **same** call count for the same
+run — which is the acceptance test, not an intention. `l4-pair` publishes `first.calls` / `second.calls` beside
+`pass4` in one file, so the accuracy-versus-cost board no longer needs two artefacts and a hand-joined log line.
 
 ### Which BIRD split you measure, and why none of them is a leaderboard entry
 
@@ -1115,7 +1163,7 @@ pnpm bench      # study only, writes bench/results/study.json
 ```
 
 Coverage is enforced at 95% on lines, statements, functions **and** branches. It currently reports
-**100 / 99.91 / 100 / 100** over **6,128 tests**; the branch arms that remain uncovered are
+**100 / 99.91 / 100 / 100** over **6,167 tests**; the branch arms that remain uncovered are
 listed with file, line, and reason in the internal technical design, and none is excluded with an ignore
 comment.
 

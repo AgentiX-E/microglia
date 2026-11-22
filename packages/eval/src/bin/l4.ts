@@ -23,6 +23,9 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
   L4ParseError,
+  armBillLine,
+  armBillMetrics,
+  armBillOf,
   comparePaired,
   compareToPublished,
   denominatorFieldsOf,
@@ -50,6 +53,7 @@ import type {
   NotedFacadeReading,
   PairedFacadeReading,
   Tau2ArmRecord,
+  Tau2PhaseUsage,
   TauTrialRow,
 } from '@agentix-e/microglia-eval';
 import { writeJson, writeResult } from './lib.js';
@@ -276,6 +280,14 @@ type Measurement = {
    * the artefact has to be able to distinguish "no task was unscored" from "this driver never said".
    */
   readonly unscoredSource?: 'document' | 'ids' | 'count' | 'unreported';
+  /**
+   * The provider's own account of the phase, from wherever this run could read one.
+   *
+   * Absent on a re-scored upstream document, which carries no bill, and on a driver that exported an
+   * `instrument()` without a census. Absent is the honest value: `armBillOf` turns it into an explicit
+   * "unmeasured" rather than into the zero this file used to write.
+   */
+  readonly usage?: Tau2PhaseUsage;
 };
 
 /**
@@ -329,6 +341,9 @@ async function measureFromResults(path: string): Promise<Measurement> {
       format: run.format,
       inferredTrials: run.inferredTrials,
       unscoredSource: 'document',
+      // R198: the bill a recorded document carries, when a writer put one in it. Absent on upstream's
+      // own file, which is why the artefact says "unmeasured" instead of "zero calls".
+      ...(run.usage === undefined ? {} : { usage: run.usage }),
     };
   } catch (error) {
     if (error instanceof L4ParseError) return refuse(error, path);
@@ -402,6 +417,10 @@ async function measureFromDriver(module: string): Promise<Measurement> {
     format: 'driver',
     inferredTrials: 0,
     ...(instrumentation === undefined ? {} : { instrumentation }),
+    // R198: the census the driver's own record carries. Read from the record this file already holds
+    // rather than from a second export, so the arm's bill and the arm's store cannot come from two
+    // different processes.
+    ...(instrumentation?.usage === undefined ? {} : { usage: instrumentation.usage }),
     ...(trialRows === undefined ? {} : { trialRows }),
     ...(pairedFacades === undefined ? {} : { pairedFacades }),
     ...(notedFacades === undefined ? {} : { notedFacades }),
@@ -605,15 +624,34 @@ const gates = [
 // anything to learn that a 0.750 came from 141 of 160 episodes.
 const episodeFields = denominatorFieldsOf(trialRateOf(perTaskRows(measured.tasks)));
 
+/**
+ * R198 — what this arm was billed, and whether anybody measured it.
+ *
+ * Computed once, before the artefact is written, because the log line and the file would otherwise
+ * disagree about a run whose bill arrived through only one of the two channels. `calls` was a literal
+ * `0` here for the lane's whole history: the driver had been counting provider calls since R103 and the
+ * number never reached the file a reader opens first, so every cost claim about this lane had to be
+ * assembled by hand from a workflow log.
+ */
+const bill = armBillOf(measured.usage);
+
 await writeResult({
   id: 'poc-l4',
   title: 'L4 — τ²-bench pass^4 against ALTK-Evolve',
   ranAt: new Date().toISOString(),
   model: process.env['TAU_MODEL'] ?? 'unknown',
   n: measured.tasks.length,
-  calls: 0,
+  calls: bill.calls,
+  // R198: the census itself, not only its summary. Written at the root so any lane's artefact can be
+  // priced by the same reader; the `tau2.usage` copy below stays for the readers that predate this
+  // field, and both are the same object rather than two measurements.
+  ...(measured.usage === undefined ? {} : { usage: measured.usage }),
   metrics: {
     pass4: mean,
+    // R198: the three states of the bill, always written as a pair of flags (`0/0` census, `0/1` count,
+    // `1/0` silence) plus the token columns the census carried. A cost axis that cannot be told from a
+    // missing one is how the τ² lane bought accuracy three times and priced it never.
+    ...armBillMetrics(bill),
     // R120: the level at which this `n` has resolution, beside the level the competitor's table is
     // written at. Two runs of one lane measured 0.600 and 0.750 off 140 and 141 episodes of 160, so a
     // headline without its rate is a number a reader cannot tell from a coin.
@@ -675,6 +713,9 @@ await writeResult({
   notes: [
     `Source: ${source} (${measured.format} form). Two arms must share the split.`,
     scenarioBar.note,
+    // R198: the bill, in the sentence that says which of its three states it is in. Placed above the
+    // accuracy lines because a reader comparing two arms reads the price first.
+    armBillLine(bill, 'Arm bill'),
     sotaLineOf(SCENARIO, mean, measured.tasks.length),
     ...(episodeFields === null
       ? []

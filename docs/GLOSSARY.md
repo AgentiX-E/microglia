@@ -2203,8 +2203,9 @@ margin does not.
 
 **Shipping contract** — The pairing of the serve profile with `eval/results/serve-profile.json`, which carries a
 justification per field, checked by `pnpm eval:serve-profile`. It refuses a value the record and the product
-disagree about, a field with no justification, a placeholder reason, and a reading that does not resolve. What it
-does not bind is a lane's treatment arm, which is `profile + Δ` by design.
+disagree about, a field with no justification, a placeholder reason, and a reading that does not resolve. A lane's
+treatment arm is bound by the same record through **arm serve** below, so "the arm" and "the product" are one
+program plus a named delta rather than two argument lists that happen to agree.
 
 **Decorative reading** — A resolving paired interval about a knob the product ships at its default. The evidence
 is real and the deployment ignores it, which is the shape a measurement takes when it is collected for a report
@@ -2213,3 +2214,19 @@ rather than for a release; the audit refuses it instead of counting it.
 **Measured field** — A serve-profile field that carries a resolving reading *and* whose value the product ships.
 Both halves are required, which is why the count is the honest one: this version is five fields, zero measured,
 each with a stated reason.
+
+**Arm serve** — An eval arm's host options, derived by `armServeOf()` as `serveOptions()` plus the fields the
+dispatch named. Each moved field carries a `reason` (a variable or a registration), a field named twice is refused,
+and a field named at the value the profile already ships is kept as *named and unmoved* — "asked for the default"
+and "never mentioned it" are different dispatches. The run prints the result as `[tau2] serve: arm = profile + …`
+before its first model call.
+
+**Arm bill** — What a run was charged, read by `armBillOf()` into three states that are never spelled the same way:
+`census` (calls and tokens measured), `count` (calls measured, tokens absent), and `absent` (nothing measured, so
+`calls: 0` means "nobody counted"). The artefact writes the state as the flag pair `usage_absent` / `usage_counted`
+— `0/0`, `0/1`, `1/0` respectively — because one flag cannot carry three states.
+
+**Bill silence** — The `absent` state of an arm bill. It is not a measured zero and not a failure: it says that no
+census and no recorded count reached the file, which is what a re-scored upstream document and every pre-R198
+artefact look like. A recorded `calls: 0` is deliberately read as silence, because no artefact in this lane has ever
+measured a zero it could prove.

@@ -1146,3 +1146,53 @@ describe("the control arm's own record", () => {
     delete process.env['TAU_MEMORY'];
   });
 });
+
+/**
+ * R199 — the arm a dispatch buys, relative to the product.
+ *
+ * The host's argument list used to be written by hand, so the arm and the shipped profile agreed by
+ * convention: a treatment could move two knobs and be reported as one, and nothing in the artefact could
+ * see it. The arm is now derived, and these two cases are the acceptance the registration named — the
+ * baseline dispatch moves nothing (it *is* the product), and a dispatch that names fields moves exactly
+ * those fields, no more.
+ */
+describe('the arm is the profile plus what the dispatch named', () => {
+  const NAMED = ['TAU_PACK_BUDGET', 'TAU_SPEAK_MARGIN', 'TAU_INJECTION_NOTE'] as const;
+
+  function clear(): void {
+    for (const name of NAMED) delete process.env[name];
+  }
+
+  it('moves nothing when the dispatch named nothing', async () => {
+    clear();
+    const driver = await import('../bin/tau2-driver.js?case=serve-arm-baseline');
+    const arm = driver.serveArm();
+    expect(arm.moved).toEqual([]);
+    // The baseline arm really is the product: every knob the profile owns arrives from it.
+    expect(arm.options).toEqual(expect.objectContaining({ credit: expect.any(Boolean) }));
+  });
+
+  it('moves exactly the fields the dispatch named, in profile order', async () => {
+    clear();
+    process.env['TAU_PACK_BUDGET'] = '1500';
+    process.env['TAU_SPEAK_MARGIN'] = '0.05';
+    process.env['TAU_INJECTION_NOTE'] = 'hardened';
+    try {
+      const driver = await import('../bin/tau2-driver.js?case=serve-arm-named');
+      const arm = driver.serveArm();
+      expect(arm.moved.map((override: { field: string }) => override.field)).toEqual([
+        'budget',
+        'note',
+        'speakMargin',
+      ]);
+      expect(arm.options).toMatchObject({ budget: 1500, note: 'hardened', speakMargin: 0.05 });
+      expect(arm.moved.map((override: { reason: string }) => override.reason)).toEqual([
+        'TAU_PACK_BUDGET',
+        'TAU_INJECTION_NOTE',
+        'TAU_SPEAK_MARGIN (R123)',
+      ]);
+    } finally {
+      clear();
+    }
+  });
+});

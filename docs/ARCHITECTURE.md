@@ -3218,3 +3218,70 @@ The gate binds the shipped defaults and the one host that is a control by constr
 lane's treatment arm, which is `profile + Δ` by design and still sets its own knobs in the driver; making those
 literal is the next step, and when it lands the record is where the claim will be declared rather than inferred
 from a diff.
+
+### 8.60 A treatment arm is `profile + the fields the dispatch named`
+
+§8.59 bound the product and the control host to one record and left the lane's treatment arms writing their own
+argument lists. That gap is not cosmetic: `tau2-driver.ts` set `budget`, `note`, `budgetBasis` and `speakMargin`
+by hand, so a treatment could move two knobs, be reported as a one-knob arm, and the artefact would carry the
+result without ever naming the second. The product then ships the profile while the paper quotes the arm, and the
+two numbers describe two programs — the exact split §8.59 was written to close, one layer down.
+
+**The mechanism.** `packages/eval/src/arm-serve.ts` exports `armServeOf(overrides, profile?)`: it starts from
+`serveOptions(profile)`, overlays only the fields the dispatch named, and returns `{ options, moved, unmoved }`.
+The driver spreads `options` into `openMicroglia` instead of writing keys, so there is no place left to set a
+profile-owned knob outside the mechanism. Each override carries a `reason` — a variable name or a registration —
+and three refusals follow:
+
+| refusal | what it catches |
+|---|---|
+| `arm names 'speakMargin' twice` | one arm with two values and two reasons, which cannot say what it is |
+| `arm moves 'note' without a reason` | a knob that moved and cannot say what moved it |
+| *(not a refusal)* a field named at the shipped value | kept as `named and unmoved`, because "asked for the default" and "never mentioned it" are different dispatches |
+
+**What the driver says before it spends anything.** The run prints one line —
+
+```text
+[tau2] serve: arm = the product's profile
+[tau2] serve: arm = profile + budget 1500 (TAU_PACK_BUDGET) + speakMargin 0.05 (TAU_SPEAK_MARGIN (R123))
+```
+
+— and `serveArm()` returns the same object, which is what makes the acceptance a type rather than a paragraph: the
+test imports the driver twice, once with no variables set (zero fields moved) and once with three named (exactly
+those three, in profile order). The baseline arm is therefore *the product*, by construction rather than by
+resemblance, which is the property a release needs before it can quote a lane's number.
+
+**What it does not decide.** The profile's values. An arm that still moves `speakMargin` today is R123's rung,
+which lost; a `budget` override is a dispatch parameter. This module makes the delta visible, named and priced; it
+does not choose it, and `eval/results/serve-profile.json` remains the place a changed default is justified.
+
+### 8.61 The bill: three states, and why `0` was the defect
+
+`bin/l4.ts` wrote `calls: 0` as a **literal** for the lane's whole history. The driver had been counting provider
+calls since R103, `l4-pair` read `tau2.usage.calls`, and neither number reached the field a reader opens first — so
+a run had two answers in two files and every cost claim about this lane had to be assembled by hand from a workflow
+log. The register (R198) was explicit: read the census, and make absence explicit.
+
+**One reader, three states.** `packages/eval/src/arm-bill.ts` turns a `Tau2PhaseUsage` and/or a recorded call count
+into an `ArmBill` with `source ∈ {census, count, absent}`:
+
+- **census** — the phase printed what the provider charged it. Calls and tokens are measured; the artefact writes
+  `usage_absent: 0, usage_counted: 0` plus the token columns.
+- **count** — the artefact recorded a call count and no census (every arm written before R198). Calls are
+  measured, tokens are **absent** rather than zero, and the flags are `0/1`.
+- **absent** — nothing was recorded. `0/0` is a census, `0/1` a count, `1/0` silence; two flags because one cannot
+  carry three states, and `calls: 0` is then spelled as "nobody counted" in the note beside it.
+
+A recorded `calls: 0` is deliberately read as **absent**, because that is the literal the module exists to stop
+quoting and no artefact in the lane has ever measured a zero it could prove. `measureFromResults` reads the census a
+document carries at the root or under `tau2.usage` (our phase summary prints one; an arm artefact carries the other).
+`measureFromDriver` reads the same block out of the record the driver already returns, so the arm's bill and the
+arm's store cannot come from two processes. `usageOf()` refuses a census whose numbers are not numbers
+(`bad-usage`), because `calls: "12"` would otherwise reach the estimator as `NaN` and be stored as a number somebody
+could divide by.
+
+**The acceptance is a number in two files.** The pair step publishes `first.calls` / `second.calls` beside each
+arm's `pass4`, read through the same `artefactBillOf`, and the test writes one document into two arm artefacts, runs
+the pair, and asserts the three agree — the arm's `calls`, the pair's `first.calls`, and the census both were built
+from. That is also what puts a τ² row on the accuracy-versus-cost board without a hand-joined log line: the paired
+file now carries both axes.

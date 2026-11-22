@@ -521,6 +521,23 @@ export {
 export { parseContrastArgs, type ContrastPair } from './arm-contrast.js';
 
 export {
+  armServeLine,
+  armServeOf,
+  type ArmServe,
+  type ServeOverride,
+  type ServeValue,
+} from './arm-serve.js';
+
+export {
+  armBillLine,
+  armBillMetrics,
+  armBillOf,
+  artefactBillOf,
+  type ArmBill,
+  type BillSource,
+} from './arm-bill.js';
+
+export {
   HALF_WIDTH_Z,
   pairedWidths,
   pairRowOf,
@@ -700,6 +717,7 @@ export {
   type AdmissionCensus,
   type RecallTally,
   type StoreCensus,
+  type Tau2PhaseUsage,
   type Tau2Raw,
 } from './tau2-instrument.js';
 export { isGoldVerifiedCorrection, tau2EditSemantics } from './tau2-admission.js';

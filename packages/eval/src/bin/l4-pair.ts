@@ -62,6 +62,8 @@ import {
   tau2DetectablePp,
   tau2GateAudit,
   transferReadingOf,
+  armBillLine,
+  artefactBillOf,
   type Tau2ArmRecord,
   type Tau2ComparisonRecord,
   type Tau2Evidence,
@@ -85,6 +87,15 @@ type TaskRow = { readonly id: string; readonly passed_all: boolean };
 
 type Artefact = {
   readonly n?: number;
+  /**
+   * The arm's recorded call count, written by every artefact.
+   *
+   * R198: read only when `tau2.usage` is absent, and only as a *count* rather than a census — a
+   * pre-R198 artefact has this field and no token columns, and the pair must not present the difference
+   * as a measured vector. Until R198 this file ignored the field entirely and read the census alone, so
+   * an arm whose bill lived in `calls` read as "no bill" while the arm artefact beside it said `0`.
+   */
+  readonly calls?: number;
   readonly metrics?: { readonly pass4?: number; readonly k?: number; readonly tasks?: number };
   /** The model that answered, which a cross-fit compares because two models are two experiments. */
   readonly model?: string;
@@ -252,6 +263,14 @@ function load(path: string): Artefact {
 
 const first = load(FIRST);
 const second = load(SECOND);
+
+/**
+ * R198 — what each arm was billed, read once and used three times (the two log lines, the premium, and
+ * the pair artefact's own record). Read here rather than at the point of use because the pair artefact
+ * is written above the log lines, and a bill computed below them would be a value the file could not see.
+ */
+const firstBill = artefactBillOf(first);
+const secondBill = artefactBillOf(second);
 
 for (const [label, artefact, path] of [
   ['first', first, FIRST],
@@ -711,12 +730,19 @@ await writeJson('poc-l4-pair', {
     ranAt: first.ranAt ?? null,
     pass4: first.metrics?.pass4 ?? null,
     k: first.metrics?.k ?? null,
+    // R198: the arm's bill, so a reader with only this file can price both arms. `bill` says which of the
+    // three states the number is in, because a pair that published `calls: 0` without it would spell
+    // "nobody counted" the same way as "no calls".
+    calls: firstBill.calls,
+    bill: firstBill.source,
   },
   second: {
     path: SECOND,
     ranAt: second.ranAt ?? null,
     pass4: second.metrics?.pass4 ?? null,
     k: second.metrics?.k ?? null,
+    calls: secondBill.calls,
+    bill: secondBill.source,
   },
   comparison,
   ...(foldSplit.ok
@@ -939,35 +965,35 @@ if (transfer !== undefined) {
       `net ${transfer.gate.netPp.toFixed(2)}pp, verdict \`${transfer.gate.verdict}\`\n`,
   );
 }
-// The bill's mechanism, per arm, read off each artefact's own census.
+// The bill, then the bill's mechanism, per arm, read off each artefact's own record.
 //
 // A pair that reports a delta and a cost but not this has reported that the memory arm paid twice as
 // much without saying what it bought, which is the state PROGRESS 179 left the lane in for two rounds
-// and the reason R102.1 was nearly dispatched against a placement theory the probe then refused.
+// and the reason R102.1 was nearly dispatched against a placement theory the probe then refused. R198
+// put the bill first because the cache sentence explains a number the reader had to assemble by hand
+// until the arm artefact carried one.
 for (const [name, record] of [
   ['first', first],
   ['second', second],
 ] as const) {
+  const bill = name === 'first' ? firstBill : secondBill;
+  process.stdout.write(`[l4-pair] ${armBillLine(bill, `${name} arm's bill`)}\n`);
   const census = cacheCensusVerdict(record.tau2?.usage?.cache);
   process.stdout.write(`[l4-pair] cache ${name} (${record.tau2?.arm ?? 'unstated'}): ${census.state} — ${census.sentence}\n`);
 }
 // And the premium, split, when both arms carry the columns it is computed from. This is the sentence
 // R103 published — and printing it per pair is what keeps it a measurement rather than a paragraph:
 // the next arm to serve a different pack re-derives it instead of quoting it.
-const firstUsage = first.tau2?.usage;
-const secondUsage = second.tau2?.usage;
 const servedChars = second.tau2?.pack?.summary?.meanChars ?? 0;
 if (
-  firstUsage?.calls != null &&
-  firstUsage.uncached_tokens != null &&
-  secondUsage?.calls != null &&
-  secondUsage.uncached_tokens != null
+  firstBill.uncachedTokens != null &&
+  secondBill.uncachedTokens != null
 ) {
   const premium = premiumSplitOf({
-    control: { calls: firstUsage.calls, uncachedTokens: firstUsage.uncached_tokens },
+    control: { calls: firstBill.calls, uncachedTokens: firstBill.uncachedTokens },
     treatment: {
-      calls: secondUsage.calls,
-      uncachedTokens: secondUsage.uncached_tokens,
+      calls: secondBill.calls,
+      uncachedTokens: secondBill.uncachedTokens,
       servedChars,
     },
   });

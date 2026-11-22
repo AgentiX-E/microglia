@@ -32,6 +32,7 @@
  */
 import type { PassAtKInput } from './passk.js';
 import { comparePaired } from './stats.js';
+import type { Tau2PhaseUsage } from './tau2-instrument.js';
 
 /** One scored attempt: which task, which trial, what reward (null = unscored). */
 export type TauTrial = {
@@ -50,6 +51,17 @@ export type TauRun = {
   readonly format: 'json' | 'dir';
   /** Trials whose `trial` field was absent and therefore indexed by position. */
   readonly inferredTrials: number;
+  /**
+   * What the provider said the run was sent and charged for, when the document carries it.
+   *
+   * τ²'s own result document has no such block — the provider's account reaches this lane through the
+   * driver's diagnostics — so a re-scored *upstream* file is absent here and that absence is the
+   * truth. What the field exists for is the other two writers: our phase summary, which prints
+   * `usage` at the root, and an arm artefact, which carries the same block under `tau2.usage`. Both
+   * are read, because a reader that accepts one shape and silently ignores the other is how R198's
+   * `calls: 0` survived: the number was in the file and the reader was not looking.
+   */
+  readonly usage?: Tau2PhaseUsage;
 };
 
 export type TaskTrials = {
@@ -73,6 +85,7 @@ export type L4ParseReason =
   | 'duplicate-trial'
   | 'bad-reward'
   | 'bad-trial'
+  | 'bad-usage'
   | 'short-grid'
   | 'no-scored-tasks';
 
@@ -125,6 +138,36 @@ function trialOf(entry: Record<string, unknown>): number | undefined {
     throw new L4ParseError('bad-trial', `trial must be a non-negative integer, got ${String(trial)}`);
   }
   return trial;
+}
+
+/** The numeric fields a census is made of, and the only ones this reader grades. */
+const USAGE_COUNTS = ['calls', 'prompt_tokens', 'completion_tokens', 'cached_tokens', 'uncached_tokens'] as const;
+
+/**
+ * The provider's census, from whichever of the two writers put it in the document.
+ *
+ * Read in the order `usage` then `tau2.usage`: the phase summary prints the block at the root, and an
+ * arm artefact carries it under `tau2`, and a file that carries both is one writer's copy of the other.
+ *
+ * Each numeric field is graded rather than coerced. A `calls: "12"` written by a serializer bug would
+ * otherwise reach the estimator as `NaN` and be stored as a number a reader could divide by — the same
+ * class of defect as a reward parsed from a string, which this module already refuses. `null` is
+ * accepted and dropped, because the provider's own census uses it for "this phase did not report it",
+ * and a field that reported nothing must not become a zero.
+ */
+function usageOf(root: Record<string, unknown>): Tau2PhaseUsage | undefined {
+  const block = asRecord(root['usage']) ?? asRecord(asRecord(root['tau2'])?.['usage']);
+  if (block === undefined) return undefined;
+  for (const name of USAGE_COUNTS) {
+    const value = block[name];
+    if (value === null || value === undefined) continue;
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+      throw new L4ParseError('bad-usage', `usage.${name} must be a non-negative number, got ${String(value)}`);
+    }
+  }
+  // The composition blocks (`cache`, `cost`) travel verbatim: the modules that read them validate their
+  // own shape, and a second copy of that validation here would be the one that drifted.
+  return block as Tau2PhaseUsage;
 }
 
 /**
@@ -202,8 +245,12 @@ export function parseTauResults(text: string): TauRun {
   const info = asRecord(root['info']);
   const environment = asRecord(info?.['environment_info']);
   const domain = environment?.['domain_name'];
+  // Read last, so a document that cannot be scored is refused for that reason first: the bill of a run
+  // that produced no grid is a number about nothing, and naming it would bury the defect.
+  const usage = usageOf(root);
   return {
     ...(typeof domain === 'string' ? { domain } : {}),
+    ...(usage === undefined ? {} : { usage }),
     taskIds,
     trials,
     format: simulations === undefined ? 'dir' : 'json',

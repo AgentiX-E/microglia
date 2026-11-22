@@ -7,6 +7,7 @@
  */
 import { existsSync } from 'node:fs';
 import { attemptTimeoutMs, chooseArtefact, retryAfterMs, splitClaim } from '@agentix-e/microglia-eval';
+import type { Tau2PhaseUsage } from '@agentix-e/microglia-eval';
 
 // Re-exported so a CLI takes its arguments through the package rather than through a second
 // `process.argv` reader, which is how three readings came to describe a file nobody named.
@@ -276,6 +277,15 @@ export type PocResult = {
   readonly model: string;
   readonly n: number;
   readonly calls: number;
+  /**
+   * What the provider charged this arm, when anybody measured it.
+   *
+   * Root-level rather than only inside a lane's projection, because the bill is a property of the arm
+   * and not of one benchmark's record: a reader pricing two runs should not have to know which lane
+   * wrote them. R198 added the field because the τ² arm wrote `calls: 0` as a literal for the lane's
+   * whole history while the driver had been counting provider calls since R103.
+   */
+  readonly usage?: Tau2PhaseUsage;
   readonly metrics: Record<string, number>;
   readonly notes: readonly string[];
   /**

@@ -154,6 +154,84 @@ describe('what the reader refuses', () => {
   });
 });
 
+describe('the bill a document carries', () => {
+  const grid = [sim('t0', 0, 1), sim('t1', 0, 1)];
+
+  it('reads the census a phase summary prints at the root', () => {
+    const run = parseTauResults(
+      JSON.stringify({ info, tasks: [{ id: 't0' }, { id: 't1' }], simulations: grid, usage: { calls: 9, prompt_tokens: 900 } }),
+    );
+    expect(run.usage).toEqual({ calls: 9, prompt_tokens: 900 });
+  });
+
+  it('reads the census an arm artefact carries under `tau2`', () => {
+    const run = parseTauResults(
+      JSON.stringify({
+        info,
+        tasks: [{ id: 't0' }, { id: 't1' }],
+        simulations: grid,
+        tau2: { usage: { calls: 12, uncached_tokens: 120 } },
+      }),
+    );
+    expect(run.usage?.calls).toBe(12);
+    expect(run.usage?.uncached_tokens).toBe(120);
+  });
+
+  it('prefers the root census when one document carries both writers\u2019 copies', () => {
+    const run = parseTauResults(
+      JSON.stringify({
+        info,
+        tasks: [{ id: 't0' }, { id: 't1' }],
+        simulations: grid,
+        usage: { calls: 12 },
+        tau2: { usage: { calls: 99 } },
+      }),
+    );
+    expect(run.usage?.calls).toBe(12);
+  });
+
+  it('reports no census on upstream\u2019s own document, which carries none', () => {
+    expect(parseTauResults(jsonForm(grid)).usage).toBeUndefined();
+  });
+
+  it('drops a null the provider wrote for "this phase did not report it"', () => {
+    const run = parseTauResults(
+      JSON.stringify({
+        info,
+        tasks: [{ id: 't0' }, { id: 't1' }],
+        simulations: grid,
+        usage: { calls: 4, prompt_tokens: null },
+      }),
+    );
+    // Carried verbatim, and `armBillOf` is what turns the null into an absent column rather than a zero.
+    expect(run.usage?.prompt_tokens).toBeNull();
+  });
+
+  it('refuses a census whose numbers are not numbers', () => {
+    for (const usage of [{ calls: '12' }, { calls: 12, prompt_tokens: '400' }, { calls: -1 }, { calls: 12, uncached_tokens: 'lots' }]) {
+      const document = JSON.stringify({ info, tasks: [{ id: 't0' }, { id: 't1' }], simulations: grid, usage });
+      expect(reasonOf(() => parseTauResults(document))).toBe('bad-usage');
+    }
+    // `1e999` is legal JSON and parses to `Infinity`, which is not a count: written as text because
+    // `JSON.stringify` would turn the value into `null` and test the null path instead.
+    const infinite =
+      '{"info":{"environment_info":{"domain_name":"retail"}},"tasks":[{"id":"t0"},{"id":"t1"}],' +
+      '"simulations":[{"task_id":"t0","trial":0,"reward":1},{"task_id":"t1","trial":0,"reward":1}],' +
+      '"usage":{"calls":1e999}}';
+    expect(reasonOf(() => parseTauResults(infinite))).toBe('bad-usage');
+  });
+
+  it('refuses a broken census in the projection too, not only at the root', () => {
+    const document = JSON.stringify({
+      info,
+      tasks: [{ id: 't0' }, { id: 't1' }],
+      simulations: grid,
+      tau2: { usage: { calls: null, prompt_tokens: 'many' } },
+    });
+    expect(reasonOf(() => parseTauResults(document))).toBe('bad-usage');
+  });
+});
+
 describe('turning a run into the estimator input', () => {
   const run = parseTauResults(
     jsonForm([

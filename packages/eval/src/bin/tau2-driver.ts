@@ -131,6 +131,8 @@ import {
   traceOf,
   actionSentence,
   resolveFacadeNotePlan,
+  armServeLine,
+  armServeOf,
   tau2EditSemantics,
   toPassAtK,
   toolInventoryOf,
@@ -214,6 +216,7 @@ import {
   type ShapeObservation,
 } from "../shape-pair.js";
 import { defaultPolicy } from "@agentix-e/microglia-core";
+import type { ArmServe } from "@agentix-e/microglia-eval";
 
 const runFile = promisify(execFile);
 
@@ -745,6 +748,41 @@ const SPEAK_MARGIN = resolveSpeakMargin();
 const SPEAK_CENSUS = resolveSpeakCensus();
 
 /**
+ * R199 — this arm, stated as the product's profile plus what the dispatch named.
+ *
+ * The host argument list used to write its own `budget`, `note`, `budgetBasis` and `speakMargin`, so the arm and
+ * the shipped product agreed by convention. Two of those fields are set by a dispatch on every run, and a
+ * treatment that moved a third was indistinguishable in the artefact from one that did not — which is exactly the
+ * split R197a closed on the product side and left open here. The list below is the whole delta: an unset variable
+ * is not listed, so the baseline arm *is* the product, and the line it prints says so.
+ *
+ * Values rather than the plan objects, because a plan carries three levels inside one run (R53's note arm); the
+ * host argument is the one the run starts from.
+ */
+const ARM_SERVE = armServeOf([
+  ...(PACK_BUDGET === DEFAULT_PACK_BUDGET
+    ? []
+    : [{ field: 'budget' as const, value: PACK_BUDGET, reason: 'TAU_PACK_BUDGET' }]),
+  ...(NOTE_PLAN.mode === 'standard'
+    ? []
+    : [{ field: 'note' as const, value: NOTE_PLAN.mode, reason: 'TAU_INJECTION_NOTE' }]),
+  // Declared with the note arm rather than alone: the hardened sentence is longer, so the accounting that pays for
+  // it has to move with it or the three levels are not the same budget. See R53 in the prereg directory.
+  ...(NOTE_ARMS.enabled
+    ? [
+        {
+          field: 'budgetBasis' as const,
+          value: NOTE_ARMS.budgetBasis,
+          reason: "R53's note arm, whose hardened sentence needs the accounting to move with it",
+        },
+      ]
+    : []),
+  ...(SPEAK_MARGIN === 0
+    ? []
+    : [{ field: 'speakMargin' as const, value: SPEAK_MARGIN, reason: 'TAU_SPEAK_MARGIN (R123)' }]),
+]);
+
+/**
  * The longest statement the pack can carry under this arm, measured on the shape it writes.
  *
  * Absent for every unit but `raw`, and the absence is the honest reading: a claim's line is as long as
@@ -1146,6 +1184,17 @@ export function controlRaw(
       ? {}
       : { inaction: diagnostics["inaction"] as InactionCensus }),
   };
+}
+
+/**
+ * R199: what this arm is, relative to the product's profile.
+ *
+ * Exported because the acceptance is a *type* and a diff, not a paragraph: a test sets the dispatch's variables,
+ * imports this module and asserts that the arm moved exactly the fields the dispatch named — and that the
+ * baseline run (no variables) moved none at all.
+ */
+export function serveArm(): ArmServe {
+  return ARM_SERVE;
 }
 
 /** The arm record the protocol's gates read, or `undefined` before a run has happened. */
@@ -1647,7 +1696,9 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     namespace: "tau2",
     store,
     interpreter,
-    budget: PACK_BUDGET,
+    // R199: the product's profile plus the fields this dispatch named, instead of a hand-written argument list.
+    // Every knob below that the profile owns arrives through this spread; a caller cannot set one outside it.
+    ...ARM_SERVE.options,
     clock: steppingClock(1_700_000_000_000, 1),
     random: mulberry32(Number(process.env["TAU_SEED"] ?? 7) || 7),
     // A τ² correction is gold-verified by `evaluation_criteria.actions`, not judged
@@ -1655,20 +1706,17 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // takes, which is what held all of R44's items as candidates. See
     // `tau2-admission.ts` for the measurement and the guarded condition.
     editSemantics: tau2EditSemantics,
-    note: NOTE_PLAN.mode,
     // R53: the three levels must serve the same items for the same request, and at a fixed
     // budget the hardened sentence is longer than the standard one and used to buy that room
-    // by dropping the last rule. Declared only for the arm that needs it, because an upgrade
-    // must not change what a published number measured.
-    ...(NOTE_ARMS.enabled ? { budgetBasis: NOTE_ARMS.budgetBasis } : {}),
+    // by dropping the last rule. Carried by `ARM_SERVE` above, for the arm that needs it, because an
+    // upgrade must not change what a published number measured.
     // R109: the host's half of the shape fold. The lane's records state their calls on an `A:` line and
     // nothing else knows that, so the vocabulary is declared here and the request only says which unit it
     // wants. A dispatch that declares `shape=per-failure` gets the same census over the same pack, which
     // is what makes the two arms one experiment.
     shapeOf,
-    // R123: the gate on whether the pack speaks. Declared only when the dispatch named one, because a
-    // host that never heard of the option must serve the pack it always served.
-    ...(SPEAK_MARGIN === 0 ? {} : { speakMargin: SPEAK_MARGIN }),
+    // R123: the gate on whether the pack speaks. Carried by `ARM_SERVE` above, only when the dispatch named
+    // one, because a host that never heard of the option must serve the pack it always served.
     ...(SPEAK_CENSUS ? { speakCensus: true } : {}),
   });
 
@@ -2088,6 +2136,9 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       `rephrased=${String(distillReport.rephrased)} ` +
       `suppressed=${String(distillReport.suppressed)}\n`,
   );
+  // R199: what this arm is, relative to the product, printed before the first episode is paid for. The line
+  // beside it in the artefact is the same object; this one is what a reader of a workflow log sees.
+  process.stdout.write(`[tau2] serve: ${armServeLine(ARM_SERVE)}\n`);
   process.stdout.write(
     `[tau2] injection-note: mode=${NOTE_PLAN.mode} declared=${String(NOTE_PLAN.declared)}\n`,
   );
