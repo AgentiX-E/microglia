@@ -57,7 +57,9 @@ function selfTest(): number {
 
   // A record whose stated value disagrees with the product: one refusal, and it names both numbers.
   const drifted = structuredClone(sound);
-  drifted.profile.budget = 800;
+  // The clone carries the literal type of the fixture, so the field is widened here rather than in the fixture:
+  // this record exists to be wrong, and a type that refuses the wrongness would hide the case.
+  (drifted.profile as Record<string, unknown>)['budget'] = 800;
   expect('drifted record', auditServeProfileRecord(drifted), 1);
 
   // A reading that does not resolve is not a justification, however complete its fields are.
