@@ -1,0 +1,42 @@
+{
+  "schema": "microglia.alfworld-bank/1",
+  "cap": 20,
+  "identity": "substring",
+  "source": {
+    "kind": "three entries: the two published sentences byte for byte, plus one untagged sentence about the turn budget",
+    "matches": "entries 1 and 2 are banks/bank-putscope-2.json byte for byte; entry 3 is new and untagged, so every game carries it",
+    "note": "R188. R186's ten losses are two disjoint families of five, and the aggregate now prints the split: five games act every turn and never find the object (49 or 50 environment steps, 0 or 1 thoughts), five spend the pass's fifty turns on thoughts and touch the world 4 to 26 times (24 to 46 thoughts). The separation holds on the winning side too -- no won game in 264 has twenty thoughts -- and the pack already moves the mean, 9.23 thoughts a game in the control to 4.2 with the scoped bank. So half the remaining gap is a turn-economy failure, not a search failure, and this entry is the direct instruction against it: a reply that only plans spends a turn and changes nothing.",
+    "registration": "R188",
+    "operations_kept": [
+      "the put-to-move phrasing",
+      "one command per turn, on its own line (clean, cool, examine, heat, puttwo)",
+      "open the container before taking from it (put)",
+      "end every reply with a command rather than a plan (all six kinds)"
+    ],
+    "provenance": "written after R186 measured 264/274 with 5 thought-heavy losses and after the join learned to print rumination; the placebo is the same sentence with its own words permuted, which is the only length-matched control that preserves the vocabulary instead of the instruction"
+  },
+  "entries": [
+    {
+      "text": "If a \"put\" action repeatedly fails despite being at the correct location and holding the object, try the alternative phrasing \"move <object> to <receptacle>\". Write the command alone on its own line and put nothing under it: a command that shares a line with a thought is read as part of the thought, so it never reaches the world and still costs a turn.",
+      "votes": 10,
+      "kinds": [
+        "clean",
+        "cool",
+        "examine",
+        "heat",
+        "puttwo"
+      ]
+    },
+    {
+      "text": "If a \"put\" action repeatedly fails despite being at the correct location and holding the object, try the alternative phrasing \"move <object> to <receptacle>\". A closed container hides its contents: open the cabinet, fridge, drawer or safe before taking anything from it, or the take answers \"Nothing happens.\" and the put that follows fails the same way.",
+      "votes": 10,
+      "kinds": [
+        "put"
+      ]
+    },
+    {
+      "text": "Every reply must end with a command, because a reply that only plans still spends one turn of the fifty available and leaves the world exactly as it was. Do not describe the next step, take it: issue the command you were about to consider and read the answer.",
+      "votes": 10
+    }
+  ]
+}

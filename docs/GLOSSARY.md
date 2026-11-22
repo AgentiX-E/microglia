@@ -2063,3 +2063,21 @@ before quoting it — the question three of this lane's failed readings had in c
 denominator fixed by the outcome. R183 took a mean over **lost** games (nine became three, so the mean rose); R184 read a
 counterfactual over a **sampled** policy as a floor; R186 registered a band over a **pool** that is nine-tenths one kind.
 Each was arithmetic documented to the digit and each was a true number about a population nobody had named.
+
+**Rumination** — A model turn that carries no command. It is charged to the pass budget exactly like an action and it
+moves nothing in the world, so an episode can be lost without the environment being touched more than a handful of
+times. R186's ten losses are five games of 24 to 46 thoughts against 4 to 26 environment steps, and five games of 0 or 1
+thought against 49 or 50 environment steps; no won game in 264 has twenty. The join prints the mean and the count of
+**heavy** games (≥ 20) because the two families are disjoint rather than distributed.
+
+**Turn economy** — How much of the fixed turn budget reaches the world. A pack raises it here: 9.23 thoughts a game in
+the control against 4.2 with the scoped bank, because a sentence that names the next action leaves less to deliberate
+about. The five thought-heavy losses are the part of the corpus no sentence in the bank covers, which is why they are
+read as a coverage failure rather than as harm.
+
+**Skill utility score** — The execution-free diagnostic from *Break It Down, Pass It On* (arXiv 2608.20274): the product
+of a skill's **specificity** (the probability that it is closer to its nearest task than two random tasks are to each
+other) and its **abstractness** (the normalized perplexity of its similarity distribution over the task set). It needs
+only the skill and the task descriptions, no rollout, and the paper reports that neither property predicts success alone
+while their product does. It is the first published candidate for the question this project has been answering by
+measurement — *which entries will hurt* — and the scope tags of R186 to R188 are the hand-built approximation of it.

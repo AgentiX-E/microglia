@@ -728,5 +728,81 @@ class RegroupedBankTest(unittest.TestCase):
         self.assertEqual({len(entry["text"]) for entry in self.payload()["entries"]}, {354})
 
 
+class TurnBudgetBankTest(unittest.TestCase):
+    """R188's bank: the published two entries untouched, one untagged sentence about the turn budget, and its placebo.
+
+    R186's ten losses are two disjoint families of five, and only one of them is about finding things. Five games spend
+    the fifty-turn pass on thoughts — 24 to 46 of them — and touch the world 4 to 26 times; five spend 0 or 1 thought
+    and 49 or 50 environment steps looking for an object. The pack already moves the mean (9.23 thoughts a game in the
+    control against 4.2 with the scoped bank), so the class is what the pack failed to reach rather than what it
+    caused, and the entry this class guards is the direct instruction against it.
+
+    Three properties have to hold for the round to be a content test:
+
+    * **every kind carries two entries and 814 characters**, identical across all six, so the round moves no length;
+    * **entries 1 and 2 are byte-identical to the published bank**, so the round moves no other sentence;
+    * **the placebo is the same sentence permuted inside itself** — same characters, same words, no instruction — so a
+      difference between the arms is content and not the 259 characters carrying it.
+    """
+
+    NAME = "bank-turnbudget-1.json"
+    PLACEBO = "bank-turnbudget-1-placebo.json"
+    KINDS = ("clean", "cool", "examine", "heat", "put", "puttwo")
+    RENDERED = 814
+
+    def selected(self, name: str, kind: str) -> "list[str]":
+        payload = payload_of(name)
+        rules = [entry["text"] for entry in payload["entries"]]
+        kinds = [list(entry.get("kinds") or []) for entry in payload["entries"]]
+        return driver.applicable(rules, kinds, kind)
+
+    def test_every_kind_carries_two_entries_at_814_characters_in_both_arms(self):
+        for name in (self.NAME, self.PLACEBO):
+            for kind in self.KINDS:
+                with self.subTest(bank=name, kind=kind):
+                    selected = self.selected(name, kind)
+                    self.assertEqual(len(selected), 2)
+                    self.assertEqual(len(driver.render_pack(selected)), self.RENDERED)
+
+    def test_the_new_entry_reaches_all_six_kinds_because_it_is_untagged(self):
+        for kind in self.KINDS:
+            with self.subTest(kind=kind):
+                self.assertEqual(self.selected(self.NAME, kind)[-1], payload_of(self.NAME)["entries"][2]["text"])
+
+    def test_the_first_two_entries_are_the_published_bank_byte_for_byte(self):
+        published = payload_of("bank-putscope-2.json")["entries"]
+        for name in (self.NAME, self.PLACEBO):
+            for index, entry in enumerate(published):
+                with self.subTest(bank=name, entry=index):
+                    self.assertEqual(payload_of(name)["entries"][index]["text"], entry["text"])
+                    self.assertEqual(payload_of(name)["entries"][index]["kinds"], entry["kinds"])
+
+    def test_the_placebo_is_the_treatment_permuted_inside_itself(self):
+        treatment = payload_of(self.NAME)["entries"][2]["text"]
+        placebo = payload_of(self.PLACEBO)["entries"][2]["text"]
+        self.assertNotEqual(treatment, placebo)
+        self.assertEqual(len(treatment), len(placebo))
+        # Same words, different order: the multiset is what a length-matched control preserves and what an
+        # instruction cannot survive.
+        self.assertEqual(sorted(treatment.split()), sorted(placebo.split()))
+
+    def test_the_two_banks_are_two_banks(self):
+        # The digest hashes text *and* tags since AUDIT 34.269; two banks with one entry swapped must differ, or the
+        # join's one-bank-per-label guard cannot see this round at all.
+        digests = set()
+        for name in (self.NAME, self.PLACEBO):
+            payload = payload_of(name)
+            rules = [entry["text"] for entry in payload["entries"]]
+            kinds = [list(entry.get("kinds") or []) for entry in payload["entries"]]
+            digests.add(driver.bank_digest_of(rules, kinds))
+        self.assertEqual(len(digests), 2)
+
+    def test_the_placebo_carries_no_command_shaped_instruction(self):
+        # The permutation destroys the sentence, so the placebo has no imperative anyone can follow. Checked as the
+        # absence of the treatment's own opening rather than as a grammar test, because the claim is about this pair.
+        placebo = payload_of(self.PLACEBO)["entries"][2]["text"]
+        self.assertNotIn("Every reply must end with a command", placebo)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

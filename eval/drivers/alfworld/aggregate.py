@@ -52,6 +52,12 @@ PARSERS = (REFERENCE_PARSER, "any-line")
 # than the fast one (15 games against 40 at cap 30), so a delta across two caps is partly a statement about the budget.
 REFERENCE_CAP = 50
 
+# A reply that carries no command is charged to the same turn budget as one that moves the world, so a game can be
+# lost without the environment ever being touched. `THOUGHT_HEAVY` is where that stops being an episode and becomes a
+# class: no won game in R186's 264 has twenty thoughts, and five of its ten losses have 24 to 46 of them. The number is
+# a property of the recorded artefacts rather than of this file, which is why it is a reading and not a gate.
+THOUGHT_HEAVY = 20
+
 
 def fail(message: str) -> "None":
     print(f"FAIL {message}")
@@ -663,6 +669,14 @@ def refusals(left: "list[dict]", right: "list[dict] | None" = None, labels: "tup
         # look like a cure for the format rather than a different end for the same turn (AUDIT 34.262).
         recovered = sum(int(episode.get("recovered_actions") or 0) for episode in episodes)
         recovered_counted = any("recovered_actions" in episode for episode in episodes)
+        # The turn a reply spends on a thought is charged to the pass budget and moves nothing, which is the third way
+        # a turn can fail to reach the world and the only one that costs the whole episode rather than a step. R186's
+        # ten losses split cleanly on it: five spend 24 to 46 turns on thoughts and 4 to 26 on the environment, five
+        # spend 0 or 1 on thoughts and 49 or 50 on the environment. The class is read as `thought_heavy` rather than as
+        # a mean because the two families are not a distribution around anything.
+        thoughts = sum(int(episode.get("thoughts") or 0) for episode in episodes)
+        thoughts_counted = any("thoughts" in episode for episode in episodes)
+        heavy = sum(1 for episode in episodes if int(episode.get("thoughts") or 0) >= THOUGHT_HEAVY)
         return {
             "games": len(episodes),
             "calls": calls,
@@ -673,6 +687,12 @@ def refusals(left: "list[dict]", right: "list[dict] | None" = None, labels: "tup
             "refused_counted": counted,
             "recovered_actions": recovered,
             "recovered_counted": recovered_counted,
+            "thoughts": thoughts,
+            "thoughts_counted": thoughts_counted,
+            "thought_heavy": heavy,
+            # A rate over no games is undefined rather than zero, for the reason the call rates below are: a slice
+            # that recorded no episode did not think nothing, it did not happen.
+            "thoughts_per_game": round(thoughts / len(episodes), 2) if episodes else None,
             # A rate over no calls is not zero, it is undefined: a slice that recorded no call did not
             # refuse nothing, it did not happen.
             "invalid_per_call": round(invalid / calls, 4) if calls else None,
@@ -978,6 +998,20 @@ def main() -> int:
                 f"  recovered       {treatment} {recovered_cell(left_counts)} "
                 f"vs {control} {recovered_cell(right_counts)}"
             )
+
+        # The third way a turn fails to reach the world, and the one that ends an episode rather than costing a step:
+        # a reply with no command spends the pass budget and moves nothing. Printed with the heavy count beside the
+        # mean because the two families of loss R186 recorded are disjoint — five games at 24 to 46 thoughts and five
+        # at 0 or 1 — so a mean alone would average two classes into a number neither of them has.
+        def rumination_cell(counts: dict) -> str:
+            if not counts["thoughts_counted"]:
+                return "not counted"
+            return f"{counts['thoughts_per_game']} per game, {counts['thought_heavy']} heavy"
+
+        print(
+            f"  rumination      {treatment} {rumination_cell(left_counts)} "
+            f"vs {control} {rumination_cell(right_counts)}"
+        )
     print(f"  bill            ${payload['bill']['usd']} over {payload['bill']['calls']} calls")
     if arguments.out:
         print(f"  written         {arguments.out}")

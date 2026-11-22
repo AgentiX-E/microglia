@@ -5308,3 +5308,27 @@ everywhere else**, so a pool that moved by a hundred moved inside one kind. Four
 The general form, which is the most reusable thing this lane has learned: **before quoting a pooled number, ask what
 share of it comes from one stratum.** The three failures in this lane's record are all that question unasked — a mean
 over lost games, a counterfactual over a sampled policy, and a band over a pool.
+
+### 32.29 Reading `rumination`, and why a lost game is not one thing
+
+Every reading prints one more line than it used to:
+
+```
+  rumination      always-in@kind+anyline 4.2 per game, 5 heavy vs none@anyline 9.23 per game, 19 heavy
+```
+
+It answers a question a win count cannot: **did the arm lose the game by walking, or by thinking?** The pass cap counts
+model turns, so a reply with no command spends a turn and changes nothing in the world. Three rules for reading it:
+
+1. **`heavy` is the class, the mean is the drift.** A game is heavy at `THOUGHT_HEAVY` (20) thoughts or more, which is
+   the smallest count a lost game showed in the round that introduced the line. Five games at 24 to 46 and five at 0 or
+   1 are two families; their mean is a number neither family has.
+2. **Heavy and lost are not the same claim.** In R186 no *won* game was heavy, so a heavy game is a strong predictor of
+   a loss — but the line reports the counter, and the win count is two lines above it on purpose.
+3. **`not counted` is not zero.** An arm file written before the field existed prints `not counted`; a file that recorded
+   the field and saw no thoughts prints `0 per game, 0 heavy`. The distinction is the same one `dropped` and
+   `recovered` make, and it is worth more than the number: one of them is evidence.
+
+What the counter has shown so far is the opposite of the intuitive story. A pack does not make the model chatty — it
+**halves** the chatter (9.23 → 4.2 thoughts a game) because an instruction that names the next action leaves less to
+deliberate about. What is left over is the part of the corpus the instruction did not cover.

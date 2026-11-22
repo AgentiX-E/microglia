@@ -2882,3 +2882,34 @@ This is the third time the same class has been caught, and the class has a shape
 design, not by the outcome.** R183 caught it in a mean over *lost* games (nine became three, so the mean rose over the
 hardest survivors); R184 in a counterfactual over a *sampled* policy (a prediction, not a floor); R186 in a *pool* that is
 nine-tenths one kind. Every one of the three was a true number about a population nobody had named.
+
+### 8.50 A turn spent thinking is a turn the world never sees, and the reading had to say so
+
+The pass cap counts **model turns**, not environment steps, because that is what bounds the bill. A reply that carries
+no command therefore costs the episode a turn and moves nothing, and until R188 the join reported every such game as
+"lost" with no way to tell it from a game that walked the house for fifty turns and never found its object.
+
+The two families are disjoint in R186's ten losses and the winning side says where the line is:
+
+| arm | wins | thoughts a game | games with ≥20 thoughts | environment steps a game |
+| --- | --- | --- | --- | --- |
+| control, no pack | 197/274 | 9.23 | 19 | 21.6 |
+| R183's single-entry bank | 257/274 | 4.7 | 8 | 13.1 |
+| R186's scoped bank | **264/274** | **4.2** | **5** | 12.6 |
+
+**No won game in 264 has twenty thoughts**, and none has ten invalid actions. Every loss has one or the other: five spend
+24 to 46 turns on thoughts and touch the world 4 to 26 times, five spend 0 or 1 thought and 49 or 50 environment steps
+looking for something.
+
+So `aggregate.py` prints `rumination <arm> <mean> per game, <n> heavy vs <arm> ...`, where heavy means at or above
+`THOUGHT_HEAVY` (20) — the smallest count a lost game shows rather than a round number. Two decisions are in the line:
+
+1. **A mean beside a count.** The two families are not a distribution around anything, so a mean alone would average two
+   classes into a number neither of them has. The count is the class; the mean is the drift.
+2. **`not counted` for a file that predates the field**, for the third time and the same reason as `dropped` and
+   `recovered`: a zero there is not a measurement of quiet, it is a file that never recorded the field.
+
+**What it changes about the project's own question.** Memory here does not make the agent verbose — it makes it concise:
+9.23 thoughts a game become 4.2. The remaining thought-heavy games are the ones the pack did not reach, which is a
+statement about the entry's coverage and not about its harm. That is why the next round is a sentence aimed at the class
+rather than at the score.

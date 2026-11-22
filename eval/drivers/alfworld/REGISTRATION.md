@@ -2692,3 +2692,78 @@ budget on a take that never finds its object (`pick_and_place_simple` twice, `he
 which no sentence about a kind can reach. R188 banks a **location prior** distilled offline from the training
 transcripts — where each object class is found, and how often — because that is the one form of cross-task knowledge the
 remaining failures are made of.
+
+## R188 — half the remaining gap is not search: one untagged sentence about the turn budget, and its own placebo
+
+R186 loses ten games and the aggregate now prints what kind of game each one was. Five act every turn and never find
+their object — **49 or 50 environment steps, 0 or 1 thoughts** — and five never act at all: **24 to 46 thoughts over 4
+to 26 environment steps**. The two families are disjoint, and the winning side says the boundary is sharp: **no won game
+in 264 has twenty thoughts**, and none has ten invalid actions.
+
+The pack already moves the mean and does not move this class:
+
+| arm | wins | thoughts a game | thought-heavy (≥20) | steps a game |
+| --- | --- | --- | --- | --- |
+| `none@anyline` (control) | 197/274 | 9.23 | **19** | 30.9 |
+| `line@anyline` (R183) | 257/274 | 4.7 | 8 | 17.7 |
+| `scope@kind+anyline` (R186) | **264/274** | **4.2** | **5** | 16.8 |
+
+So the remaining thought-heavy games are **what the pack failed to reach**, not what it caused: memory halves rumination
+and the five survivors are the ones the instruction did not land on. A reply that carries no command spends one turn of
+the fifty and moves nothing, which is a turn-economy failure rather than a search failure — and it is reachable by one
+sentence, not by a corpus.
+
+`banks/bank-turnbudget-1.json` carries the published two entries **byte for byte** and adds one **untagged** sentence:
+
+> Every reply must end with a command, because a reply that only plans still spends one turn of the fifty available and
+> leaves the world exactly as it was. Do not describe the next step, take it: issue the command you were about to
+> consider and read the answer.
+
+`banks/bank-turnbudget-1-placebo.json` is the same file with that sentence's **own words permuted** — 259 characters,
+the same multiset, no instruction — so the two arms differ in content and in nothing else.
+
+| property | treatment | placebo |
+| --- | --- | --- |
+| rendered characters, every kind | **814** | **814** |
+| entries per game, every kind | **2** | **2** |
+| entries 1 and 2 | R186's, byte for byte | R186's, byte for byte |
+| entry 3 | 259 chars, untagged | 259 chars, permuted |
+| `bank_digest` | `22dbe9f7` | `084688d7` |
+
+The sentence is untagged on purpose, and that makes the round a second test of the scope law in the direction R187 could
+not run. Every previous measurement gave an entry to kinds it was **not about**; this one gives an entry to six kinds it
+**is** about. If scope costs games because content is foreign, this entry costs nothing; if it costs games because any
+longer pack perturbs, it costs the same as R185's did.
+
+### Registered readings
+
+Two arms, `--gate-kind true`, `any-line`, cap 50, 274 games each, four jobs, read against R186's own arm:
+
+1. **`thought_heavy` at or below 2 of 274** in the treatment arm (R186 5, control 19). The class is the entry's own
+   target and the only reading that is about the mechanism rather than about the score.
+2. **The treatment's pool is at or above the placebo's plus 4 games**, paired on the same 274 games. The placebo is the
+   length control; a treatment that does not beat it is a treatment whose effect is 259 characters of anything.
+3. **Thoughts a game fall by at least 0.5 in the treatment against the placebo** (R186 4.2). Direction, not threshold:
+   the entry says one command every turn and the counter is the reply that does not carry one.
+4. **The treatment's pool is at or above 264** of 274 — not worse than R186 at 551 characters with 814 — and its
+   `invalid_actions` per call stay at or below the placebo's.
+5. `pack_chars` **814** and `pack_entries` **2** in all 548 games, `parser` `any-line`, `max_steps` **50**, **one**
+   `bank_digest` per arm per section, and **two** `pack_digest` values per arm in the 215:59 proportion the tags imply
+   (five kinds carry entry 1, `put` carries entry 2).
+
+### Refutation
+
+**`thought_heavy` stays at 5, or falls while the pool does not move.** The first says the class is a property of the
+model that a bank cannot reach, and the lane stops treating rumination as a memory problem; the second says the turn
+budget was not the binding constraint in those five games — the environment steps were too few to finish even at a
+clean turn economy — and the next round is the **location prior** of §R188-planned, built from the training corpus
+offline at zero API cost, because the five search-heavy losses are the other half of the gap and no sentence about
+turns reaches them.
+
+### Void
+
+Any game whose `pack_chars` is not 814 or whose `pack_entries` is not 2, a label spanning two `bank_digest` values, an
+arm whose `bank_digest` equals the other arm's, `parser` not `any-line`, `max_steps` not 50, or a section short of its
+published size (134 held out, 140 seen).
+
+**Price ≈ ¥3.00**, four jobs (two arms, both sections), off-peak band.

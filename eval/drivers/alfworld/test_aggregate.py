@@ -1597,5 +1597,106 @@ class BankTest(unittest.TestCase):
         printed = buffer.getvalue()
         self.assertIn("bank            always-in abcd1234 vs none no pack", printed)
 
+class RuminationTest(unittest.TestCase):
+    """The second loss class, and the reason it needed its own line rather than a footnote.
+
+    R186's ten losses are two disjoint families of five. Five act every turn and never find the object (`env` 49 or
+    50, thoughts 0 or 1); five spend the pass's turn budget on thoughts and barely touch the world (thoughts 24 to 46,
+    `env` 4 to 26). The separation is sharp on the winning side too: **no won game in 264 has twenty thoughts**. So the
+    counter is not decoration, it is the description of half the remaining gap — and a reading that prints only a win
+    count reports both families as "lost", which is the state the lane was in for two rounds.
+    """
+
+    def setUp(self):
+        self.paths = []
+
+    def tearDown(self):
+        for path in self.paths:
+            path.unlink(missing_ok=True)
+
+    def write(self, name: str, payload: dict) -> Path:
+        path = HERE / name
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        self.paths.append(path)
+        return path
+
+    def run_main(self, argv):
+        original = sys.argv
+        sys.argv = ["aggregate.py"] + argv
+        try:
+            return aggregate.main()
+        finally:
+            sys.argv = original
+
+    def test_a_ruminating_arm_reports_its_total_its_rate_and_its_heavy_games(self):
+        left = [
+            episode("g1", False, thoughts=46, steps=50),
+            episode("g2", True, thoughts=4, steps=9),
+            episode("g3", True, thoughts=1, steps=6),
+        ]
+        counts = aggregate.refusals(left, labels=("arm", "other"))["arm"]
+        self.assertEqual(counts["thoughts"], 51)
+        self.assertEqual(counts["thought_heavy"], 1)
+        self.assertEqual(counts["thoughts_per_game"], 17.0)
+        self.assertTrue(counts["thoughts_counted"])
+
+    def test_the_heavy_threshold_is_inclusive_at_twenty(self):
+        # Nineteen is the largest count a won game has shown and twenty is the smallest a lost one has; the boundary is
+        # inclusive so that the class is defined by the losing side's floor rather than by a strict inequality nobody
+        # reading the report can see.
+        left = [episode("g1", True, thoughts=19), episode("g2", False, thoughts=20)]
+        counts = aggregate.refusals(left, labels=("arm", "other"))["arm"]
+        self.assertEqual(counts["thought_heavy"], 1)
+
+    def test_an_arm_that_predates_the_field_says_not_counted(self):
+        counts = aggregate.refusals([episode("g1", True)], labels=("arm", "other"))["arm"]
+        self.assertFalse(counts["thoughts_counted"])
+        # The rate is a zero over one game that recorded no thought count, so it is a zero and not a measurement. The
+        # print is what protects the reader: `not counted` is said instead of the number, which is the same discipline
+        # `dropped` uses and for the same reason.
+        self.assertEqual(counts["thoughts_per_game"], 0.0)
+        self.assertEqual(counts["thought_heavy"], 0)
+
+    def test_the_report_prints_rumination_beside_the_refusals(self):
+        treatment = self.write(
+            "ruin-a.json",
+            {
+                "summary": summary("always-in"),
+                "episodes": [episode("g1", False, thoughts=46, steps=50), episode("g2", True, thoughts=4, steps=9)],
+            },
+        )
+        control = self.write(
+            "ruin-b.json",
+            {
+                "summary": summary("none"),
+                "episodes": [episode("g1", True, thoughts=2, steps=7), episode("g2", True, thoughts=3, steps=8)],
+            },
+        )
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            self.assertEqual(
+                self.run_main(
+                    ["--input", str(treatment), "--input", str(control), "--compare", "always-in,none", "--rounds", "50"]
+                ),
+                0,
+            )
+        lines = [line for line in printed.getvalue().splitlines() if line.strip().startswith("rumination")]
+        self.assertEqual(len(lines), 1, printed.getvalue())
+        self.assertIn("always-in 25.0 per game, 1 heavy", lines[0])
+        self.assertIn("none 2.5 per game, 0 heavy", lines[0])
+
+    def test_a_join_of_two_arms_that_both_predate_the_field_prints_not_counted(self):
+        left = self.write("ruin-old-a.json", {"summary": summary("always-in"), "episodes": [episode("g1", True)]})
+        right = self.write("ruin-old-b.json", {"summary": summary("none"), "episodes": [episode("g1", False)]})
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            self.assertEqual(
+                self.run_main(["--input", str(left), "--input", str(right), "--compare", "always-in,none"]),
+                0,
+            )
+        lines = [line for line in printed.getvalue().splitlines() if line.strip().startswith("rumination")]
+        self.assertIn("not counted", lines[0])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
