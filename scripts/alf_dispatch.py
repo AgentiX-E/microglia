@@ -94,6 +94,10 @@ def parser():
     # measured the overlap one admitting nothing at all on this corpus.
     result.add_argument("--gate-kind", dest="gate_kind", default="")
     result.add_argument("--parser", default="")
+    # The guard at the state, which is the only knob in this file that changes what the driver *answers* rather
+    # than what the model reads. It is a flag rather than a bank because R188 measured an entry aimed at the same
+    # loop as inert: the loop is a state inside an episode, and a constant in front of every turn cannot reach it.
+    result.add_argument("--guard-commandless", dest="guard_commandless", action="store_true")
     # The comparison this sweep is half of, when the other half was bought in an earlier dispatch. A two-treatment
     # comparison is the one this lane trusts — the control moves eight to eleven wins between dispatches, the
     # treatments repeat — and a sweep that can only buy a control it does not need pays for a band (AUDIT 34.232).
@@ -270,6 +274,11 @@ def check(arguments, tree=None):
         # after the environment install, in twelve jobs, with the money committed. Checked here, where the refusal is
         # still free.
         raise Refused(f"--parser {arguments.parser!r} is not one of {PARSERS}")
+    if arguments.guard_commandless and not (arguments.sweep or arguments.games):
+        # A flag that reaches no job is a flag nobody bought: the guard is read by the step that drives games, and a
+        # dispatch that names neither a sweep nor a calibration has no such step. Refused here rather than dropped,
+        # because a payload that says `guard` and a run that is not armed is the one failure this flag can produce.
+        raise Refused("--guard-commandless changes what the driver answers, so it needs a pass to change: name --sweep or --games")
     if not arguments.max_steps.isdigit():
         # R184 is the first round that moves the cap, so the flag stops being a constant nobody types. The workflow
         # hands it to `agent.py` as `type=int`, which means `30.0` survives this payload and dies in eight jobs after
@@ -322,6 +331,7 @@ def payload(arguments):
         ("gate_share", arguments.gate_share),
         ("gate_kind", arguments.gate_kind),
         ("parser", arguments.parser),
+        ("guard_commandless", "true" if arguments.guard_commandless else ""),
         ("split", arguments.split),
         # The size travels with the section, because the workflow's join tiles to it and a section without its
         # published size is a sweep whose twelve jobs drive one number and whose reading checks another.

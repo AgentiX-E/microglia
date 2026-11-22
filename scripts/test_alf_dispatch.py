@@ -172,6 +172,20 @@ class RefusalTest(unittest.TestCase):
         )
         self.assertNotIn("parser", lane.payload(arguments("--sweep", "true")))
 
+    def test_the_guard_travels_with_the_dispatch(self):
+        # R189's two arms are one family, one bank, one channel and one cap, so this input is the whole difference
+        # between them: a payload that dropped it would buy two unarmed runs and the round would read as a null that
+        # lives in this file rather than in the driver.
+        self.assertEqual(
+            lane.payload(arguments("--sweep", "true", "--guard-commandless"))["guard_commandless"], "true"
+        )
+        self.assertNotIn("guard_commandless", lane.payload(arguments("--sweep", "true")))
+
+    def test_a_guard_with_no_pass_to_change_is_refused(self):
+        # The flag is read by the step that drives games; a dispatch that names neither a sweep nor a calibration has
+        # no such step, so the input would be dropped in silence and the dispatch would not be the one it says.
+        self.assertIn("needs a pass to change", self.refused("--guard-commandless"))
+
     def test_a_kind_gate_without_a_bank_is_refused(self):
         self.assertIn("tagged bank", self.refused("--arm", "always-in", "--gate-kind", "true", "--games", "134"))
 

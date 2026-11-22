@@ -1698,5 +1698,195 @@ class RuminationTest(unittest.TestCase):
         self.assertIn("not counted", lines[0])
 
 
+class CommandGuardReportTest(unittest.TestCase):
+    """The join's reading of the guard, and the two ways a guarded slice can lie about it.
+
+    R189 changes one string in the driver and records three counters per episode. Both facts have to survive the join:
+    an arm that was armed and never fired is indistinguishable from a control by its score, so `fires` is printed
+    rather than summarised away; and a guarded slice whose episodes carry no ledger is a slice whose arm somebody
+    believes was armed, which is the same failure as an empty pack wearing a treatment's name (R174.2).
+    """
+
+    def setUp(self):
+        self.paths = []
+
+    def tearDown(self):
+        for path in self.paths:
+            path.unlink(missing_ok=True)
+
+    def write(self, name: str, payload: dict) -> Path:
+        path = HERE / name
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        self.paths.append(path)
+        return path
+
+    def run_main(self, argv):
+        original = sys.argv
+        sys.argv = ["aggregate.py"] + argv
+        try:
+            return aggregate.main()
+        finally:
+            sys.argv = original
+
+    def test_the_ledger_is_summed_per_arm(self):
+        guarded = [
+            episode("g1", True, guard=True, guard_fires=2, guard_checked=2, guard_relapsed=1, thoughts=2),
+            episode("g2", False, guard=True, guard_fires=5, guard_checked=4, guard_relapsed=2, thoughts=26),
+        ]
+        counts = aggregate.refusals(guarded, labels=("arm", "other"))["arm"]
+        self.assertEqual(counts["guard_fires"], 7)
+        self.assertEqual(counts["guard_checked"], 6)
+        self.assertEqual(counts["guard_relapsed"], 3)
+        self.assertTrue(counts["guard_counted"])
+
+    def test_an_arm_that_predates_the_guard_says_not_counted(self):
+        # The control of every round before R189 has no field at all, and a zero read as "did not fire" would make an
+        # unarmed arm look like an armed one that never engaged.
+        counts = aggregate.refusals([episode("g1", True)], labels=("arm", "other"))["arm"]
+        self.assertFalse(counts["guard_counted"])
+        self.assertEqual(counts["guard_fires"], 0)
+
+    def test_a_guarded_episode_without_the_ledger_is_refused(self):
+        # The void condition of the registration: an episode that says it was guarded but does not say how often the
+        # guard fired cannot be joined, because the round's first reading is computed from that number.
+        arm = self.write(
+            "guard-void.json",
+            {"summary": summary("always-in", guard_commandless=True), "episodes": [episode("g1", True, guard=True)]},
+        )
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed), self.assertRaises(SystemExit):
+            aggregate.load_slices([arm])
+        self.assertIn("guard_fires", printed.getvalue())
+
+    def test_one_label_cannot_span_two_guard_states(self):
+        first = self.write(
+            "guard-mix-a.json",
+            {"summary": summary("always-in"), "episodes": [episode("g1", True, guard=False, guard_fires=0)]},
+        )
+        second = self.write(
+            "guard-mix-b.json",
+            {"summary": summary("always-in"), "episodes": [episode("g2", True, guard=True, guard_fires=1)]},
+        )
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed), self.assertRaises(SystemExit):
+            aggregate.load_slices([first, second], expect_guard=("on", "off"))
+        self.assertIn("one arm cannot span two guard states", printed.getvalue())
+
+    def test_a_join_across_guard_states_is_refused_until_it_names_them(self):
+        guarded = self.write(
+            "guard-on.json",
+            {
+                "summary": summary("always-in", guard_commandless=True, arm_label="always-in@guard"),
+                "episodes": [episode("g1", True, guard=True, guard_fires=1, guard_checked=1)],
+            },
+        )
+        plain = self.write(
+            "guard-off.json",
+            {"summary": summary("always-in"), "episodes": [episode("g1", False, guard=False, guard_fires=0)]},
+        )
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed), self.assertRaises(SystemExit):
+            aggregate.load_slices([guarded, plain])
+        self.assertIn("--expect-guard", printed.getvalue())
+        grouped = aggregate.load_slices([guarded, plain], expect_guard=("on", "off"))
+        self.assertEqual(aggregate.guards(grouped), {"always-in@guard": "on", "always-in": "off"})
+
+    def test_a_declaration_that_does_not_match_the_slices_is_refused(self):
+        guarded = self.write(
+            "guard-on2.json",
+            {
+                "summary": summary("always-in", guard_commandless=True, arm_label="always-in@guard"),
+                "episodes": [episode("g1", True, guard=True, guard_fires=1, guard_checked=1)],
+            },
+        )
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed), self.assertRaises(SystemExit):
+            aggregate.load_slices([guarded], expect_guard=("on", "off"))
+        self.assertIn("--expect-guard", printed.getvalue())
+
+    def test_the_report_prints_the_ledger_beside_the_rumination_line(self):
+        guarded = self.write(
+            "guard-print-a.json",
+            {
+                "summary": summary("always-in", guard_commandless=True, arm_label="always-in@guard"),
+                "episodes": [
+                    episode("g1", True, guard=True, guard_fires=2, guard_checked=2, guard_relapsed=1, thoughts=2),
+                    episode("g2", True, guard=True, guard_fires=1, guard_checked=1, thoughts=1),
+                ],
+            },
+        )
+        plain = self.write(
+            "guard-print-b.json",
+            {
+                "summary": summary("always-in"),
+                "episodes": [
+                    episode("g1", True, guard=False, guard_fires=0, thoughts=3),
+                    episode("g2", False, guard=False, guard_fires=0, thoughts=28),
+                ],
+            },
+        )
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            self.assertEqual(
+                self.run_main(
+                    [
+                        "--input", str(guarded), "--input", str(plain),
+                        "--compare", "always-in@guard,always-in",
+                        "--expect-guard", "on,off", "--rounds", "50",
+                    ]
+                ),
+                0,
+            )
+        lines = [line for line in printed.getvalue().splitlines() if line.strip().startswith("guard")]
+        self.assertEqual(len(lines), 1, printed.getvalue())
+        self.assertIn("always-in@guard 3 fires, 1 relapsed of 3 checked", lines[0])
+        self.assertIn("always-in 0 fires", lines[0])
+
+    def test_a_guard_state_that_is_not_a_state_is_refused_before_the_slices_are_read(self):
+        # `onn` is a typo, not a declaration that matched nothing. Refusing it here means the failure names the flag
+        # rather than the slices, which is the difference between a dispatch that was mistyped and a corpus that moved.
+        arm = self.write(
+            "guard-typo.json",
+            {
+                "summary": summary("always-in", guard_commandless=True, arm_label="always-in@guard"),
+                "episodes": [episode("g1", True, guard=True, guard_fires=1, guard_checked=1)],
+            },
+        )
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed), self.assertRaises(SystemExit):
+            self.run_main(["--input", str(arm), "--expect-guard", "onn"])
+        self.assertIn("not a guard state", printed.getvalue())
+
+    def test_the_report_says_not_counted_for_the_arm_that_predates_the_guard(self):
+        # One arm counted and one did not is the shape of the first reading against a round before it: the old file is
+        # `not counted` rather than `0 fires`, because a zero over an arm that never counted is not a measurement.
+        counted = self.write(
+            "guard-half-a.json",
+            {
+                "summary": summary("always-in", guard_commandless=True, arm_label="always-in@guard"),
+                "episodes": [episode("g1", True, guard=True, guard_fires=2, guard_checked=2, thoughts=2)],
+            },
+        )
+        old = self.write(
+            "guard-half-b.json",
+            {"summary": summary("always-in"), "episodes": [episode("g1", False, thoughts=26)]},
+        )
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            self.assertEqual(
+                self.run_main(
+                    [
+                        "--input", str(counted), "--input", str(old),
+                        "--compare", "always-in@guard,always-in",
+                        "--expect-guard", "on,off", "--rounds", "50",
+                    ]
+                ),
+                0,
+            )
+        lines = [line for line in printed.getvalue().splitlines() if line.strip().startswith("guard")]
+        self.assertIn("2 fires, 0 relapsed of 2 checked", lines[0])
+        self.assertIn("always-in not counted", lines[0])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

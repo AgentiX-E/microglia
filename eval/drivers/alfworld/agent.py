@@ -137,6 +137,13 @@ ACTION_VERB_PATTERN = r"(?i)(?:go to|open|take|put|use|heat|cool|look|clean|inve
 # the string a rejected action gets -- so that is the string a refused turn gets, and it is the string the
 # model already knows the meaning of (AUDIT 34.259).
 NO_OP = "Nothing happens."
+# The guard's line, and the whole of R189. `OK.` answers a thought truthfully and that is exactly the problem: a model
+# that has started narrating is told, once per turn, that narrating is a fine thing to do. This answer says the same
+# `OK.` and then names the requirement, which is the one sentence a loop turn can be interrupted by without a second
+# call, without a second pack and without a rule that would sit in front of the 98.7% of turns that are not loops.
+# It is a function of the state the episode is in -- the previous reply carried no command -- so it cannot fire in a
+# game that never enters the state, and `guard_fires` is recorded per episode so a join can prove it engaged.
+COMMAND_GUARD = "OK. Reply with one command only."
 # How many refused commands an episode quotes back beside the count. Three is enough to name the shape of a
 # model's mistake in an arm file and small enough that a 274-game pass does not become a transcript.
 REFUSED_SAMPLES = 3
@@ -440,7 +447,12 @@ def sham_entries(entries: "list[str]") -> "list[str]":
 
 
 def arm_label(
-    arm: str, top_k: int, gate_share: float, gate_kind: bool = False, parser: str = REFERENCE_PARSER
+    arm: str,
+    top_k: int,
+    gate_share: float,
+    gate_kind: bool = False,
+    parser: str = REFERENCE_PARSER,
+    guard_commandless: bool = False,
 ) -> str:
     """The arm's identity, including only the knobs that were moved off their registered values.
 
@@ -463,6 +475,11 @@ def arm_label(
 
     The registered arms keep the names they have always had: a label that appeared only when a knob moved means the
     default reading is unchanged, which is what makes every artefact before this one still comparable.
+
+    `guard_commandless` is the fourth harness knob and the only one that changes the driver's own answer rather than
+    the prompt or the reader, so it travels in the label for the same reason the channel does: R189's two arms are one
+    family, one bank, one channel and one cap, and this token is the entire difference between them. A join that
+    grouped them would refuse the doubled games only after both were paid for.
     """
     moved = []
     if arm == "retrieved":
@@ -474,6 +491,8 @@ def arm_label(
         moved.append("kind")
     if parser != REFERENCE_PARSER:
         moved.append(PARSER_TOKENS.get(parser, parser.replace("-", "")))
+    if guard_commandless:
+        moved.append("guard")
     return f"{arm}@{'+'.join(moved)}" if moved else arm
 
 
@@ -684,6 +703,7 @@ def run_episode(
     rule_kinds: "list[list[str]] | None" = None,
     gate_kind: bool = False,
     parser: str = REFERENCE_PARSER,
+    guard_commandless: bool = False,
 ) -> dict:
     """One game, driven by one arm. Returns the episode record; never a partly-filled one.
 
@@ -720,6 +740,13 @@ def run_episode(
     # the same model behaviour rather than a repaired model (AUDIT 34.262).
     recovered = 0
     recovered_samples: "list[str]" = []
+    # The guard's three counters. `fires` is the line sent, `checked` is the fires a later reply answered, and
+    # `relapsed` is the ones whose answer carried no command either. A fire on the last turn of a pass is unchecked
+    # rather than relapsed: there is no later reply to read, and counting it either way would invent an outcome.
+    guard_fires = 0
+    guard_checked = 0
+    guard_relapsed = 0
+    guard_pending = False
     pack_entries: "int | None" = None
     # The rendered pack's length, as opposed to the prefix's. `prefix_chars` is the whole fixed prompt — examples,
     # system instruction and pack — so two arms of different lengths differ by a number that also contains the
@@ -801,6 +828,18 @@ def run_episode(
                 reply = f"> {admissible[0]}"
 
             kind_of_reply, payload = parse_reply(reply)
+            # Read once, before the branch, because the guard's ledger needs to know whether *this* reply carried a
+            # command -- a reply whose first line is a thought and whose later line is one did carry it, and a guard
+            # that counted it as a relapse would report its own recovery as a failure.
+            refused_here = refused_command(reply)
+            if guard_pending:
+                # The previous turn fired the guard, so this reply is the answer to it. `checked` is the denominator
+                # and `relapsed` the numerator: the registered question is "does an interrupted reply come back with
+                # a command", and a fire nobody answered is not evidence either way.
+                guard_pending = False
+                guard_checked += 1
+                if kind_of_reply != "action" and refused_here is None:
+                    guard_relapsed += 1
             replies.append(reply)
             if trace and len(replies) <= trace:
                 print(f"  [{gamefile.split('/')[-3]}] turn {len(replies)} {kind_of_reply}: {reply[:160]!r}")
@@ -810,7 +849,6 @@ def run_episode(
             if kind_of_reply == "action" and payload:
                 action = payload
                 break
-            refused_here = refused_command(reply)
             if refused_here is not None and parser == ANY_LINE_PARSER:
                 # The command the first-line rule refuses is executed instead of dropped. The reply is not re-read
                 # and nothing is invented: the parser found this command and refused it, and this channel is the
@@ -835,7 +873,17 @@ def run_episode(
                 refused += 1
                 if len(refused_samples) < REFUSED_SAMPLES:
                     refused_samples.append(refused_here)
-            answer = NO_OP if refused_here is not None else "OK."
+            if refused_here is not None:
+                answer = NO_OP
+            elif guard_commandless:
+                # The registered change, and the whole of it: the same answer, with the requirement named. The pack,
+                # the reader, the cap and the call count are untouched, so anything this arm moves is the loop being
+                # interrupted and nothing else (R189).
+                answer = COMMAND_GUARD
+                guard_fires += 1
+                guard_pending = True
+            else:
+                answer = "OK."
             messages.append({"role": "user", "content": answer})
             trajectory.append(answer)
             if steps >= max_steps:
@@ -890,6 +938,13 @@ def run_episode(
         # is what makes it readable: a channel that recovered nothing did not meet the format at all.
         "recovered_actions": recovered,
         "recovered_samples": recovered_samples,
+        # The guard, per episode. `guard` is recorded on both arms rather than only on the guarded one: a field that is
+        # absent from the control cannot be told apart from a control that was never armed, which is the ambiguity
+        # `refused_actions` had to be read with for two rounds (AUDIT 34.259).
+        "guard": bool(guard_commandless),
+        "guard_fires": guard_fires,
+        "guard_checked": guard_checked,
+        "guard_relapsed": guard_relapsed,
         # Which reader drove this game. In the record and not only in the summary, because a join that pooled two
         # channels would otherwise be undetectable per episode (AUDIT 34.262).
         "parser": parser,
@@ -1018,11 +1073,19 @@ def pass_header(arguments, rules: "list[str]", total: int, kinds: "list[list[str
         # What a reading groups on. `arm` stays the family so that every artefact before this field is still
         # comparable; the label is what distinguishes two configurations of the same family.
         "arm_label": arm_label(
-            arguments.arm, arguments.top_k, arguments.gate_share, bool(arguments.gate_kind), arguments.parser
+            arguments.arm,
+            arguments.top_k,
+            arguments.gate_share,
+            bool(arguments.gate_kind),
+            arguments.parser,
+            bool(arguments.guard_commandless),
         ),
         # The channel travels in the header as well as in every episode: a reader opening the file sees which reader
         # drove it before seeing a single score (AUDIT 34.262).
         "parser": arguments.parser,
+        # And the guard, for the same reason: two dispatches of one arm that differ by this flag are two treatments,
+        # and a reader of the summary has to be able to say which one this file is without opening an episode.
+        "guard_commandless": bool(arguments.guard_commandless),
         "rules_in_bank": len(rules),
         # R185 swaps a bank under an unchanged label at an unchanged length. Without this field the two artefacts
         # differ only by run id, and a join of them would print one rate over two prompts.
@@ -1069,6 +1132,11 @@ def pass_summary(
             # the runs it was diagnosed from.
             "refused_actions": sum(episode.get("refused_actions", 0) for episode in episodes),
             "recovered_actions": sum(episode.get("recovered_actions", 0) for episode in episodes),
+            # The guard's ledger, summed the same way. A pass that was not armed records zeros, which is the true
+            # count of lines it sent.
+            "guard_fires": sum(episode.get("guard_fires", 0) for episode in episodes),
+            "guard_checked": sum(episode.get("guard_checked", 0) for episode in episodes),
+            "guard_relapsed": sum(episode.get("guard_relapsed", 0) for episode in episodes),
             "off_space_actions": sum(episode["off_space_actions"] for episode in episodes),
             "usage": usage,
             "cache_hit_rate": round(usage["cache_hit_tokens"] / usage["prompt_tokens"], 4) if usage["prompt_tokens"] else None,
@@ -1148,6 +1216,12 @@ def main() -> int:
         "the command it refuses; a channel, so both arms are re-run on it and no level is pooled across it",
     )
     parser.add_argument("--max-steps", type=int, default=50, help="the environment's own cap")
+    parser.add_argument(
+        "--guard-commandless",
+        action="store_true",
+        help="answer a reply that carried no command with `OK. Reply with one command only.` instead of `OK.`; the "
+        "registered change of R189, recorded per episode as `guard_fires` so a join can prove it engaged",
+    )
     parser.add_argument("--seed", type=int, default=20261120)
     parser.add_argument("--model", default=os.environ.get("ALFWORLD_MODEL", DEFAULT_MODEL))
     parser.add_argument("--timeout", type=float, default=120.0)
@@ -1257,6 +1331,7 @@ def main() -> int:
             rule_kinds,
             arguments.gate_kind,
             arguments.parser,
+            arguments.guard_commandless,
         )
         # Checked before the write, so a file on disk never holds one game twice: the checkpoint is the
         # evidence, and evidence that has to be re-checked before it can be trusted is not evidence.
@@ -1323,6 +1398,13 @@ def main() -> int:
     # line that printed it there would teach a reader to skip both.
     if arguments.parser != REFERENCE_PARSER:
         print(f"  recovered       {summary['recovered_actions']} commands executed from a later line ({arguments.parser})")
+    # Printed on both arms, because `0 fires` is the statement that the unguarded arm was not armed and it is the
+    # number the guarded one is compared against. A line printed only when the flag was set would leave a reader
+    # unable to tell a control from an old file.
+    print(
+        f"  guard           {summary['guard_fires']} fires, {summary['guard_relapsed']} relapsed of "
+        f"{summary['guard_checked']} checked"
+    )
     print(f"  cache hit rate  {summary['cache_hit_rate']}")
     print(f"  prefix chars    {summary['prefix_chars_mean']}")
     print(f"  bill            ${bill['usd']} ({bill['band']}); other band ${bill['usd_in_other_band']}")

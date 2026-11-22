@@ -89,6 +89,7 @@ def load_slices(
     expect_splits: "tuple[str, ...]" = (),
     expect_parsers: "tuple[str, ...]" = (),
     expect_caps: "tuple[int, ...]" = (),
+    expect_guard: "tuple[str, ...]" = (),
 ) -> "dict[str, list[dict]]":
     """Every episode of every slice, grouped by the arm that drove it.
 
@@ -270,6 +271,38 @@ def load_slices(
         )
     if expect_caps and budgets != set(expect_caps):
         fail(f"--expect-caps {sorted(expect_caps)} but the slices were driven at {sorted(budgets)}")
+    # The guard is the fourth harness knob and the only one that changes the driver's own answer, so it is refused and
+    # graded exactly as the reader and the budget are: one label at two states is two treatments, a join across states
+    # is legal only when it names them, and a guarded episode with no ledger is refused outright -- it claims to have
+    # been armed and does not say how often it fired, which is the number the round is read from (R189).
+    state_of = guards(grouped)
+    span = sorted(label for label, state in state_of.items() if "+" in state)
+    if span:
+        listed = ", ".join(f"{label}: {state_of[label]}" for label in span)
+        fail(
+            f"one arm cannot span two guard states ({listed}); a label is one driver, so re-drive the slice or label "
+            "it after the guard rather than averaging two treatments into one rate"
+        )
+    for label, episodes in grouped.items():
+        for episode in episodes:
+            if episode.get("guard") is True and "guard_fires" not in episode:
+                fail(
+                    f"{label}: {episode.get('gamefile')} was guarded but carries no guard_fires, so the round's first "
+                    "reading cannot be computed from it; re-drive the slice rather than joining an arm whose "
+                    "engagement is unknown"
+                )
+    # For the span checks `absent` reads as `off`: an artefact from before the flag existed was driven without the
+    # guard, which is a fact about the driver and not a third state. The print keeps `absent` because the counter
+    # cannot show a fire it never counted, and the reader has to know which of the two it is looking at.
+    driven_states = {"on" if state == "on" else "off" for state in state_of.values()}
+    if len(driven_states) > 1 and not expect_guard:
+        listed = ", ".join(f"{label}: {state}" for label, state in sorted(state_of.items()))
+        fail(
+            f"this join mixes guard states ({listed}); name them with --expect-guard to compare them, because an armed "
+            "arm and an unarmed one are two treatments and their average is neither"
+        )
+    if expect_guard and driven_states != set(expect_guard):
+        fail(f"--expect-guard {sorted(expect_guard)} but the slices were driven {sorted(driven_states)}")
     # And the pack is the harness too. The rule is the channel's and the cap's with one difference: a treatment and
     # its control are always two packs (the control renders none), so a join across labels is the normal case and
     # only *one label* spanning two banks is illegal. R185 is the first round to swap a bank under an unchanged label
@@ -630,6 +663,27 @@ def caps(grouped: "dict[str, list[dict]]") -> "dict[str, str]":
     }
 
 
+def guards(grouped: "dict[str, list[dict]]") -> "dict[str, str]":
+    """Whether each arm answered a commandless turn with the guard's line, from the episodes rather than the labels.
+
+    The fourth harness knob, and the first that changes the driver's own answer rather than the prompt or the reader:
+    R189's two arms are one family, one bank, one channel and one cap, so this token is the whole difference between
+    them and a join that could not read it would pool two treatments into one rate. `absent` is the pre-R189 state and
+    is said rather than defaulted: an episode that predates the field made no claim about the guard, while a control
+    written after it claims `off` explicitly.
+    """
+    states: "dict[str, str]" = {}
+    for arm, episodes in grouped.items():
+        seen = set()
+        for episode in episodes:
+            if "guard" not in episode:
+                seen.add("absent")
+            else:
+                seen.add("on" if episode.get("guard") else "off")
+        states[arm] = "+".join(sorted(seen))
+    return states
+
+
 def banks(grouped: "dict[str, list[dict]]") -> "dict[str, str]":
     """Which pack each arm rendered, from the episodes rather than from the labels.
 
@@ -677,6 +731,14 @@ def refusals(left: "list[dict]", right: "list[dict] | None" = None, labels: "tup
         thoughts = sum(int(episode.get("thoughts") or 0) for episode in episodes)
         thoughts_counted = any("thoughts" in episode for episode in episodes)
         heavy = sum(1 for episode in episodes if int(episode.get("thoughts") or 0) >= THOUGHT_HEAVY)
+        # The guard's ledger. `checked` is the denominator the registered reading needs and `relapsed` its numerator: a
+        # fire nobody answered is not evidence that the model re-entered the loop, and a fire answered by another
+        # commandless reply is exactly that evidence. Counted only when a file has the field, for the reason `dropped`
+        # is: a zero over an arm that never counted is not a measurement (R189).
+        guard_fires = sum(int(episode.get("guard_fires") or 0) for episode in episodes)
+        guard_checked = sum(int(episode.get("guard_checked") or 0) for episode in episodes)
+        guard_relapsed = sum(int(episode.get("guard_relapsed") or 0) for episode in episodes)
+        guard_counted = any("guard_fires" in episode for episode in episodes)
         return {
             "games": len(episodes),
             "calls": calls,
@@ -690,6 +752,10 @@ def refusals(left: "list[dict]", right: "list[dict] | None" = None, labels: "tup
             "thoughts": thoughts,
             "thoughts_counted": thoughts_counted,
             "thought_heavy": heavy,
+            "guard_fires": guard_fires,
+            "guard_checked": guard_checked,
+            "guard_relapsed": guard_relapsed,
+            "guard_counted": guard_counted,
             # A rate over no games is undefined rather than zero, for the reason the call rates below are: a slice
             # that recorded no episode did not think nothing, it did not happen.
             "thoughts_per_game": round(thoughts / len(episodes), 2) if episodes else None,
@@ -809,6 +875,13 @@ def main() -> int:
         "before R184 ran at it. A span is refused until it is named here, because a shorter cap costs the slow arm "
         "more than the fast one and the delta is then partly arithmetic (R184)",
     )
+    parser.add_argument(
+        "--expect-guard",
+        default="",
+        help="the guard states this join compares, comma separated: `on` answers a commandless turn with the guard's "
+        "line and `off` with `OK.`. A span is refused until it is named here, because an armed arm and an unarmed one "
+        "are two treatments and their average is neither (R189)",
+    )
     parser.add_argument("--rounds", type=int, default=10000)
     parser.add_argument("--seed", type=int, default=20261120)
     parser.add_argument("--out", default="")
@@ -828,7 +901,19 @@ def main() -> int:
             fail(f"--expect-caps {item!r} is not a step count")
         declared_caps.append(int(item))
     declared_caps = tuple(declared_caps)
-    grouped = load_slices(paths, arguments.relabel, declared, declared_parsers, declared_caps)
+    declared_guard = []
+    for item in arguments.expect_guard.split(","):
+        item = item.strip()
+        if not item:
+            continue
+        # Refused here rather than three frames down: `--expect-guard onn` would otherwise read as a declaration that
+        # matched nothing rather than as a typo, and the failure would be reported against the slices.
+        if item not in ("on", "off"):
+            fail(f"--expect-guard {item!r} is not a guard state; say on or off")
+        declared_guard.append(item)
+    grouped = load_slices(
+        paths, arguments.relabel, declared, declared_parsers, declared_caps, tuple(declared_guard)
+    )
     # Printed rather than implied: a reading that crosses dispatches is the one kind of reading whose
     # provenance a reader cannot recover from the arms' names in the report.
     for spec in arguments.relabel:
@@ -1012,6 +1097,21 @@ def main() -> int:
             f"  rumination      {treatment} {rumination_cell(left_counts)} "
             f"vs {control} {rumination_cell(right_counts)}"
         )
+
+        # The guard's engagement, printed only when a slice counted it: an arm that was armed and never fired has the
+        # control's score for the control's reason, and this is the only line that can say so. Beside `rumination`
+        # because the two are one question -- the heavy count says the loop happened, this says whether it was
+        # interrupted and whether the model came back with a command (R189).
+        def guard_cell(counts: dict) -> str:
+            if not counts["guard_counted"]:
+                return "not counted"
+            return f"{counts['guard_fires']} fires, {counts['guard_relapsed']} relapsed of {counts['guard_checked']} checked"
+
+        if left_counts["guard_counted"] or right_counts["guard_counted"]:
+            print(
+                f"  guard           {treatment} {guard_cell(left_counts)} "
+                f"vs {control} {guard_cell(right_counts)}"
+            )
     print(f"  bill            ${payload['bill']['usd']} over {payload['bill']['calls']} calls")
     if arguments.out:
         print(f"  written         {arguments.out}")

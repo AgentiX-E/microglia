@@ -1201,6 +1201,37 @@ class MainTest(unittest.TestCase):
             self.run_main(["--policy", "first", "--games", "2", "--out", str(self.out)])
         self.assertEqual(caught.exception.code, 1)
 
+    def test_a_channel_pass_prints_the_commands_it_executed_from_a_later_line(self):
+        # The line only exists on a channel that can recover something, which is why it is a branch in `main` and why
+        # it needs a pass to cover it: a `reference` run printing it would print a structural zero and teach a reader
+        # to skip the line that matters on the other channel.
+        script = ["> think: I need the apple\n> take apple 1 from countertop 1", "> put apple 1 in/on cabinet 1"]
+
+        def chat(messages, model, api_key, timeout):
+            return script.pop(0), {"prompt_tokens": 10, "completion_tokens": 1}, 0
+
+        agent.chat = chat
+        original_key = os.environ.get("DEEPSEEK_API_KEY")
+        os.environ["DEEPSEEK_API_KEY"] = "test-key"
+        printed = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(printed):
+                self.assertEqual(
+                    self.run_main(
+                        [
+                            "--arm", "none", "--policy", "model", "--games", "1",
+                            "--parser", "any-line", "--out", str(self.out),
+                        ]
+                    ),
+                    0,
+                )
+        finally:
+            if original_key is None:
+                os.environ.pop("DEEPSEEK_API_KEY", None)
+            else:
+                os.environ["DEEPSEEK_API_KEY"] = original_key
+        self.assertIn("recovered       1 commands executed from a later line (any-line)", printed.getvalue())
+
     def test_the_artefact_records_the_section_and_the_size_it_publishes(self):
         # A join across two sections is refused by `aggregate.py`, and it can only be refused if every slice says
         # which section it drove. `split_size` is the denominator a tiling check holds to.
@@ -2664,6 +2695,174 @@ class BankProvenanceTest(unittest.TestCase):
         payload = self.artefact()
         self.assertEqual(payload["summary"]["bank_digest"], "")
         self.assertEqual(payload["episodes"][0]["pack_digest"], "")
+
+    def test_a_tag_list_that_does_not_line_up_with_the_rules_is_refused(self):
+        # The digest pairs each rule with its tags, so a list that is one short would silently digest the last rule with
+        # no tags at all -- a bank whose `put` entry had lost its claim and whose digest still looked like a bank's.
+        with self.assertRaises(SystemExit):
+            agent.bank_digest_of(["take the apple", "put it in the cabinet"], [["put"]])
+
+
+class CommandGuardTest(unittest.TestCase):
+    """The guard at the state: one changed answer for the turn that carried no command.
+
+    R188 spent 3.03 CNY to show that a bank entry can only be a constant in front of every turn, and that the loop it
+    was aimed at is a rare *state* inside one: the five games that lost to rumination in R186 were won 4 of 5 and 5 of
+    5 when re-run. A constant cannot reach a state, so the next lever is the one the driver already owns -- the string
+    it answers a commandless reply with. The guard changes that string and nothing else, which is what makes it
+    measurable: it is a function of the state the episode is in, so it cannot fire in a game that never enters it, and
+    `guard_fires` is in every episode so a join can prove engagement rather than assume it.
+
+    Three counters and one flag, because a guard arm with zero fires is a no-op wearing a treatment's name (R174.2):
+    `guard_fires` counts the line sent, `guard_checked` counts the fires a later reply answered, and `guard_relapsed`
+    counts the ones where that reply carried no command either -- a model that re-enters the loop at once is a guard
+    that slowed the loss rather than a recovered turn.
+    """
+
+    def setUp(self):
+        self.examples = agent.load_examples()
+        self.world = FakeWorld()
+        self.original = agent.chat
+
+    def tearDown(self):
+        agent.chat = self.original
+
+    def drive(self, replies, guard=False, parser="any-line", world=None, max_steps=50):
+        seen = []
+        script = list(replies)
+
+        def chat(messages, model, api_key, timeout):
+            seen.append([message["content"] for message in messages])
+            return script.pop(0), {"prompt_tokens": 10, "completion_tokens": 1}, 0
+
+        agent.chat = chat
+        episode = agent.run_episode(
+            world or FakeWorld(), "none", "model", self.examples, [], agent.Draw(1), max_steps, 3,
+            "deepseek-flash", "k", 1.0, parser=parser, guard_commandless=guard,
+        )
+        return episode, seen
+
+    def test_the_guard_s_line_asks_for_one_command_and_is_one_line(self):
+        # A string a model can count on: one line, so it is answered the way `OK.` was answered, and it names the
+        # requirement rather than describing it. A two-line answer would have been a second observation's worth of
+        # prompt on every loop turn, which is the cost the round is trying not to pay.
+        self.assertEqual(agent.COMMAND_GUARD, "OK. Reply with one command only.")
+        self.assertNotIn("\n", agent.COMMAND_GUARD)
+        self.assertTrue(agent.COMMAND_GUARD.startswith("OK."))
+
+    def test_the_guard_answers_a_commandless_turn_and_the_unguarded_arm_does_not(self):
+        replies = ["> think: I need the apple", "> take apple 1 from countertop 1", "> put apple 1 in/on cabinet 1"]
+        guarded, guarded_seen = self.drive(replies, guard=True)
+        plain, plain_seen = self.drive(replies, guard=False)
+        self.assertEqual(guarded_seen[1][-1], agent.COMMAND_GUARD)
+        self.assertEqual(plain_seen[1][-1], "OK.")
+        # The only difference the guard is allowed to make to the turn count, the score or the pack: none.
+        self.assertTrue(guarded["won"])
+        self.assertTrue(plain["won"])
+        self.assertEqual(guarded["steps"], plain["steps"])
+        self.assertEqual(guarded["calls"], plain["calls"])
+        self.assertEqual(guarded["pack_entries"], plain["pack_entries"])
+
+    def test_the_guard_does_not_answer_a_refused_command_because_the_command_did_reach_the_driver(self):
+        # AUDIT 34.259: a reply whose first line is a thought and whose later line is a command is refused on the
+        # reference channel, and the answer has to say the world did not move. The guard is about the turn that carried
+        # *no* command, so it must leave that answer alone -- otherwise the repair for rumination would undo the repair
+        # for the format, on the same string.
+        episode, seen = self.drive(
+            [
+                "> think: I need the apple\n> take apple 1 from countertop 1",
+                "> take apple 1 from countertop 1",
+                "> put apple 1 in/on cabinet 1",
+            ],
+            guard=True,
+            parser="reference",
+        )
+        self.assertEqual(seen[1][-1], agent.NO_OP)
+        self.assertEqual(episode["guard_fires"], 0)
+        self.assertEqual(episode["refused_actions"], 1)
+
+    def test_every_fire_and_every_immediate_relapse_is_counted(self):
+        # Two fires, one relapse: the second thought answered a firing, and it carried no command either. The third
+        # reply is the action, so the second fire was answered. A count that only had `fires` could not tell this game
+        # from one where the guard recovered the model at once.
+        episode, _seen = self.drive(
+            ["> think: one", "> think: two", "> take apple 1 from countertop 1", "> put apple 1 in/on cabinet 1"],
+            guard=True,
+        )
+        self.assertEqual(episode["guard_fires"], 2)
+        self.assertEqual(episode["guard_checked"], 2)
+        self.assertEqual(episode["guard_relapsed"], 1)
+        self.assertTrue(episode["guard"])
+        self.assertTrue(episode["won"])
+
+    def test_the_unguarded_arm_records_the_guard_as_off_rather_than_absent(self):
+        # A field that is missing from one arm and zero in the other is a join that cannot tell "did not fire" from
+        # "was never armed" -- which is the ambiguity `refused_actions` had to be read with for two rounds.
+        episode, seen = self.drive(["> think: one", "> take apple 1 from countertop 1", "> put apple 1 in/on cabinet 1"])
+        self.assertFalse(episode["guard"])
+        self.assertEqual(episode["guard_fires"], 0)
+        self.assertEqual(episode["guard_checked"], 0)
+        self.assertEqual(episode["guard_relapsed"], 0)
+        self.assertEqual(seen[1][-1], "OK.")
+
+    def test_the_guard_costs_under_two_percent_of_the_prompt_per_turn(self):
+        # Registered reading 5, as arithmetic rather than as a hope: the line is 25 characters longer than `OK.`, it is
+        # repeated once per loop turn, and every repeat also lengthens the transcript the next call carries. The
+        # comparison is per turn, because the two arms' prompts differ in length by construction.
+        replies = ["> think: a", "> think: b", "> take apple 1 from countertop 1", "> put apple 1 in/on cabinet 1"]
+        guarded, _ = self.drive(replies, guard=True)
+        plain, _ = self.drive(replies, guard=False)
+        guarded_turn = guarded["prompt_chars"] / guarded["steps"]
+        plain_turn = plain["prompt_chars"] / plain["steps"]
+        self.assertGreater(guarded_turn, plain_turn)
+        self.assertLess((guarded_turn - plain_turn) / plain_turn, 0.02)
+        self.assertEqual(guarded["steps"], 4)
+
+    def test_a_fire_on_the_last_turn_is_not_counted_as_checked(self):
+        # The budget can run out on the turn the guard answered. There is no later reply to read, so the fire is
+        # unchecked rather than relapsed: counting it either way would invent an outcome for a turn that never came.
+        episode, _seen = self.drive(["> think: one", "> think: two"], guard=True, max_steps=2)
+        self.assertEqual(episode["guard_fires"], 2)
+        self.assertEqual(episode["guard_checked"], 1)
+        self.assertEqual(episode["guard_relapsed"], 1)
+        self.assertTrue(episode["budget_exhausted"])
+
+    def test_the_label_carries_the_guard_so_two_states_cannot_be_pooled(self):
+        # Same family, same bank, same channel: the two arms of R189 differ by this token and by nothing else. Without
+        # it, `aggregate.py` would group both dispatches under the same label and refuse the doubled games only after
+        # both were paid for -- the failure the label exists to prevent.
+        self.assertEqual(agent.arm_label("always-in", 3, 0.0, True, "any-line", True), "always-in@kind+anyline+guard")
+        self.assertEqual(agent.arm_label("always-in", 3, 0.0, True, "any-line", False), "always-in@kind+anyline")
+        self.assertEqual(agent.arm_label("none", 3, 0.0, False, "reference", True), "none@guard")
+
+    def test_a_pass_records_the_guard_in_its_header_its_label_and_its_ledger(self):
+        # The three places a reader looks before an episode: the label the join groups on, the header field the file
+        # is identified by, and the ledger the round's first reading is computed from. A flag that reached only the
+        # driver would leave the artefact indistinguishable from an unguarded pass with the same score.
+        original_build = agent.build_env
+        original_argv = sys.argv
+        out = HERE / "guard-under-test.json"
+        agent.build_env = lambda batch_size=1, train_eval="eval_out_of_distribution": (FakeWorld(), 1)
+        try:
+            sys.argv = [
+                "agent.py", "--arm", "none", "--policy", "first", "--games", "1",
+                "--guard-commandless", "--out", str(out),
+            ]
+            self.assertEqual(agent.main(), 0)
+            payload = json.loads(out.read_text(encoding="utf-8"))
+        finally:
+            agent.build_env = original_build
+            sys.argv = original_argv
+            out.unlink(missing_ok=True)
+        summary = payload["summary"]
+        self.assertTrue(summary["guard_commandless"])
+        self.assertEqual(summary["arm_label"], "none@guard")
+        # The first policy acts every turn, so the guard had nothing to answer -- and says so, rather than reporting a
+        # fire it never sent.
+        self.assertEqual(summary["guard_fires"], 0)
+        self.assertEqual(summary["guard_relapsed"], 0)
+        self.assertFalse(payload["episodes"][0]["guard"] is None)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
