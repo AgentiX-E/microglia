@@ -20,6 +20,7 @@ import json
 import os
 import socket
 import sys
+import tempfile
 import threading
 import unittest
 import urllib.error
@@ -2002,8 +2003,15 @@ class KindGateTest(unittest.TestCase):
 class BankLoadTest(unittest.TestCase):
     """Reading a bank as rules *and* tags, because the two have to be cut by the cap together."""
 
+    def setUp(self):
+        # A temporary directory rather than the source tree: these cases used to leave
+        # `bank-kinds-under-test.json` beside the driver, so running the suite made the checkout dirty and the
+        # file's absence from every commit looked like an oversight rather than a test's litter.
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+
     def write(self, payload: dict) -> Path:
-        path = HERE / "bank-kinds-under-test.json"
+        path = Path(self.directory.name) / "bank-kinds-under-test.json"
         path.write_text(json.dumps(payload), encoding="utf-8")
         return path
 
