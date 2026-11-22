@@ -658,7 +658,9 @@ one line naming the last three commands already tried, repeats collapsed. It fir
 does (a command that failed rather than a reply that carried none), so it carries its own token (`always-in@anyline+guard+ledger`)
 and its own two counters (`ledger_fires`, `ledger_chars`), and `aggregate.py` refuses to pool the two states until a join
 names them with `--expect-ledger`. The line is conditional by construction: a game whose actions all land carries no
-extra character, which is what keeps a search repair inside the price of a pass.
+extra character, which is what keeps a search repair inside the price of a pass. R191 bought it: **267/274 against the
+guard's 265/274**, +0.73 pp (p = 0.597, mde 2.89 pp), all **four** games the guard alone lost won, **413 fires** and
+42,845 characters — 2.28% of the arm's prompt — for **¥2.69**, with 76 fewer calls than the control it beat.
 
 The one component that is scored **before** anything is bought is `scripts/score_bank.py`, which reads a bank and
 returns the literature's admission score for the pack each task type would render — specificity x abstractness, with no

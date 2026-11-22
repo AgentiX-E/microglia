@@ -3029,3 +3029,40 @@ renders nothing is not a treatment); an entry that is blank (an empty string sco
 read); an effects table row without the comparison it is (the first registration compared a bank-vs-control delta with a
 bank-vs-placebo delta and a row that belonged to a run which drove no games); and the correlation itself below three
 points (two points give ±1 by arithmetic).
+
+### 8.54 The state ledger: an answer-side renderer, and the cost of a line that repeats
+
+R189's guard answers the turn that carried **no command**. R191 adds the sibling for the other way a turn fails: the turn
+whose command **moved nothing**. The world answers `Nothing happens.`, or the action is not in the turn's admissible set —
+both are the same event from the model's side, and neither is reachable by a sentence in front of the episode.
+
+**The history already exists, so the treatment is a renderer.** `run_episode` holds `actions`, in order, for every command
+the episode handed the world. `ledger_line()` takes the last three, drops repeats, and returns one line:
+
+| | without `--state-ledger` | with it |
+| --- | --- | --- |
+| a turn whose command moved nothing | the observation alone | the observation, then `Already tried this episode: a; b; c.` |
+| a turn whose command landed | the observation | **unchanged** |
+| a turn that ended the episode | the observation | **unchanged** (a line no later turn reads is not engagement) |
+| the pack, the reader, the cap, the guard | — | unchanged |
+
+**Four properties are load-bearing and each is a test.**
+
+1. **Conditional by construction.** A game whose actions all land carries no extra character, which is what keeps a search
+   repair inside the price of a pass. Measured: 182 games carry one line, 44 two, 27 none.
+2. **The instrument is untouched.** `observe_chars`, `observe_fingerprint` and `last_line` measure the *world's* text, so
+   the hint is appended to what the model hears and never to what the record measures. A ledger that changed the
+   observation fingerprint would make two arms' environments look different when the environments are identical.
+3. **Both sides of the parser.** A refused command is appended to the history without joining `actions`: it was never
+   executed, and the action digest is a published field.
+4. **A label token and two counters** — `ledger` in the arm label, `ledger_fires` and `ledger_chars` in every episode, and
+   `aggregate.py` refuses a join that mixes the two states until `--expect-ledger` names them, that one label spans two
+   states, or that an armed episode carries no counters. The same four refusals the guard has, for the same reason.
+
+**What the first purchase measured, and the architecture lesson in it.** 267/274 against the guard's 265/274, with all
+four named cap-loss games won — and a tail where one game received **40** lines and still ended at the cap. That tail is
+the design's own failure mode stated architecturally: **the line is a function of the episode's history, and a history
+that does not change reproduces the same line, which is a constant.** R188 measured a constant in front of every turn as
+inert; the ledger can become one on the games where the model is stuck in a loop, which is the state it was built for. The
+repair is a renderer change — a repeat count instead of a repeat, and no line when the history did not change — and it is
+registered rather than assumed.

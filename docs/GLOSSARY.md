@@ -2081,6 +2081,15 @@ only.` — one line, no extra call, and conditional on the state the episode is 
 enters a loop. It is a **harness** knob rather than an arm: it travels in the label (`@guard`), the header and every
 episode, and a join refuses to pool two guard states until it is told it is comparing them.
 
+**State ledger** — The driver's answer to a turn whose command moved nothing (`--state-ledger`), and the guard's
+sibling on the other side of a failed turn: the world said `Nothing happens.`, or the action was not admissible, so the
+observation is followed by one line naming the last three commands already tried with repeats collapsed. It is a
+**renderer over the episode's own history**, not a memory: nothing is written back, nothing survives the episode, and a
+game whose actions all land carries no extra character. Conditional by construction, recorded per episode
+(`ledger_fires`, `ledger_chars`), labelled (`@ledger`), and refused in a join that does not name both states. R191 read
+**413 fires / 42,845 characters** and won all four games it was registered for; its failure mode is that a line which
+repeats is a constant, and one game received forty of them and still lost at the cap (AUDIT 34.279).
+
 **Utility score** — The admission family's offline estimate of what an entry is worth, computed with no rollout:
 specificity x abstractness (`arXiv:2608.20274`). Specificity is the share of the text that is command notation (quoted
 spans, `<placeholders>`); abstractness is the share of the words that are frame words (`if`, `before`, `every`,

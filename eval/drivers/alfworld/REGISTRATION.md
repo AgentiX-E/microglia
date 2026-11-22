@@ -3184,3 +3184,92 @@ or `bank_digest` differs from the tiling above; any game outside the 274.
 
 **Next after this round: R192 — the release distribution.** 265, 264, 264, 258 on the same 274 games: the published
 number is a draw, and four more dispatches (≈ ¥6.0) buy the interval instead of the point.
+
+## R191, amendment 1 — the line reaches all four games it was built for, and the pool does not move
+
+Four dispatches, **548 games, two arms on one bank**, `--gate-kind true`, `any-line`, cap 50, `guard` on both arms,
+off-peak in all sixteen summaries: run `44998336698` (ledger, 134) + `44998433515` (ledger, 140) and `44998455032`
+(control, 134) + `44998557297` (control, 140).
+
+| arm | pack | pooled | unseen 134 | seen 140 | thoughts a game | heavy (≥20) | steps a game | calls |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| **`always-in@kind+anyline+guard+ledger`** | 551 ch, 1 entry | **267/274 (97.45%)** | **134/134** | **133/140 (95.00%)** | **2.65** | **1** | **15.11** | **4,140** |
+| `always-in@kind+anyline+guard` | 551 ch, 1 entry | 265/274 (96.72%) | 134/134 | 131/140 (93.57%) | 2.99 | 2 | 15.39 | 4,216 |
+
+**Paired +0.73 pp** [−1.09, +2.92], exact McNemar on **5 + 3** discordant games, p = 0.597, mde 2.89 pp; engagement 35.0%
+of games changed course. Every section moves the same way and neither is separable: seen **+1.43 pp**, unseen **+0.00**
+(both arms 134/134).
+
+### The four named games, which is the round's actual result
+
+The registration named four games from R189's record — the ones the guard lost and the plain arm won — **before** this
+round began. All four carried the line, and all four won:
+
+| game | kind | control (the guard) | ledger | fires |
+| --- | --- | --- | --- | --- |
+| `pick_cool_then_place_in_recep-Plate-None-CounterTop-1` | `cool` | lost, 50 steps (cap) | **won, 11 steps** | 1 |
+| `look_at_obj_in_light-Bowl-None-DeskLamp-301` | `examine` | lost, 50 steps (cap) | **won, 36 steps** | 3 |
+| `pick_two_obj_and_place-Box-None-CoffeeTable-213` | `puttwo` | lost, 50 steps (cap) | **won, 40 steps** | 2 |
+| `pick_clean_then_place_in_recep-Spatula-None-DiningTable-4` | `clean` | won, 12 steps | **won, 11 steps** | 1 |
+
+Three of the four were cap-losses in the control on this draw and all three flipped; the fourth was won by both arms and
+the ledger did not cost it. **4 of 4 named games won, against a registered floor of 2.**
+
+### Reading by reading
+
+| # | registered | read | verdict |
+| --- | --- | --- | --- |
+| 1 | `ledger_fires` 20 to 200 per arm | **413 per arm**; non-zero in **4 of 4** named games | **failed on the band**, held on the cell |
+| 2 | ≥ 2 of the 4 named games win | **4 of 4** | **held** |
+| 3 | paired pooled delta ≥ −2.0 pp | **+0.73 pp** [−1.09, +2.92] | **held** |
+| 4 | one pack, one channel, one cap, one guard, one bank, `ledger` in the label | 551 ch and 1 entry in all 548 games, `any-line`, 50, `guard: true` on both, one `bank_digest` (349213e8), `always-in@kind+anyline+guard+ledger` against `always-in@kind+anyline+guard` | **held** |
+| 5 | spend ≤ ¥3.4, treatment prompt ≤ +6% | **$0.3735 ≈ ¥2.69**, prompt **+2.11%** over 4,140 against 4,216 calls | **held** |
+
+**Reading 1's band was wrong in the same way R189's was, and the registration contradicted itself.** The band said 20 to
+200 fires over 274 games — 0.07 to 0.73 a game — while the paragraph justifying it said "the trajectory says that is
+**one to three turns a game**", which over 274 games is 274 to 822. The measured 413 sits inside the justification and
+outside the band. AUDIT 34.278.
+
+### The line can license the loop it was built to break
+
+The three games the ledger lost are the informative ones, and two of them are `examine`:
+
+| game | fires | ledger | control |
+| --- | --- | --- | --- |
+| `look_at_obj_in_light-AlarmClock-None-DeskLamp-323` | **40** | lost, 50 steps, 6 thoughts | won, 5 steps |
+| `look_at_obj_in_light-Laptop-None-DeskLamp-328` | **16** | lost, 50 steps, 22 thoughts | won, 5 steps |
+| `pick_and_place_simple-Box-None-Dresser-224` | 5 | lost, 50 steps | won, 8 steps |
+
+Forty repetitions of `Already tried this episode: …` on one game is forty turns of prompt for a model that kept issuing
+the same refused command: by the third repetition the line **is** the loop's constant, and a constant in front of every
+turn is what R188 measured as inert. The distribution says this is the tail rather than the shape — 182 games carry
+exactly one line, 44 carry two, and 27 carry none — but the tail is where a "state" turns into a "prior". AUDIT 34.279.
+
+### The arm that received no treatment changed its own trajectory in 14 of 27 games
+
+Twenty-seven games carried no line at all, so their prompts are the control's, byte for byte. Fourteen of them still took
+a different path, and one of those (`look_at_obj_in_light-Pillow-None-DeskLamp-323`) won under the ledger and lost under
+the control at 50 steps. Only **15 of 274** games have identical prompt totals across the two arms.
+
+That is the lane's cross-dispatch control drift (AUDIT 34.232) measured **inside one round**: the model re-samples even
+at the prompts it has already answered. Two consequences, both of which shape the next registration: the pool claim is
+"not worse" and cannot be more than that at 2.89 pp of resolution, and a mechanism claim has to be made on the games where
+the treatment fired — which is why reading 2, not reading 3, is this round's result. AUDIT 34.280.
+
+### Cost, and where it went
+
+| | treatment | control |
+| --- | --- | --- |
+| calls | 4,140 | 4,216 |
+| prompt characters | 1,881,410 | 1,842,583 (**+2.11%**) |
+| of which the line | **42,845 (2.28%)**, 103.7 per fire | — |
+| bill | **$0.3735 (≈ ¥2.69) for both arms**, 8,356 calls | |
+
+The line is **two per cent of its arm's prompt**, and the treatment makes **76 fewer calls** than the control it beat,
+because eight of the control's cap-losses spend their last twenty turns failing. Total spend is **¥2.69**, inside the
+registered ¥3.4 ceiling by 21%.
+
+**What it changes about the plan.** The state family is **adopted at the mechanism level and not at the pool level**: four
+named games, four wins, for ¥2.69. The next purchase is not another sentence and not another state — it is the
+**distribution** (R192), because the published number is now one draw of a pool whose own draws span seven games.
+

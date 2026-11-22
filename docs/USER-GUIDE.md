@@ -5465,3 +5465,44 @@ After R190 you can classify a bank's failure before paying for it, in this order
 
 The scorer sees (1) and half of (2). It cannot see (3), and (3) is why `--gate-kind` and the per-kind table are part of
 the instrument rather than of the report.
+
+### 32.35 Turning the state line on: `--state-ledger`, and how to read what it did
+
+`--guard-commandless` answers the turn that carried **no command**. `--state-ledger` answers the turn whose command
+**moved nothing** — the world said `Nothing happens.`, or the action was not in that turn's admissible set. Both are one
+flag, both are recorded per episode, and they compose:
+
+```bash
+python eval/drivers/alfworld/agent.py \
+  --arm always-in --policy model --split eval_in_distribution \
+  --rules eval/drivers/alfworld/banks/bank-putscope-2.json --gate-kind true \
+  --parser any-line --guard-commandless --state-ledger \
+  --out arm-ledger.json
+```
+
+The arm's label becomes `always-in@kind+anyline+guard+ledger`, and each episode carries `ledger: true`, `ledger_fires`
+and `ledger_chars`. A join that puts that label beside `always-in@kind+anyline+guard` needs one declaration:
+
+```bash
+python eval/drivers/alfworld/aggregate.py \
+  --input logs/ledger-134/*.json --input logs/guard-134/*.json \
+  --compare "always-in@kind+anyline+guard+ledger,always-in@kind+anyline+guard" \
+  --expect-parsers any-line --expect-caps 50 --expect-guard on --expect-ledger on,off
+```
+
+and it prints the line the round is read from:
+
+```
+ledger          always-in@kind+anyline+guard+ledger 413 fires, 42845 chars added vs always-in@kind+anyline+guard 0 fires, 0 chars added
+```
+
+**Read the fires first, then the delta.** The delta over 274 games has a resolution of about 3 pp, so it can say "not
+worse" and not much else; `ledger_fires` is what says whether the treatment ever reached the model. The first purchase read
+413 fires and won four of the four games it was registered for. Two cautions, both measured rather than supposed:
+
+- **A game with zero fires is not a control for its own arm.** Twenty-seven games in that round carried no line, and
+  fourteen of them still took a different path, because the model re-samples a prompt it has already answered. A pool
+  difference of two games over 274 is one draw against another draw.
+- **A line that repeats is a constant.** The same round's worst games received 16 and 40 lines and lost at the cap: by the
+  third repetition the model is being told the same thing every turn, which is the shape R188 measured as inert. If you
+  see a high fire count on a losing game, the treatment has become narration.
