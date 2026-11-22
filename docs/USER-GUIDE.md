@@ -5675,3 +5675,45 @@ appearing in two shards. Each refusal names the episode and the two numbers that
 | `retries` | refusals were state-dependent and the model corrected itself by moving | the refusals were permanent, which is what a state line is for |
 | `headroom` | a cycle line has something to reach | it does not, whatever the mechanism is worth elsewhere |
 | `price` | the line is long relative to its reach | — compare with `ledger_chars` of the same pass before pricing a dispatch |
+
+### 32.41 Proving your deployment ships what was measured: `eval:serve-profile`
+
+The library's defaults live in `packages/core`, the arms live in `packages/eval`, and a host that adopts a winning
+arm has, until now, done so by copying numbers into a `openMicroglia` call. Nothing compared the two. The contract
+is a record with five fields, and two commands read it.
+
+```bash
+pnpm eval:serve-profile            # the table, then "no drift" or REFUSED with every problem
+pnpm eval:serve-profile --print    # just the shipped profile
+```
+
+```
+budget        default    unmeasured
+note          default    unmeasured
+budgetBasis   default    unmeasured
+speakMargin   default    unmeasured
+credit        true       unmeasured
+serve profile: 5 fields, 0 measured, 5 unmeasured, no drift
+```
+
+`default` is not a number the audit forgot; it is the field's value `null`, which means "the library's own
+default". The distinction matters in both directions: `speakMargin: 0` and an absent margin are two different
+programs (`recall` attaches `pack.decision` only when a margin is declared), so the profile keeps absence
+expressible and `serveOptions()` omits those fields rather than filling them in.
+
+**What a field's justification can be.** Either a reading — `{kind: "reading", id, artefact, deltaPp, ciLowPp,
+ciHighPp, alpha}` — or a reason there is none. The audit refuses a reading whose interval contains zero, and it
+refuses a resolving reading on a field the product ships at its default: evidence about a knob nobody shipped is a
+finding, not a justification. In this version all five fields are `unmeasured`, and each states why.
+
+| reading | what it means for you | what to do |
+|---|---|---|
+| `N measured` above 0 | those knobs cannot move without a record change | read the reading before you upgrade |
+| `unmeasured` with a reason | the shipped value is the library default and no arm has priced it | treat the field as untested when you size your own workload |
+| `REFUSED … states X, the product ships Y` | the two halves disagree, and the build fails | repair whichever side moved, not the check |
+| `dropping a decorative reading` | someone collected evidence for a knob the product ignores | ship the value or delete the claim |
+
+**Adopting a win, in three steps.** Put the value in `SERVE_PROFILE` (the constant the product reads), put the
+reading in `eval/results/serve-profile.json` beside it, run `pnpm eval:serve-profile` — a clean run prints
+`1 measured` and no drift. The gate fails in the other order, which is the point: a value without its reading is a
+default wearing a decision's clothes.

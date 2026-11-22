@@ -799,14 +799,14 @@ stops being true. `pnpm eval:coupling` recomputes it from the source tree on eve
 
 | layer | production modules | lines | modules that name a scenario |
 |---|---|---|---|
-| `core` | 47 | 10,588 | **0** |
+| `core` | 48 | 10,749 | **0** |
 | `protocol` | 3 | 1,922 | **0** |
 | `sql` (the adapter) | 7 | **1,956** | 5 |
-| `eval` | 192 | 57,632 | 25, each with a written reason |
+| `eval` | 193 | 57,915 | 25, each with a written reason |
 | `browser` | 2 | 280 | 0 |
-| `node` | 6 | 1,291 | 0 |
+| `node` | 6 | 1,294 | 0 |
 
-**The scenario is 2.7% of the production tree and none of it is in the library.** `core` names no
+**The scenario is 2.6% of the production tree and none of it is in the library.** `core` names no
 database in code — every occurrence of `sql` in it is inside a test, where a scope string is free text —
 and the text-to-SQL surface is **1,956 lines in 7 modules** that execute, guard, differ, link and
 render SQL. The 25 modules that keep a scenario word outside the adapter each carry a reason in the
@@ -1016,6 +1016,43 @@ build would fail if either stopped bundling without Node builtins, which is the 
 promise measured rather than asserted. `pnpm bundle:size -- --probe` halves a ceiling and must be
 rejected — a budget that cannot be exceeded is not a gate.
 
+### What a deployment actually ships: five knobs, and the reading behind each
+
+A library and its benchmark are two programs that drift by default. The arm sets `speakMargin: 0.2` in its own
+`openMicroglia` call and publishes the win; `createServer` still serves the library default, because nothing in
+the repository compared the two and no line that looks like a configuration changed. The gap is invisible in
+both halves and total in the product.
+
+So the shipped configuration is **a record with five fields** —
+[`packages/core/src/kernel/serve-profile.ts`](packages/core/src/kernel/serve-profile.ts) — and both sides read
+it: `createServer` spreads `serveOptions()`, an eval control arm spreads the same call, and
+`eval/results/serve-profile.json` carries, per field, either the reading that chose the shipped value or a
+written reason there is none.
+
+```bash
+pnpm eval:serve-profile            # the table, then no drift / REFUSED with every problem listed
+pnpm eval:serve-profile --print    # just the shipped profile, for a deployment note
+```
+
+It refuses four things, and the fourth is the reason it exists:
+
+| refusal | what it catches |
+|---|---|
+| `the record states 800, the product ships null` | the two halves disagree |
+| `the reading [-2, 4] does not resolve` | a justification that is a sentence wearing an interval |
+| `claims the reading R197 while the product ships the default` | a **decorative reading**: real evidence about a knob the product ignores |
+| `an unmeasured field needs a reason` | a placeholder where the debt used to be invisible |
+
+**Today the table reads five fields, zero measured.** That is not a defect to hide; it is the state, printed on
+every push. `speakMargin` has a dispatched reading that does not resolve (R123: −2.50 pp [−22.50, +17.50] at
+n = 160, while the rung withheld a third of the packs). `note` has an arm that was built, pre-registered and
+never dispatched. `credit` has a mechanism check, not a rate. `budget` and `budgetBasis` have never been varied
+alone. The product ships the library defaults, and the record says so in the same words a reviewer would.
+
+What the gate does **not** bind is a lane's treatment arm: those are deliberately `profile + Δ`, and the drivers
+still set their own knobs. Binding them literally is the next step, and the record will be the place it is
+declared rather than inferred.
+
 ### Which BIRD split you measure, and why none of them is a leaderboard entry
 
 Three splits, three different questions, and the lane refuses a fourth name rather than defaulting to
@@ -1078,7 +1115,7 @@ pnpm bench      # study only, writes bench/results/study.json
 ```
 
 Coverage is enforced at 95% on lines, statements, functions **and** branches. It currently reports
-**99.98 / 99.67 / 100 / 99.98** over **2,689 tests**; the branch arms that remain uncovered are
+**100 / 99.91 / 100 / 100** over **6,128 tests**; the branch arms that remain uncovered are
 listed with file, line, and reason in the internal technical design, and none is excluded with an ignore
 comment.
 

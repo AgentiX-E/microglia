@@ -3184,3 +3184,37 @@ repetition at all. The mechanism's ceiling is therefore +3 games = **1.09
 pp** against a paired **mde of 2.29 pp**, so the dispatch it was built to justify was not bought (AUDIT 34.288). The
 reader is the lane's first **ceiling instrument**: it prices a treatment before the treatment is paid for, in the same way
 `score_bank.py` prices a bank and `--state-admissible`'s instrument priced a line.
+
+### 8.59 The shipping contract: one record, read by the product and by the control arm
+
+The library and its benchmark are two programs. Until R197 nothing compared them: an arm set its own knobs in its
+own `openMicroglia` call and published a delta, `createServer` served the library defaults, and neither file was
+wrong. The failure mode is not a bug in either half — it is that a win can be measured in one program and never
+reach the other, and that no diff shows it.
+
+**The record.** `packages/core/src/kernel/serve-profile.ts` holds five fields — `budget`, `note`, `budgetBasis`,
+`speakMargin`, `credit` — and the single function that turns them into `openMicroglia` options. `null` is a value
+and means "the library's own default", which is not the same as the default's value: `speakMargin: 0` attaches
+`pack.decision` where an absent margin does not, so a helper that filled absences in with their defaults would
+change the bytes a host receives and silently reprice every number produced without one. `serveOptions()` therefore
+**omits** absent fields, and the product (`createServer`) and the ablation control (`tinyHost`) both spread its
+result.
+
+**The evidence.** `eval/results/serve-profile.json` carries, per field, either a `reading` — id, artefact, delta,
+both bounds, alpha — or an `unmeasured` reason. `pnpm eval:serve-profile` recomputes the record against the
+constant and refuses four things: a field whose stated value differs from the shipped one, a field with no
+justification, an `unmeasured` field whose reason is a placeholder, and a `reading` that does not resolve. The
+fourth refusal is the one that earns the module: a **decorative reading** — a resolving interval about a knob the
+product ships at its default — is the shape evidence takes when it is collected for a paper and not for a
+deployment, and it is refused rather than counted.
+
+**What it says today, and what it does not.** Five fields, zero measured, five reasons: R123's dispatched
+`speakMargin` rung read −2.50 pp [−22.50, +17.50] at n = 160 while withholding a third of the packs; R53's three
+note levels were built and never dispatched; `credit` has a mechanism check and no rate; `budget` and
+`budgetBasis` have never been varied alone. The audit prints that as a debt line on every push, which is the
+difference between "we should measure these" and a number someone can act on.
+
+The gate binds the shipped defaults and the one host that is a control by construction. It does **not** bind a
+lane's treatment arm, which is `profile + Δ` by design and still sets its own knobs in the driver; making those
+literal is the next step, and when it lands the record is where the claim will be declared rather than inferred
+from a diff.

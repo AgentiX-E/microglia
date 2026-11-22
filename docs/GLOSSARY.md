@@ -2194,3 +2194,22 @@ therefore one that is not dispatched.
 **Ceiling instrument** — A reader that prices a treatment's *reach* before it is bought, from artefacts already paid for:
 `score_bank.py` for a bank, `admissible_mean` for a state line, and `cycles.py` for a cycle. Its output is a comparison
 between the reach and the split's minimum detectable effect; a ceiling below the mde is a null by construction.
+
+**Serve profile** — The five knobs a deployment actually ships (`budget`, `note`, `budgetBasis`, `speakMargin`,
+`credit`), held as data in `packages/core/src/kernel/serve-profile.ts` and read by the product (`createServer`)
+and by an eval control arm through `serveOptions()`. A field's value `null` means "the library's own default" and
+is deliberately distinct from the default's value: `speakMargin: 0` attaches `pack.decision` where an absent
+margin does not.
+
+**Shipping contract** — The pairing of the serve profile with `eval/results/serve-profile.json`, which carries a
+justification per field, checked by `pnpm eval:serve-profile`. It refuses a value the record and the product
+disagree about, a field with no justification, a placeholder reason, and a reading that does not resolve. What it
+does not bind is a lane's treatment arm, which is `profile + Δ` by design.
+
+**Decorative reading** — A resolving paired interval about a knob the product ships at its default. The evidence
+is real and the deployment ignores it, which is the shape a measurement takes when it is collected for a report
+rather than for a release; the audit refuses it instead of counting it.
+
+**Measured field** — A serve-profile field that carries a resolving reading *and* whose value the product ships.
+Both halves are required, which is why the count is the honest one: this version is five fields, zero measured,
+each with a stated reason.

@@ -1,0 +1,33 @@
+{
+  "schema": "microglia.serve-profile/1",
+  "updatedBy": "R197",
+  "profile": {
+    "budget": null,
+    "note": null,
+    "budgetBasis": null,
+    "speakMargin": null,
+    "credit": true
+  },
+  "fields": {
+    "budget": {
+      "kind": "unmeasured",
+      "reason": "No arm has varied the character budget alone. Every lane fixes it (ALFWorld renders 551 characters per game from a 20-entry bank, tau2 uses DEFAULT_PACK_BUDGET) and the arms that changed the pack changed its content, not its size. R120 read the composition of a full pack -- four items from 73 records, one of them taking 54% of requests -- which is a supply finding, not a budget one. Shipping the policy default is therefore the honest state: it is what every published number was produced under, and it is the value no arm has ever disputed."
+    },
+    "note": {
+      "kind": "unmeasured",
+      "reason": "R53 built the three-level arm over one store (none / standard / hardened) and pre-registered it; it was never dispatched, so the shipped absence is the renderer's default sentence, which every committed artefact carries byte for byte. The arm stays dispatch-ready and is the cheapest open reading on this list: one store, one variable, 228 episodes."
+    },
+    "budgetBasis": {
+      "kind": "unmeasured",
+      "reason": "An accounting declaration rather than a treatment: it decides what a fixed budget pays for, and only the note arms need it, because the hardened sentence is longer than the standard one and used to buy that room by dropping the last rule. Shipping note-included is the accounting every published number was produced under, and it is the reason R53's arm can vary one sentence at all."
+    },
+    "speakMargin": {
+      "kind": "unmeasured",
+      "reason": "R123 dispatched the rung the census chose, speakMargin 0.05, and read episode rate -2.50pp [-22.50, +17.50], p = 1.0000 at n = 160: the interval cannot separate the rung from speaking always, while the rung withholds about a third of the packs. A gate that withholds a third of the renderings and cannot be told from the default does not ship, so the product speaks always and the reading stays open at the lane's own resolution."
+    },
+    "credit": {
+      "kind": "unmeasured",
+      "reason": "The credit ablation (ablations.ts, creditAblation) shows the module binds -- a rule that keeps failing is retired only when feedback is applied -- but that is a mechanism check on a synthetic workload, not a paired rate with an interval. No lane has run credit off against credit on at the same n, so the shipped value is the module's own default and the reason it is not yet a reading is stated here rather than implied."
+    }
+  }
+}

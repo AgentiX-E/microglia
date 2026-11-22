@@ -1018,6 +1018,17 @@ jobs:
         # its own writer, a new field invented in the shape of the old ones.
         run: pnpm eval:claim-check
 
+      - name: The shipping contract still holds
+        # R197. The product ships five knobs and the eval package varies them; nothing in the repository
+        # compared the two, so a knob could be won in an arm and lost in a deployment without a line moving
+        # in the file that looks like a configuration. The check recomputes the record against the constant
+        # the product reads, refuses a `reading` that does not resolve, and refuses a resolving reading on a
+        # knob the product ships at its default -- the evidence in a drawer.
+        run: |
+          set -euo pipefail
+          pnpm eval:serve-profile --self-test
+          pnpm eval:serve-profile
+
       - name: The pack-copy census has not drifted
         # R158. The census reads four committed artefacts and two hundred statements, so it is exactly
         # the kind of evidence that moves when an artefact is re-committed and nobody re-reads it. The

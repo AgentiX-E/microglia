@@ -7,7 +7,7 @@
  */
 import { serve } from '@hono/node-server';
 import { EmbeddedMemory, JsonlJournal } from '@agentix-e/microglia-core/memory';
-import { openMicroglia } from '@agentix-e/microglia-core';
+import { openMicroglia, serveOptions } from '@agentix-e/microglia-core';
 import { combineInterpreters, createLlmInterpreter, ruleInterpreter } from '@agentix-e/microglia-core/distill';
 import type { Microglia } from '@agentix-e/microglia-core';
 import type { LlmProvider } from '@agentix-e/microglia-core/providers';
@@ -37,6 +37,9 @@ export async function createServer(options: ServerOptions): Promise<Server> {
     app: options.app ?? 'microglia',
     namespace: options.namespace,
     store,
+    // The shipped configuration, from the record rather than from this file: `serveOptions()` is the profile
+    // the eval package's control arm also reads, so a knob cannot be won in an arm and lost in a deployment.
+    ...serveOptions(),
     ...(llm === undefined
       ? {}
       : {

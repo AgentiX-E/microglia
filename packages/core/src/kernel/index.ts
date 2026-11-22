@@ -166,3 +166,19 @@ export {
   visibleBefore,
   type AdmissionDecision,
 } from './knowledge.js';
+
+export {
+  SERVE_PROFILE,
+  SERVE_PROFILE_FIELDS,
+  describeServeProfile,
+  diffServeProfile,
+  sameServeProfile,
+  serveOptions,
+  type ServeBudgetBasis,
+  type ServeField,
+  type ServeNote,
+  type ServeOptionValues,
+  type ServeProfile,
+  type ServeProfileDiff,
+  type ServeProfileDivergence,
+} from './serve-profile.js';
