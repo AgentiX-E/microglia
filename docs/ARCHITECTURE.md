@@ -3438,3 +3438,48 @@ cannot be said to lose repairs it never had.
 **And the net delta turns positive only by turning the memory off.** +0.00pp at 0.25 with 69% of packs withheld;
 +0.40pp at 0.30 with 76%. That is the arithmetic of a dose, not of a mechanism, and it is why the next round spends
 on `selectivity`, not on the sign of the sum.
+
+### 8.65 The price of a pack is its size times the turns it rides
+
+§8.62 left the price column empty with the reason printed: no committed fold carried a bill, because every one
+predated R198's reader. The first fold bought after that reader is `poc-l4-pair-r198`, and the column now reads:
+
+```text
+3299.6 injected prompt tokens an episode, of which 2722.1 bought nothing
+```
+
+**The registration's own band was wrong, and the error is the finding.** R198 predicted 100–900 injected tokens an
+episode, from the pack's measured 551–788 characters inside a 2,400-character budget. The measurement is **3,299.6**
+— 3.7× the top of the band. The mechanism was in the driver all along and in no registration: the agent appends the
+pack as a second system message and **reuses it on every later turn of the episode**, so the premium is the pack
+**× the turns it rides**, plus the scaffold's own delta:
+
+| quantity | value | where it comes from |
+|---|---|---|
+| pack | 788 characters ≈ 197 tokens | `pack.meanChars` on the same artefact |
+| turns an episode | 11.2 | `agent_turns 446 / 40 episodes` |
+| premium an episode | **3,299.6 tokens** | (3,162,246 − 3,030,263) / 40 |
+| premium a turn | ≈ 295 tokens | 3,299.6 / 11.2 |
+
+R135 had measured the same thing from the other side — **559 tokens of system growth per call against a
+725-character pack** — and read it as "carriage or material no field had ever named". This fold names it: the
+carriage is the message list, and it is re-sent, so a memory that costs 200 tokens a request costs 3,300 an episode.
+
+**What the two units buy.** Money and tokens answer different questions and both are now measured:
+
+| unit | value | what it is for |
+|---|---|---|
+| tokens an episode | 3,299.6 | the number competitors publish, and the one a context window charges for |
+| tokens a repair | **32,996** | 131,984 injected tokens over four repairs — the price of the effect |
+| money a run | **$0.384 ≈ ¥2.75** | learn $0.1969 + memory eval $0.0944 + control eval $0.0931, at the off-peak band |
+
+**And the accuracy reading is unresolved, which is the point of quoting it last.** The fold reads `pass^4` **0.85**
+against the control's **0.825** — a paired **+2.50 pp** [−10.00, +15.00] at p = 1.0000 over 40 pairs, against an
+18.53 pp minimum detectable difference. It is the first fold with a *positive* delta and it is the least
+informative one in the corpus, which is why the pool does not move: 291 served packs, **78.7% [73.6, 83.0]** inert,
+**−3.44 pp**.
+
+**The corpus arithmetic after six folds, restated.** The pool needs **11 of its 36 breaks prevented (31%)** before
+the delta stops being negative — down from 12 of 33, because this fold added four repairs and three breaks. That is
+the target every later mechanism is priced against, and §8.64's gate reaches it only by withholding most of the
+memory.

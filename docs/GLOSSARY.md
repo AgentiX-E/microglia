@@ -2283,3 +2283,14 @@ prices every rung against the same episodes — the one design decision that mak
 corpus's breaks a rung withholds than of its repairs. Zero is a dose knob (both removed in proportion), positive is a
 gate that selects on harm, negative is a rung that silences the packs that were *helping*. `null` on a corpus that
 repaired nothing, because a gate cannot lose repairs it never had.
+
+**Injected tokens per episode** — the memory arm's prompt tokens minus its own control's, divided by the episodes
+measured. It is a *difference between two runs of one dispatch*, so it is refusable when either arm lacks a census,
+and it is not the pack's size: the pack rides every later turn of the episode, so the premium is its size × the
+turns it rides, plus the scaffold's own delta. On the one fold that carries a bill, 3,299.6 tokens an episode
+against a 197-token pack over 11.2 turns.
+
+**Tokens per repair** — injected tokens × episodes ÷ repairs: the price of the effect rather than of the delivery.
+It makes the cost axis comparable across mechanisms, because a system that serves the same tokens and repairs twice
+as often is measurably better, and it is the number a memory has to be judged on when its inert share is high. On
+the one priced fold, **32,996**: 131,984 tokens over four repairs.

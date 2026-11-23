@@ -5937,3 +5937,33 @@ removes repairs and breaks in exactly the corpus's own proportion — selectivit
 with a threshold's name. Between 0.05 and 0.10 selectivity is *negative*: the margin silences repairing packs faster
 than breaking ones. The net delta only turns positive at 0.25, where 69% of packs are withheld. Read those three
 facts together and the gate is a price, not a mechanism — which is why the next question is what a token buys.
+
+### 32.48 Reading the price: tokens an episode, tokens a repair, and why they differ by 16×
+
+One fold in this repository carries a bill on both arms, so the price column is a measurement rather than a promise:
+
+```bash
+pnpm eval:pack-ledgers | tail -6
+# eval/results/poc-l4-pair-r198.json inert price: 3299.6 injected prompt tokens an episode, of which 2722.1 bought nothing
+```
+
+The number is the **difference between the two arms' prompt tokens**, divided by the episodes measured, and it is
+three quantities in one:
+
+| reading | how to get it | what it means |
+|---|---|---|
+| tokens an episode | `(memoryPrompt − controlPrompt) / measured` | what one episode's memory costs, and the number a context window charges for |
+| tokens a repair | `injected × measured / repaired` | 131,984 over four repairs: **32,996** tokens per verdict the memory changed for the better |
+| inert tokens | `injected × inertShare` | 2,722.1 an episode bought a pack that changed nothing |
+
+**Why the episode number is ~16× the pack.** The pack is 788 characters (≈197 tokens), and the arm carries it on
+every turn: it is appended once as a second system message and reused for the rest of the episode, so 11.2 turns ×
+≈295 tokens is 3,299.6. A rate you compute from pack size alone will be wrong by the turn count — that is exactly
+the error R198's own registration made when it predicted 100–900 tokens, and the measurement refuted it.
+
+Two cautions before quoting either number:
+
+- **A zero is not a zero.** An arm that reports `bill: absent` spent something; nobody counted it. The ledger prints
+  `unpriced — <reason>` and never `0`.
+- **Money and tokens are not proportional.** Tokens are what this project compares on (every competitor row reports
+  them); money is what a deployment pays, and at the off-peak band a 3,300-token episode is a fifth of a cent.

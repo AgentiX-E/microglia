@@ -37,6 +37,17 @@
       "significant95": false
     },
     {
+      "artefact": "poc-l4-pair-r198.json",
+      "n": 40,
+      "helped": 4,
+      "harmed": 3,
+      "deltaPp": 2.5,
+      "halfWidthPp": 12.964181424216495,
+      "minDetectablePp": 18.533487934007457,
+      "resolvable": false,
+      "significant95": false
+    },
+    {
       "artefact": "poc-l4-pair-swapped.json",
       "n": 74,
       "helped": 7,
@@ -292,8 +303,8 @@
   ],
   "resolvable": 1,
   "significant95": 6,
-  "total": 26,
-  "resolvableShare": 0.038461538461538464,
+  "total": 27,
+  "resolvableShare": 0.037037037037037035,
   "largest": {
     "artefact": "poc-l4-pair-swapped.json",
     "n": 74,

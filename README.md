@@ -1118,7 +1118,7 @@ blocks do not close, and prints one line per fold:
 ```text
 eval/results/poc-l4-pair-r152c.json: 40 served, 29 inert (72.5%), 4 repaired against 7 broke (0.57 repairs per
   break), -7.50 pp
-all: 5 fold(s), 251 served, inert 78.1% [72.6, 82.8], -4.38 pp, 12 of 33 breaks must go (36%) – pooled over 3
+all: 6 fold(s), 291 served, inert 78.7% [73.6, 83.0], -3.44 pp, 11 of 36 breaks must go (31%) — pooled over 3
   treatment(s)
 ```
 
@@ -1126,14 +1126,15 @@ all: 5 fold(s), 251 served, inert 78.1% [72.6, 82.8], -4.38 pp, 12 of 33 breaks 
 |---|---|---|---|---|---|---|
 | `r152` | 40 | 35 | 3 | 2 | 1.50 | +2.50 pp |
 | `poc-l4-pair-official` | 40 | 33 | 4 | 3 | 1.33 | +2.50 pp |
+| `poc-l4-pair-r198` (the priced fold) | 40 | 33 | 4 | 3 | 1.33 | +2.50 pp |
 | `poc-l4-pair` (pre-R152) | 57 | 47 | 4 | 6 | 0.67 | −3.51 pp |
 | `poc-l4-pair-r152c` (bounded arm) | 40 | 29 | 4 | 7 | 0.57 | −7.50 pp |
 | `poc-l4-pair-swapped` | 74 | 52 | 7 | 15 | 0.47 | −10.81 pp |
-| **all five** | **251** | **196** | **22** | **33** | **0.67** | **−4.38 pp** |
+| **all six** | **291** | **229** | **26** | **36** | **0.72** | **−3.44 pp** |
 
-**The delta does not replicate and the inert share does.** Five folds, five splits, three treatments, and the
+**The delta does not replicate and the inert share does.** Six folds, six splits, three treatments, and the
 delta ranges from +2.50 to −10.81 pp inside intervals ±9 to ±11 points wide. The inert share lands between 70.3%
-and 87.5% every time, and its corpus interval — [72.6, 82.8] — is narrow because it is a count of episodes rather
+and 87.5% every time, and its corpus interval — [73.6, 83.0] — is narrow because it is a count of episodes rather
 than a contrast between two arms. The stable statement about this memory is therefore not "it costs accuracy"; it
 is **"most of what it serves cannot change anything, and the part that can breaks slightly more often than it
 repairs."**
@@ -1141,8 +1142,8 @@ repairs."**
 **The pooled number was also a mixture.** R197's cancellation quoted **−4.64 pp over 194 pairs**, which is the four
 folds paid for after R152 — and that pool silently averaged R152c's *bounded* arm (a rotation over the travel
 budget) with three that declare none. The gate now pools by treatment and reports each key separately: −3.90 pp
-over 154 episodes for the key without a rotation field, −7.50 pp for the bounded one, −3.51 pp for the artefact
-written before the treatment block existed. Every key is negative, so the conclusion survives the correction while
+over 154 episodes for the key without a rotation field, −2.50 pp over 80 for the bounded one (two independent
+draws after R198), −3.51 pp for the artefact written before the treatment block existed. Every key is negative, so the conclusion survives the correction while
 the number does not — and the test recomputes −4.64 from the four artefacts to show the published figure was
 arithmetic, not invention.
 
@@ -1155,15 +1156,23 @@ deliberately unchanged — a committed key may not move because the fold was re-
 keep exactly the strings they had, and `pnpm eval:pack-ledgers --check` proves the record and the artefacts agree.
 Keys are still quoted as *what the artefact declares*, never as *what ran*.
 
-**What a gate would have to buy, in episodes.** The corpus needs **12 of its 33 breaks prevented (36%)** before the
+**What a gate would have to buy, in episodes.** The corpus needs **11 of its 36 breaks prevented (31%)** before the
 delta stops being negative. That is the target the next registered gate is priced against, and it is a different
 target from "serve less": withholding an inert pack is free by construction — the verdict it did not change stays
 unchanged — and saves the injection, not a repair.
 
-**The price column is empty, and says why.** No committed pair artefact carries a bill: every fold predates
-R198's reader, so the injection price is absent by construction rather than zero. `l4-pair` now publishes each
-arm's `promptTokens` beside its `calls`, which is what the column is a difference of, so the first priced
-dispatch fills it without another code change.
+**The price column is filled, and it is the number that re-prices everything above.** Five folds are `unpriced`
+with the reason printed — they predate R198's reader. The sixth is a bill on both arms, and it reads:
+
+```text
+eval/results/poc-l4-pair-r198.json inert price: 3299.6 injected prompt tokens an episode, of which 2722.1 bought nothing
+```
+
+3,299.6 tokens an episode, for a pack that is 788 characters (≈200 tokens) and inert 82.5% of the time. The premium
+is not the pack's size, it is its size **× the turns it rides**: the agent appends the pack as a second system
+message and reuses it on every later turn, so ~11.2 turns an episode × ~295 tokens is the 3,299.6. The fold's four
+repairs therefore cost **32,996 injected tokens each** (131,984 tokens over four repairs), and in money the run cost
+**$0.384 ≈ ¥2.75** (learn $0.1969, memory eval $0.0944, control eval $0.0931).
 
 **The gate that follows, priced from the same artefacts rather than bought.** R200's 78% answers a natural
 question — withhold a pack that cannot change anything, and only the bill moves — and `speakMargin` is exactly that
@@ -1174,29 +1183,29 @@ already exist. `pnpm eval:rung-dose` reads it, and the corpus says this:
 
 | rung | served | withheld | repairs kept | breaks left | breaks prevented | inert among served | selectivity | net |
 |---|---|---|---|---|---|---|---|---|
-| 0 | 251 | 0 | 22 | 33 | 0 | 78.1% | +0.0pp | −4.38pp |
-| 0.01 | 219 | 32 | 18 | 27 | 6 | 79.5% | +0.0pp | −3.59pp |
-| 0.05 | 183 | 68 | 13 | 23 | 10 | 80.3% | −10.6pp | −3.98pp |
-| 0.10 | 145 | 106 | 11 | 17 | 16 | 80.7% | −1.5pp | −2.39pp |
-| 0.20 | 96 | 155 | 10 | 12 | 21 | 77.1% | +9.1pp | −0.80pp |
-| 0.25 | 78 | 173 | 10 | 10 | 23 | 74.4% | +15.2pp | +0.00pp |
-| 0.30 | 61 | 190 | 9 | 8 | 25 | 72.1% | +16.7pp | +0.40pp |
+| 0 | 291 | 0 | 26 | 36 | 0 | 78.7% | +0.0pp | −3.44pp |
+| 0.01 | 257 | 34 | 22 | 30 | 6 | 79.8% | +1.3pp | −2.75pp |
+| 0.05 | 216 | 75 | 17 | 26 | 10 | 80.1% | −6.8pp | −3.09pp |
+| 0.10 | 172 | 119 | 14 | 20 | 16 | 80.2% | −1.7pp | −2.06pp |
+| 0.20 | 114 | 177 | 12 | 14 | 22 | 77.2% | +7.3pp | −0.69pp |
+| 0.25 | 94 | 197 | 11 | 12 | 24 | 75.5% | +9.0pp | −0.34pp |
+| 0.30 | 76 | 215 | 10 | 10 | 26 | 73.7% | +10.7pp | +0.00pp |
 
 Three readings, and the middle one is why the module exists:
 
 - **It passes its own acceptance, literally.** The registered bar was "≥4 repairs kept and ≥4 breaks prevented";
-  rung 0.01 keeps 18 and prevents 6. A gate that meets the count is shippable on that count alone.
-- **And it is not selecting on inertness.** Among the packs the rung still serves, the inert share *rises* (78.1% →
-  79.5% → 80.3%), then falls only where more than half the packs are withheld. `selectivity` is the number that
-  says why: at 0.01 it is exactly 0.0pp — 4 of 22 repairs lost (18.2%) against 6 of 33 breaks prevented (18.2%) —
-  and in the middle band it is **negative**, because the margin withholds *repairing* packs faster than breaking
-  ones. A dose knob has selectivity 0; a gate over inert packs needs it positive.
-- **The net delta only turns positive by turning the memory off.** At 0.25 the corpus reads +0.00pp with 69% of
-  packs withheld, and at 0.30 +0.40pp with 76% withheld.
+  rung 0.01 keeps 22 of 26 and prevents 6 of 36. A gate that meets the count is shippable on that count alone.
+- **And it is not selecting on inertness.** Among the packs the rung still serves, the inert share *rises* (78.7% →
+  79.8% → 80.1% → 80.2%), then falls only where more than half the packs are withheld. `selectivity` is the number
+  that says why: at 0.01 it is **+1.3pp** — 4 of 26 repairs lost against 6 of 36 breaks prevented — and through the
+  middle band it is **negative** (−6.8pp at 0.05), because the margin withholds *repairing* packs faster than
+  breaking ones. A dose knob has selectivity 0; a gate over inert packs needs it positive by a wide margin.
+- **The net delta only turns positive by turning the memory off.** −0.34pp at 0.25 with 68% of packs withheld, and
+  +0.00pp at 0.30 with 74%.
 
 So the honest statement is not "the gate works" and not "the gate fails": it is a **cost knob with a measurable
-price** — 12.7% of the injection bill for 18% of the repairs at rung 0.01 — and whether that trade is worth taking
-is a token-price question, which is what R198's bill answers next.
+price** — 11.7% of the injection bill for 15% of the repairs at rung 0.01 — and the bill it trades against is now a
+number rather than a promise.
 
 ### Which BIRD split you measure, and why none of them is a leaderboard entry
 

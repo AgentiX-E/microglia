@@ -54,6 +54,23 @@
       "repairsPerBreak": 0.5714285714285714
     },
     {
+      "artefact": "eval/results/poc-l4-pair-r198.json",
+      "treatment": "unit=correction/form=lesson/scope=all/model=deepseek/deepseek-flash/traceClaims=6/rotation=fair-share",
+      "renders": 40,
+      "opportunity": 7,
+      "repaired": 4,
+      "broke": 3,
+      "inert": 33,
+      "measured": 40,
+      "blankRight": 33,
+      "netPp": 2.5,
+      "deltaPp": 2.5,
+      "inertShare": 0.825,
+      "engagedShare": 0.175,
+      "breakPremium": -1,
+      "repairsPerBreak": 1.3333333333333333
+    },
+    {
       "artefact": "eval/results/poc-l4-pair-swapped.json",
       "treatment": "unit=correction/form=lesson/scope=all/model=deepseek/deepseek-flash/traceClaims=6",
       "renders": 74,
@@ -117,25 +134,26 @@
     {
       "treatment": "unit=correction/form=lesson/scope=all/model=deepseek/deepseek-flash/traceClaims=6/rotation=fair-share",
       "folds": [
-        "eval/results/poc-l4-pair-r152c.json"
+        "eval/results/poc-l4-pair-r152c.json",
+        "eval/results/poc-l4-pair-r198.json"
       ],
-      "renders": 40,
-      "measured": 40,
-      "repaired": 4,
-      "broke": 7,
-      "inert": 29,
-      "opportunity": 6,
-      "inertShare": 0.725,
+      "renders": 80,
+      "measured": 80,
+      "repaired": 8,
+      "broke": 10,
+      "inert": 62,
+      "opportunity": 13,
+      "inertShare": 0.775,
       "inertInterval": [
-        0.5716504419378943,
-        0.8389198375233267
+        0.6721321021639265,
+        0.8526679265915337
       ],
-      "engagedShare": 0.275,
-      "breakPremium": 3,
-      "repairsPerBreak": 0.5714285714285714,
-      "deltaPp": -7.5,
-      "breaksToFlip": 4,
-      "breakShareToFlip": 0.5714285714285714
+      "engagedShare": 0.225,
+      "breakPremium": 2,
+      "repairsPerBreak": 0.8,
+      "deltaPp": -2.5,
+      "breaksToFlip": 3,
+      "breakShareToFlip": 0.3
     },
     {
       "treatment": "unstated",
@@ -167,26 +185,27 @@
       "eval/results/poc-l4-pair-official.json",
       "eval/results/poc-l4-pair-r152.json",
       "eval/results/poc-l4-pair-r152c.json",
+      "eval/results/poc-l4-pair-r198.json",
       "eval/results/poc-l4-pair-swapped.json",
       "eval/results/poc-l4-pair.json"
     ],
-    "renders": 251,
-    "measured": 251,
-    "repaired": 22,
-    "broke": 33,
-    "inert": 196,
-    "opportunity": 37,
-    "inertShare": 0.7808764940239044,
+    "renders": 291,
+    "measured": 291,
+    "repaired": 26,
+    "broke": 36,
+    "inert": 229,
+    "opportunity": 44,
+    "inertShare": 0.7869415807560137,
     "inertInterval": [
-      0.7256798576080821,
-      0.8276053129151619
+      0.7363153060571789,
+      0.8300907911991772
     ],
-    "engagedShare": 0.21912350597609562,
-    "breakPremium": 11,
-    "repairsPerBreak": 0.6666666666666666,
-    "deltaPp": -4.382470119521913,
-    "breaksToFlip": 12,
-    "breakShareToFlip": 0.36363636363636365,
+    "engagedShare": 0.21305841924398625,
+    "breakPremium": 10,
+    "repairsPerBreak": 0.7222222222222222,
+    "deltaPp": -3.436426116838488,
+    "breaksToFlip": 11,
+    "breakShareToFlip": 0.3055555555555556,
     "treatments": [
       "unit=correction/form=lesson/scope=all/model=deepseek/deepseek-flash/traceClaims=6",
       "unit=correction/form=lesson/scope=all/model=deepseek/deepseek-flash/traceClaims=6/rotation=fair-share",
@@ -211,6 +230,13 @@
       "memoryState": "absent",
       "controlState": "absent",
       "reason": "both arms need a census: the memory arm is 'absent' and the control is 'absent', and a token premium cannot be taken from a count"
+    },
+    "eval/results/poc-l4-pair-r198.json": {
+      "priced": true,
+      "memoryState": "census",
+      "controlState": "census",
+      "injectedTokensPerEpisode": 3299.575,
+      "inertTokensPerEpisode": 2722.1493749999995
     },
     "eval/results/poc-l4-pair-swapped.json": {
       "priced": false,

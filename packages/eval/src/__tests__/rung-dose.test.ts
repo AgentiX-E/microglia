@@ -269,7 +269,10 @@ describe('the committed corpus, priced', () => {
   }
 
   it('reads every committed fold’s ladder', () => {
-    expect(folds).toHaveLength(5);
+    // One ladder per committed fold, and the count is the corpus rather than a constant: R198's fold is the sixth,
+    // and a test that pinned five would have to be edited by every dispatch that adds one.
+    expect(folds).toHaveLength(sources.length);
+    expect(folds.length).toBeGreaterThanOrEqual(6);
   });
 
   it('reproduces the ledger at rung 0, which is the check that the two readers see one corpus', () => {

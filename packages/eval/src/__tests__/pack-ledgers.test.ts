@@ -476,12 +476,13 @@ describe('priceLines', () => {
 });
 
 /**
- * The published number, recomputed.
+ * The published numbers, recomputed — each from the folds it was published over.
  *
- * R197's cancellation quoted a pooled census of −4.64 pp over 194 pairs. That pool is the four folds paid for
- * after R152 — and it silently mixed R152c's bounded arm with three unbounded ones. This test recomputes both
- * readings from the committed artefacts: the published one to show it was arithmetically right, and the
- * five-fold one to show what including the pre-treatment artefact does to it.
+ * R197's cancellation quoted a pooled census of −4.64 pp over 194 pairs: the four folds paid for after R152, which
+ * silently mixed R152c's bounded arm with three unbounded ones. R200 then read five folds to −4.38 pp. Those two
+ * numbers are *historical* and are recomputed here from the exact files they were taken over, because a corpus that
+ * grows would otherwise rewrite the arithmetic of a published sentence and hide that it had moved. The corpus of
+ * record is the last case, and it is quoted with the count it was taken over rather than as a constant.
  */
 describe('the published τ² census, recomputed from the artefacts', () => {
   const sources = readdirSync(join(process.cwd(), 'eval/results'))
@@ -492,22 +493,55 @@ describe('the published τ² census, recomputed from the artefacts', () => {
       artefact: JSON.parse(readFileSync(join(process.cwd(), 'eval/results', name), 'utf8')) as unknown,
     }));
 
-  it('reads all five committed folds without a refusal', () => {
+  it('reads every committed fold without a refusal', () => {
     const read = packLedgersRecord(sources);
     expect(read.refusals).toEqual([]);
-    expect(read.record?.folds).toHaveLength(5);
+    // The count is the number of files the lane has committed, not a constant: a fold added without its record
+    // regenerated fails the drift test below, and a test that also pinned the count would have to be edited for
+    // every dispatch — which is how a suite starts testing its own edit history.
+    expect(read.record?.folds).toHaveLength(sources.length);
   });
 
-  it('reproduces −4.64 pp on the four post-R152 folds, and −4.38 pp on all five', () => {
-    const record = packLedgersRecord(sources).record as PackLedgersRecord;
-    const four = record.folds.filter((fold) => !fold.artefact.endsWith('/poc-l4-pair.json'));
+  it('still reproduces −4.64 pp over the four folds it was published over', () => {
+    // The exact population R197's cancellation quoted. Named rather than derived from "everything except the
+    // pre-treatment artefact", because that filter silently grew when R198's fold arrived.
+    const named = ['poc-l4-pair-official.json', 'poc-l4-pair-r152.json', 'poc-l4-pair-r152c.json', 'poc-l4-pair-swapped.json'];
+    const byPath = new Map(sources.map((source) => [source.path.split('/').pop() ?? '', source.artefact]));
+    const four = packLedgersRecord(
+      named.map((name) => ({ path: `eval/results/${name}`, artefact: byPath.get(name) as unknown })),
+    ).record?.folds;
     expect(four).toHaveLength(4);
-    const broke = four.reduce((total, fold) => total + fold.broke, 0);
-    const repaired = four.reduce((total, fold) => total + fold.repaired, 0);
-    const measured = four.reduce((total, fold) => total + fold.measured, 0);
+    const broke = (four ?? []).reduce((total, fold) => total + fold.broke, 0);
+    const repaired = (four ?? []).reduce((total, fold) => total + fold.repaired, 0);
+    const measured = (four ?? []).reduce((total, fold) => total + fold.measured, 0);
     expect(measured).toBe(194);
     expect(((repaired - broke) / measured) * 100).toBeCloseTo(-4.64, 2);
+  });
+
+  it('reproduces −4.38 pp over the five folds R200 published it on', () => {
+    // R200's headline, over the five folds that existed when it was written. Six folds now, and the last case
+    // states that reading — the published sentence keeps its own arithmetic.
+    const five = sources.filter((source) => !source.path.includes('r198'));
+    const record = packLedgersRecord(five).record as PackLedgersRecord;
+    expect(record.folds).toHaveLength(5);
     expect(record.headline.deltaPp).toBeCloseTo(-4.38, 2);
+  });
+
+  it('states the corpus of record with its own count, and the price it now carries', () => {
+    const record = packLedgersRecord(sources).record as PackLedgersRecord;
+    expect(record.folds).toHaveLength(sources.length);
+    // Six folds, 291 served packs, −3.44 pp: the number R198's fold moved, and the reason it is quoted with the
+    // count beside it rather than as a bare percentage.
+    expect(record.headline.measured).toBe(291);
+    expect(record.headline.deltaPp).toBeCloseTo(-3.44, 2);
+    expect(record.headline.inert).toBe(229);
+    // And it is the first corpus with a priced column: one fold's bill is a census on both arms, and the premium
+    // it prints is the number every cost claim in this record now has to be quoted against.
+    const prices = Object.values(record.price);
+    const priced = prices.filter((entry) => entry.priced);
+    expect(priced).toHaveLength(1);
+    expect(priced[0]).toMatchObject({ priced: true, memoryState: 'census', controlState: 'census' });
+    expect(priced[0].priced && priced[0].injectedTokensPerEpisode).toBeCloseTo(3299.6, 1);
   });
 
   it('keeps the sign under either pooling rule, which is what the conclusion rests on', () => {
