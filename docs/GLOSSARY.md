@@ -2270,3 +2270,16 @@ weekdays for the card in `cost.ts`. Weekends have no peak, which is why a Sunday
 **Window fit** — Whether a run can finish inside the current off-peak stretch, computed from an estimate of
 `26 s` an episode plus ten minutes of setup. A refusal names two hours: `peakOpensAt` (what the run would cross)
 and `windowOpensAt` (the next stretch long enough to hold it, which is what goes in `not_before`).
+
+**Rung** — one threshold of the serving policy: a pack is withheld when its top two candidates are closer than the
+rung. The set of rungs a run prices is its *ladder*, and every fold this lane has committed carries one
+(`serveSweep`), which is why a dose–response can be read from a fold that was bought for another question.
+
+**Dose–response (of a gate)** — what each rung does to the corpus: how many packs it silences, how many repairs
+survive, how many breaks it removes. It is read from a ladder rather than bought with a dispatch, because a ladder
+prices every rung against the same episodes — the one design decision that makes R201 cost nothing.
+
+**Selectivity** — `prevention − repairLoss`, with both as shares of their own corpus totals: how much more of the
+corpus's breaks a rung withholds than of its repairs. Zero is a dose knob (both removed in proportion), positive is a
+gate that selects on harm, negative is a rung that silences the packs that were *helping*. `null` on a corpus that
+repaired nothing, because a gate cannot lose repairs it never had.

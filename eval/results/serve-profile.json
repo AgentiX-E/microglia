@@ -1,6 +1,6 @@
 {
   "schema": "microglia.serve-profile/1",
-  "updatedBy": "R197",
+  "updatedBy": "R201",
   "profile": {
     "budget": null,
     "note": null,
@@ -23,7 +23,7 @@
     },
     "speakMargin": {
       "kind": "unmeasured",
-      "reason": "R123 dispatched the rung the census chose, speakMargin 0.05, and read episode rate -2.50pp [-22.50, +17.50], p = 1.0000 at n = 160: the interval cannot separate the rung from speaking always, while the rung withholds about a third of the packs. A gate that withholds a third of the renderings and cannot be told from the default does not ship, so the product speaks always and the reading stays open at the lane's own resolution."
+      "reason": "Two readings, neither of which ships. R123 dispatched the rung the census chose (0.05) and read -2.50pp [-22.50, +17.50], p = 1.0000 at n = 160: the interval cannot separate the rung from speaking always while the rung withholds about a third of the packs. R201 then priced every rung from the serveSweep ladders the committed folds already carry, over 251 trials: the lowest rung meeting the registered acceptance (0.01) keeps 18 of 22 repairs and prevents 6 of 33 breaks, which is exactly the corpus's own proportion (selectivity +0.0pp); the middle band is anti-selective (-10.6pp at 0.05, the margin silencing repairing packs faster than breaking ones); and the net delta turns positive only where more than half the packs are withheld (+0.00pp at 0.25, +0.40pp at 0.30). No rung dominates the default, so the product speaks always. What is left is a price rather than a threshold: whether the withheld share of the injection bill is worth the lost repairs, which needs R198's census."
     },
     "credit": {
       "kind": "unmeasured",

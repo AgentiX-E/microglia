@@ -3385,3 +3385,56 @@ now be *stated* by the file that wrote it instead of being inferred by the file 
 passed or failed, so the comparison is only definable once the pool is one treatment. That is the whole reason this
 round is ¥0 and one commit: it costs nothing to buy a key that can be computed, and everything downstream is a
 statement about a population that is actually one population.
+
+### 8.64 The gate's dose–response, priced from the ladders the folds already carried
+
+§8.62 ended with 78% of served packs inert and a target in episodes: 12 of 33 breaks prevented before the pooled
+delta stops being negative. The obvious mechanism is a **gate**: withhold a pack that cannot change anything and
+only the bill moves, because the verdict it did not change stays unchanged. `speakMargin` is that gate — a pack is
+served only when its top two candidates are further apart than the threshold — and R201 registered three dispatches
+(≈0%, ≈35%, ≈70% withheld) at **¥4–5** to trace the curve.
+
+**The curve was already bought.** Every fold this lane has committed carries `serveSweep`: a ladder that prices
+*every* rung against the same episodes — for each rung, how many trials still carry a pack, how many of those
+repaired, how many broke. The three margins are rows of that ladder, so `packages/eval/src/rung-dose.ts` reads a
+dose–response that cost nothing, and `pnpm eval:rung-dose` prints it:
+
+| rung | served | withheld | kept | broke | prevented | inert·served | selectivity | net |
+|---|---|---|---|---|---|---|---|---|
+| 0 | 251 | 0 | 22 | 33 | 0 | 78.1% | +0.0pp | −4.38pp |
+| 0.01 | 219 | 32 | 18 | 27 | 6 | 79.5% | +0.0pp | −3.59pp |
+| 0.05 | 183 | 68 | 13 | 23 | 10 | 80.3% | −10.6pp | −3.98pp |
+| 0.10 | 145 | 106 | 11 | 17 | 16 | 80.7% | −1.5pp | −2.39pp |
+| 0.20 | 96 | 155 | 10 | 12 | 21 | 77.1% | +9.1pp | −0.80pp |
+| 0.25 | 78 | 173 | 10 | 10 | 23 | 74.4% | +15.2pp | +0.00pp |
+| 0.30 | 61 | 190 | 9 | 8 | 25 | 72.1% | +16.7pp | +0.40pp |
+
+**Two inert columns, because one of them lies.** `inertAll` counts a withheld pack as inert — withholding cannot
+change a verdict the pack did not change — so it rises towards 1 with the rung *by construction*, and a module that
+reported only it would make any gate look like a success. `inertServed` is the ledger's reading over the packs that
+survive, and it is the one that can answer "does this rung select on inertness". It does not: 78.1% → 79.5% →
+80.3% → 80.7% before it falls, i.e. the served population gets *more* inert through the low and middle rungs.
+
+**`selectivity` is the diagnostic the acceptance needed.** `prevention − repairLoss`, both as shares of their own
+corpus totals. A dose knob removes repairs and breaks in the proportion the corpus holds them, so its selectivity is
+0. At rung 0.01 the gate is exactly that: 4 of 22 repairs lost (18.2%) against 6 of 33 breaks prevented (18.2%),
+selectivity **+0.0pp**. Through 0.05–0.10 it is **negative** — the margin withholds repairing packs *faster* than
+breaking ones — and it turns positive only where more than half the packs are withheld.
+
+**What that means for the registration.** R201's acceptance predicate ("keeps ≥4 of 22 repairs while preventing ≥4
+of 33 breaks") is **met**, at rung 0.01: 18 kept, 6 prevented. It is met by a rung that is also exactly proportional,
+which is the finding: the predicate is necessary and not sufficient, and the column that separates the two is
+`selectivity`. So the gate is not refuted and not vindicated — it is a **cost knob with a measured price**: at 0.01
+it withholds 12.7% of the packs to lose 18% of the repairs, and whether that trade is worth taking is a token-price
+question, which §8.62's empty price column answers next.
+
+**What the module refuses.** No ladder (`carries no rung rows`), no trials (`no share would have a denominator`), a
+ladder whose own arithmetic fails (`says N withheld` against `trials − served`), a repair or break on a trial that
+carried no pack (`engages N trial(s) of M served`), one fold pricing a rung twice, folds whose ladders do not cover
+the same rungs (pooling needs one ladder, not an intersection), and a curve with no rung 0 (no baseline, so every
+delta is against nothing). `selectivity` is `null` — not `−100pp` — on a corpus that repaired nothing, because a gate
+cannot be said to lose repairs it never had.
+
+**And the net delta turns positive only by turning the memory off.** +0.00pp at 0.25 with 69% of packs withheld;
++0.40pp at 0.30 with 76%. That is the arithmetic of a dose, not of a mechanism, and it is why the next round spends
+on `selectivity`, not on the sign of the sum.

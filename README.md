@@ -802,7 +802,7 @@ stops being true. `pnpm eval:coupling` recomputes it from the source tree on eve
 | `core` | 48 | 10,749 | **0** |
 | `protocol` | 3 | 1,922 | **0** |
 | `sql` (the adapter) | 7 | **1,956** | 5 |
-| `eval` | 196 | 58,901 | 25, each with a written reason |
+| `eval` | 197 | 59,341 | 25, each with a written reason |
 | `browser` | 2 | 280 | 0 |
 | `node` | 6 | 1,294 | 0 |
 
@@ -1164,6 +1164,39 @@ unchanged — and saves the injection, not a repair.
 R198's reader, so the injection price is absent by construction rather than zero. `l4-pair` now publishes each
 arm's `promptTokens` beside its `calls`, which is what the column is a difference of, so the first priced
 dispatch fills it without another code change.
+
+**The gate that follows, priced from the same artefacts rather than bought.** R200's 78% answers a natural
+question — withhold a pack that cannot change anything, and only the bill moves — and `speakMargin` is exactly that
+gate: a pack is served only when its top two candidates are further apart than a threshold. R201 was registered as
+three dispatches at ¥4–5 to trace the dose–response. It did not need them: every committed fold already carries
+`serveSweep`, a ladder pricing **every** rung against the same episodes, so the curve is a column of numbers that
+already exist. `pnpm eval:rung-dose` reads it, and the corpus says this:
+
+| rung | served | withheld | repairs kept | breaks left | breaks prevented | inert among served | selectivity | net |
+|---|---|---|---|---|---|---|---|---|
+| 0 | 251 | 0 | 22 | 33 | 0 | 78.1% | +0.0pp | −4.38pp |
+| 0.01 | 219 | 32 | 18 | 27 | 6 | 79.5% | +0.0pp | −3.59pp |
+| 0.05 | 183 | 68 | 13 | 23 | 10 | 80.3% | −10.6pp | −3.98pp |
+| 0.10 | 145 | 106 | 11 | 17 | 16 | 80.7% | −1.5pp | −2.39pp |
+| 0.20 | 96 | 155 | 10 | 12 | 21 | 77.1% | +9.1pp | −0.80pp |
+| 0.25 | 78 | 173 | 10 | 10 | 23 | 74.4% | +15.2pp | +0.00pp |
+| 0.30 | 61 | 190 | 9 | 8 | 25 | 72.1% | +16.7pp | +0.40pp |
+
+Three readings, and the middle one is why the module exists:
+
+- **It passes its own acceptance, literally.** The registered bar was "≥4 repairs kept and ≥4 breaks prevented";
+  rung 0.01 keeps 18 and prevents 6. A gate that meets the count is shippable on that count alone.
+- **And it is not selecting on inertness.** Among the packs the rung still serves, the inert share *rises* (78.1% →
+  79.5% → 80.3%), then falls only where more than half the packs are withheld. `selectivity` is the number that
+  says why: at 0.01 it is exactly 0.0pp — 4 of 22 repairs lost (18.2%) against 6 of 33 breaks prevented (18.2%) —
+  and in the middle band it is **negative**, because the margin withholds *repairing* packs faster than breaking
+  ones. A dose knob has selectivity 0; a gate over inert packs needs it positive.
+- **The net delta only turns positive by turning the memory off.** At 0.25 the corpus reads +0.00pp with 69% of
+  packs withheld, and at 0.30 +0.40pp with 76% withheld.
+
+So the honest statement is not "the gate works" and not "the gate fails": it is a **cost knob with a measurable
+price** — 12.7% of the injection bill for 18% of the repairs at rung 0.01 — and whether that trade is worth taking
+is a token-price question, which is what R198's bill answers next.
 
 ### Which BIRD split you measure, and why none of them is a leaderboard entry
 

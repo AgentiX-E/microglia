@@ -5899,3 +5899,41 @@ joined in the order above:
 ```bash
 node -e "const a=require('./eval/results/poc-l4-pair-r152c.json');console.log(a.treatment)"
 ```
+
+### 32.47 Reading the gate's dose–response: `pnpm eval:rung-dose`
+
+`speakMargin` withholds a pack when its top two candidates are too close. The obvious question is what happens at
+0.01, 0.05, 0.20 — and the answer is already in every committed fold, because each carries a `serveSweep` ladder
+pricing every rung against the same episodes. No dispatch is needed:
+
+```bash
+pnpm eval:rung-dose            # the curve, one line per rung, then the verdict
+pnpm eval:rung-dose --check    # fail when the committed record and the artefacts disagree
+```
+
+```text
+rung 0.01: 219 served, 32 withheld; 18 kept, 27 broke (6 break(s) prevented, 4 repair(s) lost);
+  inert 79.5% of served, selectivity +0.0pp, net -3.59pp
+```
+
+Four numbers on that line decide whether a rung is a mechanism or a dose:
+
+| column | what it means | what to look for |
+|---|---|---|
+| `served` / `withheld` | trials that still carry a pack, and trials the rung silenced | the price: withheld share is the share of the injection bill you save |
+| `kept` / `prevented` | repairs that survive, and breaks the rung removed | R201's bar is ≥4 of each; a rung that keeps fewer is a filter on the memory |
+| `inert … of served` | of the packs that survive, how many changed nothing | **falling** means the rung selects on inertness; rising means it does not |
+| `selectivity` | `prevention − repairLoss`, as shares of their own totals | `0` is a dose knob, positive withholds breaks first, negative withholds *repairs* first |
+
+Two traps in reading it:
+
+- **A withheld pack is inert by construction**, so the curve's *overall* inert share always rises with the rung. That
+  number is not evidence; the `of served` column is.
+- **`selectivity` is `null` on a corpus that repaired nothing**, because a gate cannot lose repairs it never had.
+  `n/a` in the line is a missing denominator, not a zero.
+
+**What the committed corpus says.** The bar is met at rung 0.01 (18 repairs kept, 6 breaks prevented), and that rung
+removes repairs and breaks in exactly the corpus's own proportion — selectivity +0.0pp, which makes it a dose knob
+with a threshold's name. Between 0.05 and 0.10 selectivity is *negative*: the margin silences repairing packs faster
+than breaking ones. The net delta only turns positive at 0.25, where 69% of packs are withheld. Read those three
+facts together and the gate is a price, not a mechanism — which is why the next question is what a token buys.

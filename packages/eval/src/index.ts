@@ -547,6 +547,23 @@ export {
 } from './pack-ledgers.js';
 
 export {
+  DEFAULT_GATES,
+  RUNG_DOSE_SCHEMA,
+  doseFoldOf,
+  dosePointLine,
+  doseResponseOf,
+  driftOfDose,
+  parseRungDose,
+  shippableLine,
+  type DoseFold,
+  type DoseGates,
+  type DoseOutcome,
+  type DosePoint,
+  type DoseResponse,
+  type RungRow,
+} from './rung-dose.js';
+
+export {
   armServeLine,
   armServeOf,
   type ArmServe,
