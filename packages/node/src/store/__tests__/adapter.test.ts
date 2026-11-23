@@ -81,6 +81,14 @@ describe('projection mapping', () => {
     expect(expired.stability).toBe(0.5);
   });
 
+  it('carries the item use count as the read count cortex ranks on', () => {
+    // `reads` is cortex's retention tie-break — "how many windows have quoted this entry" — and the item's
+    // `applied` counts the same event on this side. Resetting it to the factory's zero would tell a consumer
+    // that schedules review that a rule used six times had never been read.
+    expect(toCortexMemory(item()).reads).toBe(0);
+    expect(toCortexMemory({ ...item(), applied: 6 }).reads).toBe(6);
+  });
+
   it('projects bitemporal validity into a fact', () => {
     const fact = toCortexFact(item());
     expect(fact.validFrom).toBe(at);
@@ -193,5 +201,28 @@ describe('type compatibility', () => {
     const memory: CortexMemoryValue = toCortexMemory(item());
     expect(typeof memory.stability).toBe('number');
     expect(memory.difficulty).toBeGreaterThanOrEqual(1);
+  });
+
+  it('emits exactly the fields cortex createMemory emits', () => {
+    // The other half of this pin lives in `scripts/cortex-conformance.mjs`, which compares the projection
+    // against the real package. This one is what the local gate can hold: the field set is written down, so a
+    // field added to the adapter without a decision shows up as a failing test rather than as a lane that
+    // fails the next time somebody looks at it. `reads` is here because the lane caught it missing (AUDIT
+    // 34.206) — the copy is written against a package that is not on npm, so nothing local could have.
+    expect(Object.keys(toCortexMemory(item())).sort()).toEqual([
+      'confidence',
+      'content',
+      'createdAt',
+      'difficulty',
+      'id',
+      'lastAccessedAt',
+      'reads',
+      'source',
+      'sourceTrust',
+      'stability',
+      'tags',
+      'type',
+      'value',
+    ]);
   });
 });

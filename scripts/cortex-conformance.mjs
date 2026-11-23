@@ -63,6 +63,10 @@ const reference = cortex.createMemory({
   tags: projected.tags,
   createdAt: projected.createdAt,
   lastAccessedAt: projected.lastAccessedAt,
+  // Passed rather than left to the factory's default, so the two are built from the same input and the
+  // comparison below is between factories rather than between one factory and one default. The item carries
+  // `applied: 2`, so a projection that reset the count would disagree here instead of agreeing by accident.
+  reads: projected.reads,
 });
 
 const problems = [];
@@ -77,6 +81,9 @@ for (const key of referenceKeys) {
   if (expected !== actual) problems.push(`field ${key}: adapter ${actual} vs cortex ${expected}`);
 }
 if (projected.confidence !== item.confidence) problems.push('confidence is not carried through');
+if (projected.reads !== reference.reads) {
+  problems.push(`reads is not carried through: adapter ${String(projected.reads)} vs cortex ${String(reference.reads)}`);
+}
 if (projected.type !== 'semantic') problems.push('a constraint must project as semantic memory');
 if (projected.source !== 'microglia') problems.push('source tag is missing');
 

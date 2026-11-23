@@ -804,7 +804,7 @@ stops being true. `pnpm eval:coupling` recomputes it from the source tree on eve
 | `sql` (the adapter) | 7 | **1,956** | 5 |
 | `eval` | 198 | 59,555 | 25, each with a written reason |
 | `browser` | 2 | 280 | 0 |
-| `node` | 6 | 1,294 | 0 |
+| `node` | 6 | 1,308 | 0 |
 
 **The scenario is 2.6% of the production tree and none of it is in the library.** `core` names no
 database in code — every occurrence of `sql` in it is inside a test, where a scope string is free text —

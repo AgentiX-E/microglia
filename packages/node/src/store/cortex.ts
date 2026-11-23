@@ -45,6 +45,15 @@ export type CortexMemoryValue = {
   lastAccessedAt: number;
   stability: number;
   difficulty: number;
+  /**
+   * How many times this memory has been read back, which is cortex's retention tie-break.
+   *
+   * Added after the `cortex` lane caught its absence: cortex's `createMemory` began emitting it, the adapter's
+   * structural copy did not, and the conformance comparison refused the projection on a key set that differed by
+   * one field. The local suite could not have seen it — the copy is written against a package that is not on
+   * npm — which is what the lane is for.
+   */
+  reads: number;
 };
 
 export type CortexFact = {
@@ -107,6 +116,11 @@ export function toCortexMemory(item: KnowledgeItem, source = 'microglia'): Corte
     // not treat it as durable.
     stability: item.validUntil === Infinity ? 1 : 0.5,
     difficulty: 5,
+    // Cortex's `reads` is "how many windows have quoted this entry", the observed count its retention rank
+    // tie-breaks on. `item.applied` is the same event counted on this side — "runs in which this item was
+    // retrieved and injected" — so the projection carries the count rather than resetting it to the factory's
+    // zero: a consumer that schedules review would otherwise treat a rule used a hundred times as unread.
+    reads: item.applied,
   };
 }
 
