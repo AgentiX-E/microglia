@@ -2310,6 +2310,18 @@ records and the request and is told that `NONE` is an acceptable answer. Three o
 (served), a refusal (`NONE`, the arm's own gate) and a failure (the provider, which injects nothing rather than
 falling back to the block).
 
+**Refusal (guidance arm)** — the summariser answering `NONE`: it was shown the served records and the request, and
+judged that they do not bear on it. A refusal injects nothing, exactly as a provider failure does, so the two are
+counted apart but treated alike by every gate that asks whether a fold's served population is its injected one. The
+first fold of the transient arm refused **34 of 40** episodes, which is the same verdict R200 reached from outcomes
+(78.7% inert) and this fold's own census reached from renders (80.0%) — three instruments, one answer.
+
+**Injected population** — the episodes that actually carried a body. On every arm before R204 it coincided with
+`serveYield.renders`, so the inert identity had one denominator; on the transient arm `renders` counts the packs the
+*facade* served while the agent may have read nothing, and the two populations differ by the refusals and failures. A
+transient fold whose two populations differ cannot quote an inert share, and `pack-ledgers` refuses it rather than
+publishing one over a population the artefact does not carry.
+
 **Store growth** — the store counted before and after an evaluation phase, recorded on every arm as
 `storeGrowth: { before, after, grew }`. It exists because a mechanism whose claim is "the artefact is the defect"
 must be checkable against a file, and because an arm that writes during evaluation is a lesson arm with a step in

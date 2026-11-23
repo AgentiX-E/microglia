@@ -33,6 +33,15 @@ WORKERS = 16
 
 
 def token() -> str:
+    """The PAT, from the environment when the session carries one.
+
+    The file is where earlier rounds kept it; an environment variable is where this session is told to keep
+    it, and a second copy on disk is a second copy to forget. Environment first, file second, and nothing
+    here is ever printed.
+    """
+    from_env = os.environ.get("GH_TOKEN", "").strip()
+    if from_env:
+        return from_env
     with open("/root/.gh_pat", encoding="utf-8") as handle:
         return handle.read().strip()
 

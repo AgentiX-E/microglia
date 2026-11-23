@@ -138,9 +138,11 @@ def grade(pair: dict[str, Any]) -> tuple[str, Report]:
             return "DISCARDED", report
 
     split = pair.get("foldSplit")
+    episodes: int | None = None
     if isinstance(split, dict):
         learned = len(split.get("learned") or [])
         evaluated = len(split.get("evaluated") or [])
+        episodes = evaluated
         report.predict(
             "the halves are the benchmark's: 74 learned, 40 held out",
             learned == PREDICTED_TRAIN and evaluated == PREDICTED_TASKS,
@@ -181,19 +183,23 @@ def grade(pair: dict[str, Any]) -> tuple[str, Report]:
         calls == sentences + refusals + failures,
         f"{sentences} sentence(s) + {refusals} refusal(s) + {failures} failure(s) against {calls} call(s)",
     )
+    # The denominator is the episode, not the render: `serveYield.renders` counts the packs the facade served,
+    # and an episode that recalls twice is two renders and one guidance call. The first draft of this check
+    # compared the call count to `renders` and would have called the first healthy fold a per-turn plant — 40
+    # calls against 50 renders on a run where every call was in the right place.
     report.predict(
-        "the summariser was called once per served episode, not once per turn",
-        isinstance(renders, int) and calls == renders,
-        f"{calls} call(s) against {renders!r} rendered pack(s)",
+        "the summariser was called once per evaluated episode, not once per turn",
+        episodes is not None and calls == episodes,
+        f"{calls} call(s) against {episodes!r} evaluated episode(s), {renders!r} render(s)",
     )
-    # A call count that is not the served count is one of the four refutations: the registration bought
-    # one sentence an episode, and a plant that runs the summariser per turn has changed the mechanism it
-    # was registered to test. Guarded on `renders` being a count, so a file that omits it is unmeasured
-    # rather than abandoned.
+    # A call count that is not the episode count is one of the refutations: the registration bought one
+    # sentence an episode, and a plant that runs the summariser per turn has changed the mechanism it was
+    # registered to test. Guarded on the split being readable, so a file that omits it is unmeasured rather
+    # than abandoned.
     report.refute(
-        "the summariser ran a different number of times than there were served episodes",
-        isinstance(renders, int) and calls != renders,
-        f"{calls} call(s) against {renders} rendered pack(s)",
+        "the summariser ran a different number of times than there were episodes",
+        episodes is not None and calls != episodes,
+        f"{calls} call(s) against {episodes} evaluated episode(s)",
     )
     report.refute(
         "the pack was withheld on every request: the reading is about the prompt, not the mechanism",
@@ -234,6 +240,22 @@ def grade(pair: dict[str, Any]) -> tuple[str, Report]:
     if share is None:
         report.predict("the fold prices the inert share", None, "serveYield.inert or renders absent")
         return "NO_MEASUREMENT", report
+    # R204's own instrument finding, from the first dispatch: a request whose guidance call answered `NONE`
+    # carried no pack at all, while `serveYield.renders` counts what the facade served. A fold with refusals
+    # therefore reports a share over a population that is not the injected one — 34 of 40 episodes on this
+    # arm — and the honest state is that the artefact cannot answer, rather than that the body did nothing.
+    if refusals > 0 or failures > 0:
+        report.predict(
+            "the served population is the injected population, so the share is a statement about the body",
+            None,
+            f"{refusals} of {calls} call(s) answered NONE, {failures} failed, against {renders} render(s)",
+        )
+        report.note(
+            "the inert share is not quotable on this fold: an episode with no sentence carried no pack, and "
+            "`serveYield` counts the facade's packs rather than the bodies the agent read"
+        )
+        return ("ABANDONED" if report.refutation_fired else "NO_MEASUREMENT"), report
+
     moved_pp = (share - POOLED_INERT) * 100
     report.note(
         f"inert share {share:.1%} against the six-fold pool's {POOLED_INERT:.1%} "
@@ -254,6 +276,14 @@ def grade(pair: dict[str, Any]) -> tuple[str, Report]:
     price = injection_tokens(pair)
     if price is None:
         report.note("the pair carries no bill, so the price of this episode is unmeasured")
+    elif price < 0:
+        # No pack-serving arm can spend less than its control: a negative premium is the refusals showing up in
+        # the bill, and reading it as an efficiency is the mistake this branch exists to prevent.
+        report.predict(
+            "the arm's prompt total exceeds its control's, which is what serving a pack looks like",
+            False,
+            f"{price:,.1f} tokens an episode — the arm injected less than nothing",
+        )
     else:
         report.predict(
             f"a sentence arm costs less than the block arm's {BLOCK_INJECTED_TOKENS:,.1f} tokens an episode",
@@ -305,8 +335,8 @@ def _pair(
     body: str = "guidance",
     scope: str = "all",
     calls: int = 40,
-    sentences: int = 37,
-    refusals: int = 3,
+    sentences: int = 40,
+    refusals: int = 0,
     failures: int = 0,
     renders: int = 40,
     inert: int = 30,
@@ -348,10 +378,17 @@ CASES = [
     ("a fold that met all three readings is graded", _pair(), "GRADED"),
     ("the block arm is another arm", _pair(body="rendered"), "DISCARDED"),
     ("another store is another arm", _pair(scope="edited"), "DISCARDED"),
-    ("a provider failure abandons the reading", _pair(calls=40, sentences=35, refusals=3, failures=2), "ABANDONED"),
+    ("a provider failure abandons the reading", _pair(sentences=38, refusals=0, failures=2), "ABANDONED"),
     ("a store that grew abandons the reading", _pair(before=11, after=12), "ABANDONED"),
     ("a call per turn abandons the reading", _pair(calls=160), "ABANDONED"),
     ("a pack withheld everywhere abandons the reading", _pair(sentences=0, refusals=40, inert=40), "ABANDONED"),
+    # The reading the first dispatch produced: the mechanism ran, the store did not move, and the summariser
+    # declined on most episodes — so the share exists but is about the facade's packs, not the sentences.
+    (
+        "a fold whose summariser refused leaves the share unmeasured",
+        _pair(sentences=6, refusals=34, inert=40, renders=50, calls=40),
+        "NO_MEASUREMENT",
+    ),
     ("an inert share above the band abandons the reading", _pair(inert=38), "ABANDONED"),
     ("a bill above the block arm's abandons the reading", _pair(memory_prompt=3_200_000), "ABANDONED"),
 ]

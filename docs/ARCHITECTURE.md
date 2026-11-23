@@ -3578,3 +3578,43 @@ conformance run somebody reruns later.
 The cost of getting this wrong is not the key set. `reads` is what cortex ranks retention on, so a projection that
 dropped it would hand the substrate a store in which every entry looked equally used, and the review schedule built
 on that rank would be answering a different question than the one its author documented.
+
+### 8.68 The transient arm's first fold: the summariser declined 85% of the time, and the census was measuring the input
+
+R204's arm was dispatched on 23 Nov (run 45192820103) and came back with three readings and one instrument defect.
+The numbers are the ones the registration ordered, quoted before the delta:
+
+| reading | the fold |
+| --- | --- |
+| the call | **40 calls, 6 sentences, 34 refusals, 0 failures** — one call per evaluated episode, and the arithmetic closes |
+| the store | **73 → 73, `grew: false`** — nothing durable was written, measured on the file rather than argued from the code |
+| the served share | `serveYield` 50 renders / 6 repairs / 4 breaks / 40 inert — **80.0%**, and not about the sentences |
+| the delta (by-product) | **+5.00 pp** at p = 0.727, interval [−7.5, +17.5], against a minimum detectable 19.81 pp |
+| the price (by-product) | the memory arm spent **3,099,936** prompt tokens against the control's **3,246,017** — *less*, which is the refusals showing up in the bill |
+
+**The finding that matters is the refusal rate, because it is a second instrument agreeing with the first.** The
+summariser was shown the same block the block arm injects, and told to answer `NONE` when the records do not bear on
+the request. It answered `NONE` on **34 of 40** episodes — 85.0%. R200 measured the inert share from *outcomes* at
+78.7% over 291 served packs, and this fold's own census says 80.0%. Three numbers, one from a model reading the
+records and two from what the episodes did, agree within 6 pp. That is the strongest statement this line of work can
+make about a single-shot retail harness: the memory's records mostly do not bear on the next request, and the number
+is not an artefact of the outcome counter.
+
+**The defect: on this arm `serveYield` describes the input.** `renders` counts the packs the *facade* served; the
+agent read a sentence. When the summariser refuses, `pack_for` injects nothing and the facade's pack still counts —
+so 34 of the 40 episodes that carried no body were booked as inert, and the 80.0% share is a statement about packs
+nobody read. The ledger's gate covered the failure case (`failures > 0`) and this fold had `failures: 0` with 34
+refusals: a refusal injects nothing exactly as a failure does, and the difference is only who declined. The gate now
+refuses both. `V1-pack-not-empty` has the same shape one layer up — it reported "1.25 rules/question, 40 of 40
+requests carried an item" for a fold in which the agent read something on six.
+
+**What the arm cost, and what that means.** The guidance calls themselves are cheap: 89,951 prompt characters over 40
+episodes, ≈562 tokens an episode against R198's **3,299.6** for the block — 5.9× less, at 15% coverage. The *total*
+came in below the control because 34 episodes injected nothing; a negative premium is not an efficiency, it is the
+refusal rate in another column, and the readback reports it as a failed prediction rather than as a saving.
+
+**Why the fold is not in the pool.** `pnpm eval:pack-ledgers --check` reads every committed pair, and this one would
+be refused by the gate above — correctly, because its share cannot be quoted. The artefact therefore stays with the
+run and the numbers are recorded here; the fix is an instrument, not a threshold: the agent has to say, per request,
+whether a body was injected, and the driver has to join that flag to the ledger. Until it does, a transient fold has
+a mechanism reading and no share reading, and saying so is the difference between a measurement and a number.

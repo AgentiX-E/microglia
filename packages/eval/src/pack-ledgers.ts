@@ -201,12 +201,22 @@ export function ledgerOf(artefact: unknown, file: string): LedgerRead {
       );
     } else {
       const failures = countOf(guidanceBlock, 'failures');
+      const refusals = countOf(guidanceBlock, 'refusals');
       const calls = countOf(guidanceBlock, 'calls');
-      if (failures === undefined || calls === undefined) {
-        problems.push(`${file}: the guidance census carries no call and failure count`);
+      if (failures === undefined || refusals === undefined || calls === undefined) {
+        problems.push(`${file}: the guidance census carries no call, refusal and failure count`);
       } else if (failures > 0) {
         problems.push(
           `${file}: ${failures} of ${calls} guidance calls failed, so the rendered count is not the injected one`,
+        );
+      } else if (refusals > 0) {
+        // The first dispatch of this arm came back with `failures: 0` and `refusals: 34` of 40, and the gate as
+        // written above read that as a fold it could quote. A refusal injects nothing exactly as a failure does —
+        // the difference is who declined — so the population that carried a body is the `sentences`, and the
+        // rendered count is the facade's. 85% of that fold's share was therefore about packs nobody read.
+        problems.push(
+          `${file}: ${refusals} of ${calls} guidance call(s) answered NONE, so the rendered count is not the ` +
+            'injected one — an episode with no sentence carried no pack',
         );
       }
     }

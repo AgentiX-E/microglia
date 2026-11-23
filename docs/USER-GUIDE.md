@@ -6007,3 +6007,48 @@ means both bodies were paid for, which is a wiring defect rather than a mechanis
 **What it does not do.** It does not read the outcome and it does not decide at inference time. A critic that sees
 the sentence and the request and may still withhold it is a different, later arm; this one measures whether the body
 alone moves the share.
+
+### 32.50 Reading a transient fold: 6 sentences, 34 refusals, and a share you cannot quote
+
+The arm was dispatched once (run `45192820103`, two arms, 114 tasks, 74/40) and the way it came back is the way a
+transient fold will usually come back, so this is how to read one.
+
+```text
+[pair] serveBody guidance · guidance 40 call(s), 6 sentence(s), 34 refusal(s), 0 failure(s)
+[pair] store 73 → 73 (grew false)
+```
+
+**The call reading is per episode, not per render.** `calls` is compared to the number of evaluated tasks — 40 here —
+and not to `serveYield.renders`, which is the count of packs the *facade* served (50 on this fold, because ten
+episodes recalled twice). Comparing the two is the mistake the first version of the readback made; it would have
+called a healthy fold a per-turn plant.
+
+**The refusal rate is the interesting number, and it is not an error.** The summariser was shown the same block the
+block arm injects and told that `NONE` is an acceptable answer. It declined on **34 of 40** episodes. That is the same
+verdict R200 reached from outcomes (78.7% of served packs changed nothing) and the same one this fold's own census
+reaches (80.0% inert): the records mostly do not bear on the next request. A model saying so is independent evidence,
+and it is the first time this record has had any.
+
+**The share is unquotable, and the gate says so.** An episode with no sentence carried no pack, while `serveYield`
+counts the facade's packs — so the 80.0% is a statement about packs the agent never read. `pnpm eval:pack-ledgers`
+refuses such a fold:
+
+```text
+refused: eval/results/poc-l4-pair-…: 34 of 40 guidance call(s) answered NONE, so the rendered count is not the
+injected one — an episode with no sentence carried no pack
+```
+
+and `eval/verifiers/r204_readback.py --dir <evidence>` returns `NO_MEASUREMENT` for the same reason, with the two
+readings that *are* answerable printed above it.
+
+**The price is a symptom on this arm.** The memory arm spent **3,099,936** prompt tokens against the control's
+**3,246,017** — less, not more. No pack-serving arm can undercut its control; a negative premium is the refusal rate
+shown in tokens. What the body itself costs is the summariser's own input: 89,951 characters over 40 episodes, ≈562
+tokens an episode against R198's 3,299.6 for the block — 5.9× cheaper, at 15% coverage.
+
+**What the delta is worth.** +5.00 pp with the interval [−7.5, +17.5] against a minimum detectable 19.81 pp, and on 34
+of 40 episodes the two arms read the same thing. It is unresolvable, which the registration said before the run.
+
+**What to do with a fold like this.** Record the mechanism reading, do not quote the share, and fix the instrument
+rather than the threshold: the agent has to report, per request, whether a body was injected so the census can be
+taken over the injected population. Until it does, `store` and `call` are the readings a transient fold can support.
