@@ -2251,9 +2251,10 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     /**
      * R204: the store's size before and after this phase, which is the no-durable-write reading.
      *
-     * Counted on both arms rather than only on the transient one: a field that exists on one arm and not the
-     * other has to be explained in every readback, and "this arm wrote nothing" is a fact about the reference
-     * arm too — it is the arm that cannot write, and saying so costs one query.
+     * Only a pack-serving arm reaches this document: the reference arm opens no store at all and returns before
+     * the store exists, so a field here for it would be a measurement of nothing. The pair publishes `null` for
+     * that side, and the sentence it supports — "the control wrote nothing" — rests on the control having no
+     * store rather than on a count of zero.
      */
     readonly storeGrowth: { readonly before: number; readonly after: number; readonly grew: boolean };
     /**
@@ -3138,11 +3139,12 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // R152: what the travel budget did, beside the recall it acted on. Absent on every arm that declared no
     // rotation, so an artefact cannot mistake the identity for a policy that bound nothing.
     ...(primary.rotation === undefined ? {} : { serveRotation: primary.rotation }),
-    // R204: what the pack was made of, on every arm that serves one. Written from the switch rather than from
-    // the artefact's own reading, because a body inferred from what the prompt contained is a body nobody
-    // declared — and an arm that served a mix of block and sentence would read as whichever came last.
-    ...(MEMORY ? { serveBody: SERVE_BODY.body } : {}),
-    // The two counts the transient arm's claim is measured against, recorded on both arms (see the type).
+    // R204: what the pack was made of. Written from the switch rather than from the artefact's own reading,
+    // because a body inferred from what the prompt contained is a body nobody declared — and an arm that served a
+    // mix of block and sentence would read as whichever came last. Unconditional because only a pack-serving arm
+    // reaches this document: the reference arm returns before the store it would be describing exists.
+    serveBody: SERVE_BODY.body,
+    // The two counts the transient arm's claim is measured against (see the type's own note).
     storeGrowth: primary.storeGrowth,
     // R92: the questions the packs were ranked on. Recorded beside the store because the two are the
     // function's arguments: R91 replayed one exactly and the other moved by 13 characters a pack, and

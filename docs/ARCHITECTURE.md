@@ -3530,8 +3530,10 @@ and the pair refused the arm *after* the run. Both new fields — `serveBody` an
 them so the `carried` decision is exercised rather than written down.
 
 **Nothing durable is a measurement, not a claim.** The driver counts the store after the evaluation phase as well as
-before it, and records `storeGrowth: { before, after, grew }` on both arms. An arm whose mechanism is "the artefact
-is the defect" has to be checkable against the file rather than against the code that was supposed to leave it alone.
+before it, and records `storeGrowth: { before, after, grew }` in the arm's own document. An arm whose mechanism is
+"the artefact is the defect" has to be checkable against the file rather than against the code that was supposed to
+leave it alone. The control has no such field and no store either — it returns before the store exists — so the
+pair publishes `null` for that side, which is an absence rather than a count of zero.
 
 **The pool key sees the body.** `serveBody` is appended to `treatmentKeyOf`'s field order — after `rotation`, and
 therefore outside every key committed before it — and `treatmentOf` states it on every pair: `guidance` when the

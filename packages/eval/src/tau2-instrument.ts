@@ -357,8 +357,8 @@ export type Tau2Raw = {
    *
    * The arm's mechanism is that nothing durable is written: the sentence is used and discarded. That is a claim
    * about a file, so it is settled by counting the file on both sides of the phase rather than by reading the code
-   * that was supposed to leave it alone. Recorded on both arms — the reference arm cannot write, and saying so
-   * costs one query.
+   * that was supposed to leave it alone. Absent on the reference arm, which opens no store at all — that arm's
+   * "wrote nothing" is not a count of zero but the absence of a file.
    */
   readonly storeGrowth?: { readonly before: number; readonly after: number; readonly grew: boolean };
   /**

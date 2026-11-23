@@ -795,9 +795,11 @@ await writeJson('poc-l4-pair', {
   // this file already carries and which the registration names as a by-product.
   //
   // (1) the summariser's own account: one call per served episode, and the tokens it was shown. (2) the store,
-  // counted on both arms, so "nothing durable was written" is a measurement of a file rather than a claim about
-  // the code that was supposed to leave it alone. Both are published whether or not the arm is the transient
-  // one, so an arm that ran the block is distinguishable from an arm whose census went missing.
+  // counted on both sides of the memory arm's phase, so "nothing durable was written" is a measurement of a file
+  // rather than a claim about the code that was supposed to leave it alone. The control's entry is `null` because
+  // that arm opens no store — an absence, not a zero, and the pair says which. Both are published whether or not
+  // the arm is the transient one, so an arm that ran the block is distinguishable from one whose census went
+  // missing.
   transient: {
     serveBody: treatment.ok ? treatment.treatment.serveBody : null,
     guidance: guidanceCensusOf(second.tau2?.memory),

@@ -5991,8 +5991,10 @@ the agent and prints what it resolved before the first episode:
    `refusals`, `failures`, `promptChars` and `sentenceChars`, and the arm's `usage.calls` exceeds its control's by
    one per served episode. `refusals` is the model answering `NONE` — that is the arm's gate and not an error.
    `failures` above zero is a repair, not a result: no pack is injected when the summariser is unreachable.
-2. **The store did not grow.** `transient.store` carries `{ before, after, grew }` for both arms. An arm whose claim
-   is "nothing durable is written" is checked against the file, not against the code.
+2. **The store did not grow.** `transient.store.memory` carries `{ before, after, grew }`. `transient.store.reference`
+   is `null`, because the control arm opens no store at all — its "wrote nothing" is the absence of a file, which is a
+   different sentence from a count of zero. An arm whose claim is "nothing durable is written" is checked against the
+   file, not against the code.
 3. **The inert share moved, or it did not.** `pnpm eval:pack-ledgers` refuses a transient fold whose guidance calls
    failed, because `serveYield.renders` counts the packs the *facade* served and on this arm the agent read the
    sentence: a failed call would otherwise be booked as an inert pack, and 78.7% is the number every gate in this
