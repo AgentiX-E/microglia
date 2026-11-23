@@ -6052,3 +6052,41 @@ of 40 episodes the two arms read the same thing. It is unresolvable, which the r
 **What to do with a fold like this.** Record the mechanism reading, do not quote the share, and fix the instrument
 rather than the threshold: the agent has to report, per request, whether a body was injected so the census can be
 taken over the injected population. Until it does, `store` and `call` are the readings a transient fold can support.
+
+### 32.51 The `withheld` count, and the one number a transient fold can now quote
+
+Before R205 a transient fold's share could not be quoted at all: `serveYield.renders` counted the packs the facade
+served, and an episode whose summariser answered `NONE` carried nothing while its pack still counted. After R205 the
+join drops those episodes and says how many it dropped.
+
+```text
+[pair] serve yield: 6 render(s), 4 opportunity, 1 repaired, 1 broke, 4 inert (16.7% of renders changed nothing)
+[pair] 34 episode(s) withheld: the prompt carried no body, so their packs are inputs rather than renders
+```
+
+**Read `withheld` first.** It is the number of episodes whose prompt carried no body, so `renders` is the injected
+population and the share is a statement about the body. If the line is absent from a pair whose `serveBody` is
+`guidance`, the artefact was written before the instrument and the share is still about the facade:
+
+```text
+refused: fold.json: the fold carries no withheld count, so the renders may describe the facade rather than the
+prompts — an episode with no sentence carried no pack
+```
+
+**The census has to close before the population can be named.** `calls == sentences + refusals + failures` is the
+arm's own arithmetic and it is checked first, because a program with one integer per call cannot lose one.
+
+**Then read the share, with its interval.** Over six bodies the interval is 30–40 pp wide:
+
+```text
+[pair] inert share 83.3% [40.0%, 99.0%] over 6 render(s) against the six-fold pool's 78.7% (+4.6 pp, band ±10 pp)
+```
+
+The verdict on that line is `GRADED` and the reading is *nothing* — the interval contains the pool and everything
+above it. `eval/verifiers/r204_readback.py` refuses to fire a refutation unless the interval's **lower bound** clears
+78.7% + 10 pp, which is why a 95% share over forty renders is also graded rather than abandoned: at that sample the
+two are indistinguishable, and a point estimate is not evidence.
+
+**What a transient fold supports.** The call reading (one call an episode), the store reading (`before == after`),
+and the population reading (`withheld`). The share is supported only when the population is named *and* wide enough
+to separate — which on a 15%-coverage arm means the second dispatch, not the first.

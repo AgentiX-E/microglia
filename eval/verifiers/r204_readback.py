@@ -14,14 +14,23 @@ is not a delta. Three readings, in the order the registration ordered them:
 
 The delta is the by-product and is quoted last, against the ±11 pp a 40-task half can resolve.
 
+R205 changed the third reading's *evidence*, not its claim. The join now drops the episodes whose prompt
+carried no body and publishes how many it dropped, so the share is taken over the prompts rather than over the
+packs the facade served — and a refusal is no longer a reason to withhold the share but a reason to say how
+much of the traffic it was. Because the surviving population can be six episodes, the share is quoted with its
+own Wilson interval and the refutation requires that **interval** to clear the band: a point estimate over six
+bodies is not evidence that the body moved anything, and the number that looks like a finding is the one this
+file exists to refuse.
+
 States, the four the other verifiers use:
 
   GRADED          the artefact is this arm's, the three readings hold, and the inert share moved or did
                   not — both are graded statements about the body.
-  NO_MEASUREMENT  the artefact cannot answer: no guidance census, no store counts, no serve ledger.
+  NO_MEASUREMENT  the artefact cannot answer: no guidance census, no store counts, no serve ledger, or a
+                  share over a population nobody named.
   DISCARDED       another arm: the block body, another unit, another scope, another scenario pair.
   ABANDONED       a refutation fired: a provider failure, a store that grew, a call count that is not the
-                  served count, or a pack withheld on every request.
+                  served count, a pack withheld on every request, or an inert interval that clears the band.
 
 Usage:
   python3 eval/tools/fetch_evidence.py --repo microglia --run <run-id> --out /tmp/r204
@@ -54,6 +63,24 @@ INERT_BAND_PP = 10.0
 BLOCK_INJECTED_TOKENS = 3_299.6
 #: The resolution 40 held-out tasks support. Quoted beside the delta so the delta is not read as a result.
 RESOLUTION_PP = 11.0
+
+
+def wilson(passes: int, total: int, z: float = 1.96) -> tuple[float, float]:
+    """The Wilson score interval for one proportion, which is the only interval this file quotes.
+
+    Chosen over the normal approximation for the reason the lane is a small-sample lane: on six bodies the
+    normal interval runs below zero and above one, and a bound outside [0, 1] is not an interval a reader can
+    act on. The formula is the standard one and is the same quantity `wilsonInterval` computes on the
+    TypeScript side; it is written here rather than imported because this file is run by `python3` against a
+    fetched artefact, with no package to import from.
+    """
+    if total <= 0:
+        return (0.0, 1.0)
+    p = passes / total
+    denominator = 1 + z * z / total
+    centre = (p + z * z / (2 * total)) / denominator
+    half = (z / denominator) * ((p * (1 - p) / total + z * z / (4 * total * total)) ** 0.5)
+    return (max(0.0, centre - half), min(1.0, centre + half))
 
 
 def guidance_of(pair: dict[str, Any]) -> dict[str, Any] | None:
@@ -242,9 +269,14 @@ def grade(pair: dict[str, Any]) -> tuple[str, Report]:
         return "NO_MEASUREMENT", report
     # R204's own instrument finding, from the first dispatch: a request whose guidance call answered `NONE`
     # carried no pack at all, while `serveYield.renders` counts what the facade served. A fold with refusals
-    # therefore reports a share over a population that is not the injected one — 34 of 40 episodes on this
+    # therefore reports a share over a population that is not the injected one — 34 of 40 episodes on that
     # arm — and the honest state is that the artefact cannot answer, rather than that the body did nothing.
-    if refusals > 0 or failures > 0:
+    #
+    # R205 changed what the file can say. The join drops the episodes whose prompt carried no body and publishes
+    # the count it dropped, so the question is no longer "did the model decline" but "did the artefact name its
+    # population". A fold that carries `withheld` has answered it; one that does not is the pre-R205 shape.
+    withheld = (pair.get("serveYield") or {}).get("withheld")
+    if (refusals > 0 or failures > 0) and not isinstance(withheld, int):
         report.predict(
             "the served population is the injected population, so the share is a statement about the body",
             None,
@@ -255,21 +287,40 @@ def grade(pair: dict[str, Any]) -> tuple[str, Report]:
             "`serveYield` counts the facade's packs rather than the bodies the agent read"
         )
         return ("ABANDONED" if report.refutation_fired else "NO_MEASUREMENT"), report
+    if isinstance(withheld, int):
+        report.predict(
+            "the join names the episodes it withheld, so the renders are the prompts and not the facade's",
+            withheld >= 0,
+            f"{withheld} episode(s) withheld of {episodes!r} evaluated",
+        )
+        if withheld > 0:
+            # A reading in its own right: how much of the store's traffic the summariser declined to turn into
+            # a body. It is the same fact the refusal count carries, counted on the other side of the join.
+            report.note(
+                f"{withheld} of {episodes!r} episode(s) carried no body and are excluded from the share; "
+                f"{renders} render(s) remain"
+            )
 
     moved_pp = (share - POOLED_INERT) * 100
+    lower = wilson(inert, renders)
     report.note(
-        f"inert share {share:.1%} against the six-fold pool's {POOLED_INERT:.1%} "
-        f"({moved_pp:+.1f} pp, band ±{INERT_BAND_PP:.0f} pp)"
+        f"inert share {share:.1%} [{lower[0]:.1%}, {lower[1]:.1%}] over {renders} render(s) against the "
+        f"six-fold pool's {POOLED_INERT:.1%} ({moved_pp:+.1f} pp, band ±{INERT_BAND_PP:.0f} pp)"
     )
     report.predict(
         f"the share is within ±{INERT_BAND_PP:.0f} pp of the pool or below it",
         moved_pp <= INERT_BAND_PP,
         f"{moved_pp:+.1f} pp",
     )
+    # The refutation is on the interval, not the point: the reading this arm can produce is a share over a
+    # handful of bodies, and six of forty episodes is a population where 100% and 60% are the same observation.
+    # Requiring the interval's lower bound to clear the band says "the move is distinguishable from the pool",
+    # which is the only version of this sentence the evidence can support.
     report.refute(
         "the body moved the inert share up, so the published 59.9% does not transfer here",
-        moved_pp > INERT_BAND_PP,
-        f"{moved_pp:+.1f} pp above the pool",
+        (lower[0] - POOLED_INERT) * 100 > INERT_BAND_PP,
+        f"{share:.1%} with a lower bound of {lower[0]:.1%}, which is {(lower[0] - POOLED_INERT) * 100:+.1f} pp "
+        f"against a band of {INERT_BAND_PP:.0f} pp",
     )
 
     # ---- the by-product: price and delta, both quoted rather than concluded from ------------------
@@ -340,6 +391,7 @@ def _pair(
     failures: int = 0,
     renders: int = 40,
     inert: int = 30,
+    withheld: int | None = 0,
     before: int = 11,
     after: int = 11,
     control_prompt: int = 3_000_000,
@@ -358,7 +410,11 @@ def _pair(
         "first": {"promptTokens": control_prompt},
         "second": {"promptTokens": memory_prompt},
         "comparison": {"paired": paired, "deltaPp": delta},
-        "serveYield": {"renders": renders, "inert": inert},
+        "serveYield": {
+            "renders": renders,
+            "inert": inert,
+            **({} if withheld is None else {"withheld": withheld}),
+        },
         "transient": {
             "serveBody": body,
             "guidance": {
@@ -383,13 +439,30 @@ CASES = [
     ("a call per turn abandons the reading", _pair(calls=160), "ABANDONED"),
     ("a pack withheld everywhere abandons the reading", _pair(sentences=0, refusals=40, inert=40), "ABANDONED"),
     # The reading the first dispatch produced: the mechanism ran, the store did not move, and the summariser
-    # declined on most episodes — so the share exists but is about the facade's packs, not the sentences.
+    # declined on most episodes — so the share exists but is about the facade's packs, not the sentences. That
+    # artefact was written before the join could name its population, which is what makes it unquotable.
     (
-        "a fold whose summariser refused leaves the share unmeasured",
-        _pair(sentences=6, refusals=34, inert=40, renders=50, calls=40),
+        "a refusal fold written before the instrument leaves the share unmeasured",
+        _pair(sentences=6, refusals=34, inert=40, renders=50, calls=40, withheld=None),
         "NO_MEASUREMENT",
     ),
-    ("an inert share above the band abandons the reading", _pair(inert=38), "ABANDONED"),
+    # R205's fold: the same run, with the episodes that carried nothing counted rather than rendered. Six of
+    # forty episodes carried a sentence, six renders remain, and the share is finally about the bodies.
+    (
+        "a refusal fold whose join named its population grades its share",
+        _pair(sentences=6, refusals=34, inert=5, renders=6, withheld=34),
+        "GRADED",
+    ),
+    (
+        "and a share over six episodes can still move the wrong way",
+        _pair(sentences=6, refusals=34, inert=6, renders=6, withheld=34, memory_prompt=3_200_000),
+        "ABANDONED",
+    ),
+    # The interval, not the point. 38 of 40 is 95.0% and its lower bound is 83.6%, which does not clear the
+    # band: at forty renders the fold cannot tell a share that moved by 16 pp from one that moved by 5. Firing
+    # on the point estimate here would be the defect this round is about, one layer down.
+    ("a point estimate the interval cannot separate is not a refutation", _pair(inert=38), "GRADED"),
+    ("an inert share whose interval clears the band abandons the reading", _pair(inert=40), "ABANDONED"),
     ("a bill above the block arm's abandons the reading", _pair(memory_prompt=3_200_000), "ABANDONED"),
 ]
 

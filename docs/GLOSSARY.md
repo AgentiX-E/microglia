@@ -2316,11 +2316,17 @@ counted apart but treated alike by every gate that asks whether a fold's served 
 first fold of the transient arm refused **34 of 40** episodes, which is the same verdict R200 reached from outcomes
 (78.7% inert) and this fold's own census reached from renders (80.0%) — three instruments, one answer.
 
-**Injected population** — the episodes that actually carried a body. On every arm before R204 it coincided with
-`serveYield.renders`, so the inert identity had one denominator; on the transient arm `renders` counts the packs the
-*facade* served while the agent may have read nothing, and the two populations differ by the refusals and failures. A
-transient fold whose two populations differ cannot quote an inert share, and `pack-ledgers` refuses it rather than
-publishing one over a population the artefact does not carry.
+**Injected population** — the episodes whose prompt actually carried a body. On every arm before R204 it coincided
+with `serveYield.renders`, so the inert identity had one denominator; on the transient arm `renders` counts the packs
+the *facade* served while the agent may have read nothing. Since R205 the population is a **field**: the agent raises
+`injectedEpisodes` where the injected message is built, the join drops the episodes that carried nothing, and
+`serveYield.withheld` is the number it dropped. A transient fold with no `withheld` predates the instrument and its
+share is still about the facade, which is why `pack-ledgers` refuses it.
+
+**Withheld episode** — an episode excluded from a render census because its prompt carried no body: the summariser
+answered `NONE`, the provider failed, or the recall came back empty. Excluded rather than booked as inert, because an
+episode that read nothing cannot be evidence that reading changed nothing. On R204's fold 34 of 40 episodes were
+withheld, which is the same fact as the 85% refusal rate counted on the other side of the join.
 
 **Store growth** — the store counted before and after an evaluation phase, recorded on every arm as
 `storeGrowth: { before, after, grew }`. It exists because a mechanism whose claim is "the artefact is the defect"

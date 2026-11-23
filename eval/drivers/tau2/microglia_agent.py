@@ -149,6 +149,30 @@ _recall_repeats = 0
 # already normalised to `MAX_QUERY_CHARS`, so two boundaries of one task carry equal strings and a
 # retry is *named* by comparison rather than inferred from a count.
 _boundary_tasks: list = []
+# R205. Whether each episode's prompt carried a body, positional against `_episode_starts`.
+#
+# R204's fold reported 50 renders over 40 episodes of which six carried a sentence, and every gate that asked
+# "did serving help" read the facade's count as the injected one. The flag is set where the injected message is
+# built rather than where the pack is decided, because those are different moments: `guidance` can decline after
+# the facade served, and a retry inside one episode can speak after the first attempt was silent. Whatever the
+# cause -- a refusal, a provider error, an empty recall -- the effect is one message or none, and only the effect
+# belongs in the population a share is read over.
+_episode_injected: list = []
+
+
+def _open_episode() -> None:
+    """Record a boundary and its flag together, because the join between them is positional.
+
+    Two parallel lists are one list when they are appended at one site and a silent shift when they are
+    appended at two: an episode count and a flag count that drift apart hand every flag after the drift to
+    the wrong episode, and the share that comes out is over a population nobody chose. One function, one
+    append order, and a length the reader can assert (`injectedEpisodes` and `episodeStarts` are equal in
+    length on every artefact this module writes).
+    """
+    _episode_starts.append(_recalls)
+    # Opened as unserved: the boundary is recorded before the pack exists, and the flag is raised at the one
+    # place the prompt is actually built.
+    _episode_injected.append(False)
 # Characters of the message this agent actually injects, and of the pack the facade served. R135 measured
 # 559 tokens of system growth per call against a 725-character pack and could not say whether the other
 # ~400 tokens were the pack's carriage or material no field had ever named: the census counts every system
@@ -518,7 +542,7 @@ class MicrogliaAgent(LLMAgent):
             # inside the episode that already has a boundary. Appending on both made the list one entry per
             # request (R123: `[0..161]` over 160 episodes), which is a position, not a boundary.
             if held is _UNSET:
-                _episode_starts.append(_recalls)
+                _open_episode()
                 # The same moment as the index, from the same string the recall will send. A boundary
                 # that named its index and not its task is what made R135's 41-versus-40 a refusal.
                 _boundary_tasks.append((text or "")[:MAX_QUERY_CHARS])
@@ -572,6 +596,11 @@ class MicrogliaAgent(LLMAgent):
                 # bill, and a census that only knows the pack's length cannot see it.
                 _injected_chars += len(injected.content)
                 _injected_lengths.append(len(injected.content))
+                # R205: the episode this request belongs to carried a body. Guarded on the list being non-empty
+                # because an agent constructed and driven without a recall has no boundary to raise, and a
+                # `[-1]` on an empty list would take the episode down for the instrument's convenience.
+                if _episode_injected:
+                    _episode_injected[-1] = True
                 kept = kept + [injected]
             state.system_messages = kept
         return super().generate_next_message(message, state)
@@ -605,6 +634,12 @@ def memory_stats() -> dict:
         # *id* is not knowable on this side of the socket — the agent is never told which task it is in —
         # so the text travels and the runner resolves it against the messages it holds.
         "boundaryTexts": list(_boundary_tasks),
+        # R205: one flag per boundary, positional against `episodeStarts`, and the count that sums it. The
+        # population a served share is read over is the `True` entries -- not `recalls`, and not the number of
+        # packs the facade rendered, which on a transient arm is the count of *inputs* to a summariser that
+        # may have declined on most of them.
+        "injectedEpisodes": list(_episode_injected),
+        "episodesWithBody": sum(_episode_injected),
         # R136: the three lengths, in characters, that the system column is made of. `packChars` is what
         # the facade served, `injectedChars` is the message this agent built from it, and the census
         # carries the column the provider billed. `injectedCharsPerCall` divides by *this agent's* calls,

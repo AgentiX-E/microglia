@@ -176,16 +176,20 @@ export function ledgerOf(artefact: unknown, file: string): LedgerRead {
   }
   if (problems.length > 0) return { ok: false, artefact: file, problems };
 
-  // R204: a transient fold whose summariser failed cannot quote its served share, and this is the round that has
-  // to say so rather than the round after it.
+  // R204/R205: a transient fold can quote its served share only when its artefact names the population.
   //
-  // `serveYield.renders` counts the packs the *facade* served. On every arm before this one that was also what the
-  // agent read, so served and injected were the same population and the identity `inert = served − repaired −
-  // broke` had one denominator. On the transient arm the block is the summariser's input: an episode whose
-  // guidance call failed carried nothing at all while its block still counted as rendered, and every failure
-  // would therefore be booked as an inert pack — inflating the one number this line of work is about. The fold is
-  // refused rather than adjusted, because subtracting failures from renders would publish a share over a
-  // population no field of the artefact carries.
+  // `serveYield.renders` counts the packs the *facade* served. On every arm before R204 that was also what the
+  // agent read, so served and injected were one population and `inert = served − repaired − broke` had one
+  // denominator. On the transient arm the block is the summariser's *input*: an episode whose call answered
+  // `NONE`, failed, or had nothing to summarise carried no body while its block still counted as rendered.
+  //
+  // R204's gate inferred that from the counters and refused a fold with any refusal — correct for the artefact it
+  // had, and wrong as a rule: the counters name a cause, and the run that broke the rule declined through a path
+  // the gate did not name. R205 makes the *effect* a field. The join drops the episodes whose prompt carried
+  // nothing and publishes how many it dropped, so the gate asks the artefact a question it can answer: does
+  // `withheld` exist? A fold that carries it has said which population its renders are over; a fold that does not
+  // is the pre-R205 shape and its renders may still be the facade's. Failures remain a refusal on top of that,
+  // because an episode the provider lost is a hole in the arm's coverage rather than a population question.
   const treatmentBlock = isObject(root['treatment']) ? root['treatment'] : {};
   if (treatmentBlock['serveBody'] === 'guidance') {
     // The pair's own reading first, then the phase's: a fold read from a driver artefact carries the census under
@@ -202,21 +206,30 @@ export function ledgerOf(artefact: unknown, file: string): LedgerRead {
     } else {
       const failures = countOf(guidanceBlock, 'failures');
       const refusals = countOf(guidanceBlock, 'refusals');
+      const sentences = countOf(guidanceBlock, 'sentences');
       const calls = countOf(guidanceBlock, 'calls');
-      if (failures === undefined || refusals === undefined || calls === undefined) {
+      const yieldBlock = isObject(root['serveYield']) ? root['serveYield'] : {};
+      const withheld = countOf(yieldBlock, 'withheld');
+      if (failures === undefined || refusals === undefined || sentences === undefined || calls === undefined) {
         problems.push(`${file}: the guidance census carries no call, refusal and failure count`);
       } else if (failures > 0) {
         problems.push(
           `${file}: ${failures} of ${calls} guidance calls failed, so the rendered count is not the injected one`,
         );
-      } else if (refusals > 0) {
-        // The first dispatch of this arm came back with `failures: 0` and `refusals: 34` of 40, and the gate as
-        // written above read that as a fold it could quote. A refusal injects nothing exactly as a failure does —
-        // the difference is who declined — so the population that carried a body is the `sentences`, and the
-        // rendered count is the facade's. 85% of that fold's share was therefore about packs nobody read.
+      } else if (sentences + refusals + failures !== calls) {
+        // The arm's own arithmetic before anyone else's: three outcomes, one call each. A census that does not
+        // close cannot name the population it claims to, and the counters were written by a program that had
+        // one integer per call and could not lose one.
         problems.push(
-          `${file}: ${refusals} of ${calls} guidance call(s) answered NONE, so the rendered count is not the ` +
-            'injected one — an episode with no sentence carried no pack',
+          `${file}: the guidance census does not close — ${calls} call(s) against ${sentences} sentence(s), ` +
+            `${refusals} refusal(s) and ${failures} failure(s)`,
+        );
+      } else if (withheld === undefined) {
+        // The pre-R205 artefact. `renders` may be the facade's count, so the share it produces is over packs the
+        // agent may never have read — 44 of 50 on the fold that produced this rule.
+        problems.push(
+          `${file}: the fold carries no withheld count, so the renders may describe the facade rather than the ` +
+            'prompts — an episode with no sentence carried no pack',
         );
       }
     }

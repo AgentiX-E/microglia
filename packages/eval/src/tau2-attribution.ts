@@ -54,6 +54,19 @@ export type EpisodeOutcome = {
   readonly memory: boolean;
   readonly control: boolean;
   /**
+   * Whether this episode's prompt carried a body.
+   *
+   * R205. `serveYield` counts the packs the *facade* served and the agent may have read nothing: on R204's
+   * transient fold 50 packs were rendered over 40 episodes of which six carried a sentence, so a render census
+   * over the facade's count described the summariser's input rather than anything an agent saw. The flag is
+   * per episode and taken where the injected message is built, so a refusal, a provider error and an empty
+   * recall all end in the same state without the reader knowing which it was.
+   *
+   * Absent on every artefact written before the instrument, and absent is a third state: it means nobody asked,
+   * so the renders are published as they stand and `withheldEpisodes` is zero rather than a claim.
+   */
+  readonly injected?: boolean;
+  /**
    * The task this episode simulated, when the arm named it.
    *
    * R148. The id was in hand at every join — it is the trial row's own `id` — and it was dropped when the
@@ -112,6 +125,16 @@ export function itemTransfer(input: {
    * where the episode's outcome is still in hand.
    */
   readonly renders: readonly PricedRender[];
+  /**
+   * Episodes dropped because their prompt carried no body.
+   *
+   * R205. Zero on every arm written before the instrument and on every block arm (a block arm injects or it
+   * serves nothing, and the ledger's empty list already says which). Non-zero on a transient arm whose
+   * summariser declined: those episodes' facade packs are inputs, not renders, and a census that counted them
+   * would report the summariser's refusal rate as the store's inertness — which is the reading R204's fold
+   * produced, 44 of 50 renders describing packs nobody read.
+   */
+  readonly withheldEpisodes: number;
 } {
   // A row that is not a list of ids is a malformed ledger, not a request that served nothing. Thrown rather
   // than tolerated: a hole read as an empty pack would make the request count the table's denominator while
@@ -126,6 +149,7 @@ export function itemTransfer(input: {
   const renders: PricedRender[] = [];
   const covered = new Array<boolean>(input.ledger.length).fill(false);
   let unmatchedRequests = 0;
+  let withheldEpisodes = 0;
 
   for (let index = 0; index < ordered.length; index += 1) {
     const episode = ordered[index] as EpisodeOutcome;
@@ -171,6 +195,16 @@ export function itemTransfer(input: {
       }
     }
     if (spans.every(([from, to]) => to <= from)) continue;
+    // R205: the episode carried nothing, so its records were inputs to a summariser rather than things an
+    // agent read. Counted and dropped -- not booked as inert, which would inflate the share this line is
+    // about in the direction that looks like the mechanism working.
+    //
+    // The requests stay `covered`: they were sent and they belong to this episode, so reporting them as
+    // unmatched would attribute an instrument decision to a join that made none.
+    if (episode.injected === false) {
+      withheldEpisodes += 1;
+      continue;
+    }
     for (const id of served) {
       const tally = tallies.get(id) ?? { episodes: 0, kept: 0, broke: 0 };
       tally.episodes += 1;
@@ -207,7 +241,7 @@ export function itemTransfer(input: {
   const items = [...tallies.entries()]
     .map(([id, tally]) => ({ id, ...tally, net: tally.kept - tally.broke }))
     .sort((left, right) => (left.net === right.net ? left.id.localeCompare(right.id) : left.net - right.net));
-  return { items, unmatchedRequests, renders };
+  return { items, unmatchedRequests, renders, withheldEpisodes };
 }
 
 /**
@@ -255,6 +289,8 @@ export function pairedEpisodes(input: {
   readonly episodeStarts: readonly number[];
   /** R136: the task each boundary opened for, when the arm names them. */
   readonly boundaryTasks?: readonly (string | null)[];
+  /** R205: one flag per boundary, positional, already aligned by `injectedEpisodesOf`. */
+  readonly injectedEpisodes?: readonly boolean[];
   /** The request count the last boundary's range ends at. Absent when the caller has no ledger. */
   readonly ledgerLength?: number;
 }): readonly EpisodeOutcome[] | undefined {
@@ -291,7 +327,17 @@ export function pairedEpisodes(input: {
       if (other === null || other === undefined || row.reward === null) continue;
       const spans = group.boundaries.map((index) => boundarySpan(input.episodeStarts, index, ledgerLength));
       const startsAt = Math.min(...spans.map(([from]) => from));
-      episodes.push({ startsAt, spans, memory: row.reward === 1, control: other === 1, task: row.id });
+      // Any boundary of a repeated task injecting makes the episode served: the trial is the unit an outcome
+      // is measured on, so a body that reached one of its two attempts reached the trial.
+      const injected = input.injectedEpisodes?.some((flag, index) => group.boundaries.includes(index) && flag);
+      episodes.push({
+        startsAt,
+        spans,
+        memory: row.reward === 1,
+        control: other === 1,
+        task: row.id,
+        ...(injected === undefined ? {} : { injected }),
+      });
     }
     return episodes;
   }
@@ -304,11 +350,13 @@ export function pairedEpisodes(input: {
     // `null` is the harness declining to score, on either side, and folding it into a failure is the defect
     // `tau2-degradation` was written against.
     if (other === null || other === undefined || row.reward === null) return;
+    const injected = input.injectedEpisodes?.[index];
     episodes.push({
       startsAt: input.episodeStarts[index] as number,
       memory: row.reward === 1,
       control: other === 1,
       task: row.id,
+      ...(injected === undefined ? {} : { injected }),
     });
   });
   return episodes;
@@ -329,12 +377,16 @@ export function pairAttribution(input: {
   readonly referenceTrials?: readonly TauTrialRow[];
   /** R151: the gate's margin per request, aligned with `ledger`, for the sweep that prices a rung. */
   readonly margins?: readonly (number | null)[];
+  /** R205: one flag per boundary, positional, for the render census to read. */
+  readonly injectedEpisodes?: readonly boolean[];
 }): {
   readonly items: readonly ItemTransfer[];
   readonly unmatchedRequests: number;
   readonly renders: readonly PricedRender[];
+  readonly withheldEpisodes: number;
 } | undefined {
-  const { ledger, episodeStarts, memoryTrials, referenceTrials, boundaryTasks, margins } = input;
+  const { ledger, episodeStarts, memoryTrials, referenceTrials, boundaryTasks, margins, injectedEpisodes } =
+    input;
   if (ledger === undefined || episodeStarts === undefined || memoryTrials === undefined) return undefined;
   const episodes = pairedEpisodes({
     referenceTrials: referenceTrials ?? [],
@@ -342,6 +394,7 @@ export function pairAttribution(input: {
     episodeStarts,
     ledgerLength: ledger.length,
     ...(boundaryTasks === undefined ? {} : { boundaryTasks }),
+    ...(injectedEpisodes === undefined ? {} : { injectedEpisodes }),
   });
   if (episodes === undefined) return undefined;
   return itemTransfer({ episodes, ledger, ...(margins === undefined ? {} : { margins }) });
@@ -389,6 +442,31 @@ export function episodeStartsOf(memory: unknown): readonly number[] | undefined 
   if (!Array.isArray(raw) || raw.length === 0) return undefined;
   if (!raw.every((entry) => Number.isInteger(entry) && (entry as number) >= 0)) return undefined;
   return raw as readonly number[];
+}
+
+/**
+ * Whether each episode's prompt carried a body, from `memory.injectedEpisodes`, or `undefined` when absent.
+ *
+ * R205's half of the join. The list is positional against `episodeStarts`, so a list that is not the same
+ * length is dropped rather than used: an off-by-one hands every flag after the gap to the wrong episode and
+ * produces a share over a population nobody chose, which is exactly the class of defect the flag exists to
+ * remove. Dropping it leaves the renders as the artefact states them and `withheldEpisodes: 0`, which is the
+ * honest reading of a file that cannot be aligned.
+ *
+ * Entries are read strictly: `true` and `false` are both answers and anything else is not, because a `1` or a
+ * `"yes"` would be a producer's spelling arriving where a boolean is required, and a coercion here would
+ * decide which episodes were served on the reader's behalf.
+ */
+export function injectedEpisodesOf(
+  memory: unknown,
+  boundaries: readonly number[] | undefined,
+): readonly boolean[] | undefined {
+  if (memory === null || typeof memory !== 'object') return undefined;
+  const raw = (memory as Record<string, unknown>)['injectedEpisodes'];
+  if (!Array.isArray(raw) || raw.length === 0) return undefined;
+  if (boundaries === undefined || raw.length !== boundaries.length) return undefined;
+  if (!raw.every((entry) => typeof entry === 'boolean')) return undefined;
+  return raw as readonly boolean[];
 }
 
 /**

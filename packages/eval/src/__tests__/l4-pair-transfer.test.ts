@@ -529,6 +529,12 @@ describe('the fold a cross-fit reads off the pair', () => {
     readonly storeGrowth?: { readonly before: number; readonly after: number; readonly grew: boolean };
     /** R204: the summariser's own census, which the agent writes into the phase's diagnostics. */
     readonly guidance?: Readonly<Record<string, unknown>>;
+    /** R205: where each episode's requests begin, so the render census can be joined at all. */
+    readonly episodeStarts?: readonly number[];
+    /** R205: whether each of those episodes carried a body, positional against the boundaries. */
+    readonly injectedEpisodes?: readonly boolean[];
+    /** R205: the ids served per request, in request order. */
+    readonly ledger?: readonly (readonly string[])[];
   }): unknown {
     const base = arm({ arm: input.arm, rows: input.rows, pass4: 0.5 }) as Record<string, unknown>;
     return {
@@ -548,7 +554,19 @@ describe('the fold a cross-fit reads off the pair', () => {
         ...(input.rotation === undefined ? {} : { serveRotation: { mode: input.rotation } }),
         ...(input.serveBody === undefined ? {} : { serveBody: input.serveBody }),
         ...(input.storeGrowth === undefined ? {} : { storeGrowth: input.storeGrowth }),
-        ...(input.guidance === undefined ? {} : { memory: { guidance: input.guidance } }),
+        ...(input.guidance === undefined &&
+        input.episodeStarts === undefined &&
+        input.injectedEpisodes === undefined
+          ? {}
+          : {
+              memory: {
+                ...(input.guidance === undefined ? {} : { guidance: input.guidance }),
+                ...(input.episodeStarts === undefined ? {} : { episodeStarts: input.episodeStarts }),
+                ...(input.injectedEpisodes === undefined
+                  ? {}
+                  : { injectedEpisodes: input.injectedEpisodes }),
+              },
+            }),
         ...(input.treatment === undefined
           ? {}
           : {
@@ -557,6 +575,9 @@ describe('the fold a cross-fit reads off the pair', () => {
               ...(input.treatment.scope === undefined ? {} : { distillScope: input.treatment.scope }),
               ...(input.treatment.knobs === undefined ? {} : { pack: { summary: null, knobs: input.treatment.knobs } }),
             }),
+        // After the treatment block, because a knobs-bearing arm also writes `pack`: the ledger is the field
+        // under test here, and an arm that states both has one `pack` block rather than two.
+        ...(input.ledger === undefined ? {} : { pack: { summary: null, ledger: input.ledger } }),
       },
     };
   }
@@ -694,6 +715,62 @@ describe('the fold a cross-fit reads off the pair', () => {
     }));
     expect(treatmentKeyOf(published['treatment'])).toContain('serveBody=guidance');
     expect(treatmentKeyOf(block['treatment'])).toContain('serveBody=rendered');
+  }, 60_000);
+
+  it('reads the render census over the episodes that carried a body, and counts what it withheld', () => {
+    // R205's acceptance at the boundary the reader sees. R204's fold read 50 renders over 40 episodes of which
+    // six carried a sentence, because `serveYield` counted the packs the facade served. The flag says which
+    // episodes carried something, the join drops the rest, and the count of drops is published beside the
+    // census so a reader can see how much of the store's traffic was input rather than injection.
+    const treatment = { unit: 'correction', form: 'lesson', scope: 'edited', knobs: '' };
+    const guidance = { calls: 2, sentences: 1, refusals: 1, failures: 0 };
+    const reference = armWithSplit({
+      arm: 'reference',
+      rows: ROWS,
+      train: [],
+      test: ['airline/1', 'airline/2'],
+    });
+    const memory = armWithSplit({
+      arm: 'memory',
+      rows: ROWS,
+      train: ['retail/1'],
+      test: ['airline/1', 'airline/2'],
+      treatment,
+      serveBody: 'guidance',
+      guidance,
+      episodeStarts: [0, 1],
+      injectedEpisodes: [false, true],
+      ledger: [[], ['k_a']],
+    });
+
+    const published = publish(reference, memory);
+    const yields = published['serveYield'] as { renders: number; withheld: number; inert: number };
+    // One episode carried `k_a`, the other carried nothing: one render, and the episode that was dropped is
+    // reported rather than silently absent from a denominator.
+    expect(yields.renders).toBe(1);
+    expect(yields.withheld).toBe(1);
+    expect(yields.inert).toBe(1);
+
+    // The control: an arm whose episodes all carried something withholds nothing, so the field's zero is a
+    // reading about the arm rather than a constant the driver writes.
+    const served = publish(
+      reference,
+      armWithSplit({
+        arm: 'memory',
+        rows: ROWS,
+        train: ['retail/1'],
+        test: ['airline/1', 'airline/2'],
+        treatment,
+        serveBody: 'guidance',
+        guidance: { ...guidance, calls: 2, sentences: 2, refusals: 0 },
+        episodeStarts: [0, 1],
+        injectedEpisodes: [true, true],
+        ledger: [['k_a'], ['k_a']],
+      }),
+    );
+    const all = served['serveYield'] as { renders: number; withheld: number };
+    expect(all.renders).toBe(2);
+    expect(all.withheld).toBe(0);
   }, 60_000);
 
   it('says which arm could not state its split, because an artefact from before the field is not a leak', () => {

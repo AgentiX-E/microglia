@@ -18,6 +18,7 @@ import {
   copyLedgerOf,
   episodeStartsOf,
   namedLedgerOf,
+  injectedEpisodesOf,
   itemTransfer,
   itemTransferLine,
   pairAttribution,
@@ -302,6 +303,9 @@ describe('reading the three fields off an artefact', () => {
     expect(reading).toEqual({
       items: [{ id: 'k_1', episodes: 1, kept: 0, broke: 1, net: -1 }],
       unmatchedRequests: 0,
+      // R205: the field is present on every reading, so a zero here is "nothing was withheld" rather than
+      // "the instrument did not ask" -- the distinction the whole round turns on.
+      withheldEpisodes: 0,
       // R144: the same join also yields the render, because the yield census needs the episode's control outcome
       // and this loop is the last place it is in hand.
       renders: [{ itemId: 'k_1', controlPassed: true, memoryPassed: false, task: 'a' }],
@@ -316,7 +320,7 @@ describe('reading the three fields off an artefact', () => {
     });
     // The request is counted as unattributed rather than attributed to a loss: with no control row there is
     // no outcome to pair, and the one served request belongs to an episode that was never measured.
-    expect(reading).toEqual({ items: [], unmatchedRequests: 1, renders: [] });
+    expect(reading).toEqual({ items: [], unmatchedRequests: 1, renders: [], withheldEpisodes: 0 });
   });
 });
 
@@ -984,5 +988,103 @@ describe('the abandoned attempt', () => {
     });
     expect(split).toMatchObject({ measured: { droppedRequests: 0 } });
     expect(serveSplitLine(split)).not.toContain('abandoned');
+  });
+});
+
+describe('the population that carried a body', () => {
+  // R204's fold read its share over 50 facade renders and six sentences; the gate that should have caught it
+  // named a failed call, and this run declined through a different path with the same effect. R205 is the
+  // instrument: one flag per episode, and a render census taken over the episodes that carried something.
+  it('drops an episode that injected nothing from the renders, and counts what it dropped', () => {
+    const result = itemTransfer({
+      episodes: [
+        { startsAt: 0, memory: false, control: true, injected: false },
+        { startsAt: 1, memory: true, control: false, injected: true },
+      ],
+      ledger: [['k_a'], ['k_b']],
+    });
+    // `k_a` was in a prompt nobody read: counting it as an inert render is the 44-of-50 defect, and counting
+    // it as a break would be worse. It is neither, it is not in the population, and the count says so.
+    expect(result.renders.map((render) => render.itemId)).toEqual(['k_b']);
+    expect(result.items).toEqual([{ id: 'k_b', episodes: 1, kept: 1, broke: 0, net: 1 }]);
+    expect(result.withheldEpisodes).toBe(1);
+  });
+
+  it('withholds nothing on an arm that never states the flag', () => {
+    // Every artefact written before R205: absence is not "no body was injected", it is "nobody asked".
+    const result = itemTransfer({
+      episodes: [
+        { startsAt: 0, memory: false, control: true },
+        { startsAt: 1, memory: true, control: false },
+      ],
+      ledger: [['k_a'], ['k_b']],
+    });
+    expect(result.withheldEpisodes).toBe(0);
+    expect(result.renders).toHaveLength(2);
+    expect(result.items).toHaveLength(2);
+  });
+
+  it('marks an episode injected when any request of it carried a body', () => {
+    // A retry inside one episode: the first attempt was silent, the second spoke. The episode carried
+    // something, so its renders are real — the flag is about the episode, not about the attempt.
+    const result = itemTransfer({
+      episodes: [{ startsAt: 0, memory: true, control: false, injected: true }],
+      ledger: [['k_a'], ['k_a']],
+    });
+    expect(result.withheldEpisodes).toBe(0);
+    expect(result.items).toEqual([{ id: 'k_a', episodes: 1, kept: 1, broke: 0, net: 1 }]);
+  });
+});
+
+describe('the flag off an artefact', () => {
+  const memory = { episodeStarts: [0, 1, 2], injectedEpisodes: [true, false, true] };
+
+  it('reads one flag per boundary', () => {
+    expect(injectedEpisodesOf(memory, episodeStartsOf(memory))).toEqual([true, false, true]);
+  });
+
+  it('refuses a list that does not line up with the boundaries', () => {
+    // The join is positional: two flags for three episodes would hand every flag after the gap to the wrong
+    // episode, and the share would be over a population nobody chose. Dropped rather than shifted.
+    expect(injectedEpisodesOf({ ...memory, injectedEpisodes: [true, false] }, [0, 1, 2])).toBeUndefined();
+    expect(injectedEpisodesOf({ ...memory, injectedEpisodes: [true, 'no', true] }, [0, 1, 2])).toBeUndefined();
+    expect(injectedEpisodesOf({ episodeStarts: [0] }, [0])).toBeUndefined();
+    expect(injectedEpisodesOf(null, [0])).toBeUndefined();
+  });
+});
+
+describe('pairing carries the flag into the episode', () => {
+  const row = (id: string, trial: number, reward: number | null) => ({ id, trial, reward });
+
+  it('takes the flag from the boundary the episode opened', () => {
+    const episodes = pairedEpisodes({
+      referenceTrials: [row('a', 0, 0), row('b', 0, 0)],
+      memoryTrials: [row('a', 0, 1), row('b', 0, 1)],
+      episodeStarts: [0, 1],
+      injectedEpisodes: [false, true],
+    });
+    expect(episodes?.map((episode) => episode.injected)).toEqual([false, true]);
+  });
+
+  it('is injected when one of a repeated task\'s two boundaries injected', () => {
+    const episodes = pairedEpisodes({
+      referenceTrials: [row('a', 0, 0)],
+      memoryTrials: [row('a', 0, 1), row('a', 1, 1)],
+      episodeStarts: [0, 1],
+      boundaryTasks: ['a', 'a'],
+      injectedEpisodes: [false, true],
+      ledgerLength: 2,
+    });
+    expect(episodes).toHaveLength(1);
+    expect(episodes?.[0]?.injected).toBe(true);
+  });
+
+  it('leaves the flag absent when the artefact carries none', () => {
+    const episodes = pairedEpisodes({
+      referenceTrials: [row('a', 0, 0)],
+      memoryTrials: [row('a', 0, 1)],
+      episodeStarts: [0],
+    });
+    expect(episodes?.[0]?.injected).toBeUndefined();
   });
 });

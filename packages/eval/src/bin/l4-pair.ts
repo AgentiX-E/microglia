@@ -45,6 +45,7 @@ import {
   copyLedgerLine,
   copyLedgerOf,
   episodeStartsOf,
+  injectedEpisodesOf,
   itemTransferLine,
   pairAttribution,
   serveSplit,
@@ -524,9 +525,13 @@ process.stdout.write(`${degradationLineOf(degradation)}\n`);
  */
 function attributionOf(reference: Artefact, memory: Artefact) {
   const margins = memory.tau2?.pack?.margins?.perRequest;
+  const boundaries = episodeStartsOf(memory.tau2?.memory);
   return pairAttribution({
     ledger: memory.tau2?.pack?.ledger,
-    episodeStarts: episodeStartsOf(memory.tau2?.memory),
+    episodeStarts: boundaries,
+    // R205: whether each of those episodes carried a body. Aligned against the boundaries in the reader rather
+    // than trusted, because a list one entry short would move every flag onto its neighbour's episode.
+    injectedEpisodes: injectedEpisodesOf(memory.tau2?.memory, boundaries),
     // R136: the task each boundary opened for, when the arm names them. Absent on every artefact before the
     // instrument, which leaves the join positional and therefore refusing a 41-versus-40 pair.
     boundaryTasks: boundaryTasksOf(memory.tau2?.memory),
@@ -560,6 +565,15 @@ if (attribution !== undefined) process.stdout.write(`${itemTransferLine(attribut
 // rather than the record. Printed from the same join, at no extra cost.
 const yields = attribution === undefined ? undefined : serveYieldCensus(attribution.renders);
 if (yields !== undefined) process.stdout.write(`${serveYieldLine(yields)}\n`);
+// R205: what the census above did *not* count. A transient arm whose summariser declined serves packs the agent
+// never read, and the number of episodes that happened to is the coverage of the body itself -- printing it
+// beside the share is what keeps the share from being read as the arm's own.
+if (attribution !== undefined && attribution.withheldEpisodes > 0) {
+  process.stdout.write(
+    `[pair] ${attribution.withheldEpisodes} episode(s) withheld: the prompt carried no body, so their packs are ` +
+      'inputs rather than renders\n',
+  );
+}
 // R155: the same counts divided by the populations they came from. `yields` says four repairs and seven breaks
 // on forty trials; this says four of six failed trials repaired against seven of thirty-four passed ones
 // broken, which is the reading the delta dilutes — 86% of a retail fold is population where a memory can only
@@ -826,6 +840,9 @@ await writeJson('poc-l4-pair', {
           repairRate: yields.repairRate,
           opportunitiesForEvidence: yields.opportunitiesForEvidence,
           candidates: yields.candidates,
+          // R205: episodes dropped because their prompt carried no body. Present on every reading, so a zero
+          // is "the store injected everywhere it served" rather than "nobody asked".
+          withheld: attribution?.withheldEpisodes ?? 0,
         },
       }),
   // R155: the same counts divided by the population each came from, with the break rate at which they cancel.

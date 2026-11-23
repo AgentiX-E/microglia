@@ -403,9 +403,12 @@ def memory_stats_exposes_the_recall_count(checks):
             "calls",
             "census",
             "episodeStarts",
+            # R205: the population a share is read over, which no field before it could name.
+            "episodesWithBody",
             "injectedChars",
             "injectedCharsPerCall",
             "injectedCharsTotal",
+            "injectedEpisodes",
             "injectedMessages",
             "margin_ladder",
             "margin_p10",
@@ -675,12 +678,22 @@ def an_episode_boundary_is_recorded_where_a_join_can_use_it(checks):
     """
     agent, _, original = fresh()
     saved = list(subject._episode_starts)  # noqa: SLF001
+    # R205: the flag list is positional against the boundary list, so a case that empties one empties both --
+    # and the case's own assertions are where the pairing is checked, because a fixture that cleared one and
+    # not the other would leave every later case reading a shifted population.
+    saved_flags = list(subject._episode_injected)  # noqa: SLF001
     saved_repeats = subject._recall_repeats  # noqa: SLF001
     try:
         subject._episode_starts.clear()  # noqa: SLF001
+        subject._episode_injected.clear()  # noqa: SLF001
         state = LLMAgentState()
         state = episode_step(agent, state, "first turn")
         checks.equal(len(subject._episode_starts), 1, "one episode, one boundary")  # noqa: SLF001
+        checks.equal(
+            len(subject._episode_injected),  # noqa: SLF001
+            len(subject._episode_starts),  # noqa: SLF001
+            "and one flag, so the join between them stays positional",
+        )
         state = episode_step(agent, state, "second turn")
         checks.equal(
             len(subject._episode_starts),
@@ -717,6 +730,7 @@ def an_episode_boundary_is_recorded_where_a_join_can_use_it(checks):
         )
     finally:
         subject._episode_starts[:] = saved  # noqa: SLF001
+        subject._episode_injected[:] = saved_flags  # noqa: SLF001
         subject.recall = original
 
 
@@ -919,16 +933,26 @@ class _Reply:
         self.choices = [types.SimpleNamespace(message=message)]
 
 
-def fake_litellm(reply: str, *, raises: BaseException | None = None):
-    """A `litellm` module whose one entry point records its arguments and answers `reply`."""
+def fake_litellm(reply, *, raises: BaseException | None = None):
+    """A `litellm` module whose one entry point records its arguments and answers `reply`.
+
+    `reply` may be a list, answered in order with the last entry repeated. An arm has to be able to decline
+    once and then speak, because that is the shape R204's fold produced on 34 episodes of 40 — and the shape
+    the injected flag exists to keep out of the served population.
+    """
     calls: list[dict] = []
     module = types.ModuleType("litellm")
+
+    def answer():
+        if isinstance(reply, list):
+            return reply[min(len(calls) - 1, len(reply) - 1)]
+        return reply
 
     def completion(**kwargs):
         calls.append(kwargs)
         if raises is not None:
             raise raises
-        return _Reply(reply)
+        return _Reply(answer())
 
     module.completion = completion
     return module, calls
@@ -1154,6 +1178,82 @@ def the_census_names_three_populations(checks):
     checks.substring(stats["model"], "deepseek", "the model that wrote them is recorded beside the counts")
     checks.equal(stats["promptChars"] > 0, True, "and what it was shown is priced")
     checks.equal(stats["sentenceChars"], len("Serve this."), "beside what it wrote")
+
+
+# ----------------------------------------------------------------- R205: the injected population
+#
+# R204's fold read its share over 50 facade renders and six sentences. The gate that should have caught it
+# named the *cause* -- a failed call -- and the run declined through a different path with the same effect.
+# The instrument is therefore the effect itself: one flag per episode, set where the message is built.
+
+
+@case
+def the_population_that_carried_a_body_is_the_one_the_share_is_read_over(checks):
+    """R205. `serveYield` counts the packs the facade served; the agent may have read nothing."""
+    agent, _, original = fresh(pack="RECORDS-FROM-THE-STORE")
+    # The module's lists are the phase's, not the case's: every earlier case in this file appended to them,
+    # so the reading is the tail this case added rather than the whole list.
+    before = len(subject._episode_starts)  # noqa: SLF001
+    try:
+        with guidance_arm(["NONE", "Use the order id before quoting a refund."]) as arm:
+            first = episode_step(agent, LLMAgentState(), "refund?")
+            # τ² constructs one agent per simulation, so a second episode is a second instance: reusing this
+            # one would make the second recall a *retry* of the first episode, which is a different case.
+            second = episode_step(subject.MicrogliaAgent(), LLMAgentState(), "where is my order?")
+            # Read inside the block: the census is a function of the switch, and the switch is restored on
+            # the way out, which is how an earlier round read `guidance` after the arm had already ended.
+            stats = subject.memory_stats()
+    finally:
+        subject.recall = original
+    checks.equal(len(arm.calls), 2, "one call an episode")
+    checks.equal(stats["injectedEpisodes"][before:], [False, True], "one flag per boundary, in request order")
+    checks.equal(len(stats["episodeStarts"]) - before, 2, "positional against the boundaries the join uses")
+    checks.equal(sum(stats["injectedEpisodes"][before:]), 1, "and the count is the list's own sum")
+    checks.equal(stats["episodesWithBody"], sum(stats["injectedEpisodes"]), "which the census states once")
+    checks.equal(len(first.system_messages), 0, "the episode that declined carried nothing")
+    checks.equal(len(second.system_messages), 1, "the episode that spoke carried one message")
+
+
+@case
+def a_retry_that_finally_speaks_marks_its_episode_once(checks):
+    """One episode, two calls: the first declined, the retry spoke. The population is episodes, not calls."""
+    agent, recalls, original = fresh(pack="RECORDS-FROM-THE-STORE")
+    before = len(subject._episode_starts)  # noqa: SLF001
+    try:
+        with guidance_arm(["NONE", "Use the order id."]):
+            state = LLMAgentState()
+            state.messages.append(("user", "refund?"))
+            _, once = agent.generate_next_message(Turn("refund?"), state)
+            # The host re-asks the same turn: the state did not advance, so the pack is decided again.
+            _, twice = agent.generate_next_message(Turn("refund?"), once)
+            stats = subject.memory_stats()
+    finally:
+        subject.recall = original
+    checks.equal(len(stats["episodeStarts"]) - before, 1, "the retry opened no boundary of its own")
+    checks.equal(len(recalls), 2, "and it did re-decide the pack")
+    checks.equal(
+        stats["injectedEpisodes"][before:], [True], "while the episode counts once, and as injected"
+    )
+    checks.equal(len(once.system_messages), 0, "the attempt that declined carried nothing")
+    checks.equal(len(twice.system_messages), 1, "the retry carried the sentence")
+
+
+@case
+def a_failed_call_leaves_its_episode_out_of_the_served_population(checks):
+    """The effect, not the cause: a provider error ends with no body exactly as a refusal does."""
+    agent, _, original = fresh(pack="RECORDS-FROM-THE-STORE")
+    before = len(subject._episode_starts)  # noqa: SLF001
+    try:
+        with guidance_arm(raises=RuntimeError("provider said no")):
+            episode_step(agent, LLMAgentState(), "anything")
+            stats = subject.memory_stats()
+    finally:
+        subject.recall = original
+    checks.equal(
+        stats["injectedEpisodes"][before:], [False], "the arm served nothing, so the episode is not served"
+    )
+    checks.equal(sum(stats["injectedEpisodes"][before:]), 0, "and the count agrees with the list")
+    checks.equal(stats["guidance"]["failures"], 1, "which is the provider's, counted where it happened")
 
 
 @case

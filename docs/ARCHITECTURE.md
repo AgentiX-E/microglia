@@ -3618,3 +3618,39 @@ be refused by the gate above — correctly, because its share cannot be quoted. 
 run and the numbers are recorded here; the fix is an instrument, not a threshold: the agent has to say, per request,
 whether a body was injected, and the driver has to join that flag to the ledger. Until it does, a transient fold has
 a mechanism reading and no share reading, and saying so is the difference between a measurement and a number.
+
+### 8.69 The census measured the input, so the population became a field
+
+R204's arm ran once and produced three readings; the third was unreadable. `serveYield.renders` counts the packs
+the **facade** served, and on a transient arm the facade's pack is the summariser's *input*. Forty episodes made
+fifty renders, six of them carried a sentence, and the inert share — 80.0% — was computed over the fifty. The gate
+written the round before refused a fold whose guidance **call failed**; this fold had `failures: 0` and 34
+refusals, declined through a second path with the same effect, and passed the gate.
+
+**A gate is a statement about a population, so it has to be written from the effect.** The effect is "this episode's
+prompt carried a body or it did not", and it now travels as a field:
+
+| layer | what it records | where it is taken |
+| --- | --- | --- |
+| agent | `injectedEpisodes: boolean[]`, one per boundary, plus `episodesWithBody` | raised where the injected message is built — not where the pack is decided |
+| join | `withheldEpisodes`, excluded from `renders` and from the per-item table | `tau2-attribution.ts`, at the episode loop |
+| pair | `serveYield.withheld`, beside `renders`/`inert` | the driver, from the join's own count |
+| gate | refuses a transient fold with no `withheld`, or a census that does not close | `pack-ledgers.ts` |
+
+**Why the flag is per episode and taken at the effect.** A refusal, a provider failure and an episode whose recall
+came back empty all end with no body, and the counter that produced them cannot tell a reader which it was. A retry
+inside one episode can also speak after a silent first attempt, so the unit is the episode and the moment is the
+injection. `_open_episode()` appends the boundary and its flag at one site, because two parallel lists appended at
+two sites drift silently and a positional join then hands every flag after the gap to the wrong episode.
+
+**What the gate now asks, and why it is not a relaxation.** R204's gate inferred the population from a refusal
+count. R205's asks the artefact whether it named the population, and the answer is a field it can read: a fold with
+`withheld` has said its renders are the prompts. The failure case remains a refusal on top of that, because an
+episode the provider lost is a hole in the arm's coverage rather than a population question. A refusal fold
+**without** `withheld` is still refused, which is the shape of every artefact written before this commit.
+
+**The interval, not the point.** After the fix the surviving population can be six episodes. Six of forty is a
+population where a share of 100% and a share of 60% are the same observation, so the readback quotes a Wilson
+interval and the refutation requires the *lower bound* to clear the band: at forty renders, 95% has a lower bound of
+83.6% and cannot be told from 88.7%, and a rule that fired on the point estimate would be this round's own defect
+one layer down.

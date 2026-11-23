@@ -125,7 +125,9 @@ describe('the reader and the writer agree on the field names', () => {
   // the boundary's own text and the three lengths the system column is made of — which is the same list
   // failing in the same direction: a writer that grew fields the reader had not been told about. R137 adds
   // `packCopiesDropped`, the agent-side corroboration of the census's copy count: `calls - boundaries` when
-  // the block is injected once, and it is what a reader checks the census's mean against.
+  // the block is injected once, and it is what a reader checks the census's mean against. R205 adds the two
+  // fields of the injected population: one flag per boundary and its sum, which is what lets a share be taken
+  // over the episodes that carried a body rather than over the packs the facade served.
   it.skipIf(!available)('carries every field the speak line reads', () => {
     const stats = JSON.parse(dumped.stdout) as Record<string, unknown>;
     expect(Object.keys(stats).sort()).toEqual(
@@ -134,9 +136,11 @@ describe('the reader and the writer agree on the field names', () => {
         'calls',
         'census',
         'episodeStarts',
+        'episodesWithBody',
         'injectedChars',
         'injectedCharsPerCall',
         'injectedCharsTotal',
+        'injectedEpisodes',
         'injectedMessages',
         'margin_ladder',
         'margin_p10',
