@@ -3551,3 +3551,30 @@ of every episode as context. §8.65's 3,299.6 injected tokens an episode is ther
 to *undercut*: at a 96-token sentence over 11.2 turns the context term falls from ≈3,300 to ≈1,100, and the one-off
 summariser call adds ≈2,500 prompt tokens. A bill that rises means the arm paid for both bodies, and the body is what
 shipped.
+
+### 8.67 A structural copy drifts where nothing local can see it, so the pin has two halves
+
+The cortex adapter declares its own `CortexMemoryValue` rather than importing `@agentix-e/cortex-core`, because that
+package is not on npm. The copy is a promise, and a promise to a package nobody can install has no compiler behind it:
+`ci` cannot compare it to anything, and the adapter's own tests compare it to itself. The scheduled `cortex` lane is
+the half that can — it clones cortex, builds it, and compares the projection against the real `createMemory`, field by
+field — and on 23 Nov it went red on a key set that differed by exactly one field: cortex had begun emitting
+**`reads`**, and the copy had not.
+
+`reads` is cortex's retention tie-break, documented as "how many windows have quoted this entry" and defaulted to zero
+in the factory because "a read is an event that happens after the write". Microglia's `applied` is the same event
+counted on this side — "runs in which this item was retrieved and injected" — so the projection carries the count
+rather than resetting it: a consumer that schedules review would otherwise be told that a rule used a hundred times
+had never been read. The distinction from `value` is cortex's own and is quoted rather than re-derived: value is
+estimated future utility on a stated `[0, 1]` scale, a use count is unbounded and observed.
+
+**The pin has to be on both sides, and only one of them can be local.** The lane is the only place upstream is
+visible, so it will always be the first to know; a repository whose only check is the lane learns about drift when
+somebody looks at a scheduled job. The local half is a test that pins the projection's field set — thirteen names,
+written down — plus one that asserts the count is carried. Together they say: an upstream field arrives as a red lane
+with a named difference, and a field added *here* without a decision arrives as a failing test rather than as a
+conformance run somebody reruns later.
+
+The cost of getting this wrong is not the key set. `reads` is what cortex ranks retention on, so a projection that
+dropped it would hand the substrate a store in which every entry looked equally used, and the review schedule built
+on that rank would be answering a different question than the one its author documented.
