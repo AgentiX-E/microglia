@@ -3285,3 +3285,54 @@ arm's `pass4`, read through the same `artefactBillOf`, and the test writes one d
 the pair, and asserts the three agree — the arm's `calls`, the pair's `first.calls`, and the census both were built
 from. That is also what puts a τ² row on the accuracy-versus-cost board without a hand-joined log line: the paired
 file now carries both axes.
+
+### 8.62 Three ledgers, one identity, and the only share that replicates
+
+§8.61 priced an arm. The same artefact also answers a different question — *what did the pack do* — and it
+answers it twice, in `serveYield` (renders, opportunity, repairs, breaks, inert) and `degradation` (broke,
+repaired, blankRight, measured). Nothing compared the two, and nothing stated the relation between them:
+
+```text
+inert = renders - repaired - broke
+```
+
+A pack is inert exactly when the episode's verdict did not change, so the identity is the definition, not an
+estimate. `packages/eval/src/pack-ledgers.ts` reads it, derives `inertShare`, `engagedShare`, `breakPremium` and
+`repairsPerBreak` from it, and refuses six shapes that would make the reading a claim instead of a count:
+
+| refusal | what it catches |
+|---|---|
+| `no serveYield block` / `no degradation block` / `no comparison block` | an artefact that cannot support the reading at all |
+| `inert does not close` | the yield block's own arithmetic, so its inert count is not a count |
+| `census disagrees` | two blocks reporting different episode populations |
+| `comparison disagrees` | `lost`/`gained` from a different run than `broke`/`repaired` — the check that catches a pair assembled from two dispatches |
+| `degradation is impossible` | a repair where the control was already right, or a break where it was wrong |
+| `net does not close` | a printed percentage that is not `(repaired - broke) / measured` |
+
+**Pooling is by treatment, and that is a correction rather than a feature.** `treatment` carries `unit`, `form`,
+`scope`, `model`, `traceClaims`, `knobs` and `rotation`; the last one is a *serving* policy, and R152c declared it.
+The published τ² census of −4.64 pp over 194 pairs averaged that bounded arm with three unbounded folds. The gate
+now groups by key — no rotation declared −3.90 pp / 154 episodes, bounded −7.50 pp / 40, pre-treatment −3.51 pp / 57
+— and the
+test recomputes −4.64 pp from the four post-R152 artefacts, so the published number is shown to be arithmetically
+right *and* methodologically mixed. The conclusion survives (every key is negative, and the corpus reads −4.38 pp);
+the number does not.
+
+The key is **not total**, and that is stated rather than repaired: `rotation` is projected only when an arm declares
+one, so `poc-l4-pair-r152` carries none while its registration pins `serveRotation: fair-share` — the "no rotation"
+pool therefore contains a bounded fold. Inferring the value from the registration would make the key depend on a
+file the artefacts do not reference, so the gate quotes keys as *what the artefact declares* and R202 makes the
+field total by writing `none`.
+
+**What replicates.** The delta moves sign across folds (+2.50 … −10.81) inside ±9–11 pp intervals; the inert share
+does not (70.3% … 87.5%, corpus 78.1% [72.6, 82.8]). The reason is structural: the delta is a contrast between two
+arms and inherits both arms' noise, while the inert share is a count over episodes whose verdicts are observed.
+That is why the next mechanism is aimed at *engagement* and not at the sign of a number — and why the corpus
+arithmetic is stated in episodes: **12 of 33 breaks must be prevented (36%) before the pooled delta stops being
+negative.**
+
+**What it refuses to invent: the price.** `inertPriceOf` takes two `ArmBill`s and returns `priced: false` with the
+states named when either is not a census, when a census carries no prompt-token column, or when the subtraction
+comes out negative (one dispatch's memory arm cannot bill fewer prompt tokens than its own control). No committed
+fold carries a bill, so the record's price column is `unpriced` with the reason — and `l4-pair` now writes each
+arm's `promptTokens`, so the first priced dispatch fills it without touching this module.

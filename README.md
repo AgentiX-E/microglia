@@ -802,7 +802,7 @@ stops being true. `pnpm eval:coupling` recomputes it from the source tree on eve
 | `core` | 48 | 10,749 | **0** |
 | `protocol` | 3 | 1,922 | **0** |
 | `sql` (the adapter) | 7 | **1,956** | 5 |
-| `eval` | 195 | 58,226 | 25, each with a written reason |
+| `eval` | 196 | 58,854 | 25, each with a written reason |
 | `browser` | 2 | 280 | 0 |
 | `node` | 6 | 1,294 | 0 |
 
@@ -1101,6 +1101,68 @@ The census is read from the document at the root or under `tau2.usage`, refused 
 run — which is the acceptance test, not an intention. `l4-pair` publishes `first.calls` / `second.calls` beside
 `pass4` in one file, so the accuracy-versus-cost board no longer needs two artefacts and a hand-joined log line.
 
+### What the pack does when it is served: 78% of it is inert, and that is the number that replicates
+
+Every τ² fold carries two blocks that describe the same episodes: `serveYield` says how many packs were rendered
+and how many repaired or broke, and `degradation` says the same counts from the comparison's side. Read together
+they close an identity no document states:
+
+```text
+inert = served - repaired - broke
+```
+
+A pack is inert exactly when the episode's verdict did not change, so that is not an estimate of inertness — it
+is the definition. `pnpm eval:pack-ledgers` recomputes it from every committed pair artefact, refuses a file whose
+blocks do not close, and prints one line per fold:
+
+```text
+eval/results/poc-l4-pair-r152c.json: 40 served, 29 inert (72.5%), 4 repaired against 7 broke (0.57 repairs per
+  break), -7.50 pp
+all: 5 fold(s), 251 served, inert 78.1% [72.6, 82.8], -4.38 pp, 12 of 33 breaks must go (36%) – pooled over 3
+  treatment(s)
+```
+
+| fold | served | inert | repaired | broke | repairs per break | delta |
+|---|---|---|---|---|---|---|
+| `r152` | 40 | 35 | 3 | 2 | 1.50 | +2.50 pp |
+| `poc-l4-pair-official` | 40 | 33 | 4 | 3 | 1.33 | +2.50 pp |
+| `poc-l4-pair` (pre-R152) | 57 | 47 | 4 | 6 | 0.67 | −3.51 pp |
+| `poc-l4-pair-r152c` (bounded arm) | 40 | 29 | 4 | 7 | 0.57 | −7.50 pp |
+| `poc-l4-pair-swapped` | 74 | 52 | 7 | 15 | 0.47 | −10.81 pp |
+| **all five** | **251** | **196** | **22** | **33** | **0.67** | **−4.38 pp** |
+
+**The delta does not replicate and the inert share does.** Five folds, five splits, three treatments, and the
+delta ranges from +2.50 to −10.81 pp inside intervals ±9 to ±11 points wide. The inert share lands between 70.3%
+and 87.5% every time, and its corpus interval — [72.6, 82.8] — is narrow because it is a count of episodes rather
+than a contrast between two arms. The stable statement about this memory is therefore not "it costs accuracy"; it
+is **"most of what it serves cannot change anything, and the part that can breaks slightly more often than it
+repairs."**
+
+**The pooled number was also a mixture.** R197's cancellation quoted **−4.64 pp over 194 pairs**, which is the four
+folds paid for after R152 — and that pool silently averaged R152c's *bounded* arm (a rotation over the travel
+budget) with three that declare none. The gate now pools by treatment and reports each key separately: −3.90 pp
+over 154 episodes for the key without a rotation field, −7.50 pp for the bounded one, −3.51 pp for the artefact
+written before the treatment block existed. Every key is negative, so the conclusion survives the correction while
+the number does not — and the test recomputes −4.64 from the four artefacts to show the published figure was
+arithmetic, not invention.
+
+**And the key is not total, which is the next seam rather than a footnote.** `rotation` is recorded only when an arm
+declares one, so a fold written before the field was projected cannot be assigned: `poc-l4-pair-r152` declares no
+rotation in its artefact, while its pre-registration pins `serveRotation: fair-share`. The "no rotation" pool
+therefore contains at least one bounded fold, which makes the mixture smaller than the published one but not zero.
+R202 registers the fix — a total field, with `none` written explicitly — and until it lands the keys are quoted as
+*what the artefact declares*, never as *what ran*.
+
+**What a gate would have to buy, in episodes.** The corpus needs **12 of its 33 breaks prevented (36%)** before the
+delta stops being negative. That is the target the next registered gate is priced against, and it is a different
+target from "serve less": withholding an inert pack is free by construction — the verdict it did not change stays
+unchanged — and saves the injection, not a repair.
+
+**The price column is empty, and says why.** No committed pair artefact carries a bill: every fold predates
+R198's reader, so the injection price is absent by construction rather than zero. `l4-pair` now publishes each
+arm's `promptTokens` beside its `calls`, which is what the column is a difference of, so the first priced
+dispatch fills it without another code change.
+
 ### Which BIRD split you measure, and why none of them is a leaderboard entry
 
 Three splits, three different questions, and the lane refuses a fourth name rather than defaulting to
@@ -1163,7 +1225,7 @@ pnpm bench      # study only, writes bench/results/study.json
 ```
 
 Coverage is enforced at 95% on lines, statements, functions **and** branches. It currently reports
-**100 / 99.91 / 100 / 100** over **6,167 tests**; the branch arms that remain uncovered are
+**100 / 99.91 / 100 / 100** over **6,209 tests**; the branch arms that remain uncovered are
 listed with file, line, and reason in the internal technical design, and none is excluded with an ignore
 comment.
 

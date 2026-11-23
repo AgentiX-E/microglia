@@ -1,0 +1,505 @@
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+import {
+  PACK_LEDGERS_SCHEMA,
+  driftOf,
+  headlineLine,
+  headlineOf,
+  inertPriceOf,
+  ledgerLine,
+  ledgerOf,
+  packLedgersRecord,
+  pairBillsOf,
+  parseLedgersRecord,
+  priceLines,
+  pooledLine,
+  pooledOf,
+  priceLine,
+  treatmentKeyOf,
+  type PackLedger,
+  type PackLedgersRecord,
+} from '../pack-ledgers.js';
+import type { ArmBill } from '../arm-bill.js';
+
+const unpriced = { priced: false as const, reason: 'no bill', memoryState: 'absent' as const, controlState: 'absent' as const };
+const priced = { priced: true as const, injectedTokensPerEpisode: 10, inertTokensPerEpisode: 7.25, memoryState: 'census' as const, controlState: 'census' as const };
+
+const TREATMENT = { unit: 'correction', form: 'lesson', scope: 'all', model: 'deepseek/deepseek-flash', traceClaims: 6, knobs: '' };
+
+/** An artefact that closes: 40 served, 29 inert, 4 repaired, 7 broke, −7.5 pp. */
+function fixture(overrides: {
+  yieldBlock?: Record<string, unknown>;
+  degradation?: Record<string, unknown>;
+  comparison?: Record<string, unknown>;
+  treatment?: unknown;
+} = {}): unknown {
+  return {
+    treatment: overrides.treatment === undefined ? TREATMENT : overrides.treatment,
+    serveYield: {
+      renders: 40,
+      opportunity: 6,
+      repairs: 4,
+      breaks: 7,
+      inert: 29,
+      ...overrides.yieldBlock,
+    },
+    degradation: {
+      broke: 7,
+      repaired: 4,
+      blankRight: 34,
+      measured: 40,
+      netPp: -7.5,
+      ...overrides.degradation,
+    },
+    comparison: { paired: 40, lost: 7, gained: 4, deltaPp: -7.5, ...overrides.comparison },
+  };
+}
+
+function ledgerOfOk(artefact: unknown, file = 'fold.json'): PackLedger {
+  const read = ledgerOf(artefact, file);
+  if (!read.ok) throw new Error(`expected a ledger, got ${read.problems.join(' | ')}`);
+  return read.ledger;
+}
+
+function problemsOf(artefact: unknown): readonly string[] {
+  const read = ledgerOf(artefact, 'fold.json');
+  if (read.ok) throw new Error('expected a refusal');
+  return read.problems;
+}
+
+describe('treatmentKeyOf', () => {
+  it('names every field the pair artefact writes, in one order', () => {
+    expect(treatmentKeyOf(TREATMENT)).toBe(
+      'unit=correction/form=lesson/scope=all/model=deepseek/deepseek-flash/traceClaims=6',
+    );
+    expect(treatmentKeyOf({ ...TREATMENT, rotation: 'fair-share' })).toContain('rotation=fair-share');
+  });
+
+  it('says `unstated` rather than guessing, for a block that is absent or empty', () => {
+    expect(treatmentKeyOf(undefined)).toBe('unstated');
+    expect(treatmentKeyOf(null)).toBe('unstated');
+    expect(treatmentKeyOf({})).toBe('unstated');
+    expect(treatmentKeyOf({ unit: '', knobs: null })).toBe('unstated');
+  });
+});
+
+describe('ledgerOf', () => {
+  it('reads the identity the artefacts close, and derives the shares from it', () => {
+    const ledger = ledgerOfOk(fixture());
+    expect(ledger).toMatchObject({ renders: 40, inert: 29, repaired: 4, broke: 7, measured: 40, blankRight: 34 });
+    expect(ledger.inertShare).toBeCloseTo(0.725, 10);
+    expect(ledger.engagedShare).toBeCloseTo(0.275, 10);
+    expect(ledger.breakPremium).toBe(3);
+    expect(ledger.repairsPerBreak).toBeCloseTo(4 / 7, 10);
+    expect(ledger.treatment).toBe('unit=correction/form=lesson/scope=all/model=deepseek/deepseek-flash/traceClaims=6');
+  });
+
+  it('refuses a file that is missing one of the three blocks, and names it', () => {
+    expect(problemsOf({ serveYield: {}, degradation: {} }).join(' ')).toContain('no comparison block');
+    expect(problemsOf({ serveYield: {}, comparison: {} }).join(' ')).toContain('no degradation block');
+    expect(problemsOf({ degradation: {}, comparison: {} }).join(' ')).toContain('no serveYield block');
+    expect(problemsOf(null).join(' ')).toContain('no serveYield block');
+  });
+
+  it('refuses a field that is not a non-negative number', () => {
+    for (const bad of [{ renders: '40' }, { renders: -1 }, { renders: 4.5 }, { inert: null }]) {
+      expect(problemsOf(fixture({ yieldBlock: bad })).join(' ')).toMatch(/not a non-negative number/);
+    }
+    // Legal JSON that parses to a non-finite number: `1e999`. The percentage is not a percentage.
+    const infinite = JSON.parse(JSON.stringify(fixture()).replace('-7.5', '1e999')) as unknown;
+    expect(problemsOf(infinite).join(' ')).toContain('degradation.netPp is not a non-negative number');
+  });
+
+  it('refuses a zero denominator instead of dividing by it', () => {
+    const zero = fixture({
+      yieldBlock: { renders: 0, inert: 0, repairs: 0, breaks: 0, opportunity: 0 },
+      degradation: { broke: 0, repaired: 0, blankRight: 0, measured: 0, netPp: 0 },
+      comparison: { paired: 0, lost: 0, gained: 0, deltaPp: 0 },
+    });
+    expect(problemsOf(zero).join(' ')).toContain('measured is zero');
+  });
+
+  it('refuses a degradation that is arithmetically impossible', () => {
+    const impossible = fixture({ degradation: { repaired: 7, blankRight: 34, netPp: -7.5 } });
+    expect(problemsOf(impossible).join(' ')).toContain('degradation is impossible');
+    const breakOutside = fixture({ degradation: { broke: 35, blankRight: 34 } });
+    expect(problemsOf(breakOutside).join(' ')).toContain('degradation is impossible');
+  });
+
+  it('refuses two blocks that describe different episodes', () => {
+    expect(problemsOf(fixture({ yieldBlock: { breaks: 6 } })).join(' ')).toContain('census disagrees');
+    expect(problemsOf(fixture({ comparison: { lost: 6 } })).join(' ')).toContain('comparison disagrees');
+  });
+
+  it('refuses an inert count that does not close on served minus engaged', () => {
+    expect(problemsOf(fixture({ yieldBlock: { inert: 30 } })).join(' ')).toContain('inert does not close');
+  });
+
+  it('refuses a percentage that is not the ledger’s own fraction', () => {
+    expect(problemsOf(fixture({ degradation: { netPp: -7.4 } })).join(' ')).toContain('net does not close');
+    expect(problemsOf(fixture({ comparison: { deltaPp: -8 } })).join(' ')).toContain('net does not close');
+  });
+
+  it('carries `null` rather than zero when nothing broke', () => {
+    const clean = fixture({
+      yieldBlock: { repairs: 2, breaks: 0, inert: 38 },
+      degradation: { broke: 0, repaired: 2, netPp: 5 },
+      comparison: { lost: 0, gained: 2, deltaPp: 5 },
+    });
+    const ledger = ledgerOfOk(clean);
+    expect(ledger.repairsPerBreak).toBeNull();
+    expect(ledger.breakPremium).toBe(-2);
+  });
+});
+
+function fold(artefact: string, overrides: Partial<PackLedger> = {}): PackLedger {
+  return {
+    artefact,
+    treatment: 'one',
+    renders: 10,
+    opportunity: 2,
+    repaired: 2,
+    broke: 3,
+    inert: 5,
+    measured: 10,
+    blankRight: 7,
+    netPp: -10,
+    deltaPp: -10,
+    inertShare: 0.5,
+    engagedShare: 0.5,
+    breakPremium: 1,
+    repairsPerBreak: 2 / 3,
+    ...overrides,
+  };
+}
+
+describe('pooledOf', () => {
+  it('pools only folds that share a treatment, in first-seen order', () => {
+    const pools = pooledOf([
+      fold('a', { treatment: 'one' }),
+      fold('b', { treatment: 'two', broke: 0, repaired: 0, inert: 10, netPp: 0, deltaPp: 0, breakPremium: 0, repairsPerBreak: null }),
+      fold('c', { treatment: 'one' }),
+    ]);
+    expect(pools.map((pool) => pool.treatment)).toEqual(['one', 'two']);
+    expect(pools[0]?.folds).toEqual(['a', 'c']);
+    expect(pools[0]?.renders).toBe(20);
+    expect(pools[0]?.inert).toBe(10);
+    expect(pools[0]?.deltaPp).toBeCloseTo(-10, 10);
+  });
+
+  it('says how many breaks a gate would have to prevent, and gives no rate when nothing broke', () => {
+    const [negative] = pooledOf([fold('a', { broke: 3, repaired: 2 })]);
+    expect(negative?.breaksToFlip).toBe(2);
+    expect(negative?.breakShareToFlip).toBeCloseTo(2 / 3, 10);
+    const [positive] = pooledOf([fold('a', { broke: 1, repaired: 3, breakPremium: -2 })]);
+    expect(positive?.breaksToFlip).toBe(0);
+    expect(positive?.breakShareToFlip).toBeNull();
+    const [silent] = pooledOf([fold('a', { broke: 0, repaired: 0, breakPremium: 0, repairsPerBreak: null })]);
+    expect(silent?.breaksToFlip).toBe(1);
+    expect(silent?.breakShareToFlip).toBeNull();
+  });
+
+  it('carries a Wilson interval on the inert share rather than a point', () => {
+    const [pool] = pooledOf([fold('a', { renders: 40, inert: 29, repaired: 4, broke: 7, measured: 40 })]);
+    expect(pool?.inertShare).toBeCloseTo(0.725, 10);
+    expect(pool?.inertInterval[0]).toBeLessThan(0.725);
+    expect(pool?.inertInterval[1]).toBeGreaterThan(0.725);
+    expect(pool?.inertInterval[0]).toBeGreaterThan(0.5);
+  });
+});
+
+describe('headlineOf', () => {
+  it('pools across treatments and names them', () => {
+    const headline = headlineOf([fold('a', { treatment: 'one' }), fold('b', { treatment: 'two' })]);
+    expect(headline.treatments).toEqual(['one', 'two']);
+    expect(headline.renders).toBe(20);
+  });
+
+  it('deduplicates the keys it mixed', () => {
+    expect(headlineOf([fold('a', { treatment: 'one' }), fold('b', { treatment: 'one' })]).treatments).toEqual(['one']);
+  });
+
+  it('refuses an empty corpus rather than printing 0% inert', () => {
+    expect(() => headlineOf([])).toThrow(/at least one fold/);
+  });
+});
+
+function census(calls: number, promptTokens?: number): ArmBill {
+  return {
+    calls,
+    source: 'census',
+    ...(promptTokens === undefined ? {} : { promptTokens, completionTokens: 10 }),
+  };
+}
+
+describe('inertPriceOf', () => {
+  const ledger = { measured: 40, inertShare: 0.725 };
+
+  it('prices the inert share as the difference between two censuses', () => {
+    const price = inertPriceOf(ledger, { memory: census(12, 1000), control: census(10, 600) });
+    expect(price.priced).toBe(true);
+    if (!price.priced) return;
+    expect(price.injectedTokensPerEpisode).toBeCloseTo(10, 10);
+    expect(price.inertTokensPerEpisode).toBeCloseTo(7.25, 10);
+  });
+
+  it('refuses to price a count, or a census with no token column', () => {
+    const counted = inertPriceOf(ledger, {
+      memory: { calls: 12, source: 'count' },
+      control: census(10, 600),
+    });
+    expect(counted.priced).toBe(false);
+    expect(counted.memoryState).toBe('count');
+    if (!counted.priced) expect(counted.reason).toContain("both arms need a census");
+
+    const noTokens = inertPriceOf(ledger, { memory: census(12), control: census(10) });
+    expect(noTokens.priced).toBe(false);
+    if (!noTokens.priced) expect(noTokens.reason).toContain('prompt-token column');
+  });
+
+  it('refuses a negative premium rather than charting it', () => {
+    const backwards = inertPriceOf(ledger, { memory: census(12, 600), control: census(10, 1000) });
+    expect(backwards.priced).toBe(false);
+    if (!backwards.priced) expect(backwards.reason).toContain('fewer prompt tokens');
+  });
+});
+
+describe('the lines a reader sees', () => {
+  it('renders a fold with and without a break to divide by', () => {
+    expect(ledgerLine(fold('a'))).toBe(
+      'a: 10 served, 5 inert (50.0%), 2 repaired against 3 broke (0.67 repairs per break), -10.00 pp',
+    );
+    expect(ledgerLine(fold('b', { broke: 0, repaired: 0, repairsPerBreak: null, breakPremium: 0, deltaPp: 0 }))).toContain(
+      'no break to divide by',
+    );
+  });
+
+  it('renders a pool with the break count a gate must buy, or says it is already positive', () => {
+    const [negative] = pooledOf([fold('a', { broke: 3, repaired: 2 })]);
+    expect(pooledLine(negative as PackLedger & never)).toContain('2 of 3 breaks must go (67%)');
+    const [positive] = pooledOf([fold('a', { broke: 1, repaired: 3 })]);
+    expect(pooledLine(positive as PackLedger & never)).toContain('already positive');
+  });
+
+  it('renders a pool with breaks but no rate as zero-percent, rather than dropping the clause', () => {
+    const [silent] = pooledOf([fold('a', { broke: 0, repaired: 0, breakPremium: 0, repairsPerBreak: null })]);
+    expect(pooledLine(silent as PackLedger & never)).toContain('1 of 0 breaks must go (0%)');
+  });
+
+  it('names what the headline mixed', () => {
+    expect(headlineLine(headlineOf([fold('a'), fold('b')]))).toContain('pooled over 1 treatment(s)');
+  });
+
+  it('renders the price in both states', () => {
+    expect(priceLine(inertPriceOf({ measured: 40, inertShare: 0.725 }, { memory: census(12, 1000), control: census(10, 600) }))).toBe(
+      'inert price: 10.0 injected prompt tokens an episode, of which 7.3 bought nothing',
+    );
+    expect(priceLine(inertPriceOf({ measured: 40, inertShare: 0.725 }, { memory: { calls: 1, source: 'absent' }, control: census(10, 600) }))).toContain(
+      'unpriced',
+    );
+  });
+});
+
+describe('the record', () => {
+  it('refuses the whole record when one fold cannot be read', () => {
+    const { record, refusals } = packLedgersRecord([
+      { path: 'good.json', artefact: fixture() },
+      { path: 'bad.json', artefact: { serveYield: {} } },
+    ]);
+    expect(record).toBeUndefined();
+    expect(refusals.join(' ')).toContain('bad.json: no degradation block');
+  });
+
+  it('writes the reason a fold is unpriced rather than pricing it at zero', () => {
+    const { record } = packLedgersRecord([{ path: 'good.json', artefact: fixture() }]);
+    expect(record?.schema).toBe(PACK_LEDGERS_SCHEMA);
+    const entry = record?.price['good.json'];
+    expect(entry?.priced).toBe(false);
+    if (entry !== undefined && !entry.priced) expect(entry.reason).toContain('no arm blocks');
+  });
+
+  it('prices a fold from its own pair blocks, and only that fold', () => {
+    const priced = {
+      ...(fixture() as Record<string, unknown>),
+      first: { calls: 10, bill: 'census', promptTokens: 600 },
+      second: { calls: 12, bill: 'census', promptTokens: 1000 },
+    };
+    const { record } = packLedgersRecord([
+      { path: 'priced.json', artefact: priced },
+      { path: 'bare.json', artefact: fixture() },
+    ]);
+    expect(record?.price['priced.json']?.priced).toBe(true);
+    expect(record?.price['bare.json']?.priced).toBe(false);
+  });
+});
+
+describe('parseLedgersRecord', () => {
+  const sound = packLedgersRecord([{ path: 'good.json', artefact: fixture() }]).record as PackLedgersRecord;
+
+  it('round-trips the record the writer produces', () => {
+    const parsed = parseLedgersRecord(JSON.parse(JSON.stringify(sound)));
+    expect(parsed.refusals).toEqual([]);
+    expect(parsed.record?.folds[0]?.artefact).toBe('good.json');
+  });
+
+  it('refuses every shape that would let a stale file pass', () => {
+    expect(parseLedgersRecord('nope').refusals[0]).toContain('not an object');
+    expect(parseLedgersRecord({ ...sound, schema: 'other' }).refusals[0]).toContain('schema must be');
+    expect(parseLedgersRecord({ ...sound, folds: [{ artefact: 'x' }] }).refusals).toContain('folds must be an array of ledgers');
+    expect(parseLedgersRecord({ ...sound, pooled: [{}] }).refusals).toContain('pooled must be an array of pools');
+    expect(parseLedgersRecord({ ...sound, headline: {} }).refusals).toContain('headline must be a pool carrying its treatments');
+    expect(parseLedgersRecord({ ...sound, price: { 'x.json': { reason: 'no flag' } } }).refusals).toContain(
+      'price must map each fold to an entry carrying a `priced` flag',
+    );
+    expect(parseLedgersRecord({ ...sound, price: [] }).refusals).toContain(
+      'price must map each fold to an entry carrying a `priced` flag',
+    );
+    // Structural checks inside the two element guards: a fold that is not an object, one with a numeric
+    // treatment, a pool with no interval and one whose interval is not a pair.
+    expect(parseLedgersRecord({ ...sound, folds: [null] }).refusals).toContain('folds must be an array of ledgers');
+    expect(
+      parseLedgersRecord({ ...sound, folds: [{ ...(sound.folds[0] as PackLedger), treatment: 7 }] }).refusals,
+    ).toContain('folds must be an array of ledgers');
+    const noInterval = { treatment: 'one', folds: ['a'], renders: 1, measured: 1, repaired: 0, broke: 0, inert: 1, inertShare: 1, deltaPp: 0, breaksToFlip: 1 };
+    expect(parseLedgersRecord({ ...sound, pooled: [noInterval] }).refusals).toContain('pooled must be an array of pools');
+    expect(parseLedgersRecord({ ...sound, pooled: [{ ...noInterval, inertInterval: [0, 1, 2] }] }).refusals).toContain(
+      'pooled must be an array of pools',
+    );
+    expect(parseLedgersRecord({ ...sound, pooled: [{ ...noInterval, inertInterval: [0, 1] }] }).refusals).toEqual([]);
+    expect(parseLedgersRecord({ ...sound, pooled: [{ ...noInterval, inertInterval: [0, 1], renders: 'ten' }] }).refusals).toContain(
+      'pooled must be an array of pools',
+    );
+    expect(parseLedgersRecord({ ...sound, pooled: [{ ...noInterval, folds: 'nope' }] }).refusals).toContain(
+      'pooled must be an array of pools',
+    );
+    expect(parseLedgersRecord({ ...sound, pooled: [null] }).refusals).toContain('pooled must be an array of pools');
+  });
+});
+
+describe('driftOf', () => {
+  const sound = packLedgersRecord([{ path: 'good.json', artefact: fixture() }]).record as PackLedgersRecord;
+
+  it('is silent when the record and the artefacts agree', () => {
+    expect(driftOf(sound, JSON.parse(JSON.stringify(sound)))).toEqual([]);
+  });
+
+  it('names each way the evidence can move', () => {
+    const moved = JSON.parse(JSON.stringify(sound)) as PackLedgersRecord;
+    const first = moved.folds[0] as unknown as Record<string, unknown>;
+    first['inert'] = 30;
+    expect(driftOf(moved, sound).join(' ')).toContain('the committed ledger has drifted');
+
+    const missing = JSON.parse(JSON.stringify(sound)) as PackLedgersRecord;
+    expect(driftOf({ ...missing, folds: [] }, sound).join(' ')).toContain('absent from the committed record');
+
+    const extra = JSON.parse(JSON.stringify(sound)) as PackLedgersRecord;
+    extra.folds.push({ ...(extra.folds[0] as PackLedger), artefact: 'gone.json' });
+    expect(driftOf(extra, sound).join(' ')).toContain('no longer carry');
+
+    const pooledMoved = JSON.parse(JSON.stringify(sound)) as PackLedgersRecord;
+    (pooledMoved.pooled[0] as unknown as Record<string, unknown>)['renders'] = 41;
+    expect(driftOf(pooledMoved, sound).join(' ')).toContain('pools have drifted');
+
+    const headlineMoved = JSON.parse(JSON.stringify(sound)) as PackLedgersRecord;
+    (headlineMoved.headline as unknown as Record<string, unknown>)['renders'] = 41;
+    expect(driftOf(headlineMoved, sound).join(' ')).toContain('corpus reading has drifted');
+
+    const priceMoved = JSON.parse(JSON.stringify(sound)) as PackLedgersRecord;
+    (priceMoved.price['good.json'] as unknown as Record<string, unknown>)['reason'] = 'something else entirely';
+    expect(driftOf(priceMoved, sound).join(' ')).toContain('price column has drifted');
+  });
+});
+
+describe('pairBillsOf', () => {
+  it('reads the control from `first` and the memory arm from `second`, tokens included', () => {
+    const bills = pairBillsOf({
+      first: { calls: 10, bill: 'census', promptTokens: 600, uncachedTokens: 40 },
+      second: { calls: 12, bill: 'census', promptTokens: 1000 },
+    });
+    expect(bills?.control).toEqual({ calls: 10, source: 'census', promptTokens: 600, uncachedTokens: 40 });
+    expect(bills?.memory).toEqual({ calls: 12, source: 'census', promptTokens: 1000 });
+  });
+
+  it('returns nothing rather than inventing a bill for a file without arm blocks', () => {
+    expect(pairBillsOf(undefined)).toBeUndefined();
+    expect(pairBillsOf('nope')).toBeUndefined();
+    expect(pairBillsOf({ first: { calls: 1 } })).toBeUndefined();
+  });
+
+  it('applies R198’s rule to a file that never wrote a state: zero is silence, a number is a count', () => {
+    const bills = pairBillsOf({ first: { calls: 0 }, second: { calls: 7 } });
+    expect(bills?.control.source).toBe('absent');
+    expect(bills?.memory.source).toBe('count');
+  });
+
+  it('drops a token column that the state says was not measured', () => {
+    const bills = pairBillsOf({
+      first: { calls: 3, bill: 'count', promptTokens: 600 },
+      second: { calls: 4, bill: 'absent', promptTokens: 900 },
+    });
+    expect(bills?.control.promptTokens).toBeUndefined();
+    expect(bills?.memory.promptTokens).toBeUndefined();
+  });
+});
+
+describe('priceLines', () => {
+  it('collapses a column where nothing is priced into one line with its count', () => {
+    const lines = priceLines({ 'a.json': unpriced, 'b.json': unpriced });
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain('unpriced for all 2 fold(s)');
+  });
+
+  it('keeps a mixed column per fold, so a reader knows which fold the price is about', () => {
+    const lines = priceLines({ 'a.json': unpriced, 'b.json': priced });
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toContain('a.json inert price: unpriced');
+    expect(lines[1]).toContain('b.json inert price: 10.0 injected');
+  });
+
+  it('says nothing for an empty column', () => {
+    expect(priceLines({})).toEqual([]);
+  });
+});
+
+/**
+ * The published number, recomputed.
+ *
+ * R197's cancellation quoted a pooled census of −4.64 pp over 194 pairs. That pool is the four folds paid for
+ * after R152 — and it silently mixed R152c's bounded arm with three unbounded ones. This test recomputes both
+ * readings from the committed artefacts: the published one to show it was arithmetically right, and the
+ * five-fold one to show what including the pre-treatment artefact does to it.
+ */
+describe('the published τ² census, recomputed from the artefacts', () => {
+  const sources = readdirSync(join(process.cwd(), 'eval/results'))
+    .filter((name) => name.startsWith('poc-l4-pair') && name.endsWith('.json'))
+    .sort()
+    .map((name) => ({
+      path: `eval/results/${name}`,
+      artefact: JSON.parse(readFileSync(join(process.cwd(), 'eval/results', name), 'utf8')) as unknown,
+    }));
+
+  it('reads all five committed folds without a refusal', () => {
+    const read = packLedgersRecord(sources);
+    expect(read.refusals).toEqual([]);
+    expect(read.record?.folds).toHaveLength(5);
+  });
+
+  it('reproduces −4.64 pp on the four post-R152 folds, and −4.38 pp on all five', () => {
+    const record = packLedgersRecord(sources).record as PackLedgersRecord;
+    const four = record.folds.filter((fold) => !fold.artefact.endsWith('/poc-l4-pair.json'));
+    expect(four).toHaveLength(4);
+    const broke = four.reduce((total, fold) => total + fold.broke, 0);
+    const repaired = four.reduce((total, fold) => total + fold.repaired, 0);
+    const measured = four.reduce((total, fold) => total + fold.measured, 0);
+    expect(measured).toBe(194);
+    expect(((repaired - broke) / measured) * 100).toBeCloseTo(-4.64, 2);
+    expect(record.headline.deltaPp).toBeCloseTo(-4.38, 2);
+  });
+
+  it('keeps the sign under either pooling rule, which is what the conclusion rests on', () => {
+    const record = packLedgersRecord(sources).record as PackLedgersRecord;
+    expect(record.headline.deltaPp).toBeLessThan(0);
+    for (const pool of record.pooled) expect(pool.deltaPp).toBeLessThan(0);
+  });
+});

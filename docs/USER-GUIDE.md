@@ -5781,3 +5781,55 @@ The third is not a refusal: "asked for the default" and "never mentioned it" are
 first tells you the driver knows the knob exists. When you size your own deployment, the baseline arm's line is the
 configuration to reproduce — and `pnpm eval:serve-profile --print` is the same five fields, in the order the audit
 prints them.
+
+### 32.44 Reading a fold's ledger: what the pack did, and what it would cost to stop it
+
+`pnpm eval:pack-ledgers` prints one line per pair artefact, then one per treatment, then the corpus:
+
+```text
+eval/results/poc-l4-pair-swapped.json: 74 served, 52 inert (70.3%), 7 repaired against 15 broke (0.47 repairs per
+  break), -10.81 pp
+unit=correction/form=lesson/scope=all/model=deepseek/deepseek-flash/traceClaims=6: 3 fold(s), 154 served,
+  inert 77.9% [70.7, 83.7], -3.90 pp, 7 of 20 breaks must go (35%)
+all: 5 fold(s), 251 served, inert 78.1% [72.6, 82.8], -4.38 pp, 12 of 33 breaks must go (36%)
+inert price: unpriced for all 5 fold(s) – both arms need a census: the memory arm is 'absent' and the control is
+  'absent', and a token premium cannot be taken from a count
+```
+
+Four numbers, and the order matters:
+
+| number | what it is | how to read it |
+|---|---|---|
+| **served / inert** | packs rendered, and packs whose episode verdict did not change | `inert = served − repaired − broke`, so this is a count, not an estimate |
+| **repaired vs broke** | episodes the pack turned from wrong to right, and right to wrong | the ratio `repairs per break` says which way it is leaning; below 1.00 the pack is losing |
+| **delta** | `(repaired − broke) / measured`, in points | two independent arms, so it carries ±9–11 points at 40 tasks |
+| **[bracket]** | Wilson interval on the inert share | narrow, because it counts episodes rather than contrasting arms |
+
+**Why the inert share is the number to watch.** Across five paid folds the delta ranges from +2.50 to −10.81 pp —
+the sign flips — while the inert share stays between 70% and 88%. If you are deciding whether to serve this pack
+in your own deployment, the share is what generalises; the delta on any one split is inside its own error bar.
+
+**Two things the line tells you that a delta cannot.**
+
+1. **How many breaks a gate must prevent.** `12 of 33 breaks must go (36%)` is the corpus arithmetic, in episodes,
+   for the pooled delta to stop being negative. A mechanism that claims to help has to beat that number, not just
+   move a bar.
+2. **Whether the pack could have helped at all.** An inert pack is one whose episode did not change — withholding
+   it is free by construction and saves the injection. That is the difference between "serve less" (a cost claim)
+   and "serve where it can act" (a mechanism claim).
+
+**When the price line is a refusal rather than a number.** The injection price is the difference between the two
+arms' prompt tokens, so it needs a *census* on both. A `count`-only artefact prices nothing (its tokens were never
+measured), and two arms whose subtraction comes out negative are refused as not one dispatch. Today every fold is
+`unpriced` for the first reason; the first dispatch after R198's reader fills the column.
+
+**Regenerating the record.** `eval/results/pack-ledgers.json` is derived. `pnpm eval:pack-ledgers --check`
+recomputes it and fails on any drift, naming the fold that moved:
+
+```bash
+pnpm eval:pack-ledgers --write   # rewrite the record from the artefacts
+pnpm eval:pack-ledgers --check   # the gate: refuses a stale or hand-edited record
+```
+
+A drift is evidence, not a chore: either a fold was re-run (the numbers moved because the run did) or a rule
+changed (the numbers moved because the reading did), and the gate cannot tell you which — you have to read it.

@@ -2230,3 +2230,25 @@ before its first model call.
 census and no recorded count reached the file, which is what a re-scored upstream document and every pre-R198
 artefact look like. A recorded `calls: 0` is deliberately read as silence, because no artefact in this lane has ever
 measured a zero it could prove.
+
+**Pack ledger** — A fold's `serveYield` and `degradation` blocks read as one account: `served`, `inert`, `repaired`,
+`broke`, closed by `inert = served − repaired − broke`. Printed by `pnpm eval:pack-ledgers` and committed as
+`eval/results/pack-ledgers.json`.
+
+**Inert share** — `inert / served`: the share of served packs whose episode verdict did not change. Measured rather
+than estimated, because inertness is defined as "the verdict did not change". The only quantity on this lane that
+replicates across folds (70–88% on five folds, three treatments).
+
+**Break premium** — `broke − repaired`, in episodes. Positive means the pack costs the lane episodes; the corpus
+value is 33 − 22 = 11, which is what `breaksToFlip` is derived from.
+
+**Repairs per break** — `repaired / broke`, or `null` when nothing broke. Below 1.00 the pack is losing episodes;
+a rate with no denominator is not zero, so it is absent rather than `0`.
+
+**Breaks to flip** — The number of breakages a gate must prevent for a pool's delta to stop being negative:
+`broke − repaired + 1` when that is positive, `0` when the pool is already positive. The corpus needs 12 of 33
+(36%), which is the target a mechanism claim is measured against.
+
+**Inert price** — The prompt tokens an episode's inert share bought: `(memory − control) / measured`, times the
+inert share. `priced: false` — with both arms' bill states named — when either arm lacks a census, when a census
+carries no token column, or when the subtraction is negative.

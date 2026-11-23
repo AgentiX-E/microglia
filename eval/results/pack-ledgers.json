@@ -1,0 +1,228 @@
+{
+  "schema": "microglia.pack-ledgers/1",
+  "updatedBy": "R200",
+  "folds": [
+    {
+      "artefact": "eval/results/poc-l4-pair-official.json",
+      "treatment": "unit=correction/form=lesson/scope=all/model=deepseek/deepseek-flash/traceClaims=6",
+      "renders": 40,
+      "opportunity": 4,
+      "repaired": 4,
+      "broke": 3,
+      "inert": 33,
+      "measured": 40,
+      "blankRight": 36,
+      "netPp": 2.5,
+      "deltaPp": 2.5,
+      "inertShare": 0.825,
+      "engagedShare": 0.175,
+      "breakPremium": -1,
+      "repairsPerBreak": 1.3333333333333333
+    },
+    {
+      "artefact": "eval/results/poc-l4-pair-r152.json",
+      "treatment": "unit=correction/form=lesson/scope=all/model=deepseek/deepseek-flash/traceClaims=6",
+      "renders": 40,
+      "opportunity": 6,
+      "repaired": 3,
+      "broke": 2,
+      "inert": 35,
+      "measured": 40,
+      "blankRight": 34,
+      "netPp": 2.5,
+      "deltaPp": 2.5,
+      "inertShare": 0.875,
+      "engagedShare": 0.125,
+      "breakPremium": -1,
+      "repairsPerBreak": 1.5
+    },
+    {
+      "artefact": "eval/results/poc-l4-pair-r152c.json",
+      "treatment": "unit=correction/form=lesson/scope=all/model=deepseek/deepseek-flash/traceClaims=6/rotation=fair-share",
+      "renders": 40,
+      "opportunity": 6,
+      "repaired": 4,
+      "broke": 7,
+      "inert": 29,
+      "measured": 40,
+      "blankRight": 34,
+      "netPp": -7.5,
+      "deltaPp": -7.5,
+      "inertShare": 0.725,
+      "engagedShare": 0.275,
+      "breakPremium": 3,
+      "repairsPerBreak": 0.5714285714285714
+    },
+    {
+      "artefact": "eval/results/poc-l4-pair-swapped.json",
+      "treatment": "unit=correction/form=lesson/scope=all/model=deepseek/deepseek-flash/traceClaims=6",
+      "renders": 74,
+      "opportunity": 11,
+      "repaired": 7,
+      "broke": 15,
+      "inert": 52,
+      "measured": 74,
+      "blankRight": 63,
+      "netPp": -10.81081081081081,
+      "deltaPp": -10.81081081081081,
+      "inertShare": 0.7027027027027027,
+      "engagedShare": 0.2972972972972973,
+      "breakPremium": 8,
+      "repairsPerBreak": 0.4666666666666667
+    },
+    {
+      "artefact": "eval/results/poc-l4-pair.json",
+      "treatment": "unstated",
+      "renders": 57,
+      "opportunity": 10,
+      "repaired": 4,
+      "broke": 6,
+      "inert": 47,
+      "measured": 57,
+      "blankRight": 47,
+      "netPp": -3.508771929824561,
+      "deltaPp": -3.508771929824561,
+      "inertShare": 0.8245614035087719,
+      "engagedShare": 0.17543859649122806,
+      "breakPremium": 2,
+      "repairsPerBreak": 0.6666666666666666
+    }
+  ],
+  "pooled": [
+    {
+      "treatment": "unit=correction/form=lesson/scope=all/model=deepseek/deepseek-flash/traceClaims=6",
+      "folds": [
+        "eval/results/poc-l4-pair-official.json",
+        "eval/results/poc-l4-pair-r152.json",
+        "eval/results/poc-l4-pair-swapped.json"
+      ],
+      "renders": 154,
+      "measured": 154,
+      "repaired": 14,
+      "broke": 20,
+      "inert": 120,
+      "opportunity": 21,
+      "inertShare": 0.7792207792207793,
+      "inertInterval": [
+        0.7073630486416989,
+        0.8374874655549225
+      ],
+      "engagedShare": 0.22077922077922077,
+      "breakPremium": 6,
+      "repairsPerBreak": 0.7,
+      "deltaPp": -3.896103896103896,
+      "breaksToFlip": 7,
+      "breakShareToFlip": 0.35
+    },
+    {
+      "treatment": "unit=correction/form=lesson/scope=all/model=deepseek/deepseek-flash/traceClaims=6/rotation=fair-share",
+      "folds": [
+        "eval/results/poc-l4-pair-r152c.json"
+      ],
+      "renders": 40,
+      "measured": 40,
+      "repaired": 4,
+      "broke": 7,
+      "inert": 29,
+      "opportunity": 6,
+      "inertShare": 0.725,
+      "inertInterval": [
+        0.5716504419378943,
+        0.8389198375233267
+      ],
+      "engagedShare": 0.275,
+      "breakPremium": 3,
+      "repairsPerBreak": 0.5714285714285714,
+      "deltaPp": -7.5,
+      "breaksToFlip": 4,
+      "breakShareToFlip": 0.5714285714285714
+    },
+    {
+      "treatment": "unstated",
+      "folds": [
+        "eval/results/poc-l4-pair.json"
+      ],
+      "renders": 57,
+      "measured": 57,
+      "repaired": 4,
+      "broke": 6,
+      "inert": 47,
+      "opportunity": 10,
+      "inertShare": 0.8245614035087719,
+      "inertInterval": [
+        0.7063264717030607,
+        0.9018114776029004
+      ],
+      "engagedShare": 0.17543859649122806,
+      "breakPremium": 2,
+      "repairsPerBreak": 0.6666666666666666,
+      "deltaPp": -3.508771929824561,
+      "breaksToFlip": 3,
+      "breakShareToFlip": 0.5
+    }
+  ],
+  "headline": {
+    "treatment": "all",
+    "folds": [
+      "eval/results/poc-l4-pair-official.json",
+      "eval/results/poc-l4-pair-r152.json",
+      "eval/results/poc-l4-pair-r152c.json",
+      "eval/results/poc-l4-pair-swapped.json",
+      "eval/results/poc-l4-pair.json"
+    ],
+    "renders": 251,
+    "measured": 251,
+    "repaired": 22,
+    "broke": 33,
+    "inert": 196,
+    "opportunity": 37,
+    "inertShare": 0.7808764940239044,
+    "inertInterval": [
+      0.7256798576080821,
+      0.8276053129151619
+    ],
+    "engagedShare": 0.21912350597609562,
+    "breakPremium": 11,
+    "repairsPerBreak": 0.6666666666666666,
+    "deltaPp": -4.382470119521913,
+    "breaksToFlip": 12,
+    "breakShareToFlip": 0.36363636363636365,
+    "treatments": [
+      "unit=correction/form=lesson/scope=all/model=deepseek/deepseek-flash/traceClaims=6",
+      "unit=correction/form=lesson/scope=all/model=deepseek/deepseek-flash/traceClaims=6/rotation=fair-share",
+      "unstated"
+    ]
+  },
+  "price": {
+    "eval/results/poc-l4-pair-official.json": {
+      "priced": false,
+      "memoryState": "absent",
+      "controlState": "absent",
+      "reason": "both arms need a census: the memory arm is 'absent' and the control is 'absent', and a token premium cannot be taken from a count"
+    },
+    "eval/results/poc-l4-pair-r152.json": {
+      "priced": false,
+      "memoryState": "absent",
+      "controlState": "absent",
+      "reason": "both arms need a census: the memory arm is 'absent' and the control is 'absent', and a token premium cannot be taken from a count"
+    },
+    "eval/results/poc-l4-pair-r152c.json": {
+      "priced": false,
+      "memoryState": "absent",
+      "controlState": "absent",
+      "reason": "both arms need a census: the memory arm is 'absent' and the control is 'absent', and a token premium cannot be taken from a count"
+    },
+    "eval/results/poc-l4-pair-swapped.json": {
+      "priced": false,
+      "memoryState": "absent",
+      "controlState": "absent",
+      "reason": "both arms need a census: the memory arm is 'absent' and the control is 'absent', and a token premium cannot be taken from a count"
+    },
+    "eval/results/poc-l4-pair.json": {
+      "priced": false,
+      "memoryState": "absent",
+      "controlState": "absent",
+      "reason": "both arms need a census: the memory arm is 'absent' and the control is 'absent', and a token premium cannot be taken from a count"
+    }
+  }
+}

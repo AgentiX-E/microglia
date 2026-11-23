@@ -735,6 +735,11 @@ await writeJson('poc-l4-pair', {
     // "nobody counted" the same way as "no calls".
     calls: firstBill.calls,
     bill: firstBill.source,
+    // R200: the columns the injection price is a difference of. Published per arm rather than as a premium,
+    // because the premium is a property of the pair and the tokens are a property of the arm — and because a
+    // reader who disagrees with the subtraction should be able to redo it from the file.
+    ...(firstBill.promptTokens === undefined ? {} : { promptTokens: firstBill.promptTokens }),
+    ...(firstBill.uncachedTokens === undefined ? {} : { uncachedTokens: firstBill.uncachedTokens }),
   },
   second: {
     path: SECOND,
@@ -743,6 +748,8 @@ await writeJson('poc-l4-pair', {
     k: second.metrics?.k ?? null,
     calls: secondBill.calls,
     bill: secondBill.source,
+    ...(secondBill.promptTokens === undefined ? {} : { promptTokens: secondBill.promptTokens }),
+    ...(secondBill.uncachedTokens === undefined ? {} : { uncachedTokens: secondBill.uncachedTokens }),
   },
   comparison,
   ...(foldSplit.ok
