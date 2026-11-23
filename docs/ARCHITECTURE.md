@@ -3654,3 +3654,41 @@ population where a share of 100% and a share of 60% are the same observation, so
 interval and the refutation requires the *lower bound* to clear the band: at forty renders, 95% has a lower bound of
 83.6% and cannot be told from 88.7%, and a rule that fired on the point estimate would be this round's own defect
 one layer down.
+
+### 8.70 The join's first fold: 35 of 40 episodes withheld, and three of my own rules refuted by the artefact
+
+R205's dispatch (run 45219898506) is the first transient fold whose population is a field. The instrument behaved
+exactly as designed, and the readback's three verdicts had to be repaired before the number could be read.
+
+| layer | R204's fold | R205's fold |
+| --- | --- | --- |
+| `serveYield.renders` | 50 — the facade's packs | **9 — the prompts** |
+| `serveYield.withheld` | the field did not exist | **35 of 40** |
+| the ledger's verdict | refused | **accepted**: `renders 9, inert 8, measured 40, delta 5` |
+| the share | 80.0% over the wrong population | **88.9% [56.5%, 98.0%]** |
+| the delta | +5.00 pp, p = 0.727 | **+5.00 pp, p = 0.6875** |
+
+**The refusal rate replicated, and that is the result.** 6 of 40 then 5 of 42 episodes got a sentence — 15.0% and
+11.9%, **11 of 82 calls pooled**. The summariser is shown records retrieved from other retail tasks and declines on
+seven of eight, which is now a property of the material measured twice. R206 is registered against it.
+
+**Three rules were wrong, and each was written from a count rather than from the defect.**
+
+1. **`calls == episodes`** fired on 42 calls for 40 episodes. Two are retries: the host re-asked the same turn inside
+   two episodes and the pack was decided again. A per-turn plant makes ~400 calls on this corpus and a retry makes one
+   more, so the rule is now `calls < episodes` (an episode nobody asked about) and `calls ≥ 2 × episodes` (the plant).
+2. **The per-episode premium** fired "the arm paid for the block and the sentence" on +3,454.9 tokens an episode. The
+   memory arm made **750 calls against 683**: the premium was 67 extra turns of a user simulator that took a different
+   path. Per agent call, net of the summariser's own input (93,267 characters ≈ 23,317 tokens), the arm spent
+   **4,693.4 against the control's 4,697.0** — 99.92%. The body cost ≈ 583 tokens an episode and the context did not
+   move.
+3. **`measured == rendered`** in the ledger is not an identity on a fold that withholds: `degradation` counts 40 paired
+   trials, `serveYield` counts 9 renders. It is scoped — each census closes inside itself; the cross-population triple
+   is owed only where the populations are one — and the scope is a test built from this fold's own numbers beside a
+   block fold as the control.
+
+**What a premium can and cannot say.** A per-episode premium is the body's price only when both arms spend the same
+number of calls, and that is a property of the simulator. When the denominators differ, the quantity that carries the
+claim is the one divided by the unit that stayed put: tokens per *agent call*, with the summariser's own input
+subtracted and the subtraction printed. The per-episode number stays in the report beside the call counts, because the
+confound is itself a reading — this arm changed the trajectory of the episode it served.

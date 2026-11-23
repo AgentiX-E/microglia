@@ -526,12 +526,13 @@ process.stdout.write(`${degradationLineOf(degradation)}\n`);
 function attributionOf(reference: Artefact, memory: Artefact) {
   const margins = memory.tau2?.pack?.margins?.perRequest;
   const boundaries = episodeStartsOf(memory.tau2?.memory);
-  return pairAttribution({
+  // R205: whether each of those episodes carried a body. Aligned against the boundaries in the reader rather
+  // than trusted, because a list one entry short would move every flag onto its neighbour's episode.
+  const injected = injectedEpisodesOf(memory.tau2?.memory, boundaries);
+  const reading = pairAttribution({
     ledger: memory.tau2?.pack?.ledger,
     episodeStarts: boundaries,
-    // R205: whether each of those episodes carried a body. Aligned against the boundaries in the reader rather
-    // than trusted, because a list one entry short would move every flag onto its neighbour's episode.
-    injectedEpisodes: injectedEpisodesOf(memory.tau2?.memory, boundaries),
+    injectedEpisodes: injected,
     // R136: the task each boundary opened for, when the arm names them. Absent on every artefact before the
     // instrument, which leaves the join positional and therefore refusing a 41-versus-40 pair.
     boundaryTasks: boundaryTasksOf(memory.tau2?.memory),
@@ -540,6 +541,11 @@ function attributionOf(reference: Artefact, memory: Artefact) {
     // R151: the gate's own decision, so the sweep can price a rung without a second dispatch.
     ...(margins === undefined ? {} : { margins }),
   });
+  // Whether the artefact could be read *at all*, which is a different fact from what it said. A pair step run
+  // over two arms written before the flag existed can compute a table and cannot name its population, and the
+  // difference has to survive to the artefact: publishing `withheld: 0` there would say "every episode carried
+  // a body" about a file that never recorded one.
+  return { reading, populationNamed: injected !== undefined };
 }
 
 /**
@@ -557,7 +563,7 @@ function repeatedTask(rows: readonly TauTrialRow[] | undefined): number | undefi
   return repeated === 0 ? undefined : repeated;
 }
 
-const attribution = attributionOf(first, second);
+const { reading: attribution, populationNamed } = attributionOf(first, second);
 if (attribution !== undefined) process.stdout.write(`${itemTransferLine(attribution)}\n`);
 // R144: the denominator the outcome counter never had. A memory can only repair a trial the bare agent failed
 // and can only break one it passed, so a record rendered nine times inside a corpus whose control passes 82.5%
@@ -840,9 +846,10 @@ await writeJson('poc-l4-pair', {
           repairRate: yields.repairRate,
           opportunitiesForEvidence: yields.opportunitiesForEvidence,
           candidates: yields.candidates,
-          // R205: episodes dropped because their prompt carried no body. Present on every reading, so a zero
-          // is "the store injected everywhere it served" rather than "nobody asked".
-          withheld: attribution?.withheldEpisodes ?? 0,
+          // R205: episodes dropped because their prompt carried no body. Absent when the arm never recorded the
+          // flag: a zero there would be an absence sold as a reading, and the ledger gate refuses a transient
+          // fold without it precisely so that the two states stay apart.
+          ...(populationNamed ? { withheld: attribution?.withheldEpisodes ?? 0 } : {}),
         },
       }),
   // R155: the same counts divided by the population each came from, with the break rate at which they cancel.

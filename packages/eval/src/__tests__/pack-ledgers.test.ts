@@ -159,6 +159,39 @@ describe('ledgerOf', () => {
     expect(problemsOf(fixture({ yieldBlock: { inert: 30 } })).join(' ')).toContain('inert does not close');
   });
 
+  it('checks each census against itself when the fold withholds episodes from one of them', () => {
+    // R205's own fold. The degradation census is over the forty paired trials and the render census is over the
+    // nine that carried a body, so `measured == renders` is not an identity on this arm and never was: the pair
+    // said 2 broke / 4 repaired of 40, and 1 broke / 0 repaired of 9 renders. Both close inside themselves, and
+    // the cross-population triple is the check that has to be scoped rather than the numbers that have to move.
+    const transient = {
+      ...(fixture({
+        yieldBlock: { renders: 9, opportunity: 0, repairs: 0, breaks: 1, inert: 8, withheld: 35 },
+        degradation: { broke: 2, repaired: 4, blankRight: 33, measured: 40, netPp: 5 },
+        comparison: { paired: 40, lost: 2, gained: 4, deltaPp: 5 },
+      }) as Record<string, unknown>),
+      treatment: { ...TREATMENT, serveBody: 'guidance' },
+      transient: { guidance: { calls: 42, sentences: 5, refusals: 37, failures: 0 } },
+    };
+    expect(ledgerOfOk(transient).renders).toBe(9);
+    // And the render census still has to close on its own terms: eight inert against nine renders with one break
+    // is the identity this fold is allowed to owe.
+    expect(
+      problemsOf({
+        ...(transient as Record<string, unknown>),
+        serveYield: { renders: 9, opportunity: 0, repairs: 0, breaks: 1, inert: 9, withheld: 35 },
+      }).join(' '),
+    ).toContain('inert does not close');
+    // A block fold still owes the cross-population identity, because on a block arm no episode is withheld and
+    // the two censuses are one population.
+    expect(
+      problemsOf({
+        ...(fixture() as Record<string, unknown>),
+        serveYield: { renders: 9, opportunity: 6, repairs: 4, breaks: 7, inert: 29 },
+      }).join(' '),
+    ).toContain('census disagrees');
+  });
+
   it('refuses a percentage that is not the ledger’s own fraction', () => {
     expect(problemsOf(fixture({ degradation: { netPp: -7.4 } })).join(' ')).toContain('net does not close');
     expect(problemsOf(fixture({ comparison: { deltaPp: -8 } })).join(' ')).toContain('net does not close');

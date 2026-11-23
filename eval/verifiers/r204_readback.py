@@ -115,6 +115,52 @@ def injection_tokens(pair: dict[str, Any]) -> float | None:
     return (memory - control) / measured
 
 
+#: Characters per token, the one assumption this file makes about a provider. It is used only to subtract the
+#: summariser's own input from the arm's prompt total, and the subtraction is reported so a reader can redo it.
+CHARS_PER_TOKEN = 4.0
+
+
+def context_price(pair: dict[str, Any], census: dict[str, Any]) -> dict[str, Any] | None:
+    """What one agent call cost the memory arm, net of the calls the summariser made for it.
+
+    A per-episode premium is the body's price only when the two arms spend the same number of calls, and that is a
+    property of the user simulator rather than of the arm: R205's fold made 750 calls against 683, so +3,454.9
+    tokens an episode was mostly 67 extra turns. The quantity that moves when an arm pays for both bodies is the
+    context it carries per agent call, and the two components are both in the artefact — the arm's prompt total,
+    and the summariser's own input (`guidance.promptChars`), which was billed to the same account by design.
+    """
+    first = pair.get("first") or {}
+    second = pair.get("second") or {}
+    control_tokens = first.get("promptTokens")
+    memory_tokens = second.get("promptTokens")
+    control_calls = first.get("calls")
+    memory_calls = second.get("calls")
+    guidance_calls = census.get("calls")
+    guidance_chars = census.get("promptChars")
+    if not all(
+        isinstance(value, (int, float))
+        for value in (control_tokens, memory_tokens, control_calls, memory_calls, guidance_calls, guidance_chars)
+    ):
+        return None
+    agent_calls = memory_calls - guidance_calls
+    if control_calls <= 0 or agent_calls <= 0:
+        return None
+    summariser_tokens = guidance_chars / CHARS_PER_TOKEN
+    memory_per_call = (memory_tokens - summariser_tokens) / agent_calls
+    control_per_call = control_tokens / control_calls
+    if control_per_call <= 0:
+        return None
+    return {
+        "control_calls": int(control_calls),
+        "memory_calls": int(memory_calls),
+        "agent_calls": int(agent_calls),
+        "summariser_tokens": summariser_tokens,
+        "memory_per_call": memory_per_call,
+        "control_per_call": control_per_call,
+        "ratio": memory_per_call / control_per_call,
+    }
+
+
 def grade(pair: dict[str, Any]) -> tuple[str, Report]:
     report = Report()
 
@@ -214,19 +260,27 @@ def grade(pair: dict[str, Any]) -> tuple[str, Report]:
     # and an episode that recalls twice is two renders and one guidance call. The first draft of this check
     # compared the call count to `renders` and would have called the first healthy fold a per-turn plant — 40
     # calls against 50 renders on a run where every call was in the right place.
+    #
+    # R205's dispatch then produced 42 calls for 40 episodes, and the rule as written fired. Two of those calls
+    # are retries: the host re-asked the same turn inside two episodes and the pack was decided again, which the
+    # registration allows and the agent's own `recallRepeats` counts. So the prediction is "at least one call an
+    # episode" and the refutation is the plant the registration actually named -- one call per *turn*, which on
+    # this corpus is ten calls an episode, not one more. A rule that fires on the retry is a rule written from a
+    # count rather than from the mechanism it protects.
     report.predict(
-        "the summariser was called once per evaluated episode, not once per turn",
-        episodes is not None and calls == episodes,
+        "the summariser was called at least once per evaluated episode",
+        episodes is not None and calls >= episodes,
         f"{calls} call(s) against {episodes!r} evaluated episode(s), {renders!r} render(s)",
     )
-    # A call count that is not the episode count is one of the refutations: the registration bought one
-    # sentence an episode, and a plant that runs the summariser per turn has changed the mechanism it was
-    # registered to test. Guarded on the split being readable, so a file that omits it is unmeasured rather
-    # than abandoned.
     report.refute(
-        "the summariser ran a different number of times than there were episodes",
-        episodes is not None and calls != episodes,
+        "an episode was never asked, so the arm did not run on every trial it is read over",
+        episodes is not None and calls < episodes,
         f"{calls} call(s) against {episodes} evaluated episode(s)",
+    )
+    report.refute(
+        "the summariser ran per turn rather than per episode, which is a different mechanism",
+        episodes is not None and calls >= 2 * episodes,
+        f"{calls} call(s) against {episodes} evaluated episode(s): {calls / max(episodes, 1):.1f} an episode",
     )
     report.refute(
         "the pack was withheld on every request: the reading is about the prompt, not the mechanism",
@@ -325,8 +379,33 @@ def grade(pair: dict[str, Any]) -> tuple[str, Report]:
 
     # ---- the by-product: price and delta, both quoted rather than concluded from ------------------
     price = injection_tokens(pair)
+    context = context_price(pair, census)
     if price is None:
         report.note("the pair carries no bill, so the price of this episode is unmeasured")
+    elif context is not None:
+        # R205's second false positive, from the same run. The memory arm made 750 calls against the control's
+        # 683, so its per-episode premium (+3,454.9 tokens) is mostly 67 extra turns -- the user simulator took a
+        # different path -- and not the body at all. The comparable quantity is the **context** cost: the arm's
+        # prompt total minus what its own summariser was shown, divided by its agent calls, against the control's
+        # prompt total over its calls. That is the number "the arm paid for the block and the sentence" would move,
+        # and the estimate of the summariser's share is stated rather than assumed.
+        report.note(
+            f"premium {price:+,.1f} tokens an episode is confounded by the call counts "
+            f"({context['memory_calls']} against {context['control_calls']}), so the body's price is taken per "
+            f"agent call: {context['memory_per_call']:,.1f} against the control's "
+            f"{context['control_per_call']:,.1f} ({context['ratio']:.1%})"
+        )
+        report.predict(
+            "the body added no context cost: the arm's agent-context tokens per call are within 5% of the "
+            "control's",
+            context["ratio"] <= 1.05,
+            f"{context['memory_per_call']:,.1f} against {context['control_per_call']:,.1f} tokens a call",
+        )
+        report.refute(
+            "the arm paid for the block as context and for the sentence: the body is not what shipped",
+            context["ratio"] > 1.05,
+            f"{context['memory_per_call']:,.1f} against {context['control_per_call']:,.1f} tokens an agent call",
+        )
     elif price < 0:
         # No pack-serving arm can spend less than its control: a negative premium is the refusals showing up in
         # the bill, and reading it as an efficiency is the mistake this branch exists to prevent.
@@ -396,6 +475,9 @@ def _pair(
     after: int = 11,
     control_prompt: int = 3_000_000,
     memory_prompt: int = 3_040_000,
+    control_calls: int | None = None,
+    memory_calls: int | None = None,
+    prompt_chars: int | None = None,
     paired: int = 40,
     delta: float = -2.5,
 ) -> dict[str, Any]:
@@ -407,8 +489,8 @@ def _pair(
             "learned": [f"retail/{index}" for index in range(74)],
             "evaluated": [f"retail/{index}" for index in range(40)],
         },
-        "first": {"promptTokens": control_prompt},
-        "second": {"promptTokens": memory_prompt},
+        "first": {"promptTokens": control_prompt, **({} if control_calls is None else {"calls": control_calls})},
+        "second": {"promptTokens": memory_prompt, **({} if memory_calls is None else {"calls": memory_calls})},
         "comparison": {"paired": paired, "deltaPp": delta},
         "serveYield": {
             "renders": renders,
@@ -424,6 +506,7 @@ def _pair(
                 "sentences": sentences,
                 "refusals": refusals,
                 "failures": failures,
+                **({} if prompt_chars is None else {"promptChars": prompt_chars}),
             },
             "store": {"reference": None, "memory": {"before": before, "after": after, "grew": after > before}},
         },
@@ -463,6 +546,50 @@ CASES = [
     # on the point estimate here would be the defect this round is about, one layer down.
     ("a point estimate the interval cannot separate is not a refutation", _pair(inert=38), "GRADED"),
     ("an inert share whose interval clears the band abandons the reading", _pair(inert=40), "ABANDONED"),
+    # R205's own fold, and the two rules it broke. Forty-two calls for forty episodes is two retries -- the host
+    # re-asked the same turn and the pack was decided again -- and the first version of this file called that a
+    # per-turn plant. The plant the registration named is ten calls an episode.
+    (
+        "a retry that asks twice in one episode is not a per-turn plant",
+        _pair(calls=42, sentences=40, refusals=2, inert=8, renders=9, withheld=35, control_calls=683, memory_calls=750),
+        "GRADED",
+    ),
+    (
+        "an episode nobody asked about leaves the arm short of its own population",
+        _pair(calls=38, sentences=38, refusals=0, inert=8, renders=9, withheld=35),
+        "ABANDONED",
+    ),
+    # The other false positive: 750 calls against 683 means the per-episode premium is mostly 67 extra turns of a
+    # user simulator that took a different path. Per agent call, net of the summariser's own input, the arm cost
+    # 4,693.3 tokens against the control's 4,697.0 -- identical, which is the reading.
+    (
+        "a premium carried by extra turns is not the body's price",
+        _pair(
+            inert=8,
+            renders=9,
+            withheld=35,
+            control_calls=683,
+            memory_calls=750,
+            control_prompt=3_208_072,
+            memory_prompt=3_346_270,
+            prompt_chars=93_267,
+        ),
+        "GRADED",
+    ),
+    (
+        "a body that raised the context cost abandons the reading",
+        _pair(
+            inert=8,
+            renders=9,
+            withheld=35,
+            control_calls=683,
+            memory_calls=750,
+            control_prompt=3_208_072,
+            memory_prompt=3_600_000,
+            prompt_chars=93_267,
+        ),
+        "ABANDONED",
+    ),
     ("a bill above the block arm's abandons the reading", _pair(memory_prompt=3_200_000), "ABANDONED"),
 ]
 

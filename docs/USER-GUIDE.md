@@ -6090,3 +6090,32 @@ two are indistinguishable, and a point estimate is not evidence.
 **What a transient fold supports.** The call reading (one call an episode), the store reading (`before == after`),
 and the population reading (`withheld`). The share is supported only when the population is named *and* wide enough
 to separate — which on a 15%-coverage arm means the second dispatch, not the first.
+
+### 32.52 Reading a transient fold whose population is named
+
+The second dispatch of the sentence arm (run `45219898506`) is the shape a working fold has. Two log lines carry it:
+
+```text
+[pair] serve yield: 9 render(s), 0 opportunity, 0 repaired, 1 broke, 8 inert (88.9% of renders changed nothing)
+[pair] 35 episode(s) withheld: the prompt carried no body, so their packs are inputs rather than renders
+```
+
+**`withheld` is the coverage of the body, not an error.** 35 of 40 episodes carried nothing, so the render census is
+over nine. The ledger accepts this fold (`renders 9, inert 8, measured 40`) because each census closes inside itself:
+the nine renders close at 8 + 0 + 1, and the forty paired trials close at 2 lost and 4 gained.
+
+**Two numbers are easy to misread, and both have a rule.**
+
+- **The call count is not the episode count.** This fold made 42 calls for 40 episodes; the extra two are retries, where
+  the host re-asked the same turn and the pack was decided again. A refutation needs *an episode nobody asked about*
+  (`calls < episodes`) or a per-turn plant (`calls ≥ 2 × episodes`), and the middle is the arm doing what it said.
+- **The token premium is not the body's price when the two arms made different numbers of calls.** Here the memory arm
+  made 750 calls against the control's 683, so "+3,454.9 tokens an episode" is 67 extra turns. Per *agent call*, net of
+  what the summariser itself was shown, the arm cost 4,693.4 against 4,697.0 — the body is ≈ 583 tokens an episode and
+  nothing else moved.
+
+**What this fold can and cannot state.** The mechanism held (one call an episode, `73 → 73`, no failures), the refusal
+rate replicated (11.9% here against 15.0% on the first fold), and the delta reproduced to 0.00 pp (+5.00 pp,
+p = 0.69). The share cannot be resolved: nine renders put the interval at 56.5–98.0%, which contains the pool and
+everything above it. A fold with 15% coverage buys a mechanism reading and a price, not a share — the arm that fixes
+coverage is a different material, and it is registered separately (R206).

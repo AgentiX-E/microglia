@@ -254,7 +254,15 @@ export function ledgerOf(artefact: unknown, file: string): LedgerRead {
         `${brokeN} broke of ${blankRightN} at risk`,
     );
   }
-  if (brokeN !== (breaks as number) || repairedN !== (repairs as number) || measuredN !== r) {
+  // R205: the two censuses are over two populations when the fold withholds episodes, and the identity between
+  // them is then not an identity. `degradation` counts the paired trials; `serveYield` counts renders, which are
+  // (record, episode) pairs *and* are taken over the episodes that carried a body. R205's own fold reads 2 broke /
+  // 4 repaired of 40 trials against 1 broke / 0 repaired of 9 renders — both true, and `measured == rendered` on
+  // that arm would mean the review found nothing to read. The check is therefore scoped rather than dropped: each
+  // census still has to close inside itself (below), and a block fold, which withholds nothing, still owes the
+  // cross-population triple.
+  const withholds = (countOf(yieldBlock, 'withheld') ?? 0) > 0;
+  if (!withholds && (brokeN !== (breaks as number) || repairedN !== (repairs as number) || measuredN !== r)) {
     problems.push(
       `${file}: census disagrees — serveYield says ${String(breaks)} broke / ${String(repairs)} repaired / ${r} ` +
         `rendered, degradation says ${brokeN} / ${repairedN} / ${measuredN}`,

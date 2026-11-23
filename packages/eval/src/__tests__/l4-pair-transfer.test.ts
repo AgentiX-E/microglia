@@ -771,6 +771,26 @@ describe('the fold a cross-fit reads off the pair', () => {
     const all = served['serveYield'] as { renders: number; withheld: number };
     expect(all.renders).toBe(2);
     expect(all.withheld).toBe(0);
+
+    // And an arm written before the flag existed publishes no `withheld` at all. The pair step can be re-run
+    // over R204's own artefacts with this build, and a `0` there would say "every episode carried a body" about
+    // a file that never recorded one -- absence sold as a zero, which is the defect this round is about one
+    // layer up from where it was found.
+    const unnamed = publish(
+      reference,
+      armWithSplit({
+        arm: 'memory',
+        rows: ROWS,
+        train: ['retail/1'],
+        test: ['airline/1', 'airline/2'],
+        treatment,
+        serveBody: 'guidance',
+        guidance,
+        episodeStarts: [0, 1],
+        ledger: [['k_a'], ['k_a']],
+      }),
+    );
+    expect(Object.hasOwn(unnamed['serveYield'] as object, 'withheld')).toBe(false);
   }, 60_000);
 
   it('says which arm could not state its split, because an artefact from before the field is not a leak', () => {
