@@ -1801,6 +1801,17 @@ artefact counts them (`serveRotation.starved`) rather than leaving a silent phas
 whose own reading cannot say whether it acted has produced no finding, and the reading is designed to say so in one
 number rather than in a paragraph of caveats.
 
+**Treatment key** — the string that decides which folds may be averaged: `unit`, `form`, `scope`, `model`,
+`traceClaims`, `knobs`, `rotation`, in that order, joined by `/`. A field the artefact does not carry is left out,
+because the key is *what the file declares* rather than what ran — inferring a value from the registration would
+make the key depend on a file the artefacts do not reference. Two folds with different keys are two experiments,
+and averaging them is the mistake the published −4.64 pp made.
+
+**Declared `none`** — the literal a fold writes when it ran with no serving policy, distinct from the silence of a
+fold written before the field existed. Silence pools with nothing; `none` pools with `none`. The distinction is only
+usable if the producer writes it — a reader that filled the blank in would make the two states identical again,
+which is why the field is total at the writer (`treatmentOf`) and unchanged at the reader (`treatmentKeyOf`).
+
 **Reuse** — the share of a nearby case's answer that applies to the case at hand, measured as the Jaccard overlap of
 the two gold queries' column sets, divided by the union so a fragment is not counted as a whole answer. It is a
 property of the **corpus**, not of the store: a lesson can only transfer where the two answers already share a

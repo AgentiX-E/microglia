@@ -525,8 +525,16 @@ export type Treatment = {
   readonly model?: string;
   readonly traceClaims?: number;
   readonly knobs?: string;
-  /** R152: the serving policy the folds declared, `none` when neither stated one. */
-  readonly rotation?: string;
+  /**
+   * R152, total since R202: how far the treatment let its items travel.
+   *
+   * Always present on a treatment this module returns, and `none` is the literal for a pair no arm declared a
+   * policy for. It used to be omitted in that case, which made a declared `none` and an artefact written before
+   * the field indistinguishable at the one place the distinction matters — the pool key — and that is how
+   * R152c's bounded fold was averaged with three unbounded ones under one label. The field is written rather
+   * than defaulted at the reader because the pair is the last producer that knows which arm stated what.
+   */
+  readonly rotation: string;
 };
 
 export type TreatmentOutcome =
@@ -607,6 +615,12 @@ export function treatmentOf(arms: readonly TreatmentArm[]): TreatmentOutcome {
   if (!knobs.ok) return knobs;
   // R152: the serving policy. Compared like every other field, and stated only by an arm that declared one — the
   // control arm serves no pack and therefore has no policy to state, which is silence rather than a disagreement.
+  // R202: and then written unconditionally. `agreement` answers `undefined` when no arm stated the field, which
+  // is the shape a pair of pre-R152 artefacts has; omitting it there made the pair's key identical to a pair that
+  // declared `none`, so the pool could not separate "served without a rotation" from "cannot say". The value is
+  // now `none` in that case — a claim about the treatment rather than about the file — and the artefact-level
+  // ambiguity that remains is confined to the three folds written before the field existed, whose keys stay
+  // exactly as they were because `treatmentKeyOf` still omits a field the file does not carry.
   const rotation = agreement(
     'rotation',
     { label: head.label, value: head.rotation },
@@ -622,7 +636,7 @@ export function treatmentOf(arms: readonly TreatmentArm[]): TreatmentOutcome {
       ...(model.value === undefined ? {} : { model: model.value }),
       ...(ceiling.value === undefined ? {} : { traceClaims: ceiling.value }),
       ...(knobs.value === undefined ? {} : { knobs: knobs.value }),
-      ...(rotation.value === undefined ? {} : { rotation: rotation.value }),
+      rotation: rotation.value ?? 'none',
     },
   };
 }

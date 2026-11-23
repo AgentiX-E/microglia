@@ -5861,3 +5861,41 @@ Send the dispatch with `not_before` set to that hour. Two limits shape what is r
 minutes is refused, and the wait is subtracted from the 340-minute job before your `deadline_min` is checked — so a
 run that needs 130 minutes cannot be queued behind a 220-minute wait. When neither works, send it inside the long
 stretch instead (after 10:00 UTC on a weekday, or any hour of a weekend, which the card bills off-peak).
+
+### 32.46 Reading a fold's key, and the one field that is always written
+
+Every ledger row carries a `treatment` string, and it is the only thing that decides which folds may be averaged:
+
+```text
+unit=correction/form=lesson/scope=all/model=deepseek/deepseek-flash/traceClaims=6/rotation=fair-share
+```
+
+Fields appear in a fixed order, and a field the artefact does not carry is left out rather than filled in. That rule
+is what makes the key trustworthy — and it is also why `rotation` had to be fixed at the other end:
+
+| the fold's file | its key ends with | read it as |
+|---|---|---|
+| written before the policy field existed | *(nothing)* | this fold cannot say how far its items travelled |
+| declares no policy | `/rotation=none` | unbounded: the ranking answered with its favourite |
+| declares `fair-share` | `/rotation=fair-share` | one item per `ceil(requests / servable)` renders |
+
+Two folds are pooled only when their keys are equal, so the second row and the third never average, and the first
+row pools with nothing that states a policy. If you are writing a new artefact, the rule is: **write the field even
+when its value is nothing.** A pair of runs that both declined a policy must be able to say so; a reader that fills
+in the blank on their behalf has invented a treatment.
+
+```bash
+pnpm eval:pack-ledgers            # print the record, one block per pool
+pnpm eval:pack-ledgers --check     # fail when the committed record and the artefacts disagree
+```
+
+`--check` is the gate. It catches two things prose cannot: a fold whose numbers moved under a re-read, and a fold
+the record no longer carries. It deliberately does **not** re-label a fold: keys are what the file declares, so a
+pre-field fold keeps the string it has even after the producer started writing the field.
+
+To see one fold's key without the record, read the artefact's own `treatment` object — the key is those fields,
+joined in the order above:
+
+```bash
+node -e "const a=require('./eval/results/poc-l4-pair-r152c.json');console.log(a.treatment)"
+```

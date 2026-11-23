@@ -3318,11 +3318,11 @@ test recomputes −4.64 pp from the four post-R152 artefacts, so the published n
 right *and* methodologically mixed. The conclusion survives (every key is negative, and the corpus reads −4.38 pp);
 the number does not.
 
-The key is **not total**, and that is stated rather than repaired: `rotation` is projected only when an arm declares
-one, so `poc-l4-pair-r152` carries none while its registration pins `serveRotation: fair-share` — the "no rotation"
-pool therefore contains a bounded fold. Inferring the value from the registration would make the key depend on a
-file the artefacts do not reference, so the gate quotes keys as *what the artefact declares* and R202 makes the
-field total by writing `none`.
+The key is **not total** in the artefacts, and that is stated rather than repaired: `rotation` is projected only
+when an arm declares one, so `poc-l4-pair-r152` carries none while its registration pins
+`serveRotation: fair-share` — the "no rotation" pool therefore contains a bounded fold. Inferring the value from the
+registration would make the key depend on a file the artefacts do not reference, so the gate quotes keys as *what
+the artefact declares*, and §8.63 closes the seam at the producer instead.
 
 **What replicates.** The delta moves sign across folds (+2.50 … −10.81) inside ±9–11 pp intervals; the inert share
 does not (70.3% … 87.5%, corpus 78.1% [72.6, 82.8]). The reason is structural: the delta is a contrast between two
@@ -3336,3 +3336,52 @@ states named when either is not a census, when a census carries no prompt-token 
 comes out negative (one dispatch's memory arm cannot bill fewer prompt tokens than its own control). No committed
 fold carries a bill, so the record's price column is `unpriced` with the reason — and `l4-pair` now writes each
 arm's `promptTokens`, so the first priced dispatch fills it without touching this module.
+
+### 8.63 The serving policy is a field, including when it is `none`
+
+§8.62 ended with a seam it named rather than repaired: the treatment key could not say whether a fold was bounded.
+R202 closes it, and the interesting part of the round is *where*.
+
+**The defect, in one line of data.** Three of the five committed folds carry no `rotation` field, one carries
+`fair-share`, and one carries no treatment block at all. `treatmentKeyOf` omits a field the file does not carry, so
+the four with a treatment block produced **one** key between them — a bounded fold and three unbounded ones filed
+under one label, which is the mixture §8.62's correction was supposed to remove and only partly did.
+
+**The repair is at the writer, not the reader.** `treatmentOf` writes `rotation` unconditionally: the value the arms
+agree on, or the literal `none` when no arm stated one. `l4-pair` states the memory arm's policy unconditionally
+(`rotationModeOf(undefined)` is `none`), and the control arm stays silent — it serves no pack and therefore has no
+policy to declare, which is silence rather than a disagreement. `treatmentKeyOf` is **unchanged**, and that is the
+load-bearing half of the decision:
+
+| rule | why |
+|---|---|
+| the producer writes the field | the pair is the last place that knows which arm stated what; every later reader would be inferring |
+| the reader still omits what the file lacks | a committed key may not move because the fold was re-read — the record regenerates byte for byte, and a test asserts `driftOf` is empty against the committed file |
+| the old folds are not re-labelled | `poc-l4-pair-r152`'s registration pins `fair-share` and its artefact says nothing; writing `fair-share` from the registration would make the key depend on a file the artefacts do not reference, which is the inference §8.62 refused |
+
+**Three states, three keys.**
+
+| artefact | key segment | what it licenses |
+|---|---|---|
+| the four pre-field folds | *(none)* | the fold cannot say; it pools with nothing that states a policy |
+| a fold after R202 that declared nothing | `rotation=none` | no policy ran, so the fold is unbounded |
+| R152c, and every fair-share arm | `rotation=fair-share` | one item per `ceil(requests / servable)` renders |
+
+`none` and `off` stay different names for the reason §8.53 gave: an arm that never declared a policy and an arm that
+declared the identity produced the same request and are not the same experiment. What changed is that the first can
+now be *stated* by the file that wrote it instead of being inferred by the file that reads it.
+
+**Acceptance, five properties.**
+
+1. a fixture pair whose arms declare no rotation writes `rotation: "none"` (`l4-pair-transfer`, end to end through
+   the step that publishes the artefact);
+2. a fixture pair whose memory arm declares `fair-share` writes `fair-share`;
+3. the two produce **different** keys (`treatmentKeyOf` on the published treatments);
+4. the committed record's key for every one of the five folds is exactly what it was — the unstated pool shrinks by
+   the folds *re-run* after the change, never by the folds merely re-read;
+5. `pnpm eval:pack-ledgers --check` reports no drift, so the record and the artefacts cannot disagree in the gate.
+
+**What this buys.** R201's dose–response compares a gate against a mixture; a mixture cannot say whether a gate
+passed or failed, so the comparison is only definable once the pool is one treatment. That is the whole reason this
+round is ¥0 and one commit: it costs nothing to buy a key that can be computed, and everything downstream is a
+statement about a population that is actually one population.

@@ -700,8 +700,9 @@ const treatment = treatmentOf([
     // R150: the filter the request carried, verbatim. Two folds served through two filters are two experiments,
     // and the pool refuses them by this string rather than by re-deriving an anchor from a knob nobody printed.
     knobs: first.tau2?.pack?.knobs,
-    // Stated only when the artefact carries a block: the control arm serves no pack and has no policy to
-    // declare, and `treatmentOf` reads silence as "this arm cannot say" rather than as a disagreement.
+    // Silent: the control arm serves no pack, so it has no policy to declare. `treatmentOf` reads that as the
+    // absence of a claim rather than as a disagreement, and R202 makes the treatment total on the memory arm's
+    // answer alone.
     rotation: first.tau2?.serveRotation === undefined ? undefined : rotationModeOf(first.tau2.serveRotation),
   },
   {
@@ -712,8 +713,11 @@ const treatment = treatmentOf([
     model: second.model,
     traceClaims: second.tau2?.traceClaims?.ceiling,
     knobs: second.tau2?.pack?.knobs,
-    rotation:
-      second.tau2?.serveRotation === undefined ? undefined : rotationModeOf(second.tau2.serveRotation),
+    // R202: stated unconditionally, and `rotationModeOf(undefined)` is the literal `none` — the memory arm is the
+    // only arm that can carry a policy, so its silence is a claim about the treatment rather than about the file.
+    // Before this the arm passed `undefined` through, the treatment omitted the field, and the pool key became
+    // identical to the one an arm that declared `none` produces.
+    rotation: rotationModeOf(second.tau2?.serveRotation),
   },
 ]);
 

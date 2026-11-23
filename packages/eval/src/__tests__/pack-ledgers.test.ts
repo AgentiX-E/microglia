@@ -82,6 +82,19 @@ describe('treatmentKeyOf', () => {
     expect(treatmentKeyOf({})).toBe('unstated');
     expect(treatmentKeyOf({ unit: '', knobs: null })).toBe('unstated');
   });
+
+  it('separates a declared `none` from a field the file does not carry', () => {
+    // R202. `poc-l4-pair-r152` declares no rotation while its registration pins `serveRotation: fair-share`, so a
+    // key that dropped the field filed a bounded fold with the unbounded ones and the pool averaged two
+    // mechanisms. Writing the field makes those two keys differ. It does **not** make the old fold correct: the
+    // three pre-field artefacts keep the key they have rather than being re-labelled by inference, and this test
+    // pins the property the pool rests on — three states, three keys.
+    const before = treatmentKeyOf(TREATMENT);
+    const none = treatmentKeyOf({ ...TREATMENT, rotation: 'none' });
+    const bounded = treatmentKeyOf({ ...TREATMENT, rotation: 'fair-share' });
+    expect(new Set([before, none, bounded]).size).toBe(3);
+    expect(none).toBe(`${before}/rotation=none`);
+  });
 });
 
 describe('ledgerOf', () => {
@@ -501,5 +514,30 @@ describe('the published τ² census, recomputed from the artefacts', () => {
     const record = packLedgersRecord(sources).record as PackLedgersRecord;
     expect(record.headline.deltaPp).toBeLessThan(0);
     for (const pool of record.pooled) expect(pool.deltaPp).toBeLessThan(0);
+  });
+
+  it('keeps every committed key exactly where it was, so re-reading a fold never re-labels it', () => {
+    // R202's acceptance clause, in the form a test can hold: the unstated pool shrinks by the folds re-run after
+    // the change, never by the folds merely re-read. Four of the five artefacts predate the field and one declares
+    // `fair-share`; none of the five may gain a `rotation=` segment from this round.
+    const record = packLedgersRecord(sources).record as PackLedgersRecord;
+    const keys = new Map(record.folds.map((fold) => [fold.artefact.split('/').pop() ?? '', fold.treatment]));
+    expect(keys.get('poc-l4-pair-r152c.json')).toContain('/rotation=fair-share');
+    for (const name of [
+      'poc-l4-pair.json',
+      'poc-l4-pair-official.json',
+      'poc-l4-pair-r152.json',
+      'poc-l4-pair-swapped.json',
+    ]) {
+      expect(keys.get(name) ?? '').not.toContain('rotation=');
+    }
+  });
+
+  it('regenerates the committed record with no drift, which is what makes `--check` a gate', () => {
+    const committed = JSON.parse(
+      readFileSync(join(process.cwd(), 'eval/results/pack-ledgers.json'), 'utf8'),
+    ) as PackLedgersRecord;
+    const fresh = packLedgersRecord(sources).record as PackLedgersRecord;
+    expect(driftOf(committed, fresh)).toEqual([]);
   });
 });

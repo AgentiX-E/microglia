@@ -525,9 +525,17 @@ const arm = (
 
 describe('treatmentOf', () => {
   it('reads the treatment the two arms agree on, which is what the pool compares', () => {
+    // R202: `rotation` is total, so a pair that declared no policy says `none` rather than saying nothing.
     expect(treatmentOf([arm('reference'), arm('memory')])).toEqual({
       ok: true,
-      treatment: { unit: 'raw', form: 'record', scope: 'edited', model: 'deepseek-chat', traceClaims: 400 },
+      treatment: {
+        unit: 'raw',
+        form: 'record',
+        scope: 'edited',
+        model: 'deepseek-chat',
+        traceClaims: 400,
+        rotation: 'none',
+      },
     });
   });
 
@@ -545,6 +553,7 @@ describe('treatmentOf', () => {
           model: 'deepseek-chat',
           traceClaims: 400,
           knobs: 'anchoring=lexical',
+          rotation: 'none',
         },
       });
     expect(
@@ -580,14 +589,16 @@ describe('treatmentOf', () => {
 
   it('leaves out a field neither arm states, rather than filling it with a default', () => {
     // A default here would reach the pool as a fact, and two runs that both lacked the field would pool as
-    // though they had stated the same one.
+    // though they had stated the same one. `rotation` is the one exception and it is not a default: R202 registers
+    // it as a field of the treatment, so `none` is the treatment's own answer rather than a value filled in for a
+    // field nobody stated.
     const outcome = treatmentOf([
       arm('reference', { traceClaims: undefined }),
       arm('memory', { traceClaims: undefined }),
     ]);
     expect(outcome).toEqual({
       ok: true,
-      treatment: { unit: 'raw', form: 'record', scope: 'edited', model: 'deepseek-chat' },
+      treatment: { unit: 'raw', form: 'record', scope: 'edited', model: 'deepseek-chat', rotation: 'none' },
     });
   });
 
@@ -604,7 +615,14 @@ describe('treatmentOf', () => {
       ]),
     ).toEqual({
       ok: true,
-      treatment: { unit: 'raw', form: 'record', scope: 'edited', model: 'deepseek-chat', traceClaims: 400 },
+      treatment: {
+        unit: 'raw',
+        form: 'record',
+        scope: 'edited',
+        model: 'deepseek-chat',
+        traceClaims: 400,
+        rotation: 'none',
+      },
     });
   });
 
@@ -618,8 +636,16 @@ describe('treatmentOf', () => {
   it('carries only the fields the arms state, however few that is', () => {
     // A pair from before any of these fields existed: the treatment it can state is what it recorded, which is
     // nothing, and the pool then refuses it with four sentences naming the four fields nobody compared.
+    //
+    // R202 is the one exception and it is stated rather than defaulted: the treatment always names a serving
+    // policy, and `none` is the name for "no arm declared one". Every pair this code writes can support that
+    // claim, because the memory arm is the only arm that can carry a policy — and the three folds whose files
+    // were written before the field existed are not re-derived, so they keep the key they already have.
     const bare = { unit: undefined, form: undefined, scope: undefined, model: undefined, traceClaims: undefined };
-    expect(treatmentOf([arm('reference', bare), arm('memory', bare)])).toEqual({ ok: true, treatment: {} });
+    expect(treatmentOf([arm('reference', bare), arm('memory', bare)])).toEqual({
+      ok: true,
+      treatment: { rotation: 'none' },
+    });
   });
 
   it('refuses a pair that disagrees about the trace ceiling, which decides the yield', () => {

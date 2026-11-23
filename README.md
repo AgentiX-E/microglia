@@ -802,7 +802,7 @@ stops being true. `pnpm eval:coupling` recomputes it from the source tree on eve
 | `core` | 48 | 10,749 | **0** |
 | `protocol` | 3 | 1,922 | **0** |
 | `sql` (the adapter) | 7 | **1,956** | 5 |
-| `eval` | 196 | 58,885 | 25, each with a written reason |
+| `eval` | 196 | 58,901 | 25, each with a written reason |
 | `browser` | 2 | 280 | 0 |
 | `node` | 6 | 1,294 | 0 |
 
@@ -1146,12 +1146,14 @@ written before the treatment block existed. Every key is negative, so the conclu
 the number does not — and the test recomputes −4.64 from the four artefacts to show the published figure was
 arithmetic, not invention.
 
-**And the key is not total, which is the next seam rather than a footnote.** `rotation` is recorded only when an arm
-declares one, so a fold written before the field was projected cannot be assigned: `poc-l4-pair-r152` declares no
-rotation in its artefact, while its pre-registration pins `serveRotation: fair-share`. The "no rotation" pool
-therefore contains at least one bounded fold, which makes the mixture smaller than the published one but not zero.
-R202 registers the fix — a total field, with `none` written explicitly — and until it lands the keys are quoted as
-*what the artefact declares*, never as *what ran*.
+**And the key was not total, so the field is now written rather than inferred.** `rotation` used to be recorded only
+when an arm declared one, so a fold written before the projection could not be assigned: `poc-l4-pair-r152` declares
+no rotation in its artefact while its pre-registration pins `serveRotation: fair-share`, and the "no rotation" pool
+therefore contained a bounded fold. R202 fixes this at the producer: `treatmentOf` writes `rotation` unconditionally,
+as the declared policy or the literal `none`, so every fold bought after that round states one. The reader is
+deliberately unchanged — a committed key may not move because the fold was re-read — so the four pre-field artefacts
+keep exactly the strings they had, and `pnpm eval:pack-ledgers --check` proves the record and the artefacts agree.
+Keys are still quoted as *what the artefact declares*, never as *what ran*.
 
 **What a gate would have to buy, in episodes.** The corpus needs **12 of its 33 breaks prevented (36%)** before the
 delta stops being negative. That is the target the next registered gate is priced against, and it is a different

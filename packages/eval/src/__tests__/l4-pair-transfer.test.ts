@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { treatmentKeyOf } from '../pack-ledgers.js';
 
 /**
  * The pairing step, end to end, over two arm artefacts that carry their episodes.
@@ -520,6 +521,8 @@ describe('the fold a cross-fit reads off the pair', () => {
       readonly scope?: string;
       readonly knobs?: string;
     };
+    /** R202: the policy the arm declared. Absent is every arm that declared none, and every artefact before R152. */
+    readonly rotation?: 'fair-share' | 'off';
   }): unknown {
     const base = arm({ arm: input.arm, rows: input.rows, pass4: 0.5 }) as Record<string, unknown>;
     return {
@@ -535,6 +538,8 @@ describe('the fold a cross-fit reads off the pair', () => {
           : { split: { train: input.train, test: input.test } }),
         servedPackSizes: [],
         learning: { rows: input.train?.length ?? 0, unanswered: 0, edited: 0, distilled: 0, distillFailed: 0 },
+        // R202: a mode on its own is what the report type allows, and it is the whole identity the pool compares.
+        ...(input.rotation === undefined ? {} : { serveRotation: { mode: input.rotation } }),
         ...(input.treatment === undefined
           ? {}
           : {
@@ -591,13 +596,32 @@ describe('the fold a cross-fit reads off the pair', () => {
       evaluated: ['airline/1', 'airline/2'],
     });
     expect(published['treatmentAbsent']).toBeUndefined();
+    // R202: the serving policy is a field of the treatment even when nobody declared one. This fixture's arms
+    // carry no `serveRotation` block, which is the shape every pre-R152 artefact has, and the pair now says
+    // `none` where it used to say nothing — the two used to produce the same pool key.
     expect(published['treatment']).toEqual({
       unit: 'correction',
       form: 'lesson',
       scope: 'edited',
       model: 'deepseek/deepseek-chat',
       knobs: '',
+      rotation: 'none',
     });
+  }, 60_000);
+
+  it('states the policy a bounded arm declared, and gives that fold a key of its own', () => {
+    // R202's other half: the field is not a constant. `none` and `fair-share` are the two names the pool has to
+    // tell apart, and this runs both through the step that writes the artefact rather than comparing literals.
+    const reference = armWithSplit({ arm: 'reference', rows: ROWS, train: [], test: ['airline/1', 'airline/2'] });
+    const treatment = { unit: 'correction', form: 'lesson', scope: 'edited', knobs: '' };
+    const memory = (rotation?: 'fair-share'): unknown =>
+      armWithSplit({ arm: 'memory', rows: ROWS, train: ['retail/1'], test: ['airline/1', 'airline/2'], treatment, rotation });
+
+    const bounded = publish(reference, memory('fair-share'));
+    const unbounded = publish(reference, memory());
+    expect((bounded['treatment'] as { rotation?: string }).rotation).toBe('fair-share');
+    expect((unbounded['treatment'] as { rotation?: string }).rotation).toBe('none');
+    expect(treatmentKeyOf(bounded['treatment'])).not.toBe(treatmentKeyOf(unbounded['treatment']));
   }, 60_000);
 
   it('says which arm could not state its split, because an artefact from before the field is not a leak', () => {

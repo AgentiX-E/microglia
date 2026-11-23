@@ -95,11 +95,13 @@ function numberOf(block: Record<string, unknown>, key: string): number | undefin
  * −4.64 pp did. A block that is absent yields `unstated` rather than a guess: an artefact from before the
  * block existed cannot be assigned to a treatment by inference.
  *
- * **The key is what the file declares, not what ran**, and the distinction is not academic: `rotation` is
- * written only when an arm states one, so `poc-l4-pair-r152` carries no rotation while its registration pins
- * `serveRotation: fair-share`. Its own pool therefore contains a bounded fold. That is recorded here rather
- * than repaired by inference, because inferring it from the registration would make the key depend on a file
- * the artefacts do not reference; R202 makes the field total by writing `none` explicitly.
+ * **The key is what the file declares, not what ran.** `poc-l4-pair-r152` carries no `rotation` while its
+ * registration pins `serveRotation: fair-share`, so its own pool contains a bounded fold. That defect is recorded
+ * rather than repaired by inference — inferring the value from the registration would make the key depend on a file
+ * the artefacts do not reference. R202 closed it at the producer: `treatmentOf` writes `rotation` unconditionally,
+ * as the declared policy or the literal `none`, so every fold bought after that round states one and this reader's
+ * omission rule no longer decides anything about a new fold. The reader is deliberately unchanged: a committed key
+ * may not move because the fold was re-read, and the four pre-field artefacts keep exactly the strings they had.
  */
 export function treatmentKeyOf(treatment: unknown): string {
   if (!isObject(treatment)) return 'unstated';
