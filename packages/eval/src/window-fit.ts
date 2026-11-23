@@ -43,12 +43,16 @@ export type WindowFit = {
   /** Minutes the run is expected to take, setup included. */
   readonly estimatedMinutes: number;
   /**
-   * The hour the guard is waiting for, as UTC `HH:MM`, when the run does not fit.
+   * The hour to **dispatch at** — the next off-peak window long enough to hold this run — as UTC `HH:MM`.
    *
-   * Absent when it fits, and present when it does not: a refusal that says "not now" and not "at 04:00" is a
-   * refusal the operator overrides, which is how a run gets dispatched at double price twice.
+   * Absent when the run fits, and present when it does not: a refusal that says "not now" and not "at 04:00" is
+   * a refusal the operator overrides, which is how a run gets dispatched at double price twice. It is the hour
+   * a *fitting* window opens, not the hour the current one closes: R198's first dispatch was told "01:00" —
+   * the moment peak begins — and following that advice is what this field exists to prevent.
    */
   readonly windowOpensAt?: string;
+  /** The hour the current off-peak stretch ends and peak billing begins, which is what the run would cross. */
+  readonly peakOpensAt?: string;
 };
 
 /** `HH:MM` UTC, so a refusal can be pasted into `not_before` without arithmetic. */
@@ -77,6 +81,31 @@ function minutesUntilPeak(
   throw new RangeError('the rate card states no peak window, so no run can be out of one');
 }
 
+/**
+ * The first moment at or after `from` where an off-peak stretch can hold `estimatedMinutes`.
+ *
+ * Walking rather than solving, because the card's windows are a table and a solution would embed its shape:
+ * from a peak moment the walk moves to the next off-peak start, measures what is left of that stretch, and if
+ * it is too short jumps to the following one. Bounded by a week for the same reason `nextOffPeak` is, and the
+ * bound throws instead of returning `now`: a guard whose "no window exists" answer is a moment that is peak
+ * would advise the dispatch it refuses.
+ */
+function nextFittingWindow(
+  from: Date,
+  estimatedMinutes: number,
+  windows: readonly PeakWindow[],
+  weekdaysOnly: boolean,
+): Date {
+  let cursor = from;
+  for (let step = 0; step <= 7; step += 1) {
+    if (isPeak(cursor, windows, weekdaysOnly)) cursor = nextOffPeak(cursor, windows, weekdaysOnly);
+    const remaining = minutesUntilPeak(cursor, windows, weekdaysOnly);
+    if (remaining >= estimatedMinutes) return cursor;
+    cursor = new Date(cursor.getTime() + remaining * 60_000);
+  }
+  throw new RangeError('no off-peak window in the next week is long enough for this run');
+}
+
 export function windowFit(input: {
   /** When the run would start, which is the dispatch time plus whatever `not_before` named. */
   readonly now: Date;
@@ -102,19 +131,21 @@ export function windowFit(input: {
       fits: false,
       minutesRemaining: 0,
       estimatedMinutes,
-      windowOpensAt: clockOf(opens),
+      windowOpensAt: clockOf(nextFittingWindow(opens, estimatedMinutes, windows, weekdaysOnly)),
+      peakOpensAt: clockOf(input.now),
     };
   }
   const minutesRemaining = minutesUntilPeak(input.now, windows, weekdaysOnly);
   if (estimatedMinutes <= minutesRemaining) {
     return { fits: true, minutesRemaining, estimatedMinutes };
   }
-  const opening = new Date(input.now.getTime() + minutesRemaining * 60_000);
+  const peakOpens = new Date(input.now.getTime() + minutesRemaining * 60_000);
   return {
     fits: false,
     minutesRemaining,
     estimatedMinutes,
-    windowOpensAt: clockOf(opening),
+    windowOpensAt: clockOf(nextFittingWindow(peakOpens, estimatedMinutes, windows, weekdaysOnly)),
+    peakOpensAt: clockOf(peakOpens),
   };
 }
 
@@ -134,9 +165,9 @@ export function windowFitLine(fit: WindowFit): string {
   }
   return (
     `off-peak window: ${String(fit.minutesRemaining)} minute(s) left against an estimate of ` +
-    `${String(fit.estimatedMinutes)} — the run would cross into the window that opens at ` +
-    `${fit.windowOpensAt ?? 'an unstated hour'}, and ` +
+    `${String(fit.estimatedMinutes)} — the run would cross into the peak window that opens at ` +
+    `${fit.peakOpensAt ?? 'an unstated hour'}, and ` +
     `\`--require-off-peak\` is checked per phase, so the half it paid for would be lost. ` +
-    `Dispatch with not_before: ${fit.windowOpensAt ?? 'HH:MM'}`
+    `Dispatch with not_before: ${fit.windowOpensAt ?? 'HH:MM'}, the next off-peak window long enough for it`
   );
 }

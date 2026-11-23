@@ -2252,3 +2252,10 @@ a rate with no denominator is not zero, so it is absent rather than `0`.
 **Inert price** — The prompt tokens an episode's inert share bought: `(memory − control) / measured`, times the
 inert share. `priced: false` — with both arms' bill states named — when either arm lacks a census, when a census
 carries no token column, or when the subtraction is negative.
+
+**Peak window** — The hours a provider bills at double the off-peak rate: 01:00–04:00 and 06:00–10:00 UTC on
+weekdays for the card in `cost.ts`. Weekends have no peak, which is why a Sunday dispatch fits any hour.
+
+**Window fit** — Whether a run can finish inside the current off-peak stretch, computed from an estimate of
+`26 s` an episode plus ten minutes of setup. A refusal names two hours: `peakOpensAt` (what the run would cross)
+and `windowOpensAt` (the next stretch long enough to hold it, which is what goes in `not_before`).

@@ -802,7 +802,7 @@ stops being true. `pnpm eval:coupling` recomputes it from the source tree on eve
 | `core` | 48 | 10,749 | **0** |
 | `protocol` | 3 | 1,922 | **0** |
 | `sql` (the adapter) | 7 | **1,956** | 5 |
-| `eval` | 196 | 58,854 | 25, each with a written reason |
+| `eval` | 196 | 58,885 | 25, each with a written reason |
 | `browser` | 2 | 280 | 0 |
 | `node` | 6 | 1,294 | 0 |
 
@@ -1225,7 +1225,7 @@ pnpm bench      # study only, writes bench/results/study.json
 ```
 
 Coverage is enforced at 95% on lines, statements, functions **and** branches. It currently reports
-**100 / 99.91 / 100 / 100** over **6,209 tests**; the branch arms that remain uncovered are
+**100 / 99.91 / 100 / 100** over **6,211 tests**; the branch arms that remain uncovered are
 listed with file, line, and reason in the internal technical design, and none is excluded with an ignore
 comment.
 

@@ -43,14 +43,44 @@ describe('windowFit', () => {
     expect(fit.fits).toBe(false);
     expect(fit.minutesRemaining).toBe(13);
     expect(fit.estimatedMinutes).toBe(109);
-    expect(fit.windowOpensAt).toBe('01:00');
-    expect(windowFitLine(fit)).toContain('would cross into the window that opens at 01:00');
+    // The advice is the next window that can *hold* the run — 04:00–06:00 offers 120 minutes for an estimate of
+    // 109 — and the crossing it names is the peak hour at 01:00. The field used to carry 01:00 itself, which is
+    // the moment peak begins: R198's first dispatch was refused with that advice, and following it would have
+    // bought the same run at double price.
+    expect(fit.peakOpensAt).toBe('01:00');
+    expect(fit.windowOpensAt).toBe('04:00');
+    expect(windowFitLine(fit)).toContain('would cross into the peak window that opens at 01:00');
+    expect(windowFitLine(fit)).toContain('Dispatch with not_before: 04:00');
+  });
+
+  it('walks past an off-peak stretch that is too short for the estimate', () => {
+    // 300 episodes is 140 minutes; the 04:00–06:00 stretch offers 120, so the answer is not "the next window"
+    // but the next one *that fits* — 10:00, with fifteen hours behind it. A guard that named 04:00 here would
+    // send the run into the same crossing it is refusing.
+    const fit = windowFit({ now: moment('2026-11-18T00:47:00Z'), episodes: 300, windows: WINDOWS });
+    expect(fit.fits).toBe(false);
+    expect(fit.estimatedMinutes).toBe(140);
+    expect(fit.peakOpensAt).toBe('01:00');
+    expect(fit.windowOpensAt).toBe('10:00');
+  });
+
+  it('refuses to name an hour when no window in the week can hold the run', () => {
+    // A card whose only off-peak hour is 01:00–02:00, billed every day of the week, cannot hold a 227-minute
+    // run; the honest answer is a refusal rather than a moment that is itself peak — which `now` would be.
+    const tight = [
+      { fromHourUtc: 0, toHourUtc: 1 },
+      { fromHourUtc: 2, toHourUtc: 24 },
+    ];
+    expect(() =>
+      windowFit({ now: moment('2026-11-18T00:47:00Z'), episodes: 500, windows: tight, weekdaysOnly: false }),
+    ).toThrow(/no off-peak window in the next week/);
   });
 
   it('refuses a start inside the window with zero minutes left rather than a negative remainder', () => {
     const fit = windowFit({ now: moment('2026-11-18T01:30:00Z'), episodes: 228, windows: WINDOWS });
     expect(fit.fits).toBe(false);
     expect(fit.minutesRemaining).toBe(0);
+    expect(fit.peakOpensAt).toBe('01:30');
     expect(fit.windowOpensAt).toBe('04:00');
   });
 
@@ -101,8 +131,12 @@ describe('windowFit', () => {
   });
 
   it('says which hour to name in not_before, and says it on the passing side too', () => {
+    // 05:30 leaves thirty minutes before the 06:00 peak, and the stretch after it is 04:00–06:00 again on the
+    // next day — too short for 109 minutes — so the answer walks past it to 10:00, the fifteen-hour stretch.
     const refuse = windowFit({ now: moment('2026-11-18T05:30:00Z'), episodes: 228, windows: WINDOWS });
-    expect(windowFitLine(refuse)).toContain('Dispatch with not_before: 06:00');
+    expect(refuse.peakOpensAt).toBe('06:00');
+    expect(refuse.windowOpensAt).toBe('10:00');
+    expect(windowFitLine(refuse)).toContain('Dispatch with not_before: 10:00');
     const allow = windowFit({ now: moment('2026-11-18T22:00:00Z'), episodes: 10, windows: WINDOWS });
     expect(windowFitLine(allow)).toContain('it fits');
   });
@@ -187,10 +221,13 @@ describe('eval:window-fit, the command a workflow step calls', () => {
     expect(result.err).toContain('TAU_START_AT');
   });
 
-  it('refuses a start the wait step woke on inside the peak window', () => {
+  it('refuses a start the wait step woke on with too little window left, and names the hour that fits', () => {
+    // 05:30 is off-peak but leaves thirty minutes for a 109-minute estimate. The advice is not 06:00 — the
+    // moment peak begins — but 10:00, the next stretch long enough to hold the run: the next morning's
+    // 04:00–06:00 is 120 minutes, which is checked, and the fifteen hours after 10:00 are the answer.
     const result = run({ TAU_TRAIN_TASKS: '57', TAU_TEST_TASKS: '57', TAU_START_AT: '2026-11-18T05:30:00Z' });
     expect(result.code).toBe(1);
-    expect(result.err).toContain('Dispatch with not_before: 06:00');
+    expect(result.err).toContain('Dispatch with not_before: 10:00');
   });
 
   /**

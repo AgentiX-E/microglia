@@ -5833,3 +5833,31 @@ pnpm eval:pack-ledgers --check   # the gate: refuses a stale or hand-edited reco
 
 A drift is evidence, not a chore: either a fold was re-run (the numbers moved because the run did) or a rule
 changed (the numbers moved because the reading did), and the gate cannot tell you which — you have to read it.
+
+### 32.45 Why a τ² dispatch is refused, and the hour to send it
+
+The lane refuses a dispatch that would still be running when peak billing starts, because `--require-off-peak` is
+checked per phase: a run that crosses loses the half it already paid for. The refusal is arithmetic, printed with
+both numbers:
+
+```text
+off-peak window: 52 minute(s) left against an estimate of 109 — the run would cross into the peak window that
+opens at 01:00, and `--require-off-peak` is checked per phase, so the half it paid for would be lost.
+Dispatch with not_before: 04:00, the next off-peak window long enough for it
+```
+
+Two hours appear, and they are different facts:
+
+| number | what it is |
+|---|---|
+| **peak window that opens at 01:00** | the moment the run would be billed double |
+| **not_before: 04:00** | the next off-peak stretch that can hold the estimate — dispatch here |
+
+The estimate is `26 s` an episode (measured on a memory arm) plus ten minutes of setup, so a two-arm 74 + 40 fold is
+109 minutes. The advice walks past a stretch that is too short: a 227-minute run is told `10:00`, not the 04:00 one
+it would overrun, and a rate card with no stretch long enough raises rather than naming an hour that is peak.
+
+Send the dispatch with `not_before` set to that hour. Two limits shape what is reachable: a wait longer than 240
+minutes is refused, and the wait is subtracted from the 340-minute job before your `deadline_min` is checked — so a
+run that needs 130 minutes cannot be queued behind a 220-minute wait. When neither works, send it inside the long
+stretch instead (after 10:00 UTC on a weekday, or any hour of a weekend, which the card bills off-peak).
