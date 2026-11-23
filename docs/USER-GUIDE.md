@@ -5967,3 +5967,41 @@ Two cautions before quoting either number:
   `unpriced — <reason>` and never `0`.
 - **Money and tokens are not proportional.** Tokens are what this project compares on (every competitor row reports
   them); money is what a deployment pays, and at the off-peak band a 3,300-token episode is a fifth of a cent.
+
+### 32.49 Running the transient arm: a sentence instead of a block
+
+The transient arm serves **one sentence written for the request** instead of the block the store rendered, and
+writes nothing back. It is off unless a registration names it:
+
+```yaml
+serveBody: guidance
+```
+
+Three lines then carry it: `prereg-form` prints `body=guidance`, the workflow exports `TAU_SERVE_BODY`, and the
+driver — which resolves it at module load and refuses a spelling it cannot serve — turns it into one variable for
+the agent and prints what it resolved before the first episode:
+
+```text
+[tau2] serve-body: guidance declared=true
+```
+
+**Three readings, in the order they decide anything.** The delta is not one of them.
+
+1. **The call was made, once an episode.** In the pair artefact, `transient.guidance` carries `calls`, `sentences`,
+   `refusals`, `failures`, `promptChars` and `sentenceChars`, and the arm's `usage.calls` exceeds its control's by
+   one per served episode. `refusals` is the model answering `NONE` — that is the arm's gate and not an error.
+   `failures` above zero is a repair, not a result: no pack is injected when the summariser is unreachable.
+2. **The store did not grow.** `transient.store` carries `{ before, after, grew }` for both arms. An arm whose claim
+   is "nothing durable is written" is checked against the file, not against the code.
+3. **The inert share moved, or it did not.** `pnpm eval:pack-ledgers` refuses a transient fold whose guidance calls
+   failed, because `serveYield.renders` counts the packs the *facade* served and on this arm the agent read the
+   sentence: a failed call would otherwise be booked as an inert pack, and 78.7% is the number every gate in this
+   lane is judged against.
+
+**What the bill should do.** The block is paid once, as the summariser's input, instead of riding 11.2 turns as
+context — so the arm's injected tokens an episode should come in **below** the published 3,299.6. A bill that rises
+means both bodies were paid for, which is a wiring defect rather than a mechanism.
+
+**What it does not do.** It does not read the outcome and it does not decide at inference time. A critic that sees
+the sentence and the request and may still withhold it is a different, later arm; this one measures whether the body
+alone moves the share.

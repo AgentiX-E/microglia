@@ -342,6 +342,26 @@ export type Tau2Raw = {
    */
   readonly serveRotation?: ServeRotationReport;
   /**
+   * R204: what the pack was made of at serve time.
+   *
+   * Declared here for the reason `serveRotation` above is: the driver emits it from a spread, which TypeScript
+   * exempts from the excess-property check, so without this line `keyof Tau2Raw` would not grow, `PROJECTION`
+   * would stay exhaustive over a type that no longer described the record, and the pair would refuse the arm
+   * after the run with `l4-projection-complete` — at the cost of the run.
+   *
+   * Absent on the reference arm, which serves no pack and therefore has no body to declare.
+   */
+  readonly serveBody?: string;
+  /**
+   * R204: the store's size before and after the evaluation phase, which is the transient arm's own claim.
+   *
+   * The arm's mechanism is that nothing durable is written: the sentence is used and discarded. That is a claim
+   * about a file, so it is settled by counting the file on both sides of the phase rather than by reading the code
+   * that was supposed to leave it alone. Recorded on both arms — the reference arm cannot write, and saying so
+   * costs one query.
+   */
+  readonly storeGrowth?: { readonly before: number; readonly after: number; readonly grew: boolean };
+  /**
    * What the pack served and what it refused, which `recall.empty` cannot separate.
    *
    * `recall.empty` counts one state. Two states produce it: a store with nothing relevant, and a
@@ -943,6 +963,12 @@ export const PROJECTION: {
   // Carried verbatim: the policy is the fold's identity and the reading is the only record of what the bound
   // did. Reduced or dropped, a rotation arm would be indistinguishable from the arm it is compared against.
   serveRotation: "carried",
+  // Carried verbatim: the body is the fold's treatment. Reduced or dropped, a sentence arm would be
+  // indistinguishable from the block arm it is measured against — and its whole claim is that difference.
+  serveBody: "carried",
+  // Carried verbatim: it is the only measurement of the transient arm's central claim, and a pair that dropped it
+  // would publish the by-product (a delta) and neither of the readings the registration ordered first.
+  storeGrowth: "carried",
   useObservations: "reduced",
   coverageObservations: "reduced",
   inaction: "carried",
@@ -1198,6 +1224,10 @@ export function armRecordFromDriver(
     // R152: carried beside the recall for the same reason. Absent rather than `{ mode: 'off' }` on an arm that
     // declared nothing, so every artefact written before the switch keeps the shape it had.
     ...(raw.serveRotation === undefined ? {} : { serveRotation: raw.serveRotation }),
+    // R204: the body and the two store counts, carried beside the recall they act on. Absent rather than
+    // `rendered` on an arm that declared nothing, so every artefact written before the field keeps its shape.
+    ...(raw.serveBody === undefined ? {} : { serveBody: raw.serveBody }),
+    ...(raw.storeGrowth === undefined ? {} : { storeGrowth: raw.storeGrowth }),
     ...(raw.pack === undefined ? {} : { pack: raw.pack }),
     ...(raw.memory === undefined ? {} : { memory: raw.memory }),
     ...(raw.turnCensus === undefined ? {} : { turnCensus: raw.turnCensus }),

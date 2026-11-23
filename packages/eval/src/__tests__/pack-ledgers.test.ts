@@ -95,6 +95,16 @@ describe('treatmentKeyOf', () => {
     expect(new Set([before, none, bounded]).size).toBe(3);
     expect(none).toBe(`${before}/rotation=none`);
   });
+
+  it('separates a sentence fold from a block fold, and both from a file written before the field', () => {
+    // R204. Three states, three keys, for R202's reason: a fold that served a sentence and a fold that served the
+    // block are two treatments, and the pool has to be able to say so from the artefact alone.
+    const before = treatmentKeyOf(TREATMENT);
+    const block = treatmentKeyOf({ ...TREATMENT, serveBody: 'rendered' });
+    const sentence = treatmentKeyOf({ ...TREATMENT, serveBody: 'guidance' });
+    expect(new Set([before, block, sentence]).size).toBe(3);
+    expect(sentence).toBe(`${before}/serveBody=guidance`);
+  });
 });
 
 describe('ledgerOf', () => {
@@ -152,6 +162,38 @@ describe('ledgerOf', () => {
   it('refuses a percentage that is not the ledger’s own fraction', () => {
     expect(problemsOf(fixture({ degradation: { netPp: -7.4 } })).join(' ')).toContain('net does not close');
     expect(problemsOf(fixture({ comparison: { deltaPp: -8 } })).join(' ')).toContain('net does not close');
+  });
+
+  it('refuses a sentence fold whose summariser failed, because rendered is then not injected', () => {
+    // R204. `serveYield.renders` counts the packs the facade served; on the transient arm the agent read the
+    // sentence. An episode whose guidance call failed carried nothing while its block counted as rendered, and
+    // every such episode would be booked as an inert pack — inflating the 78.7% this whole line is about.
+    const guided = (transient: Record<string, unknown>): unknown => ({
+      ...(fixture() as Record<string, unknown>),
+      treatment: { ...TREATMENT, serveBody: 'guidance' },
+      transient,
+    });
+    expect(problemsOf(guided({ guidance: { calls: 40, failures: 2 } })).join(' ')).toContain(
+      '2 of 40 guidance calls failed, so the rendered count is not the injected one',
+    );
+    // Zero failures is the reading, not a pass by default: the census has to say so.
+    expect(ledgerOfOk(guided({ guidance: { calls: 40, failures: 0, sentences: 40 } })).renders).toBe(40);
+    // No census at all is a third state, and it is refused rather than read as "no failures".
+    expect(problemsOf(guided({})).join(' ')).toContain('carries no guidance census');
+    expect(problemsOf(guided({ guidance: { sentences: 40 } })).join(' ')).toContain(
+      'carries no call and failure count',
+    );
+    // And the phase's own block, for a fold read from a driver artefact rather than from a pair.
+    const fromPhase = {
+      ...(fixture() as Record<string, unknown>),
+      treatment: { ...TREATMENT, serveBody: 'guidance' },
+      memory: { guidance: { calls: 40, failures: 0 } },
+    };
+    expect(ledgerOfOk(fromPhase).renders).toBe(40);
+    // A block fold is left alone whatever its memory block says: the gate is about the body, and the body is
+    // `rendered` for every artefact written before the field.
+    const block = { ...(fixture() as Record<string, unknown>), memory: { guidance: { calls: 40, failures: 3 } } };
+    expect(ledgerOfOk(block).renders).toBe(40);
   });
 
   it('carries `null` rather than zero when nothing broke', () => {

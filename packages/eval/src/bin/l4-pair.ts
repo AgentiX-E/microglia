@@ -195,6 +195,18 @@ type Artefact = {
      */
     readonly serveRotation?: { readonly mode?: string; readonly cap?: number; readonly servable?: number };
     /**
+     * R204: what the pack was made of at serve time — the block the store rendered, or one sentence written for
+     * the request. Absent on every artefact before the field, which is the block arm.
+     */
+    readonly serveBody?: string;
+    /**
+     * R204: the store counted before and after the phase, which is the no-durable-write reading.
+     *
+     * `grew` is the driver's own comparison rather than one this file derives: two files compared by a third is
+     * how a gate stops meaning what its name says.
+     */
+    readonly storeGrowth?: { readonly before?: number; readonly after?: number; readonly grew?: boolean };
+    /**
      * R128: the request index that opened each episode.
      *
      * Absent on every artefact written before the instrument existed, and the attribution reads absence as
@@ -678,6 +690,20 @@ const retention =
     : // `second` is the memory arm by construction, the same order the comparison uses.
       { reference: firstHeld, memory: secondHeld };
 
+/**
+ * R204: the transient arm's own census, from the block the agent wrote into the phase's diagnostics.
+ *
+ * Read through the type rather than cast at the printing site, because `memory` is `unknown` in this file's
+ * artefact type and the census is the one field of it this round publishes. `null` is the honest absence: an arm
+ * that injected the block ran no summariser, and a pair that printed `calls: 0` for it would say a call was
+ * counted and none was made.
+ */
+function guidanceCensusOf(memory: unknown): Record<string, unknown> | null {
+  if (typeof memory !== 'object' || memory === null) return null;
+  const block = (memory as Record<string, unknown>)['guidance'];
+  return typeof block === 'object' && block !== null ? (block as Record<string, unknown>) : null;
+}
+
 // R143: the two identities a cross-fit cannot do without, read from the arms rather than from the dispatch.
 //
 // The pair has always said which two files it compared and what the difference between them was. It has never
@@ -704,6 +730,8 @@ const treatment = treatmentOf([
     // absence of a claim rather than as a disagreement, and R202 makes the treatment total on the memory arm's
     // answer alone.
     rotation: first.tau2?.serveRotation === undefined ? undefined : rotationModeOf(first.tau2.serveRotation),
+    // Silent, for the same reason: the control arm serves no pack and therefore has no body to state.
+    serveBody: first.tau2?.serveBody,
   },
   {
     label: 'memory',
@@ -718,6 +746,9 @@ const treatment = treatmentOf([
     // Before this the arm passed `undefined` through, the treatment omitted the field, and the pool key became
     // identical to the one an arm that declared `none` produces.
     rotation: rotationModeOf(second.tau2?.serveRotation),
+    // R204: the memory arm's own answer, and its silence means `rendered` — the body every fold before this
+    // field was produced under, which `treatmentOf` states rather than infers.
+    serveBody: second.tau2?.serveBody,
   },
 ]);
 
@@ -760,6 +791,21 @@ await writeJson('poc-l4-pair', {
     ? { foldSplit: { learned: foldSplit.learned, evaluated: foldSplit.evaluated } }
     : { foldSplitAbsent: { reason: foldSplit.reason } }),
   ...(treatment.ok ? { treatment: treatment.treatment } : { treatmentAbsent: { reason: treatment.reason } }),
+  // R204: what the transient arm did, in the three readings the registration ordered — before the delta, which
+  // this file already carries and which the registration names as a by-product.
+  //
+  // (1) the summariser's own account: one call per served episode, and the tokens it was shown. (2) the store,
+  // counted on both arms, so "nothing durable was written" is a measurement of a file rather than a claim about
+  // the code that was supposed to leave it alone. Both are published whether or not the arm is the transient
+  // one, so an arm that ran the block is distinguishable from an arm whose census went missing.
+  transient: {
+    serveBody: treatment.ok ? treatment.treatment.serveBody : null,
+    guidance: guidanceCensusOf(second.tau2?.memory),
+    store: {
+      reference: first.tau2?.storeGrowth ?? null,
+      memory: second.tau2?.storeGrowth ?? null,
+    },
+  },
   // R152: what the declared reading was checked against. Recorded rather than only graded, so a reader can see
   // which fields the ledger could reach and which it could not — `mode` is a policy and no ledger holds one.
   ...(rotationReconciled === undefined ? {} : { rotationReconciled }),

@@ -115,6 +115,11 @@ function main(): void {
       // artefact written before the switch existed — and `off` travels as `off` rather than as empty, so an arm
       // that declared the default is distinguishable from one that never named it.
       `rotation=${reading.prereg.serveRotation ?? ''}\n` +
+      // R204: what the pack is made of at serve time. Empty leaves the driver injecting the block, which is
+      // byte-identical to every artefact written before the switch existed; `rendered` travels as `rendered`
+      // rather than as empty, so an arm that declared the default is distinguishable from one that never
+      // named it — the same wire `rotation` rides, for the same reason.
+      `body=${reading.prereg.serveBody ?? ''}\n` +
       // R141: the support floor at serve time. Empty leaves the run at 1, which serves every item.
       `serveSupport=${reading.prereg.serveSupport === undefined ? '' : String(reading.prereg.serveSupport)}\n` +
       `rehearsal=${declaredRehearsal === undefined ? '' : String(declaredRehearsal)}\n` +

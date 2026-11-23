@@ -523,6 +523,12 @@ describe('the fold a cross-fit reads off the pair', () => {
     };
     /** R202: the policy the arm declared. Absent is every arm that declared none, and every artefact before R152. */
     readonly rotation?: 'fair-share' | 'off';
+    /** R204: the body the pack was made of. Absent is every artefact before the field, which is the block. */
+    readonly serveBody?: 'rendered' | 'guidance';
+    /** R204: the store counted before and after the phase, as the driver records it. */
+    readonly storeGrowth?: { readonly before: number; readonly after: number; readonly grew: boolean };
+    /** R204: the summariser's own census, which the agent writes into the phase's diagnostics. */
+    readonly guidance?: Readonly<Record<string, unknown>>;
   }): unknown {
     const base = arm({ arm: input.arm, rows: input.rows, pass4: 0.5 }) as Record<string, unknown>;
     return {
@@ -540,6 +546,9 @@ describe('the fold a cross-fit reads off the pair', () => {
         learning: { rows: input.train?.length ?? 0, unanswered: 0, edited: 0, distilled: 0, distillFailed: 0 },
         // R202: a mode on its own is what the report type allows, and it is the whole identity the pool compares.
         ...(input.rotation === undefined ? {} : { serveRotation: { mode: input.rotation } }),
+        ...(input.serveBody === undefined ? {} : { serveBody: input.serveBody }),
+        ...(input.storeGrowth === undefined ? {} : { storeGrowth: input.storeGrowth }),
+        ...(input.guidance === undefined ? {} : { memory: { guidance: input.guidance } }),
         ...(input.treatment === undefined
           ? {}
           : {
@@ -606,6 +615,9 @@ describe('the fold a cross-fit reads off the pair', () => {
       model: 'deepseek/deepseek-chat',
       knobs: '',
       rotation: 'none',
+      // R204: and the body, which this fixture's arms never named — `rendered` is the answer for every fold
+      // written before the field, because there was one body and every artefact was produced under it.
+      serveBody: 'rendered',
     });
   }, 60_000);
 
@@ -622,6 +634,66 @@ describe('the fold a cross-fit reads off the pair', () => {
     expect((bounded['treatment'] as { rotation?: string }).rotation).toBe('fair-share');
     expect((unbounded['treatment'] as { rotation?: string }).rotation).toBe('none');
     expect(treatmentKeyOf(bounded['treatment'])).not.toBe(treatmentKeyOf(unbounded['treatment']));
+  }, 60_000);
+
+  it('publishes the transient arm’s three readings, and gives that fold a key of its own', () => {
+    // R204's acceptance, at the boundary the reader actually sees. The arm's claim is a shape, not a score:
+    // the summariser was called once per served episode, the store is the same size at the end of the phase as
+    // at the start, and the pack was a sentence. The delta this pair also carries is the by-product the
+    // registration ordered last, and none of the three readings above can be reconstructed from it.
+    const treatment = { unit: 'correction', form: 'lesson', scope: 'edited', knobs: '' };
+    const store = { before: 11, after: 11, grew: false };
+    const guidance = {
+      mode: 'guidance',
+      model: 'deepseek/deepseek-flash',
+      calls: 40,
+      sentences: 37,
+      refusals: 3,
+      failures: 0,
+      promptChars: 52_000,
+      sentenceChars: 96.4,
+    };
+    const reference = armWithSplit({
+      arm: 'reference',
+      rows: ROWS,
+      train: [],
+      test: ['airline/1', 'airline/2'],
+      storeGrowth: store,
+    });
+    const memory = armWithSplit({
+      arm: 'memory',
+      rows: ROWS,
+      train: ['retail/1'],
+      test: ['airline/1', 'airline/2'],
+      treatment,
+      serveBody: 'guidance',
+      storeGrowth: store,
+      guidance,
+    });
+
+    const published = publish(reference, memory);
+    expect((published['treatment'] as { serveBody?: string }).serveBody).toBe('guidance');
+    const transient = published['transient'] as {
+      serveBody: string;
+      guidance: unknown;
+      store: { reference: unknown; memory: unknown };
+    };
+    expect(transient.serveBody).toBe('guidance');
+    expect(transient.guidance).toEqual(guidance);
+    expect(transient.store).toEqual({ reference: store, memory: store });
+
+    // And the key: a sentence arm is not poolable with a block arm, which is the whole reason the field exists.
+    const block = publish(reference, armWithSplit({
+      arm: 'memory',
+      rows: ROWS,
+      train: ['retail/1'],
+      test: ['airline/1', 'airline/2'],
+      treatment,
+      serveBody: 'rendered',
+      storeGrowth: store,
+    }));
+    expect(treatmentKeyOf(published['treatment'])).toContain('serveBody=guidance');
+    expect(treatmentKeyOf(block['treatment'])).toContain('serveBody=rendered');
   }, 60_000);
 
   it('says which arm could not state its split, because an artefact from before the field is not a leak', () => {

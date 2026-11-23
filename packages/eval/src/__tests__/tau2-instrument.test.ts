@@ -574,6 +574,11 @@ describe('the projection has a decision for every field, and keeps it', () => {
         },
       },
       recall: { requests: 200, served: 200, empty: 0 },
+      // R204's body and store counts, stated for the reason every other carried field in this fixture is:
+      // the projection is only checked against the fields the fixture defines, so a fixture without them
+      // would let the table drop two fields the transient arm's whole reading depends on.
+      serveBody: 'guidance',
+      storeGrowth: { before: 14, after: 14, grew: false },
       // R152's travel budget: the field that reached a paid dispatch without a decision, because it
       // entered the record through a spread and `Tau2Raw` never declared it. The fixture states it so
       // the `carried` decision is exercised rather than merely written down.

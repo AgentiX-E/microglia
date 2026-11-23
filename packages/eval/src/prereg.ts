@@ -470,6 +470,21 @@ export type Prereg = {
    */
   readonly serveRotation?: string;
   /**
+   * What the pack is made of at serve time: the block the store rendered, or one sentence written for this
+   * request and discarded once the episode is over.
+   *
+   * R204. Every arm before it injected the block, so `rendered` is the default and an absent header is that
+   * arm. `guidance` is the transient arm: the same records are read, one model call turns them into one
+   * sentence for the request at hand, and nothing is written back — so the store is the same size at the end
+   * of the phase as at the start, which is the one property that separates this arm from every lesson arm
+   * in the record.
+   *
+   * It is a header rather than a dispatch input because it changes what the model reads: an arm served the
+   * other body under this registration's name is a different treatment wearing the same label, which is the
+   * defect the floor, the form, the unit, the shape and the rotation before it were all moved here to close.
+   */
+  readonly serveBody?: string;
+  /**
    * The unit this registration's packs are written in: one line per failure, or one per routine.
    *
    * R109's switch, registered the same way the pack mode is and for the same reason: the arm is one
@@ -578,6 +593,7 @@ const HEADER_KEYS = [
   'packShape',
   'serveAnchor',
   'serveRotation',
+  'serveBody',
   'claimRuler',
   'thinking',
 ] as const;
@@ -664,6 +680,15 @@ const HEADER_SERVE_ANCHORS: ReadonlySet<string> = new Set(SERVE_ANCHORS);
  * refuses would be a registration naming a policy no run can apply.
  */
 const HEADER_SERVE_ROTATIONS: ReadonlySet<string> = new Set(SERVE_ROTATIONS);
+
+/**
+ * The bodies a pack may be made of, spelled once for the reason above.
+ *
+ * R204. Two values and no synonyms, because the artefact compares this string across folds: an arm that
+ * declared `per-request` and one that declared `guidance` would be one treatment under two names, and the
+ * pool key would separate two halves of the same experiment.
+ */
+export const HEADER_SERVE_BODIES: ReadonlySet<string> = new Set(['rendered', 'guidance']);
 
 /**
  * The largest number of episodes one dispatch carries.
@@ -1613,8 +1638,22 @@ export function readPrereg(markdown: string, file: string): PreregReading {
     }
   }
 
-  const claimRulerText = values.get('claimRuler');
-  let claimRuler: 'point' | 'interval' | undefined;
+  // R204: what the pack is made of. Refused on an unknown spelling like the two above, and for the same
+  // reason: a body the driver does not know would run the block under the transient arm's name.
+  const serveBodyText = values.get('serveBody');
+  let serveBody: string | undefined;
+  if (serveBodyText !== undefined) {
+    if (!HEADER_SERVE_BODIES.has(serveBodyText)) {
+      collected.push({
+        where: `header 'serveBody'`,
+        problem: `'${serveBodyText}' is not one of ${[...HEADER_SERVE_BODIES].join(', ')}`,
+      });
+    } else {
+      serveBody = serveBodyText;
+    }
+  }
+
+  const claimRulerText = values.get('claimRuler');  let claimRuler: 'point' | 'interval' | undefined;
   if (claimRulerText !== undefined) {
     if (!HEADER_CLAIM_RULERS.has(claimRulerText)) {
       collected.push({
@@ -1762,6 +1801,7 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       ...(consolidateKey === undefined ? {} : { consolidateKey }),
       ...(consolidateLinkage === undefined ? {} : { consolidateLinkage }),
       ...(serveSupport === undefined ? {} : { serveSupport }),
+      ...(serveBody === undefined ? {} : { serveBody }),
       ...(speakMargin === undefined ? {} : { speakMargin }),
       ...(trials === undefined ? {} : { trials }),
       ...(effectClaimPp === undefined ? {} : { effectClaimPp }),

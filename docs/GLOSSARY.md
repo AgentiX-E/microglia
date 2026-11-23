@@ -2294,3 +2294,23 @@ against a 197-token pack over 11.2 turns.
 It makes the cost axis comparable across mechanisms, because a system that serves the same tokens and repairs twice
 as often is measurably better, and it is the number a memory has to be judged on when its inert share is high. On
 the one priced fold, **32,996**: 131,984 tokens over four repairs.
+
+**Serve body** — what the pack is made of at serve time. `rendered` is the block the store served, injected on the
+first turn and reused for the rest of the episode; `guidance` is one sentence written for the request by one model
+call and discarded once the episode ends. It is a field of the treatment (`serveBody`) rather than a detail of the
+renderer, because two folds that served two bodies are two experiments and the pool has to keep them apart.
+
+**Transient arm** — the arm whose pack is a `guidance` sentence and which writes nothing durable: the store's item
+count is the same at the end of the phase as at the start (`storeGrowth.grew` is false). Its published precedent is
+*More Memory, Worse Agents* (2026), where per-task guidance built from logs and thrown away scored 59.9% against
+53.5% for the raw logs it was built from and 49.0% for stored lessons.
+
+**Guidance sentence** — the one line the transient arm injects, produced by one model call that is shown the served
+records and the request and is told that `NONE` is an acceptable answer. Three outcomes are counted apart: a sentence
+(served), a refusal (`NONE`, the arm's own gate) and a failure (the provider, which injects nothing rather than
+falling back to the block).
+
+**Store growth** — the store counted before and after an evaluation phase, recorded on every arm as
+`storeGrowth: { before, after, grew }`. It exists because a mechanism whose claim is "the artefact is the defect"
+must be checkable against a file, and because an arm that writes during evaluation is a lesson arm with a step in
+front of it.

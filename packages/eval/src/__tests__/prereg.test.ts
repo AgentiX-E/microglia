@@ -2496,6 +2496,28 @@ describe('the serve anchor header', () => {
   });
 });
 
+describe('the serve body header', () => {
+  const withHeader = (extra: string): string => `${HEADER.replace(/^---\n/, `---\n${extra}\n`)}${PREDICTION}${REFUTATION}`;
+  const FILE = 'R8.3-xiyan-cell.md';
+
+  it('carries the two bodies a pack can be made of, and nothing else', () => {
+    // R204. `guidance` is the transient arm and `rendered` is every arm before it, stated rather than
+    // omitted — an arm that declares the default is a different document from one that never named it.
+    expect(readPrereg(withHeader('serveBody: guidance'), FILE).prereg?.serveBody).toBe('guidance');
+    expect(readPrereg(withHeader('serveBody: rendered'), FILE).prereg?.serveBody).toBe('rendered');
+  });
+
+  it('refuses a body the driver cannot serve, before the money is committed', () => {
+    const problems = problemsOf(withHeader('serveBody: per-request'), FILE);
+    expect(problems.some((entry) => entry.includes("header 'serveBody'"))).toBe(true);
+    expect(problems.some((entry) => entry.includes("'per-request' is not one of rendered, guidance"))).toBe(true);
+  });
+
+  it('leaves it absent when the header says nothing, which is every arm before this one', () => {
+    expect(readPrereg(VALID, FILE).prereg?.serveBody).toBeUndefined();
+  });
+});
+
 describe('the serve rotation header', () => {
   const withHeader = (extra: string): string => `${HEADER.replace(/^---\n/, `---\n${extra}\n`)}${PREDICTION}${REFUTATION}`;
   // The file name and the header's `id` must agree, so this block borrows the fixture's own pair rather

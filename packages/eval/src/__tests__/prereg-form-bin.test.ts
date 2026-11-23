@@ -82,3 +82,23 @@ describe('prereg-form prints the support floor the registration fixed', () => {
     expect(reading.out).toContain('serveSupport=\n');
   });
 });
+
+describe('prereg-form prints the body the pack is made of', () => {
+  // R204. The third line of the serving family. A header that named `guidance` and a form that stopped
+  // printing it would dispatch the block arm and publish it under the transient arm's name — one arm, two
+  // labels, and no field in the artefact to tell them apart.
+  it('prints the body when the header names one', () => {
+    const reading = run(registration(['serveBody: guidance']));
+    expect(reading.code).toBe(0);
+    expect(reading.out).toContain('body=guidance');
+    // The lines around it ride the same wire and must not be disturbed by the new one.
+    expect(reading.out).toContain('rotation=\n');
+    expect(reading.out).toContain('anchor=\n');
+  });
+
+  it('prints an empty line when the header names none, which leaves the run injecting the block', () => {
+    const reading = run(registration([]));
+    expect(reading.code).toBe(0);
+    expect(reading.out).toContain('body=\n');
+  });
+});

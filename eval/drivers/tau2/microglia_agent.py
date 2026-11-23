@@ -13,6 +13,11 @@ What the wrapper does:
   2. Appends that pack as one additional system message on a **copy** of the state.
   3. Reuses the same pack for every later turn of that episode.
 
+On the transient arm (R204) step 2 is preceded by one model call: the block the facade served is handed
+to the arm's own model with the request, and what is injected is the one sentence that comes back. The
+records are read, the sentence is used, nothing is written — so the store is the same size at the end of
+the phase as at the start, which is the whole difference between this arm and every lesson arm before it.
+
 **The pack is fixed per episode, and it was not before.** It used to be recalled on
 every turn from that turn's own message, which meant the second system message
 changed on every call. Two consequences, one of them financial:
@@ -40,7 +45,8 @@ injected text auditable in tau2's own simulation records.
 
 Configuration is environment-only, because `llm_args` is forwarded verbatim to the
 model call and a stray key there would break it: `MICROGLIA_MEMORY_URL`,
-`MICROGLIA_DOMAIN`, and optionally `MICROGLIA_TIMEOUT_S`.
+`MICROGLIA_DOMAIN`, and optionally `MICROGLIA_TIMEOUT_S`, `MICROGLIA_PACK_KNOBS`, and
+`MICROGLIA_GUIDANCE` / `MICROGLIA_GUIDANCE_MODEL` (R204).
 """
 
 from __future__ import annotations
@@ -67,6 +73,37 @@ except ImportError:  # v0.2.0
 DEFAULT_TIMEOUT_S = 5.0
 MAX_QUERY_CHARS = 500
 PACK_TAG = "microglia-knowledge"
+
+# R204's switch and its two bounds. The environment name is the one the driver sets from
+# `TAU_SERVE_BODY`; the dry names are read here, in the arm, so the sentence's ceiling is a property of
+# the mechanism rather than of the dispatch that asked for it.
+GUIDANCE_ENV = "MICROGLIA_GUIDANCE"
+GUIDANCE_MODEL_ENV = "MICROGLIA_GUIDANCE_MODEL"
+#: One sentence is ~25 tokens. The ceiling is generous for a sentence and tight for a paragraph, which
+#: is what makes "one sentence" a thing the bill can be read as rather than a hope.
+GUIDANCE_MAX_TOKENS = 96
+#: Longer than an episode turn's own timeout: this call happens once per episode, before the first turn,
+#: and a summariser that is slow once is cheaper than an episode that starts with no memory.
+GUIDANCE_TIMEOUT_S = 30.0
+#: What the prompt injects. A sentence past this is a paragraph, and a paragraph is the durable artefact
+#: this arm exists to not write.
+GUIDANCE_MAX_CHARS = 400
+#: How much of the served block the summariser reads. The pack is at most `TAU_PACK_BUDGET` characters
+#: (1,200 by default), so this bound is above it and clips nothing on a normal arm: it exists so that a
+#: misconfigured budget cannot turn one guidance call into a second, larger bill.
+GUIDANCE_RECORDS_CHARS = 2_400
+
+#: The instruction. Two things are stated rather than implied: the records are the only source, and the
+#: way to say nothing is `NONE`. The second is what makes the arm's gate measurable — a prompt that
+#: demanded a sentence would be answered with one even where the records say nothing about the request,
+#: which is precisely the inert pack R200 found in 78% of servings.
+GUIDANCE_SYSTEM = (
+    "You write the one sentence of guidance an agent should read before it handles a request. "
+    "Use only the RECORDS block you are given; they are notes from earlier attempts at similar "
+    "requests in the same domain. If they do not bear on this request, answer exactly NONE. "
+    "Otherwise answer one imperative sentence of at most 40 words, with no preamble, no quotes and "
+    "no restatement of the request."
+)
 
 _failures = 0
 _reported = False
@@ -132,6 +169,22 @@ _calls = 0
 # invent. On a phase with B boundaries and C calls it reads `C - B` when the fix is in and `0` when the
 # defect is, which is why it travels beside `injectedMessages` rather than instead of it.
 _pack_copies_dropped = 0
+# R204. What the pack is made of at serve time, which is the one field that separates the transient arm
+# from every arm before it. `rendered` -- the default -- injects the block the facade served, which is what
+# R92 through R198 measured. `guidance` reads the same records, makes **one** model call to turn them into
+# one sentence for *this* request, injects the sentence, and writes nothing back: nothing durable is
+# created, so the store's item count at the end of the phase is the count the learn half wrote.
+#
+# The three outcomes are counted apart because they are three different readings. A sentence is a served
+# pack; `NONE` is the model declining to say anything about this request, which is the arm's own gate; a
+# failure is the provider, and a run whose packs are mostly failures is a run whose score is about an
+# unreachable summariser rather than about the mechanism.
+_guidance_calls = 0
+_guidance_refusals = 0
+_guidance_failures = 0
+_guidance_chars = 0
+_guidance_sentences: list = []
+_guidance_first_failure: str | None = None
 
 # Sentinel rather than `None`, because "" is a real answer: a facade that was asked
 # and had nothing to say must not be asked again on the next turn.
@@ -151,6 +204,69 @@ def _timeout() -> float:
     except ValueError:
         return DEFAULT_TIMEOUT_S
     return value if value > 0 else DEFAULT_TIMEOUT_S
+
+
+def guidance_mode() -> str:
+    """`guidance` when this arm writes its pack per request, `rendered` otherwise.
+
+    R204. Read from the environment on every call rather than at import, for R123a's reason: a mode
+    decided once at import cannot be varied inside one test session, and the self-check has to run both
+    arms through the same module.
+    """
+    raw = os.environ.get(GUIDANCE_ENV, "").strip().lower()
+    return "guidance" if raw in ("1", "true", "yes", "guidance", "on") else "rendered"
+
+
+def guidance_model() -> str:
+    """The model the guidance call names, in the id litellm's provider adapters accept.
+
+    Defaulted to the arm's own model rather than to a separate one, because the mechanism this arm
+    reproduces is "the agent that is being measured reads its own records and writes itself a note". A
+    different summariser would be a different experiment, and `TAU_MODEL` is the name the run already
+    resolved in this process — the same string τ² hands litellm for the episode's own calls.
+    """
+    override = os.environ.get(GUIDANCE_MODEL_ENV, "").strip()
+    return override or os.environ.get("TAU_MODEL", "deepseek/deepseek-flash").strip()
+
+
+def guidance_prompt(records: str, request: str) -> str:
+    """The user turn: the records the store served, then the request they are for.
+
+    One string rather than two messages, so a provider that only reads the last user turn cannot be
+    handed half the question. The records are quoted as data and the request is quoted separately,
+    because everything in the first block is text a previous episode wrote and nothing in it may be read
+    as an instruction to this call.
+    """
+    return (
+        "RECORDS\n<<<\n"
+        f"{records.strip()[:GUIDANCE_RECORDS_CHARS]}\n"
+        ">>>\n\n"
+        "REQUEST\n<<<\n"
+        f"{request.strip()[:MAX_QUERY_CHARS]}\n"
+        ">>>\n"
+    )
+
+
+def guidance_sentence(reply) -> str:
+    """The sentence in a provider reply, or an empty string when the model declined.
+
+    `NONE` is the answer the prompt asks for when the records do not speak to the request, and it is
+    *not* a failure: it is the arm's gate doing its job, and a run that counted it as an error would
+    report an unreachable provider for a model that was working exactly as asked. Everything that is not
+    a usable sentence — an empty reply, a refusal, a wall of text — is emptied here and counted by the
+    caller, so the injected pack is always one sentence or nothing.
+    """
+    choices = getattr(reply, "choices", None)
+    if not isinstance(choices, list) or not choices:
+        return ""
+    message = getattr(choices[0], "message", None)
+    content = getattr(message, "content", None)
+    if not isinstance(content, str):
+        return ""
+    text = " ".join(content.split())
+    if text == "" or text.strip(" .").upper() == "NONE":
+        return ""
+    return text[:GUIDANCE_MAX_CHARS]
 
 
 def parse_knobs(raw: str) -> dict[str, str]:
@@ -216,6 +332,58 @@ def recall(text: str) -> str:
         bucket = empty_bucket(payload)
         _silent_because[bucket] = _silent_because.get(bucket, 0) + 1
     return rendered
+
+
+def guidance(records: str, request: str) -> str:
+    """One model call: the records and this request in, one sentence out, nothing written back.
+
+    R204. The call is made here rather than in the facade for two reasons, and the second is the one that
+    decides it. First, the sentence is about *this request*, and the request is a string only this side of
+    the socket holds in the form the episode will actually send. Second — and this is the reading the
+    registration names first — the call is billed in the arm's own account: `run_split` counts every
+    litellm call the process makes through a success callback, so a guidance call made here appears in
+    `usage.calls` as exactly one call per served request, with its own prompt tokens in the prompt column.
+    A call made in the TypeScript facade would be invisible to that counter and would have to be
+    attributed by a second instrument.
+
+    `litellm` is imported inside the function because it is τ²'s dependency rather than this module's: the
+    self-check runs without it installed, and a module-level import would make the whole lane's
+    instrumentation untestable in `pnpm check`. A missing package is one more failure, counted like the
+    rest, so the arm reports "no sentence" rather than crashing an episode that is already paid for.
+    """
+    global _guidance_calls, _guidance_failures, _guidance_chars, _guidance_first_failure
+    _guidance_calls += 1
+    prompt = guidance_prompt(records, request)
+    _guidance_chars += len(prompt)
+    try:
+        import litellm  # noqa: PLC0415 - τ²'s dependency, absent in the self-check
+
+        reply = litellm.completion(
+            model=guidance_model(),
+            messages=[
+                {"role": "system", "content": GUIDANCE_SYSTEM},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0,
+            max_tokens=GUIDANCE_MAX_TOKENS,
+            timeout=GUIDANCE_TIMEOUT_S,
+        )
+    except Exception as error:  # noqa: BLE001 - any failure means "no sentence"
+        _guidance_failures += 1
+        if _guidance_first_failure is None:
+            _guidance_first_failure = f"{type(error).__name__}: {error}"
+            print(
+                f"[microglia] guidance call failed ({_guidance_first_failure}); serving no pack",
+                file=sys.stderr,
+            )
+        return ""
+    sentence = guidance_sentence(reply)
+    if sentence == "":
+        global _guidance_refusals
+        _guidance_refusals += 1
+        return ""
+    _guidance_sentences.append(len(sentence))
+    return sentence
 
 
 #: The rungs a margin ladder is priced at. The same ladder the relevance floor was priced on, so the two
@@ -363,6 +531,13 @@ class MicrogliaAgent(LLMAgent):
                 # between this and the injected length is the wrapper's own carriage, and the difference
                 # between that and the census's system column is the preamble's.
                 _pack_chars.append(len(held))
+                # R204: and then, when this arm writes its pack per request, the block becomes the
+                # *input* to one model call instead of the thing the agent reads. The length above is
+                # therefore the records the summariser was shown, and `injectedChars` below is the
+                # sentence it wrote — two different objects, measured where each is made, which is what
+                # R136's three lengths were for.
+                if guidance_mode() == "guidance":
+                    held = guidance(held, text)
         self._pack = held
         self._turn = turn
         return held
@@ -404,7 +579,7 @@ class MicrogliaAgent(LLMAgent):
 
 def memory_stats() -> dict:
     """What the run should record about the sidecar, so a zero is explainable."""
-    return {
+    stats = {
         "recall_url": _memory_url(),
         "recall_failures": _failures,
         "recalls": _recalls,
@@ -455,3 +630,26 @@ def memory_stats() -> dict:
         "margin_p90": quantile_of(_margins, 0.90),
         "margin_ladder": margin_ladder(_margins),
     }
+    # R204: the transient arm's own account, absent on every arm that injects the block. Three populations
+    # rather than one count, because a language model said something three different ways: `sentences` is a
+    # served pack, `refusals` is the model declining on a request the records do not bear on (which is the
+    # arm's own gate), and `failures` is the provider. A run whose failures are not zero cannot quote its
+    # served share as the arm's own, which is why the count travels here and not only in a log line.
+    if guidance_mode() == "guidance":
+        stats["guidance"] = {
+            "mode": "guidance",
+            "model": guidance_model(),
+            "calls": _guidance_calls,
+            "sentences": len(_guidance_sentences),
+            "refusals": _guidance_refusals,
+            "failures": _guidance_failures,
+            # What the summariser was shown, and what it wrote. The first is the block's own length plus
+            # the request; the second is the sentence's, so the price of the arm is `promptChars` once an
+            # episode against `sentenceChars` on every turn of it.
+            "promptChars": _guidance_chars,
+            "sentenceChars": round(sum(_guidance_sentences) / len(_guidance_sentences), 1)
+            if _guidance_sentences
+            else None,
+            "firstFailure": _guidance_first_failure,
+        }
+    return stats

@@ -3483,3 +3483,69 @@ informative one in the corpus, which is why the pool does not move: 291 served p
 the delta stops being negative — down from 12 of 33, because this fold added four repairs and three breaks. That is
 the target every later mechanism is priced against, and §8.64's gate reaches it only by withholding most of the
 memory.
+
+### 8.66 The pack's body is a field, and the transient arm writes nothing
+
+§8.64 moved **whether** and **how much** the memory speaks and §8.65 priced it. Neither moved **what it says**:
+78.7% of served packs changed nothing, and the two dose rounds left that share where they found it. R204 makes the
+body of the pack a field of the treatment and builds the one arm the literature says is largest — *More Memory,
+Worse Agents* measured per-task guidance built from logs and discarded at **59.9%**, against raw logs at 53.5% and
+stored lessons at 49.0%.
+
+**The switch.** `serve-body.ts` resolves `TAU_SERVE_BODY` into `rendered` — every arm before this one, and the
+default — or `guidance`. The registration names it in its header (`serveBody: guidance`), `prereg-form` prints it
+as `body=`, the workflow carries it as `TAU_SERVE_BODY`, and the driver turns it into one variable for the agent
+(`MICROGLIA_GUIDANCE=1`) which it passes only to the phases that build a facade. A spelling outside the two names
+is refused at module load, so a dispatch that named a body nobody implements cannot run the block arm and publish
+it under the transient arm's name.
+
+**The mechanism is one call, made where the bill can see it.** On the first turn of an episode the agent asks the
+facade for the block as it always did, then hands the block *and the request* to its own model with a prompt that
+states two things: the records are the only source, and the way to say nothing is `NONE`. One sentence comes back
+and that sentence is the pack — not the block. Nothing is written back, so no item exists after the episode that did
+not exist before it.
+
+The call is made **in the agent** and not in the facade, and the reason is attribution rather than taste. `run_split`
+counts every litellm call the process makes through a success callback, so a call made here appears in the arm's own
+`usage.calls` as exactly one call per served episode, with its own tokens in the prompt column — the registration's
+first reading. A call made in the TypeScript facade would be invisible to that counter and would need a second
+instrument to be believed.
+
+**Three outcomes, counted apart**, because a language model says nothing in three different ways:
+
+| outcome | the field | what it means |
+|---|---|---|
+| a sentence | `guidance.sentences` | a served pack |
+| `NONE` | `guidance.refusals` | the model declining on a request the records do not bear on — this is the arm's own gate |
+| a provider error | `guidance.failures` | no pack, and the run cannot quote its served share as the arm's |
+
+A failure injects nothing rather than falling back to the block. Falling back would serve the R93 treatment under
+the transient arm's name, silently, in exactly the episodes where the summariser was unavailable.
+
+**The projection grows with the type, and that is a rule rather than a courtesy.** R152's `serveRotation` reached a
+paid dispatch because it entered the record through a spread, which TypeScript exempts from the excess-property
+check: `keyof Tau2Raw` did not grow, `PROJECTION` stayed exhaustive over a type that no longer described the record,
+and the pair refused the arm *after* the run. Both new fields — `serveBody` and `storeGrowth` — are declared in
+`Tau2Raw` and decided in `PROJECTION` in the same commit that emits them, and the projection test's fixture states
+them so the `carried` decision is exercised rather than written down.
+
+**Nothing durable is a measurement, not a claim.** The driver counts the store after the evaluation phase as well as
+before it, and records `storeGrowth: { before, after, grew }` on both arms. An arm whose mechanism is "the artefact
+is the defect" has to be checkable against the file rather than against the code that was supposed to leave it alone.
+
+**The pool key sees the body.** `serveBody` is appended to `treatmentKeyOf`'s field order — after `rotation`, and
+therefore outside every key committed before it — and `treatmentOf` states it on every pair: `guidance` when the
+memory arm said so, `rendered` when it said nothing, because before this field there was exactly one body. That is
+R202's lesson applied one round later: a policy the pool cannot see is two treatments under one name.
+
+**The ledger refuses a fold whose summariser failed.** `serveYield.renders` counts the packs the *facade* served. On
+this arm the agent read the sentence, so an episode whose guidance call failed carried nothing while its block still
+counted as rendered — and every failure would be booked as an inert pack, inflating the one number this line of work
+is about. `pack-ledgers` refuses such a fold with `N of M guidance calls failed, so the rendered count is not the
+injected one` rather than publishing a share over a population the artefact does not carry.
+
+**What the arm should cost less of.** The block is paid once, as the summariser's input, instead of riding 11.2 turns
+of every episode as context. §8.65's 3,299.6 injected tokens an episode is therefore the number this arm is expected
+to *undercut*: at a 96-token sentence over 11.2 turns the context term falls from ≈3,300 to ≈1,100, and the one-off
+summariser call adds ≈2,500 prompt tokens. A bill that rises means the arm paid for both bodies, and the body is what
+shipped.

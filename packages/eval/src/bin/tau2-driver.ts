@@ -196,6 +196,8 @@ import {
   type ServeRotationReport,
 } from "../serve-rotation.js";
 import { speakLineOf } from "../tau2-speak.js";
+// R204: what the pack is made of at serve time, and the one variable the agent reads when it is a sentence.
+import { guidanceEnvOf, resolveServeBodyPlan } from "../serve-body.js";
 import { turnCensusLine, turnCensusOf, type TurnCensus } from "../tau2-turn.js";
 import type { Tau2PhaseUsage } from "../tau2-instrument.js";
 import { cacheCensusVerdict } from "../cache-census.js";
@@ -297,6 +299,18 @@ const PAIR_PLAN = resolveFacadePairPlan(process.env);
  * not written yet, and a guess that does not bind is an arm that silently runs the identity.
  */
 const ROTATION = resolveServeRotationPlan(process.env);
+/**
+ * R204: what this dispatch's packs are made of.
+ *
+ * Resolved at module load like every other switch, and undeclared means `rendered` — the body every committed
+ * artefact was produced under. The value is written into the artefact on every pack-serving arm rather than
+ * only when a header named it, because "this arm served the block" is a fact about the run and not a claim
+ * about the registration; R202's lesson was that the *policy* fields have to be total at the producer or the
+ * pool cannot separate an arm from its control.
+ */
+const SERVE_BODY = resolveServeBodyPlan(process.env);
+/** The agent's own switch for the transient arm, empty on every arm that injects the block. */
+const PACK_ENV = guidanceEnvOf(SERVE_BODY);
 /**
  * The seed both facades must share. `run_split.py --seed` defaults to 300; in a
  * paired dispatch we pass it explicitly so common random numbers are an
@@ -856,12 +870,15 @@ function distillClient(maxCalls: number): LlmClient {
 const DISTILL_SCOPE = resolveDistillScope();
 
 /** One `run_split.py` invocation, with its stdout surfaced on failure. */
-async function phase(args: readonly string[]): Promise<string> {
+async function phase(args: readonly string[], extraEnv: Readonly<Record<string, string>> = {}): Promise<string> {
   try {
     const finished = await runFile(PYTHON, args as string[], {
       cwd: REPO,
       maxBuffer: 64 * 1024 * 1024,
-      env: { ...process.env },
+      // R204: the agent's own switches travel here rather than through the driver's environment, so a phase
+      // that serves a pack is the only one that can turn the transient arm on. An inherited variable would
+      // also arm the reference arm's phase, and its `memory_stats` would then report a summariser it never ran.
+      env: { ...process.env, ...extraEnv },
     });
     // The phase writes one summary line; the benchmark writes thousands of its own.
     // Printing the tail keeps a run's shape visible without turning the job log
@@ -2142,6 +2159,10 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   process.stdout.write(
     `[tau2] injection-note: mode=${NOTE_PLAN.mode} declared=${String(NOTE_PLAN.declared)}\n`,
   );
+  // R204: what the pack is made of, printed before the first episode is paid for. A dispatch that named the
+  // transient arm in its header and ran the block arm is a whole folded pair of numbers about an experiment
+  // nobody ran, and the artefact cannot catch it afterwards — both arms are self-consistent documents.
+  process.stdout.write(`[tau2] serve-body: ${SERVE_BODY.body} declared=${String(SERVE_BODY.declared)}\n`);
   // R57: the arm, its digest, and how often the band was reached. Printed before the run rather
   // than only recorded in the artefact, because a band that collapsed is worth knowing about before
   // an hour of evaluation is spent on it.
@@ -2227,6 +2248,14 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     readonly coverageObservations?: UseObservation[];
     /** Whether the agent acted at all in each episode, reduced to per-task counts. */
     readonly inaction: InactionCensus;
+    /**
+     * R204: the store's size before and after this phase, which is the no-durable-write reading.
+     *
+     * Counted on both arms rather than only on the transient one: a field that exists on one arm and not the
+     * other has to be explained in every readback, and "this arm wrote nothing" is a fact about the reference
+     * arm too — it is the arm that cannot write, and saying so costs one query.
+     */
+    readonly storeGrowth: { readonly before: number; readonly after: number; readonly grew: boolean };
     /**
      * R57: the level the distractor was planted at, and whether it landed in its band.
      *
@@ -2414,9 +2443,24 @@ export async function run(): Promise<readonly PassAtKInput[]> {
           requireOffPeak: REQUIRE_OFF_PEAK,
           ...(PAIR_PLAN.enabled ? { seed: PAIR_SEED } : {}),
         }),
+        // R204: the graded facade's own body. The arm and the phase are one treatment, so the switch that
+        // makes the pack a sentence travels with the phase that serves it and with no other.
+        PACK_ENV,
       );
     } finally {
       await facade.close();
+    }
+    // R204: the store, counted again after the phase. The transient arm's claim is that nothing durable is
+    // written — the sentence is used and discarded — and a claim about a file is settled by reading the file
+    // rather than by reading the code that was supposed to leave it alone. The read is a query on the same
+    // in-process store the facade served from, so it costs nothing and cannot be a second sample of a second
+    // database.
+    const storeAfterPhase = (await store.listKnowledge({})).length;
+    if (storeAfterPhase !== knowledge.length) {
+      process.stdout.write(
+        `[tau2] store mutation: ${String(knowledge.length)} item(s) after the learn half, ` +
+          `${String(storeAfterPhase)} after the phase\n`,
+      );
     }
     const diagnostics = diagnosticsOf(evalStdout);
     // Printed after the phase, so the line reports what the rotation did rather than what it intended: the
@@ -2474,6 +2518,11 @@ export async function run(): Promise<readonly PassAtKInput[]> {
             ),
           }),
       ...(rotationReport === undefined ? {} : { rotation: rotationReport }),
+      // R204: the two counts the no-durable-write reading is the difference of. Both recorded rather than only
+      // the verdict, so a reader can see the population the comparison was made over — and `grew` is derived
+      // here rather than inferred downstream, because two files compared by a third is how a gate stops
+      // meaning what its name says.
+      storeGrowth: { before: knowledge.length, after: storeAfterPhase, grew: storeAfterPhase > knowledge.length },
     };
   };
 
@@ -2537,6 +2586,10 @@ export async function run(): Promise<readonly PassAtKInput[]> {
           memoryUrl: facade.url,
           requireOffPeak: REQUIRE_OFF_PEAK,
         }),
+        // R204: the rehearsal is the arm being graded (R132), so it serves the same body the graded half
+        // served. A rehearsal of the block arm reporting a score for the transient arm is two experiments
+        // under one name, and the pair would have no way to see it.
+        PACK_ENV,
       );
     } catch (error) {
       // The window can close between the graded facade and this phase — two hours is plenty of episode for a
@@ -3085,6 +3138,12 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // R152: what the travel budget did, beside the recall it acted on. Absent on every arm that declared no
     // rotation, so an artefact cannot mistake the identity for a policy that bound nothing.
     ...(primary.rotation === undefined ? {} : { serveRotation: primary.rotation }),
+    // R204: what the pack was made of, on every arm that serves one. Written from the switch rather than from
+    // the artefact's own reading, because a body inferred from what the prompt contained is a body nobody
+    // declared — and an arm that served a mix of block and sentence would read as whichever came last.
+    ...(MEMORY ? { serveBody: SERVE_BODY.body } : {}),
+    // The two counts the transient arm's claim is measured against, recorded on both arms (see the type).
+    storeGrowth: primary.storeGrowth,
     // R92: the questions the packs were ranked on. Recorded beside the store because the two are the
     // function's arguments: R91 replayed one exactly and the other moved by 13 characters a pack, and
     // nothing in the artefact could say so.

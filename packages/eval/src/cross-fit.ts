@@ -516,6 +516,8 @@ export type TreatmentArm = {
   readonly traceClaims: number | undefined;
   readonly knobs: string | undefined;
   readonly rotation: string | undefined;
+  /** R204: what the pack was made of. Stated by the arm that serves one, silent on the control. */
+  readonly serveBody: string | undefined;
 };
 
 export type Treatment = {
@@ -535,6 +537,19 @@ export type Treatment = {
    * than defaulted at the reader because the pair is the last producer that knows which arm stated what.
    */
   readonly rotation: string;
+  /**
+   * R204, total from the start: what the pack is made of at serve time.
+   *
+   * `rendered` for every arm written before this field existed, and that is a fact rather than a default: there
+   * was one body, and the record's own module docstring says so. `guidance` is the transient arm, where the
+   * block is the summariser's input and the sentence is the pack.
+   *
+   * Total at the producer for R202's reason. A pool key that cannot see the body would average a block arm's
+   * `pass^4` with a sentence arm's and call the result the treatment's — and unlike `rotation`, where the
+   * historical artefact ambiguity had to be preserved because five committed folds' keys depended on it, here
+   * the honest value for every earlier fold is known.
+   */
+  readonly serveBody: string;
 };
 
 export type TreatmentOutcome =
@@ -592,6 +607,7 @@ export function treatmentOf(arms: readonly TreatmentArm[]): TreatmentOutcome {
     traceClaims: arm.traceClaims,
     knobs: arm.knobs,
     rotation: arm.rotation,
+    serveBody: arm.serveBody,
   }));
   const unit = agreement('unit', { label: head.label, value: head.unit }, others.map((arm) => ({ label: arm.label, value: arm.unit })));
   if (!unit.ok) return unit;
@@ -627,6 +643,15 @@ export function treatmentOf(arms: readonly TreatmentArm[]): TreatmentOutcome {
     others.map((arm) => ({ label: arm.label, value: arm.rotation })),
   );
   if (!rotation.ok) return rotation;
+  // R204: written unconditionally, like `rotation` and for the same reason — but with a value that is true of
+  // every earlier fold rather than one that has to be declared, because before this field there was only ever
+  // one body. Two folds that served different bodies are two treatments, and the pool refuses them here.
+  const serveBody = agreement(
+    'serveBody',
+    { label: head.label, value: head.serveBody },
+    others.map((arm) => ({ label: arm.label, value: arm.serveBody })),
+  );
+  if (!serveBody.ok) return serveBody;
   return {
     ok: true,
     treatment: {
@@ -637,6 +662,7 @@ export function treatmentOf(arms: readonly TreatmentArm[]): TreatmentOutcome {
       ...(ceiling.value === undefined ? {} : { traceClaims: ceiling.value }),
       ...(knobs.value === undefined ? {} : { knobs: knobs.value }),
       rotation: rotation.value ?? 'none',
+      serveBody: serveBody.value ?? 'rendered',
     },
   };
 }

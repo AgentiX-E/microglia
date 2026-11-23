@@ -1333,6 +1333,10 @@ jobs:
           # variable that bought a rotation would buy it on every queued dispatch, and the cap it resolves to is
           # arithmetic over a store that does not exist yet.
           ROTATION=$(sed -n 's/^rotation=//p' "$RUNNER_TEMP/distill.env")
+          # R204: what the pack is made of at serve time. Header-only, for the reason every switch above is one:
+          # a repository variable that bought the transient arm would arm every queued dispatch, and the arm's
+          # whole point is that the prompt carried a sentence instead of the block.
+          BODY=$(sed -n 's/^body=//p' "$RUNNER_TEMP/distill.env")
           # R118: the stop after the learning half, when the registration's claim is a census. Header
           # only — there is no variable to reconcile it against, because a global that could turn it
           # off would let a dispatch pay for an evaluation the registration never asked for.
@@ -1408,6 +1412,9 @@ jobs:
           # R152: the serving policy, published so the driver reads it as an environment variable. Both the
           # argument above and this output carry one value.
           echo "serve_rotation=$ROTATION" >> "$GITHUB_OUTPUT"
+          # R204: the body, published so the driver reads it as an environment variable. Both the argument above
+          # and this output carry one value.
+          echo "serve_body=$BODY" >> "$GITHUB_OUTPUT"
           # R118: whether the arm stops after the learning half. Header-only, because the stop is the
           # registration's own statement about what it will read.
           echo "learn_only=$LEARN_ONLY" >> "$GITHUB_OUTPUT"
@@ -1595,6 +1602,9 @@ jobs:
           # R152: the travel budget. Empty for every registration that does not name one, which leaves the
           # driver excluding nothing and the request byte-identical to every committed artefact's.
           TAU_SERVE_ROTATION: ${{ steps.recall_floor.outputs.serve_rotation }}
+          # R204: the transient arm's body. Empty on every registration that names none, which leaves the driver
+          # injecting the block — what every artefact before this field was produced under.
+          TAU_SERVE_BODY: ${{ steps.recall_floor.outputs.serve_body }}
           # R123: the margin below which a contested ranking is withheld. Empty means 0, which serves every
           # non-empty pack — the behaviour every artefact committed before this switch measured.
           TAU_SPEAK_MARGIN: ${{ steps.recall_floor.outputs.speak_margin }}

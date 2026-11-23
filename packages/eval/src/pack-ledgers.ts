@@ -105,7 +105,10 @@ function numberOf(block: Record<string, unknown>, key: string): number | undefin
  */
 export function treatmentKeyOf(treatment: unknown): string {
   if (!isObject(treatment)) return 'unstated';
-  const order = ['unit', 'form', 'scope', 'model', 'traceClaims', 'knobs', 'rotation'] as const;
+  // R204: `serveBody` last, and therefore outside every key committed before it existed — which is what keeps
+  // the six committed folds' pooled readings reproducible byte for byte. A field appended here moves only the
+  // keys of artefacts that carry it, and the driver writes it on every pack-serving arm from R204 on.
+  const order = ['unit', 'form', 'scope', 'model', 'traceClaims', 'knobs', 'rotation', 'serveBody'] as const;
   const parts: string[] = [];
   for (const field of order) {
     const value = treatment[field];
@@ -172,6 +175,42 @@ export function ledgerOf(artefact: unknown, file: string): LedgerRead {
     if (value === undefined) problems.push(`${file}: ${name} is not a non-negative number`);
   }
   if (problems.length > 0) return { ok: false, artefact: file, problems };
+
+  // R204: a transient fold whose summariser failed cannot quote its served share, and this is the round that has
+  // to say so rather than the round after it.
+  //
+  // `serveYield.renders` counts the packs the *facade* served. On every arm before this one that was also what the
+  // agent read, so served and injected were the same population and the identity `inert = served − repaired −
+  // broke` had one denominator. On the transient arm the block is the summariser's input: an episode whose
+  // guidance call failed carried nothing at all while its block still counted as rendered, and every failure
+  // would therefore be booked as an inert pack — inflating the one number this line of work is about. The fold is
+  // refused rather than adjusted, because subtracting failures from renders would publish a share over a
+  // population no field of the artefact carries.
+  const treatmentBlock = isObject(root['treatment']) ? root['treatment'] : {};
+  if (treatmentBlock['serveBody'] === 'guidance') {
+    // The pair's own reading first, then the phase's: a fold read from a driver artefact carries the census under
+    // `memory`, and one read from a pair under `transient`. One gate, two documents, no third copy of the name.
+    const transientBlock = isObject(root['transient']) ? root['transient'] : {};
+    const memoryBlock = isObject(root['memory']) ? root['memory'] : {};
+    const fromPair = isObject(transientBlock['guidance']) ? transientBlock['guidance'] : undefined;
+    const fromPhase = isObject(memoryBlock['guidance']) ? memoryBlock['guidance'] : undefined;
+    const guidanceBlock = fromPair ?? fromPhase;
+    if (guidanceBlock === undefined) {
+      problems.push(
+        `${file}: the pack was a sentence and the fold carries no guidance census, so its served share is unreadable`,
+      );
+    } else {
+      const failures = countOf(guidanceBlock, 'failures');
+      const calls = countOf(guidanceBlock, 'calls');
+      if (failures === undefined || calls === undefined) {
+        problems.push(`${file}: the guidance census carries no call and failure count`);
+      } else if (failures > 0) {
+        problems.push(
+          `${file}: ${failures} of ${calls} guidance calls failed, so the rendered count is not the injected one`,
+        );
+      }
+    }
+  }
 
   // Narrowed together so the identities below read as the arithmetic they are.
   const r = renders as number;

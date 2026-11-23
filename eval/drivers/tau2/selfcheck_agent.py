@@ -901,6 +901,427 @@ def an_empty_answer_clears_a_block_from_the_attempt_before_it(checks):
     checks.equal(subject._pack_copies_dropped, 1, "and the removal is counted")  # noqa: SLF001
 
 
+# ----------------------------------------------------------------- R204: the transient arm
+#
+# The arm's claim is a shape, not a score: the block the store served is *read* and what the prompt carries
+# is one sentence written for that request, with nothing written back. Three of the four ways to get this
+# wrong are silent — a call per turn (one per episode is the mechanism), a refusal counted as a provider
+# failure (it is the arm's own gate), and a paragraph injected where a sentence was asked for (the pack is
+# the durable artefact this arm exists not to write). The fourth, a failed call, must not take the episode
+# down with it: the episode is already paid for by the time the sentence is asked for.
+
+
+class _Reply:
+    """The two attributes `guidance_sentence` reads off a provider reply, and nothing else."""
+
+    def __init__(self, content) -> None:
+        message = types.SimpleNamespace(content=content)
+        self.choices = [types.SimpleNamespace(message=message)]
+
+
+def fake_litellm(reply: str, *, raises: BaseException | None = None):
+    """A `litellm` module whose one entry point records its arguments and answers `reply`."""
+    calls: list[dict] = []
+    module = types.ModuleType("litellm")
+
+    def completion(**kwargs):
+        calls.append(kwargs)
+        if raises is not None:
+            raise raises
+        return _Reply(reply)
+
+    module.completion = completion
+    return module, calls
+
+
+class guidance_arm:
+    """Run one block with the transient arm on, a stubbed provider, and the counters at zero.
+
+    A context manager rather than a fixture function because three things have to be undone on every exit
+    path, and the one that matters is the module table: `litellm` is stubbed into `sys.modules`, and a case
+    that left it there would make the *absence* of the package — the branch every machine without τ²
+    installed takes — untestable for every case after it.
+    """
+
+    def __init__(self, reply: str = "", *, raises: BaseException | None = None, model: str | None = None):
+        self.reply = reply
+        self.raises = raises
+        self.model = model
+
+    def __enter__(self):
+        self.saved = {
+            key: os.environ.get(key)
+            for key in (subject.GUIDANCE_ENV, subject.GUIDANCE_MODEL_ENV, "TAU_MODEL")
+        }
+        self.saved_module = sys.modules.get("litellm")
+        self.calls: list[dict] = []
+        if self.model is not None:
+            os.environ[subject.GUIDANCE_MODEL_ENV] = self.model
+        os.environ[subject.GUIDANCE_ENV] = "guidance"
+        if self.raises is not _MISSING_PROVIDER:
+            module, self.calls = fake_litellm(self.reply, raises=self.raises)
+            sys.modules["litellm"] = module
+        else:
+            # No stub at all: `import litellm` raises, which is the branch a runner without τ² installed
+            # takes and the one every local `pnpm check` run exercises.
+            sys.modules.pop("litellm", None)
+        subject._guidance_calls = 0  # noqa: SLF001
+        subject._guidance_refusals = 0  # noqa: SLF001
+        subject._guidance_failures = 0  # noqa: SLF001
+        subject._guidance_chars = 0  # noqa: SLF001
+        subject._guidance_sentences.clear()  # noqa: SLF001
+        subject._guidance_first_failure = None  # noqa: SLF001
+        return self
+
+    def __exit__(self, *exc_info):
+        for key, value in self.saved.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+        if self.saved_module is None:
+            sys.modules.pop("litellm", None)
+        else:
+            sys.modules["litellm"] = self.saved_module
+        return False
+
+
+#: A sentinel for "the provider is not installed", which is not the same as "the provider raised".
+_MISSING_PROVIDER = object()
+
+
+@case
+def the_transient_arm_writes_one_sentence_an_episode(checks):
+    """R204's mechanism in one assertion: two episodes, two calls, and only the sentences in the prompt."""
+    agent, recalls, original = fresh(pack="RECORDS-FROM-THE-STORE")
+    try:
+        with guidance_arm("Ask for the order id before quoting a refund.") as arm:
+            state = LLMAgentState()
+            for index in range(4):
+                state = episode_step(agent, state, f"first{index}")
+            first = state.system_messages[-1].content
+            second = LLMAgentState()
+            for index in range(2):
+                second = episode_step(agent, second, f"second{index}")
+    finally:
+        subject.recall = original
+    checks.equal(len(recalls), 2, "the store is asked twice, once per episode")
+    checks.equal(len(arm.calls), 2, "and the summariser is asked once per episode, not once per turn")
+    checks.substring(first, "Ask for the order id before quoting a refund.", "the sentence is the pack")
+    checks.equal(
+        first.count("RECORDS-FROM-THE-STORE"),
+        0,
+        "the records themselves never reach the prompt: they are the summariser's input",
+    )
+    checks.equal(subject._pack_chars[-1], len("RECORDS-FROM-THE-STORE"), "the block's length is still recorded")
+
+
+@case
+def the_summariser_is_shown_the_records_and_the_request(checks):
+    """What the one call is asked, since the arm's whole treatment is that prompt."""
+    agent, _, original = fresh(pack="R" * (subject.GUIDANCE_RECORDS_CHARS + 500))
+    try:
+        with guidance_arm("Do the thing.") as arm:
+            state = LLMAgentState()
+            state = episode_step(agent, state, "I want a refund for order 42")
+    finally:
+        subject.recall = original
+    call = arm.calls[0]
+    system, user = call["messages"][0], call["messages"][1]
+    checks.equal(system["role"], "system", "the instruction is a system turn")
+    checks.substring(system["content"], "NONE", "the way to say nothing is stated, because it is the gate")
+    checks.substring(user["content"], "I want a refund for order 42", "the request the sentence is for")
+    checks.substring(user["content"], "RECORDS", "and the records it is written from")
+    checks.equal(
+        user["content"].count("R" * 100),
+        subject.GUIDANCE_RECORDS_CHARS // 100,
+        "a block past the bound is clipped rather than billed whole",
+    )
+    checks.equal(call["temperature"], 0, "the sentence is not a sample: the same records give the same pack")
+    checks.equal(call["max_tokens"], subject.GUIDANCE_MAX_TOKENS, "one sentence is a token ceiling, not a hope")
+    checks.equal(call["timeout"], subject.GUIDANCE_TIMEOUT_S, "and the call cannot outlast the episode's start")
+
+
+@case
+def a_refusal_is_the_arm_gate_and_not_a_failure(checks):
+    """`NONE` is a model doing what it was asked, so counting it as a provider error would misread the arm."""
+    agent, _, original = fresh()
+    try:
+        with guidance_arm("NONE") as arm:
+            state = LLMAgentState()
+            state = episode_step(agent, state, "anything")
+            state = episode_step(agent, state, "anything else")
+            # Read inside the block: the census is a function of the switch, and the switch is restored on
+            # the way out — an arm that reported its own census after the mode moved would be uninstrumented.
+            stats = subject.memory_stats()["guidance"]
+    finally:
+        subject.recall = original
+    checks.equal(len(agent.seen.system_messages), 0, "a refusal serves nothing rather than the block")
+    checks.equal(len(arm.calls), 1, "and the refusal is settled for the episode: no retry on the next turn")
+    checks.equal(stats["refusals"], 1, "the refusal is counted as itself")
+    checks.equal(stats["failures"], 0, "and not as an unreachable provider")
+    checks.equal(stats["sentences"], 0, "nothing was served")
+
+
+@case
+def a_failed_call_serves_no_pack_and_does_not_end_the_episode(checks):
+    """The episode is already paid for when the sentence is asked for: a provider error must not kill it."""
+    agent, _, original = fresh()
+    try:
+        with guidance_arm(raises=RuntimeError("provider said no")):
+            state = LLMAgentState()
+            for index in range(3):
+                state = episode_step(agent, state, f"t{index}")
+            # A second episode fails the same way, which is the branch that keeps the log line to one per
+            # phase: a phase whose every request logged the same error would bury its own reading.
+            state = episode_step(agent, LLMAgentState(), "second episode")
+            stats = subject.memory_stats()["guidance"]
+    finally:
+        subject.recall = original
+    checks.equal(len(agent.seen.system_messages), 0, "no pack is injected")
+    checks.equal(agent.seen is not None, True, "and the episode's own call still went through")
+    checks.equal(stats["calls"], 2, "one call an episode, not one per turn")
+    checks.equal(stats["failures"], 2, "counted as the provider's")
+    checks.equal(stats["sentences"], 0, "and nothing is quoted as served")
+    checks.substring(stats["firstFailure"] or "", "provider said no", "with the reason, for the run's log")
+
+
+@case
+def a_machine_without_the_provider_counts_a_failure(checks):
+    """The branch every local run takes: `litellm` is τ²'s dependency, not this module's."""
+    agent, _, original = fresh()
+    try:
+        with guidance_arm(raises=_MISSING_PROVIDER) as arm:
+            state = LLMAgentState()
+            state = episode_step(agent, state, "hello")
+            stats = subject.memory_stats()["guidance"]
+    finally:
+        subject.recall = original
+    checks.equal(len(arm.calls), 0, "no stub, so no call to record")
+    checks.equal(stats["failures"], 1, "the import failure is a failure like any other")
+    checks.substring(stats["firstFailure"] or "", "ModuleNotFoundError", "named as the missing package it is")
+
+
+@case
+def a_paragraph_is_clipped_to_a_sentence(checks):
+    """The pack is the artefact this arm exists not to write, so its size is bounded where it is built."""
+    agent, _, original = fresh()
+    try:
+        with guidance_arm("word " * 500):
+            state = LLMAgentState()
+            state = episode_step(agent, state, "t")
+    finally:
+        subject.recall = original
+    injected = agent.seen.system_messages[-1].content
+    sentence = subject.guidance_sentence(_Reply("word " * 500))
+    checks.equal(len(sentence), subject.GUIDANCE_MAX_CHARS, "the sentence is clipped at the bound")
+    checks.equal(
+        injected.count("word"),
+        subject.GUIDANCE_MAX_CHARS // 5,
+        "and what the prompt carries is that clipped sentence, newlines already flattened",
+    )
+
+
+@case
+def the_census_names_three_populations(checks):
+    """One sentence, one refusal and one failure are three facts, and the run has to be able to say which."""
+    agent, _, original = fresh(pack="BLOCK")
+    try:
+        with guidance_arm("Serve this.") as arm:
+            first = LLMAgentState()
+            first = episode_step(agent, first, "one")
+            # A second and a third episode against replies chosen per call: the arm object is the stub,
+            # so the reply list is swapped on the module it installed rather than on a second context.
+            replies = iter(["NONE", _Reply("")])
+            module = sys.modules["litellm"]
+
+            def next_reply(**_kwargs):
+                arm.calls.append(_kwargs)
+                return _Reply(next(replies))
+
+            module.completion = next_reply
+            second = LLMAgentState()
+            second = episode_step(agent, second, "two")
+            third = LLMAgentState()
+            third = episode_step(agent, third, "three")
+            stats = subject.memory_stats()["guidance"]
+    finally:
+        subject.recall = original
+    checks.equal(stats["calls"], 3, "three episodes, three calls")
+    checks.equal(stats["sentences"], 1, "one sentence")
+    checks.equal(stats["refusals"], 2, "two silences, and an empty reply is a silence rather than a failure")
+    checks.equal(stats["failures"], 0, "the provider answered every time")
+    checks.substring(stats["model"], "deepseek", "the model that wrote them is recorded beside the counts")
+    checks.equal(stats["promptChars"] > 0, True, "and what it was shown is priced")
+    checks.equal(stats["sentenceChars"], len("Serve this."), "beside what it wrote")
+
+
+@case
+def the_block_arm_makes_no_guidance_call_and_says_nothing_about_one(checks):
+    """Absence is the statement: an arm before this one carried the block and had no summariser at all."""
+    agent, _, original = fresh(pack="BLOCK")
+    saved = os.environ.pop(subject.GUIDANCE_ENV, None)
+    saved_model = os.environ.pop(subject.GUIDANCE_MODEL_ENV, None)
+    try:
+        state = LLMAgentState()
+        state = episode_step(agent, state, "t")
+        stats = subject.memory_stats()
+    finally:
+        subject.recall = original
+        if saved is not None:
+            os.environ[subject.GUIDANCE_ENV] = saved
+        if saved_model is not None:
+            os.environ[subject.GUIDANCE_MODEL_ENV] = saved_model
+    checks.substring(agent.seen.system_messages[-1].content, "BLOCK", "the block is the pack")
+    checks.equal("guidance" in stats, False, "and the census carries no guidance block at all")
+
+
+@case
+def the_switch_reads_five_spellings_and_defaults_to_the_arm_model(checks):
+    """The switch is read on every call, and its default is the model the run already resolved."""
+    saved = {key: os.environ.get(key) for key in (subject.GUIDANCE_ENV, subject.GUIDANCE_MODEL_ENV, "TAU_MODEL")}
+    try:
+        for spelling in ("1", "true", "yes", "guidance", "on", "ON"):
+            os.environ[subject.GUIDANCE_ENV] = spelling
+            checks.equal(subject.guidance_mode(), "guidance", f"'{spelling}' turns the arm on")
+        for spelling in ("", "0", "rendered", "off", "no"):
+            os.environ[subject.GUIDANCE_ENV] = spelling
+            checks.equal(subject.guidance_mode(), "rendered", f"'{spelling}' leaves the arm alone")
+        os.environ.pop(subject.GUIDANCE_ENV, None)
+        checks.equal(subject.guidance_mode(), "rendered", "and unset is every arm before this one")
+        os.environ.pop(subject.GUIDANCE_MODEL_ENV, None)
+        os.environ["TAU_MODEL"] = "deepseek/deepseek-chat"
+        checks.equal(subject.guidance_model(), "deepseek/deepseek-chat", "the arm's own model by default")
+        os.environ[subject.GUIDANCE_MODEL_ENV] = "someone/else"
+        checks.equal(subject.guidance_model(), "someone/else", "unless a dispatch names another")
+    finally:
+        for key, value in saved.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
+
+@case
+def a_reply_this_module_cannot_read_is_a_silence(checks):
+    """Four shapes a provider can answer with, and every one of them has to leave the prompt unchanged."""
+    checks.equal(subject.guidance_sentence(_Reply(None)), "", "no content is no sentence")
+    checks.equal(subject.guidance_sentence(_Reply("")), "", "an empty reply is no sentence")
+    checks.equal(subject.guidance_sentence(_Reply("NONE")), "", "and a refusal is no sentence")
+    checks.equal(subject.guidance_sentence(_Reply("  none.  ")), "", "however it is spelled or spaced")
+    checks.equal(subject.guidance_sentence(types.SimpleNamespace(choices=[])), "", "no choices is no sentence")
+    checks.equal(
+        subject.guidance_sentence(types.SimpleNamespace(choices=None)),
+        "",
+        "and a reply without the attribute at all is the same silence",
+    )
+    checks.equal(
+        subject.guidance_sentence(_Reply("line one\nline two")),
+        "line one line two",
+        "a sentence that arrived with a newline is flattened, because the prompt has one line a sentence",
+    )
+
+
+@case
+def the_timeout_is_a_positive_number_or_the_default(checks):
+    """The sidecar's timeout, which had no test because every case stubs `recall` itself.
+
+    Four states, and the three that are not a number all have to land on the same default rather than on
+    zero: a timeout of zero is not a patient client, it is every recall failing.
+    """
+    saved = os.environ.get("MICROGLIA_TIMEOUT_S")
+    try:
+        os.environ.pop("MICROGLIA_TIMEOUT_S", None)
+        checks.equal(subject._timeout(), subject.DEFAULT_TIMEOUT_S, "unset is the default")  # noqa: SLF001
+        os.environ["MICROGLIA_TIMEOUT_S"] = "12.5"
+        checks.equal(subject._timeout(), 12.5, "a number is honoured")  # noqa: SLF001
+        os.environ["MICROGLIA_TIMEOUT_S"] = "soon"
+        checks.equal(subject._timeout(), subject.DEFAULT_TIMEOUT_S, "junk is the default")  # noqa: SLF001
+        os.environ["MICROGLIA_TIMEOUT_S"] = "-3"
+        checks.equal(subject._timeout(), subject.DEFAULT_TIMEOUT_S, "and so is a negative")  # noqa: SLF001
+    finally:
+        if saved is None:
+            os.environ.pop("MICROGLIA_TIMEOUT_S", None)
+        else:
+            os.environ["MICROGLIA_TIMEOUT_S"] = saved
+
+
+class fake_urlopen:
+    """The one call `recall` makes, replaced: a response object or an exception, recorded."""
+
+    def __init__(self, payload=None, *, raises: BaseException | None = None) -> None:
+        self.payload = payload
+        self.raises = raises
+        self.urls: list[str] = []
+
+    def __call__(self, url, timeout=None):
+        del timeout
+        self.urls.append(url)
+        if self.raises is not None:
+            raise self.raises
+        return self
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc_info):
+        return False
+
+    def read(self):
+        return json.dumps(self.payload).encode("utf-8")
+
+
+@case
+def an_unreachable_facade_is_a_failure_and_not_a_crash(checks):
+    """The sidecar's own failure branch, which every paid run reaches and no test did.
+
+    A memory that is slow or absent must not fail the episode: the benchmark is measuring the agent, and the
+    right outcome is an empty pack plus a counted failure. The print is once per phase, because a run whose
+    every request logged the same socket error would bury its own log.
+    """
+    saved_url = os.environ.get("MICROGLIA_MEMORY_URL")
+    saved_open = __import__("urllib.request", fromlist=["urlopen"]).urlopen
+    failures_before, reported_before = subject._failures, subject._reported  # noqa: SLF001
+    import urllib.request
+
+    try:
+        os.environ["MICROGLIA_MEMORY_URL"] = "http://127.0.0.1:9"
+        subject._failures, subject._reported = 0, False  # noqa: SLF001
+        urllib.request.urlopen = fake_urlopen(raises=OSError("connection refused"))
+        checks.equal(subject.recall("please cancel"), "", "an unreachable sidecar serves no pack")
+        checks.equal(subject.recall("please cancel again"), "", "and keeps serving none")
+        checks.equal(subject._failures, 2, "both attempts are counted")  # noqa: SLF001
+        checks.equal(subject._reported, True, "the log line is printed once")  # noqa: SLF001
+        # And the served path through the same function: the block the facade answered with is what it
+        # returns, and an empty block is a silence with the facade's own reason attached.
+        urllib.request.urlopen = fake_urlopen({"rendered": "BLOCK", "decision": {"margin": 0.3}})
+        checks.equal(subject.recall("cancel"), "BLOCK", "a served pack is the rendered block")
+        urllib.request.urlopen = fake_urlopen({"rendered": "", "suppressed": "nothing-matched"})
+        checks.equal(subject.recall("cancel"), "", "an empty answer stays empty")
+        urllib.request.urlopen = fake_urlopen({"rendered": 42})
+        checks.equal(subject.recall("cancel"), "", "and a payload whose block is not text is no pack")
+        # `bool` is an `int` in Python, so a census answering `true` would enter the ladder as a margin of
+        # 1.0 — a rung no request can ever beat, printed as a store that contested nothing.
+        checks.equal(subject.decision_margin({"decision": {"margin": True}}), None, "a boolean is not a margin")
+        checks.equal(subject.decision_margin({"decision": {"margin": 0.25}}), 0.25, "a number is")
+        checks.equal(subject.decision_margin({"rendered": "x"}), None, "and a response with no census is none")
+        os.environ["MICROGLIA_MEMORY_URL"] = ""
+        checks.equal(subject.recall("cancel"), "", "and no configured sidecar is no request at all")
+        checks.equal(
+            subject._timeout() > 0,  # noqa: SLF001
+            True,
+            "the request that was never made carries a timeout when it is",
+        )
+    finally:
+        urllib.request.urlopen = saved_open
+        subject._failures, subject._reported = failures_before, reported_before  # noqa: SLF001
+        subject._silent_because.clear()  # noqa: SLF001
+        if saved_url is None:
+            os.environ.pop("MICROGLIA_MEMORY_URL", None)
+        else:
+            os.environ["MICROGLIA_MEMORY_URL"] = saved_url
+
+
 def main(argv: list[str]) -> int:
     if "--dump-stats" in argv:
         return dump_stats()

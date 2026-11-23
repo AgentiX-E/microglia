@@ -508,6 +508,7 @@ const arm = (
     traceClaims: number;
     knobs: string;
     rotation: string;
+    serveBody: string;
   }> = {},
 ): Parameters<typeof treatmentOf>[0][number] => ({
   label,
@@ -520,6 +521,9 @@ const arm = (
   knobs: undefined,
   // R152: absent unless a case states one. The control arm states none of the serving policy: it serves no pack.
   rotation: undefined,
+  // R204: absent unless a case states one, which is every fold written before the field — and the answer for
+  // those is `rendered`, because there was one body.
+  serveBody: undefined,
   ...over,
 });
 
@@ -535,6 +539,8 @@ describe('treatmentOf', () => {
         model: 'deepseek-chat',
         traceClaims: 400,
         rotation: 'none',
+
+        serveBody: 'rendered',
       },
     });
   });
@@ -554,6 +560,8 @@ describe('treatmentOf', () => {
           traceClaims: 400,
           knobs: 'anchoring=lexical',
           rotation: 'none',
+
+          serveBody: 'rendered',
         },
       });
     expect(
@@ -579,11 +587,37 @@ describe('treatmentOf', () => {
         model: 'deepseek-chat',
         traceClaims: 400,
         rotation: 'fair-share',
+        serveBody: 'rendered',
       },
     });
     expect(treatmentOf([arm('reference', { rotation: 'off' }), arm('memory', { rotation: 'fair-share' })])).toEqual({
       ok: false,
       reason: "the arms are two runs, not one treatment: rotation is 'off' on reference and 'fair-share' on memory",
+    });
+  });
+
+  it('carries the body the pack was made of, and refuses a pair whose arms served two', () => {
+    // R204. The body is what the prompt carried: the block the store rendered, or one sentence written for the
+    // request and thrown away. Two folds that served two bodies are two treatments — the transient arm's whole
+    // claim is about that difference — so a pool that averaged them would report a number neither arm produced.
+    expect(treatmentOf([arm('reference'), arm('memory', { serveBody: 'guidance' })])).toEqual({
+      ok: true,
+      treatment: {
+        unit: 'raw',
+        form: 'record',
+        scope: 'edited',
+        model: 'deepseek-chat',
+        traceClaims: 400,
+        rotation: 'none',
+        serveBody: 'guidance',
+      },
+    });
+    expect(
+      treatmentOf([arm('reference', { serveBody: 'rendered' }), arm('memory', { serveBody: 'guidance' })]),
+    ).toEqual({
+      ok: false,
+      reason:
+        "the arms are two runs, not one treatment: serveBody is 'rendered' on reference and 'guidance' on memory",
     });
   });
 
@@ -598,7 +632,14 @@ describe('treatmentOf', () => {
     ]);
     expect(outcome).toEqual({
       ok: true,
-      treatment: { unit: 'raw', form: 'record', scope: 'edited', model: 'deepseek-chat', rotation: 'none' },
+      treatment: {
+        unit: 'raw',
+        form: 'record',
+        scope: 'edited',
+        model: 'deepseek-chat',
+        rotation: 'none',
+        serveBody: 'rendered',
+      },
     });
   });
 
@@ -622,6 +663,8 @@ describe('treatmentOf', () => {
         model: 'deepseek-chat',
         traceClaims: 400,
         rotation: 'none',
+
+        serveBody: 'rendered',
       },
     });
   });
@@ -637,14 +680,20 @@ describe('treatmentOf', () => {
     // A pair from before any of these fields existed: the treatment it can state is what it recorded, which is
     // nothing, and the pool then refuses it with four sentences naming the four fields nobody compared.
     //
-    // R202 is the one exception and it is stated rather than defaulted: the treatment always names a serving
-    // policy, and `none` is the name for "no arm declared one". Every pair this code writes can support that
-    // claim, because the memory arm is the only arm that can carry a policy — and the three folds whose files
-    // were written before the field existed are not re-derived, so they keep the key they already have.
+    // Two exceptions, both stated rather than defaulted, and both registered:
+    //
+    // * R202 — the treatment always names a serving policy, and `none` is the name for "no arm declared one".
+    //   Every pair this code writes can support that claim, because the memory arm is the only arm that can
+    //   carry a policy, and the three folds whose files were written before the field existed are not
+    //   re-derived, so they keep the key they already have.
+    // * R204 — `serveBody` is `rendered` for a fold that never named one, and that is a fact about the record
+    //   rather than a default: before the field there was exactly one body, and every artefact in the
+    //   repository was produced under it. A pool that could not see the body would average a sentence arm with
+    //   a block arm.
     const bare = { unit: undefined, form: undefined, scope: undefined, model: undefined, traceClaims: undefined };
     expect(treatmentOf([arm('reference', bare), arm('memory', bare)])).toEqual({
       ok: true,
-      treatment: { rotation: 'none' },
+      treatment: { rotation: 'none', serveBody: 'rendered' },
     });
   });
 
