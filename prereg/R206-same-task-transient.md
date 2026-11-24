@@ -166,3 +166,34 @@ why the pilot's artefact says `claim: none` in as many words.
   is in `selfcheck_agent.py`.
 - **One material per arm.** A facade pack wins over a note, because an arm carrying both is a third treatment
   nobody registered.
+
+## Amendment 3 (2026-11-24) — the path, and the two files that exist because the pilot needed one
+
+The engineering of Amendment 1 built a mechanism with no way to dispatch it: `run_split.py` takes `--rounds` and
+`--notes`, and neither `sota.yml` nor `tau2-driver.ts` builds those argv. This amendment is that way, registered
+before the first dispatch so the pilot's readings are graded by gates rather than by whatever the log happened to
+print.
+
+**`.github/workflows/note-pilot.yml`**, two jobs and the split is the cost model:
+
+- `contract` runs on every push that touches the material, spends nothing, and runs **the same four commands the
+  paid job runs** over a generated fixture pair, requiring the reading to come back `GRADED`. A push that breaks
+  the task list or the path convention between the builder and the verifier fails here rather than on a dispatch
+  that has already bought forty-eight simulations.
+- `pilot` is dispatch-only: two phases at `--rounds 4 --seed 300 --require-off-peak`, the control without
+  `--notes` and the treatment with it, in one job and in that order.
+
+**Two files, because the reading is arithmetic and the arithmetic is testable without a provider:**
+
+- `eval/drivers/tau2/note_pilot.py` assembles the artefact from the two phase logs, the two `results.json` files
+  and the sidecar. It refuses three states — two agents, a control carrying a notes block, no shared task — and
+  leaves every *outcome* to the verifier. `pass^k` is computed over tasks whose trial count is exactly `k`; a task
+  with fewer leaves the denominator and is named in `short`, because averaging it as a zero is the biased estimate
+  this lane exists to avoid.
+- `eval/verifiers/r206_readback.py` grades `N0`–`N4` and recomputes each arm's headline from its own per-task rows
+  before using it: a document that states a score it cannot reproduce is a document whose score is a transcription.
+
+**What the pilot is allowed to conclude.** Nothing about `pass^4`. Its registered claim is `none`, and the
+artefact says so in a field rather than in a paragraph: with six tasks the paired interval is ±30 pp, and the
+decision the pilot actually makes is whether the material is worth 320 simulations — `N2` coverage ≥ 0.6, `N3`
+specificity ≥ 0.5, `N1` a handoff observed, and zero collisions.

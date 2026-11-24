@@ -1,0 +1,270 @@
+name: note-pilot
+
+# R206a — the pilot, in its own file because the arm is a different shape.
+#
+# The pack lane's driver (`packages/eval/src/bin/tau2-driver.ts`) builds a store, splits a corpus, pins a query
+# and pairs two arms through a sidecar service. R206 runs `microglia_agent` with no facade at all, `--rounds 4`
+# and one file the runner writes between rounds, so its argv is four words long and its reading is three blocks
+# of counters. Teaching a 1,900-line driver a second shape would mean its own pair of arms could disagree about
+# what "the same scaffold" means; running the phases here keeps this arm's control checkable by reading four
+# lines of YAML.
+#
+# Two jobs, and the split is the cost model:
+#
+#   contract  free, on every push that touches the material. Runs both self-checks, then the *same* four
+#             commands the paid job runs, over a generated fixture pair, and requires the reading to come back
+#             `GRADED`. A push that breaks the task list, the path convention or the schema fails here rather
+#             than on a dispatch that has already bought forty-eight simulations.
+#   pilot     dispatch only. Two phases at the lane's measured ~26 s an episode: 6 tasks x 4 rounds x 2 arms =
+#             48 simulations, about 25 minutes of model time and roughly ¥1.5 at off-peak rates.
+#
+# The phases are separate processes on purpose. The agent's note counters live at module level, so two arms in
+# one process would report one arm's lookups against the other's hits — and the arm's first gate is exactly
+# whether the control saw a note at all.
+
+on:
+  workflow_dispatch:
+    inputs:
+      domain:
+        description: 'tau2 domain'
+        required: false
+        default: retail
+      tasks:
+        description: 'Comma-separated task ids. The pilot runs six; the fold runs forty.'
+        required: false
+        default: '1,2,3,4,5,6'
+      rounds:
+        description: 'Attempts per task, scheduled as rounds (a note needs two)'
+        required: false
+        default: '4'
+      max_steps:
+        description: 'Steps per episode'
+        required: false
+        default: '100'
+      concurrency:
+        description: 'Tasks at a time. The provider limits requests, and one episode holds three.'
+        required: false
+        default: '1'
+  push:
+    branches: [master]
+    paths:
+      - 'eval/drivers/tau2/notes.py'
+      - 'eval/drivers/tau2/note_pilot.py'
+      - 'eval/drivers/tau2/microglia_agent.py'
+      - 'eval/drivers/tau2/run_split.py'
+      - 'eval/verifiers/r206_readback.py'
+      - '.github/workflows/note-pilot.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  # One pilot at a time. Two dispatches sharing a sidecar path would have the second reading the first's notes,
+  # which is a treatment nobody registered and a reading that cannot be reproduced.
+  group: note-pilot
+  cancel-in-progress: false
+
+jobs:
+  contract:
+    name: the two commands, over a fixture pair (no model calls)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Which interpreter the reading runs on
+        run: |
+          set -euo pipefail
+          python3 --version
+          # The builder and the verifier are standard library only, so they run on the system interpreter
+          # rather than in tau2's virtualenv. That is not a detail: it is what lets the free half of this
+          # workflow exist at all, and it is why a change to either file cannot be hidden behind a dependency.
+          python3 - <<'PY'
+          import sys
+          assert sys.version_info >= (3, 11), sys.version
+          PY
+
+      - name: Both files agree with themselves
+        run: |
+          set -euo pipefail
+          python3 eval/drivers/tau2/notes.py --self-test
+          python3 eval/drivers/tau2/note_pilot.py --self-test
+          python3 eval/verifiers/r206_readback.py --self-test
+
+      - name: The chain the paid job runs, end to end
+        run: |
+          set -euo pipefail
+          FIXTURES="${RUNNER_TEMP}/note-pilot-fixtures"
+          rm -rf "$FIXTURES"
+          # The builder writes the fixture pair and prints its four paths, so a rename fails here instead of
+          # becoming a shell script that ran over nothing and a reading of an empty directory.
+          python3 eval/drivers/tau2/note_pilot.py --fixtures "$FIXTURES" --rounds 4 | tee "${RUNNER_TEMP}/fixtures.json"
+          python3 eval/drivers/tau2/note_pilot.py \
+            --control "${FIXTURES}/control.log" \
+            --treatment "${FIXTURES}/treatment.log" \
+            --control-results "${FIXTURES}/control-results.json" \
+            --treatment-results "${FIXTURES}/treatment-results.json" \
+            --domain retail --tasks 1,2,3,4,5,6 --rounds 4 --seeds 300,301,302,303 \
+            --release v1.0.1 --out "${FIXTURES}/note-pilot.json"
+          # `ABANDONED` is a result and this step would accept it, so the fixture requires `GRADED`: the
+          # fixture's mechanism demonstrably ran, and a reading that says otherwise is a broken grader.
+          python3 eval/verifiers/r206_readback.py --dir "$FIXTURES" | tee "${RUNNER_TEMP}/reading.txt"
+          tail -n 1 "${RUNNER_TEMP}/reading.txt" | grep -qx GRADED
+
+  pilot:
+    name: pilot — the note carried from attempt k to attempt k+1
+    needs: contract
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    # Install (8 min) plus two arms at 24 simulations each plus the reading. Generous rather than tight: a step
+    # killed mid-phase writes no artefact, which is the one outcome this job cannot afford.
+    timeout-minutes: 75
+    env:
+      DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+      # The release a pass^k is comparable to. R92: v0.2.0 and v1.0.1 share no retail task ids, so a number
+      # without this cannot be ranked against the board or against an earlier fold of this lane.
+      TAU_VERSION: ${{ vars.TAU_VERSION }}
+      TAU_MODEL: ${{ vars.TAU_MODEL || 'deepseek/deepseek-flash' }}
+      TAU2_DATA_DIR: ${{ github.workspace }}/.tau2-bench/data
+      PILOT_DOMAIN: ${{ github.event.inputs.domain || 'retail' }}
+      PILOT_TASKS: ${{ github.event.inputs.tasks || '1,2,3,4,5,6' }}
+      PILOT_ROUNDS: ${{ github.event.inputs.rounds || '4' }}
+      PILOT_MAX_STEPS: ${{ github.event.inputs.max_steps || '100' }}
+      PILOT_CONCURRENCY: ${{ github.event.inputs.concurrency || '1' }}
+      # The base seed, named once. `run_split.py` derives round i's seed as `base + i`, and the artefact states
+      # the same list so a reader can re-run the fold without guessing what "four rounds" meant.
+      PILOT_SEED: '300'
+      PILOT_DIR: eval/results/note-pilot
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require the provider key before the first call
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DEEPSEEK_API_KEY}" ]; then
+            echo "::error::DEEPSEEK_API_KEY is not configured for this repository"
+            exit 1
+          fi
+
+      - name: Cache the tau2 environment
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            .tau2-bench
+          key: tau2-${{ vars.TAU_VERSION }}-${{ runner.os }}
+
+      - name: Install tau2-bench at the pinned ref
+        run: |
+          set -euo pipefail
+          REF="${TAU_VERSION:-v1.0.1}"
+          if [ ! -d .tau2-bench/.git ]; then
+            git clone --depth 1 --branch "$REF" https://github.com/sierra-research/tau2-bench .tau2-bench \
+              || { echo "tau2-clone-failed:$REF"; exit 21; }
+          fi
+          cd .tau2-bench
+          python -m pip install --upgrade pip uv
+          uv sync || { echo "tau2-sync-failed:$REF"; exit 22; }
+          # litellm imports its MCP handler eagerly on the first completion and does not declare `mcp` as a
+          # hard dependency, so every model call raises ModuleNotFoundError before a request is sent.
+          uv pip install mcp || { echo "tau2-mcp-missing:$REF"; exit 24; }
+          uv run tau2 check-data || { echo "tau2-data-missing:$REF"; exit 23; }
+
+      - name: The two arms, in sequence, with the seeds written down
+        env:
+          # The summariser's own environment. `run_split.py` reads the model through `TAU_MODEL` and derives
+          # the note writer's model from it, so there is one string rather than two that can disagree.
+          TAU_CONCURRENCY: ${{ github.event.inputs.concurrency || '1' }}
+          TAU_RETRIES: '4'
+        run: |
+          set -euo pipefail
+          PYTHON="${GITHUB_WORKSPACE}/.tau2-bench/.venv/bin/python"
+          test -x "$PYTHON" || { echo "tau2-venv-missing"; exit 25; }
+          mkdir -p "${PILOT_DIR}/control" "${PILOT_DIR}/treatment"
+          SEEDS="$(python3 -c "print(','.join(str(int('${PILOT_SEED}') + index) for index in range(int('${PILOT_ROUNDS}'))))")"
+          echo "seeds ${SEEDS}" >> "$GITHUB_STEP_SUMMARY"
+          echo "PILOT_SEEDS=${SEEDS}" >> "$GITHUB_ENV"
+
+          run_arm () {
+            local arm="$1"; shift
+            # `--require-off-peak` on both arms: the same workload costs exactly double inside the provider's
+            # peak windows, and a pilot is the cheapest run in the lane to move. The guard refuses before the
+            # first call rather than reporting a bill after it.
+            "$PYTHON" eval/drivers/tau2/run_split.py \
+              --phase eval --agent microglia_agent \
+              --domain "${PILOT_DOMAIN}" --tasks "${PILOT_TASKS}" --rounds "${PILOT_ROUNDS}" \
+              --max-steps "${PILOT_MAX_STEPS}" --seed "${PILOT_SEED}" --require-off-peak \
+              --out "${PILOT_DIR}/${arm}/results.json" "$@" \
+              2>&1 | tee "${PILOT_DIR}/${arm}.log"
+          }
+
+          # Control first. If it fails, nothing has been spent on a treatment whose comparison would have no
+          # other side; if the treatment fails, the control's artefact is still a pass^k on this grid.
+          run_arm control
+          run_arm treatment --notes "${PILOT_DIR}/notes.json"
+
+      - name: Assemble the pilot's document
+        run: |
+          set -euo pipefail
+          python3 eval/drivers/tau2/note_pilot.py \
+            --control "${PILOT_DIR}/control.log" \
+            --treatment "${PILOT_DIR}/treatment.log" \
+            --control-results "${PILOT_DIR}/control/results.json" \
+            --treatment-results "${PILOT_DIR}/treatment/results.json" \
+            --domain "${PILOT_DOMAIN}" --tasks "${PILOT_TASKS}" --rounds "${PILOT_ROUNDS}" \
+            --seeds "${PILOT_SEEDS}" --release "${TAU_VERSION:-v1.0.1}" \
+            --out "${PILOT_DIR}/note-pilot.json"
+
+      - name: Grade the pilot against the gates that can grade it
+        run: |
+          set -euo pipefail
+          # `ABANDONED` keeps this step green and is the pilot's answer for a material that cannot be bought:
+          # the state is in the outcome and in the summary, and a red job would teach an operator to re-dispatch
+          # rather than to read. `NO_MEASUREMENT` and `DISCARDED` are the two that fail, because both mean the
+          # document cannot answer — and both cost nothing to fix compared with another dispatch.
+          python3 eval/verifiers/r206_readback.py --dir "${PILOT_DIR}" | tee "${PILOT_DIR}/reading.txt"
+          {
+            echo "### R206a — the note, carried one attempt forward"
+            echo
+            echo '```'
+            cat "${PILOT_DIR}/reading.txt"
+            echo '```'
+            echo
+            python3 - <<'PY'
+          import json, os
+          path = os.path.join(os.environ["PILOT_DIR"], "note-pilot.json")
+          document = json.load(open(path))
+          arms, notes = document["arms"], document["notes"]
+          print(f"| reading | value |")
+          print(f"|---|---|")
+          print(f"| pass^{document['configuration']['rounds']} control | {arms['control']['passK']:.3f} |")
+          print(f"| pass^{document['configuration']['rounds']} treatment | {arms['treatment']['passK']:.3f} |")
+          print(f"| delta (withheld) | {document['comparison']['passK']['deltaPp']} pp "
+                f"over {document['comparison']['passK']['paired']} task(s) |")
+          print(f"| note coverage | {notes['coverage']:.3f} of {notes['failed']} failure(s) |")
+          print(f"| specificity | {notes['specificity'].get('share')} |")
+          print(f"| hits / lookups | {notes['hits']} / {notes['lookups']} |")
+          print(f"| collisions | {notes['collisions']} |")
+          print(f"| bill | ${document['bill']['controlUsd']} + ${document['bill']['treatmentUsd']} |")
+          print(f"| material tokens | {document['bill']['materialTokens']} |")
+          PY
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the pilot
+        # `always()`: the artefact of a pilot that abandoned its material is the evidence for not buying the
+        # fold, and it is worth more than the log that says the job ended.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: note-pilot
+          path: |
+            eval/results/note-pilot/note-pilot.json
+            eval/results/note-pilot/reading.txt
+            eval/results/note-pilot/control.log
+            eval/results/note-pilot/treatment.log
+            eval/results/note-pilot/control/results.json
+            eval/results/note-pilot/treatment/results.json
+            eval/results/note-pilot/notes.json
+          if-no-files-found: warn
