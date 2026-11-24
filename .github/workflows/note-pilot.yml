@@ -69,6 +69,7 @@ on:
       - 'eval/drivers/tau2/run_split.py'
       - 'eval/verifiers/r206_readback.py'
       - 'eval/verifiers/opening_stability.py'
+      - 'eval/tools/note_bank.py'
       - 'scripts/check-python-coverage.py'
       - '.github/workflows/note-pilot.yml'
 
@@ -108,6 +109,7 @@ jobs:
           python3 eval/drivers/tau2/note_pilot.py --self-test
           python3 eval/verifiers/r206_readback.py --self-test
           python3 eval/verifiers/opening_stability.py --self-test
+          python3 eval/tools/note_bank.py --self-test
 
       - name: The chain the paid job runs, end to end
         run: |
@@ -158,16 +160,18 @@ jobs:
           # Installed here rather than assumed: the runner image does not carry `coverage`, and a gate that fails
           # on a missing package is a gate an operator learns to skip ("No module named coverage", first push).
           python3 -m pip install --disable-pip-version-check --quiet coverage
-          INCLUDE="*/eval/drivers/tau2/notes.py,*/eval/drivers/tau2/note_pilot.py,*/eval/verifiers/r206_readback.py,*/eval/verifiers/opening_stability.py"
+          INCLUDE="*/eval/drivers/tau2/notes.py,*/eval/drivers/tau2/note_pilot.py,*/eval/verifiers/r206_readback.py,*/eval/verifiers/opening_stability.py,*/eval/tools/note_bank.py"
           rm -f .coverage
           python3 -m coverage run --branch --include="$INCLUDE" eval/drivers/tau2/notes.py --self-test
           python3 -m coverage run --append --branch --include="$INCLUDE" eval/drivers/tau2/note_pilot.py --self-test
           python3 -m coverage run --append --branch --include="$INCLUDE" eval/verifiers/r206_readback.py --self-test
           python3 -m coverage run --append --branch --include="$INCLUDE" eval/verifiers/opening_stability.py --self-test
+          python3 -m coverage run --append --branch --include="$INCLUDE" eval/tools/note_bank.py --self-test
           python3 -m coverage json -o "${RUNNER_TEMP}/coverage-notes.json" --include="$INCLUDE"
-          # `--expect-files 4`: a run that measured nothing reports 100% of nothing, which is the one failure mode
-          # a percentage cannot express.
-          python3 scripts/check-python-coverage.py "${RUNNER_TEMP}/coverage-notes.json" --min 95 --expect-files 4
+          # `--expect-files 5`: a run that measured nothing reports 100% of nothing, which is the one failure mode
+          # a percentage cannot express. Five since R208 added the bank reader, which is the instrument the next
+          # round's population is counted with.
+          python3 scripts/check-python-coverage.py "${RUNNER_TEMP}/coverage-notes.json" --min 95 --expect-files 5
 
   pilot:
     name: pilot — the note carried from attempt k to attempt k+1
