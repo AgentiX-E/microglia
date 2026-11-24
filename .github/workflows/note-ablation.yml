@@ -1,0 +1,199 @@
+name: note-ablation
+
+# R208's material ablation: the same failures, shown to the summariser twice.
+#
+# The bank gave the lane a population (456 episodes, 85 failed attempts, every one explained). This job spends it:
+# each failure is summarised once from the attempt alone and once from the attempt plus the evaluator's verdict, and
+# the four registered predictions are measured on the pair. No simulator runs, so the whole job is 2N provider calls
+# and the bill is cents — which is why it can afford to be a separate workflow with its own budget ceiling rather
+# than a phase of the pilot.
+#
+# It reads a bank from a *previous* run's artefact rather than rebuilding one: the population is a fact about a run
+# that has already happened, and re-simulating it would make the two materials incomparable with the bank's census.
+#
+# No `push` trigger. This file calls a provider and therefore runs when someone decides to spend, and the spend is
+# bounded by `--max-usd` inside the tool rather than by an operator reading the log afterwards.
+
+on:
+  workflow_dispatch:
+    inputs:
+      bank_run:
+        description: 'The run id whose `note-bank` artefact holds the population'
+        required: true
+      limit:
+        description: 'First N failures, for a smoke run. Zero means the whole bank'
+        required: false
+        default: '0'
+      model:
+        description: 'Summariser model, or empty for the arm''s own'
+        required: false
+        default: ''
+      max_usd:
+        description: 'Refuse before the first call above this estimate'
+        required: false
+        default: '0.5'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  # One ablation at a time, for the bank's reason: two runs writing the same reading would have the second
+  # reporting the first's population.
+  group: note-ablation
+  cancel-in-progress: false
+
+jobs:
+  # The contract job needs no key: it proves the tool's own claims locally, so a dispatch that spends money starts
+  # from a suite that is green on the same commit.
+  contract:
+    name: contract — the ablation's claims, without a provider
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: The self-checks, in the order the lane runs them
+        run: |
+          set -euo pipefail
+          python3 eval/drivers/tau2/notes.py --self-test
+          python3 eval/drivers/tau2/note_pilot.py --self-test
+          python3 eval/verifiers/r206_readback.py --self-test
+          python3 eval/verifiers/opening_stability.py --self-test
+          python3 eval/tools/note_bank.py --self-test
+          python3 eval/tools/note_material_ablation.py --self-test
+
+      - name: The ablation's reading, on a fixture, before it is ever pointed at a bank
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, subprocess, sys
+          # A three-failure fixture: two the attempt arm declines and the verdict arm writes, one both write.
+          simulations = []
+          for task, reward in (("5", 0.0), ("9", 0.0), ("12", 0.0)):
+              simulations.append({
+                  "task_id": task, "trial": 0,
+                  "reward_info": {
+                      "reward": reward,
+                      "db_check": {"db_match": False},
+                      "action_checks": [{"action": {"name": f"cancel_order_{task}"}, "action_match": False}],
+                  },
+                  "messages": [{"role": "user", "content": f"please help with task {task}"},
+                               {"role": "assistant", "content": "done"}],
+              })
+          open("/tmp/fixture.json", "w").write(json.dumps({"simulations": simulations}))
+          # A dry run: it renders both prompts, bills nothing, and must find the three failures.
+          out = subprocess.run([sys.executable, "eval/tools/note_material_ablation.py", "--bank",
+                                "/tmp/fixture.json", "--dry-run"], capture_output=True, text=True)
+          assert out.returncode == 0, out.stdout + out.stderr
+          assert "3 failure(s)" in out.stdout, out.stdout
+          assert "P1 the evaluator explained | 3 of 3" in out.stdout, out.stdout
+          # A saturated fixture is not a measurement.
+          open("/tmp/saturated.json", "w").write(json.dumps({"simulations": [
+              {"task_id": "5", "reward_info": {"reward": 1.0}, "messages": []}]}))
+          out = subprocess.run([sys.executable, "eval/tools/note_material_ablation.py", "--bank",
+                                "/tmp/saturated.json"], capture_output=True, text=True)
+          assert out.returncode == 2, out.returncode
+          print("the ablation's chain, on fixtures: ok")
+          PY
+
+      - name: The coverage floor, over every module the lane runs
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check --quiet coverage
+          INCLUDE="*/eval/drivers/tau2/notes.py,*/eval/drivers/tau2/note_pilot.py,*/eval/verifiers/r206_readback.py,*/eval/verifiers/opening_stability.py,*/eval/tools/note_bank.py,*/eval/tools/note_material_ablation.py"
+          rm -f .coverage
+          for file in eval/drivers/tau2/notes.py eval/drivers/tau2/note_pilot.py eval/verifiers/r206_readback.py \
+                      eval/verifiers/opening_stability.py eval/tools/note_bank.py eval/tools/note_material_ablation.py; do
+            python3 -m coverage run --append --branch --include="$INCLUDE" "$file" --self-test >/dev/null
+          done
+          python3 -m coverage json -o "${RUNNER_TEMP}/coverage-notes.json" --include="$INCLUDE"
+          python3 scripts/check-python-coverage.py "${RUNNER_TEMP}/coverage-notes.json" --min 95 --expect-files 6
+
+  ablate:
+    name: ablate — the same failures, the attempt alone and the attempt with the verdict
+    needs: contract
+    runs-on: ubuntu-latest
+    # 170 calls at ~1 s each plus the install: generous, because a step killed mid-run writes no reading.
+    timeout-minutes: 40
+    env:
+      DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+      TAU_MODEL: ${{ vars.TAU_MODEL || 'deepseek/deepseek-flash' }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ABLATION_BANK_RUN: ${{ github.event.inputs.bank_run }}
+      ABLATION_LIMIT: ${{ github.event.inputs.limit || '0' }}
+      ABLATION_MODEL: ${{ github.event.inputs.model || '' }}
+      ABLATION_MAX_USD: ${{ github.event.inputs.max_usd || '0.5' }}
+      ABLATION_DIR: eval/results/note-ablation
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Require the provider key before the first call
+        env:
+          KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${KEY}" ]; then
+            echo "::error::DEEPSEEK_API_KEY is not set for this repository; nothing can be spent and nothing measured"
+            exit 24
+          fi
+
+      - name: Install the provider client
+        # `litellm` is the arm's own client, so the ablation calls the provider exactly as the summariser does.
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check --quiet litellm
+
+      - name: Fetch the bank this ablation is computed on
+        run: |
+          set -euo pipefail
+          mkdir -p "${ABLATION_DIR}"
+          gh run download "${ABLATION_BANK_RUN}" --repo "${GITHUB_REPOSITORY}" --name note-bank \
+            --dir "${ABLATION_DIR}"
+          test -f "${ABLATION_DIR}/control.json" || { echo "::error::the run holds no bank"; exit 25; }
+          echo "bank from run ${ABLATION_BANK_RUN}: $(du -h "${ABLATION_DIR}/control.json" | cut -f1)" \
+            >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Ablate the material
+        run: |
+          set -euo pipefail
+          set +e
+          READING="$(python3 eval/tools/note_material_ablation.py --bank "${ABLATION_DIR}/control.json" \
+            --limit "${ABLATION_LIMIT}" --model "${ABLATION_MODEL}" --max-usd "${ABLATION_MAX_USD}" \
+            --json "${ABLATION_DIR}/ablation.json" 2>&1)"
+          STATUS=$?
+          set -e
+          {
+            echo "### The material ablation"
+            echo
+            echo '```'
+            echo "${READING}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          # 0 is a graded material, 1 is a refuted one, 2 is a job that could not measure. Only the last is an
+          # error: a refutation is a finding, and a red job for a finding teaches an operator to re-dispatch rather
+          # than to read — the argument that made `ABANDONED` green in R206.
+          if [ "$STATUS" -eq 1 ]; then
+            echo "::warning::a registered bar was not met — the reading is in the summary"
+          elif [ "$STATUS" -ne 0 ]; then
+            echo "::error::the ablation could not measure (exit ${STATUS})"
+            exit "$STATUS"
+          fi
+
+      - name: Upload the ablation
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: note-ablation
+          path: |
+            eval/results/note-ablation/*.json
+          if-no-files-found: warn
+          retention-days: 30
