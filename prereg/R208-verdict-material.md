@@ -71,7 +71,9 @@ a change of arm: the fold refuses a corpus whose phases disagree about it (`tau2
 The gate below needs failures, and the six-task grid has none to spare. So the arm is measured in two steps, the
 first of which is a census rather than an experiment:
 
-1. **Bank.** One control-only round over the retail test split, 114 tasks, `deepseek-flash`, thinking disabled. Its
+1. **Bank.** One control arm over the retail **test** split — 40 held-out tasks, four trials each, 160 episodes —
+   `deepseek-flash`, thinking disabled. (The submissions report on the 114-task base split, 74 train plus these 40,
+   which is why a bank on the held-out half is the comparable population and not the identical one.) Its
    purpose is to find the tasks the arm fails and to keep their transcripts and verdicts. At the lane's measured
    $0.0019 an episode this is about **$0.21 (¥1.5)** and about an hour.
 2. **Material ablation.** On every failed attempt in the bank, call the summariser twice: once with the attempt
@@ -112,13 +114,13 @@ have one.
   decoration that costs tokens on every distilled failure.
 - If P1 fails, the evaluator is not reporting enough for this material to exist, and the lane returns to the prior
   question: which benchmark can grade a failure at all, before asking what a note is worth.
-- If the bank itself yields fewer than eight failures over 114 tasks, the retail split is saturated for this arm at
+- If the bank itself yields fewer than eight failures over its 160 episodes, the retail split is saturated at
   this model and the note lane's next round is a different domain rather than a different material.
 
 ## Price, measured rather than estimated
 
-- **Bank.** 114 tasks, one control-only round, at the lane's measured $0.0019 an episode: about **$0.21 (¥1.5)** and
-  about an hour, including the τ² import and the release install.
+- **Bank.** 40 tasks at four trials, one arm, one invocation, at the lane's measured $0.0019 an episode: about
+  **$0.30 (¥2.2)** and about forty minutes at two episodes at a time, including the τ² install.
 - **Ablation.** Two summariser calls per failed attempt, at roughly four thousand prompt characters each: a hundredth
   of a yuan per failure. The whole ablation is under **¥0.5** at the bank's expected size.
 - **What is not bought.** The 320-simulation fold is about ¥4.3 and is not dispatched on this material until P2 and

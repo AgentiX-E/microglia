@@ -6415,6 +6415,15 @@ A saturated grid is the state R207's pilot came back in: 48 episodes, one failur
 round. `grep "reason: no-distilled-failure"` is the check the workflow uses to keep the job green and print a
 warning, because the repair is a harder dispatch and not a fix.
 
-Pick the harder grid by measurement, not by hunch: run the **control** over the split you intend to use, one round,
-and take the tasks it failed. At the lane's measured $0.0019 an episode, the retail split's 114 tasks cost about
-$0.21 to census, which is cheaper than one fold dispatched on a grid that was never going to say anything.
+Pick the harder grid by measurement, not by hunch, and use `note-bank.yml`:
+
+```
+gh workflow run note-bank.yml -f domain=retail -f trials=4 -f concurrency=2
+```
+
+No `tasks` means the whole test split — 40 held-out retail tasks — and four trials makes the run a `pass^4` on the
+population the published ladder reports (whose submissions use the 114-task base split: 74 train plus these 40, which
+is why it is the comparable population and not the identical one). 160 episodes at the lane's measured $0.0019 an
+episode is about **$0.30**, and the artefact is a bank: every failed attempt with its transcript and its verdict, the
+population R208's material ablation is computed on. Four trials rather than one because the same 160 episodes answer
+both questions — where the failures are, and how reliably the arm that has no memory solves the split.
