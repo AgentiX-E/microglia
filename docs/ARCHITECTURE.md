@@ -3866,3 +3866,57 @@ would be spent on an arm whose binding cannot fire, and its zero would be publis
 The identity moves from the message to the file — one task per invocation, one sidecar per task, and the runner
 choosing which file the agent reads (`prereg/R207-transient-identity.md`). The material itself is untouched,
 because changing the summariser's prompt at the same time would make the result attributable to neither.
+
+### 8.76 The identity moves to the file, and the fold becomes a merge
+
+R207 changes one thing about R206 — **how the agent knows which task it is in** — and that one change forces three
+others, because an arm that runs one task per process no longer leaves one log and one `results.json`.
+
+**The sidecar declares its task.** `notes.SCHEMA` is `microglia.notes/2` and every document carries
+`scope: {kind: task, task: "5"}`. The runner declares it before the first episode (`run_split.set_scope`), so the
+agent reads a file that names the task it is in rather than trying to recognise the request it was given. Three
+states, and the difference between them is the whole safety argument:
+
+| scope | who writes it | what the agent serves |
+|---|---|---|
+| `task` | one invocation, one task | the key's entry, and on a miss the entry from the latest attempt — because every entry in the file is about this task |
+| `many` | a merge of several tasks' files, for the corpus measurements | the key's entry only: the identity is unknown again |
+| `none` | a store-free arm, or a file written before this schema | the key's entry only |
+
+A path reused for a second task is **refused** (`tau2-notes-scope-changed:5->9`) rather than rebound. The file is
+the identity, so a runner that pointed task 9 at task 5's sidecar would serve task 5's sentence to task 9 and every
+reading would be about the wrong task. `--notes` with more than one task is refused too
+(`tau2-notes-need-one-task:6`), which makes the gate true by construction on the runner's side rather than by
+inspection afterwards.
+
+**One entry about another task poisons the file.** `lookup` returns `("", "none")` when a file that declares task 5
+holds an entry whose `task` is 9: either the writer crossed two tasks or the file was pointed at the wrong one, and
+serving that sentence is the cross-task mechanism R41 and R204 measured. The two identities are counted apart —
+`keyHits` (the text matched, which is R206's mechanism) and `taskHits` (the file named the task, which is R207's) —
+because a single `hits` counter could not tell the repair from the defect it repaired.
+
+**An arm is now a list of phases.** Six tasks × two arms is twelve `run_split.py` invocations, each with its own
+`--out`, its own log and its own sidecar; the cost is one τ² import each, about ten seconds, which is cheaper than
+one wrong-note serving. `note_pilot.py` therefore takes each flag as a comma-separated list and merges:
+
+- **the grid** — `notes.merge_documents` takes the union of the tasks and every `(task, trial)` exactly once, and
+  refuses a task two documents both list (`tau2-merge-duplicate-task:5`) or an attempt they both hold
+  (`tau2-merge-duplicate-trial:5/0`). Both are states a reader downstream would otherwise read as a grid;
+- **the phase** — `merge_summaries` sums the bill and the agent's counters, keeps the band only when every phase ran
+  in the same one (else `mixed`), and refuses two models or two agents inside one arm;
+- **specificity** — recomputed over the merged corpus, because it is the one reading that is a property of the
+  corpus. A single invocation sees one task, so every note's entities are trivially unique and the share would be
+  **1.0 by construction**; `notes.specificity` returns `share: null` with a reason when the corpus holds fewer than
+  two tasks, and the runner writes the failed attempts beside the sidecar (`<notes>.trajectories.json`) so the
+  builder can compute the real share once all six are in hand.
+
+**`N5` is the arm's own gate.** Every sidecar declares exactly one task, and there is one per task in the grid: a
+mis-scoped file is `DISCARDED` (it is another arm — R206's defect wearing this one's clothes), a grid with fewer
+scopes than tasks is `NO_MEASUREMENT` (this arm, with a hole in it), and an artefact with no scope census at all is
+`DISCARDED` because it predates the field.
+
+**The instrument is now floored.** The lane's four Python files had a self-check each and no coverage gate, so a
+refactor could take the instrument from 95% to 80% with every job green. Measured before R207's cases were added:
+**89.4%** overall, `r206_readback.py` 86.6%, `opening_stability.py` 80.0%. The contract job now runs the four
+self-checks under `coverage --branch` and fails below **95% per file** with `--expect-files 4` (a run that measured
+nothing reports 100% of nothing); R207's cases and the coverage work took the four to 96.9 / 95.7 / 98.1 / 96.6.

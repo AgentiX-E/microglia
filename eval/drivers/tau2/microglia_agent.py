@@ -63,8 +63,9 @@ from tau2.data_model.message import Message, SystemMessage
 
 # R206. The note sidecar: the material is a sentence distilled from this task's own failed attempt, carried one
 # attempt forward and discarded. It lives beside this module and imports nothing third-party, so the arm's
-# identity rule (`note_key`) is exercised by a self-check that needs no harness.
-from notes import note_key, note_of, sentence_of, load as load_notes
+# identity rules — the key on the opening text, and R207's scope on the file — are exercised by a self-check that
+# needs no harness.
+from notes import lookup, scope_of, sentence_of, load as load_notes
 
 # `ValidAgentInputMessage` moved in τ² v1.0.0: it lived in `tau2.agent.base` and now lives in
 # `tau2.agent.base_agent`, beside the `HalfDuplexAgent` that `LLMAgent` extends. Both are tried
@@ -223,6 +224,11 @@ NOTES_ENV = "MICROGLIA_NOTES"
 _note_lookups = 0
 _note_hits = 0
 _note_chars = 0
+#: Which identity produced the note. `key` is the opening text matching the one the runner wrote under; `task` is
+#: the file naming the task this episode is in. R207's first prediction is about the second, and a single `hits`
+#: counter could not separate the repair from the defect it repaired.
+_note_key_hits = 0
+_note_task_hits = 0
 _note_problem: str | None = None
 _note_loaded_at: object = None
 _note_document: dict = {}
@@ -329,17 +335,26 @@ def note_for(text: str) -> str:
     """The note this task's last failed attempt earned, or an empty string.
 
     Counted apart from the facade's recall: this arm has no store and no retrieval, so a `recalls` counter that
-    moved here would report a facade that was never asked. Three numbers instead — lookups, hits, characters —
-    and the share the registration's first prediction is about is `hits / lookups`.
+    moved here would report a facade that was never asked.
+
+    R207 splits the hit by identity. `keyHits` is the note found because this request's text matched the one the
+    runner wrote under; `taskHits` is the note found because the sidecar declares the task this episode is in and
+    holds one entry. The first is R206's mechanism, which the pilot measured as not identifying a task (0.006
+    exact reuse over 168 same-task pairs); the second is this arm's, and a phase where `hits > 0` but
+    `taskHits == 0` says the improvement came from the text rather than from the file.
     """
-    global _note_lookups, _note_hits, _note_chars
+    global _note_lookups, _note_hits, _note_chars, _note_key_hits, _note_task_hits
     if notes_path() == "":
         return ""
     _note_lookups += 1
-    note = note_of(_notes_document(), text)
+    note, how = lookup(_notes_document(), text)
     if note == "":
         return ""
     _note_hits += 1
+    if how == "key":
+        _note_key_hits += 1
+    else:
+        _note_task_hits += 1
     _note_chars += len(note)
     return note
 
@@ -762,7 +777,14 @@ def memory_stats() -> dict:
             "path": notes_path(),
             "lookups": _note_lookups,
             "hits": _note_hits,
+            # R207. The two identities, apart: a note found under the key is R206's mechanism, a note served
+            # because the file names the task is this arm's. `hits` is their sum, so a reader that only knows the
+            # older field still reads the same quantity.
+            "keyHits": _note_key_hits,
+            "taskHits": _note_task_hits,
             "chars": _note_chars,
             "problem": _note_problem,
+            # What the file says it is: `task` on every R207 invocation, `many` only on a merge of them.
+            "scope": scope_of(_note_document),
         }
     return stats

@@ -34,8 +34,8 @@ claimRuler: interval
 
 # R207 — the same task twice, bound by the file rather than by the sentence
 
-**Registered** 2026-11-24, not built. It exists because R206's pilot found two defects and only one of them is
-about the material.
+**Registered** 2026-11-24, **built** 2026-11-24 before any dispatch. It exists because R206's pilot found two
+defects and only one of them is about the material.
 
 ## What the pilot measured
 
@@ -104,3 +104,43 @@ It does not change the summariser's prompt, and it does not add the evaluator's 
 shown. Both are candidate repairs for the starvation, and both change the *material* — which would make this arm's
 result unattributable to the identity that is its subject. They are registered as the next arm if coverage stays
 below the bar with the identity fixed.
+
+## Built, and what the build had to add
+
+Written before the dispatch, so the reading cannot be fitted to it afterwards. The arm is the one registered above;
+these are the facts an implementation had to settle, each of which the reading depends on.
+
+**The schema moved.** `microglia.notes/2`, because the document's meaning changed: an entry is addressed by the
+file's scope as well as by its key. A `/1` sidecar is refused by `load` rather than reinterpreted, which is the safe
+direction — the agent serves nothing and records the problem instead of serving a note under a rule its writer did
+not know about.
+
+**The fallback is narrow on purpose.** It fires only for `scope.kind == "task"`, serves the entry from the highest
+`attempt`, and returns nothing at all if any entry in that file names a different task. The last clause is the one
+that matters: a file holding two tasks' entries is the cross-task mechanism R41/R204 measured, and the merge that
+produces such a file (`notes.merge_sidecars`) records it as a collision rather than dropping it silently.
+
+**Two refusals, both before the first paid call.** `--notes` with more than one task is
+`tau2-notes-need-one-task:N`; a sidecar path reused for another task is `tau2-notes-scope-changed:A->B`. The first
+makes N5 true by construction on the runner's side; the second stops the one route by which R207 could reintroduce
+R206's defect.
+
+**An arm is now a list of phases, so the reading merges.** `note_pilot.py` takes every flag as a comma list and
+merges the grid (`merge_documents`), the phase (`merge_summaries`) and the corpus (`merge_sidecars` +
+`merge_trajectories`), refusing a duplicate task, a duplicate `(task, trial)` and two models inside one arm.
+
+**Specificity moved to the merge.** A share over one task is 1.0 by construction, so `notes.specificity` returns
+`null` with a reason below two tasks and the runner writes each task's failed attempt to
+`<notes>.trajectories.json`; the builder recomputes the share over all six. Without `--notes` the artefact carries
+`specificity: null` and N3 is reported as unmeasured, not refuted: an absent diagnostic is not a finding about the
+material, and turning it into an abandonment would throw away a paid fold over a missing file.
+
+**The instrument is floored, measured, and the number is in the record.** The lane's four Python files had
+self-checks and no coverage gate; measured before this round's cases, they stood at 89.4% together
+(`r206_readback.py` 86.6%, `opening_stability.py` 80.0%). The contract job now runs them under `coverage --branch`
+and fails below 95% per file, and the four stand at 96.9 / 95.7 / 98.1 / 96.6 — which is why this arm's regression
+suite is 137 + 132 + 44 + 35 cases rather than the 82 + 76 + 27 + 21 it was.
+
+**What is still unmeasured, stated before the run.** Whether the file binding actually fires (`taskHits > 0`), and
+whether coverage clears 0.6 once failures are the agent's. The pilot answers the first with 24 looked-up episodes and
+the second with the same grid R206a used; neither is a claim, and the artefact carries `claim: none`.

@@ -53,8 +53,13 @@ from notes import (  # noqa: E402
     note_model,
     note_prompt,
     note_round,
+    save as save_notes,
+    save_trajectories,
+    scope_of,
     sentence_of,
+    set_scope,
     specificity,
+    trajectories_path,
 )
 
 # Which τ² this is, decided by what the package exports rather than by a version string.
@@ -1265,6 +1270,13 @@ def main(argv: list[str]) -> int:
     tasks = get_tasks(args.domain, wanted or None)
     if not tasks:
         raise SystemExit("tau2-no-tasks")
+    # R207. The sidecar is the identity, so one invocation is one task. Two tasks in one process would write two
+    # tasks' notes into one file and the agent would have no way to tell which entry is its own — the defect
+    # `opening_stability.py` measured, reintroduced by the runner rather than by the material. Refused before the
+    # first paid call, because this costs nothing to check and a fold that discovers it after forty episodes has
+    # bought a phase it cannot grade.
+    if args.notes and len(tasks) != 1:
+        raise SystemExit(f"tau2-notes-need-one-task:{len(tasks)}")
     print(f"[tau2] {args.phase}: {len(tasks)} task(s), {args.trials} trial(s), agent={args.agent}", file=sys.stderr)
 
     # An existing output file makes `run_tasks` ask `ConsoleDisplay.console.input`
@@ -1277,6 +1289,16 @@ def main(argv: list[str]) -> int:
     # R206: the phase is one round unless a registration asks for more. A round is one attempt per task with its
     # own seed, so `rounds` copies of the task list are the same grid `--trials` would have produced — the
     # difference is that the runner gets a place between them to write what the next one reads.
+    #
+    # R207: the sidecar is declared to hold *this* task before the first episode, so the agent does not have to
+    # recognise the opening text to know where it is. It is written rather than assumed because the agent reads
+    # the file at its first turn and a scope added after that turn is a scope this episode never saw; and it is
+    # written through `set_scope` because a path reused for another task must stop the run rather than serve one
+    # task's sentence to another.
+    if args.notes:
+        declared, _problem = load_notes(args.notes)
+        save_notes(args.notes, set_scope(declared, tasks[0].id))
+        print(f"[tau2] notes: {args.notes} declares task {tasks[0].id}", file=sys.stderr)
     simulations = []
     round_paths = []
     note_rounds = []
@@ -1325,6 +1347,11 @@ def main(argv: list[str]) -> int:
             )
     if rounds > 1:
         merge_rounds(round_paths, args.out, rounds)
+    # R207: the failed attempts, beside the sidecar, because specificity is a property of the corpus and one
+    # invocation holds one task. Written after the last round so it describes every attempt this phase distilled,
+    # and written even when it is empty so a reader can tell "no failure was readable" from "the file is absent".
+    attempts_path = trajectories_path(args.notes) if args.notes else ""
+    attempts_written = save_trajectories(attempts_path, trajectories) if args.notes else 0
     # Computed once, before the diagnostics that consume it: the census needs the agent's injected lengths
     # and the artefact needs the agent's own counters, and two calls to a counter reader is two places for
     # a denominator to disagree with itself.
@@ -1352,7 +1379,19 @@ def main(argv: list[str]) -> int:
                             "refused": sum(entry["refused"] for entry in note_rounds),
                             "providerFailures": sum(entry["providerFailures"] for entry in note_rounds),
                             "collisions": sum(entry["collisions"] for entry in note_rounds),
+                            # R207: what the file declares, which is the reading the whole arm rests on. A phase
+                            # whose scope is not exactly one named task is not this arm, and the merged document
+                            # carries the field so the gate can say so rather than infer it from a failure count.
+                            "scope": scope_of(load_notes(args.notes)[0]),
+                            "task": tasks[0].id,
+                            # The attempts, and how many of them were kept: the builder recomputes specificity
+                            # over the merged corpus from these files, and a count of zero is a corpus whose
+                            # cross-task share will be a share of nothing.
+                            "trajectories": attempts_path,
+                            "attempts": attempts_written,
                             "specificity": specificity(load_notes(args.notes)[0], trajectories),
+                            "keyHits": (memory or {}).get("notes", {}).get("keyHits"),
+                            "taskHits": (memory or {}).get("notes", {}).get("taskHits"),
                         }
                     }
                     if args.notes

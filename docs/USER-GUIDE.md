@@ -6281,3 +6281,76 @@ than about the corpus.
 
 The alternative — and what R207 does — is not to match text at all: run one task per process invocation with its own
 sidecar, so the file the runner hands the agent *is* the identity, and nothing has to be recognised.
+
+### 32.57 Running the fold: one task per process, then one merge
+
+R207's arm cannot run as one invocation. The sidecar is the identity, so a file holding two tasks' notes answers
+nothing; the workflow therefore calls the runner once per task and joins the pieces afterwards. If you are running
+this lane by hand, these are the four commands and the two places they can fail.
+
+**One task, four rounds, its own files.** Nothing here is new except `--tasks` and `--notes` agreeing on a single
+task:
+
+```bash
+python3 eval/drivers/tau2/run_split.py --phase eval --agent microglia_agent \
+  --domain retail --tasks 5 --rounds 4 --seed 300 --require-off-peak \
+  --out eval/results/note-pilot/treatment/results-5.json \
+  --notes eval/results/note-pilot/notes-5.json
+```
+
+The runner writes `scope: {kind: task, task: "5"}` into that sidecar **before** the first episode, prints
+`notes: … declares task 5`, and at the end writes `notes-5.json.trajectories.json` beside it. Two refusals are worth
+knowing by heart, because both cost nothing and both would otherwise cost a fold:
+
+| refusal | what you did |
+|---|---|
+| `tau2-notes-need-one-task:6` | `--tasks` named more than one task with `--notes`; run the tasks separately |
+| `tau2-notes-scope-changed:5->9` | you reused a sidecar path for a different task; use one path per task |
+
+**Then merge, and let it refuse.** Every flag takes a comma list (or repeats):
+
+```bash
+python3 eval/drivers/tau2/note_pilot.py \
+  --control c-5.log,c-9.log --treatment t-5.log,t-9.log \
+  --control-results control/results-5.json,control/results-9.json \
+  --treatment-results treatment/results-5.json,treatment/results-9.json \
+  --notes notes-5.json,notes-9.json \
+  --tasks 5,9 --rounds 4 --seeds 300,301,302,303 --out note-pilot.json
+```
+
+The merge refuses `tau2-merge-duplicate-task:5` (one task listed by two documents), `tau2-merge-duplicate-trial:5/0`
+(one attempt counted twice), and `tau2-note-pilot-mixed-model:…` (one arm ran two models). Those three are the shapes
+a half-finished loop leaves behind, and each of them would otherwise be read as a grid.
+
+**Three numbers to read first.** The build line prints them, and they are the ones that decide whether the fold is
+about the mechanism:
+
+```
+hits 24 (key 0, task 24)   ← every note was served because the file named the task: the R207 binding fired
+scopes 6                   ← six sidecars, six tasks, none ambiguous
+coverage 100.0%            ← of the failures after round one, how many produced a sentence
+```
+
+`key 0` is *good* here and was the defect in R206: a hit under the key means the opening text matched, which the
+corpus almost never does. A fold reporting `task 0, key 0` with `lookups > 0` is a mechanism that ran and found
+nothing; a fold reporting `lookups 0` is an environment variable that never reached the process.
+
+**Specificity is computed at the merge, not per task.** Each invocation sees one task, and a share over one task is
+1.0 by construction, so the runner reports `share: null` with `a corpus of 1 task(s) has no cross-task share`. The
+builder recomputes it over the corpus from the six `<notes>.trajectories.json` files. If you pass no `--notes`, the
+artefact says `specificity: null` and the reading reports N3 as unmeasured rather than as refuted — an absent
+diagnostic is not a finding about the material.
+
+**Check the instrument before you check the arm.** The four files this lane's evidence is made of are floored at
+95% in the contract job; run the same thing locally in a few seconds:
+
+```bash
+INCLUDE="*/eval/drivers/tau2/notes.py,*/eval/drivers/tau2/note_pilot.py,*/eval/verifiers/r206_readback.py,*/eval/verifiers/opening_stability.py"
+rm -f .coverage
+for f in eval/drivers/tau2/notes.py eval/drivers/tau2/note_pilot.py \
+         eval/verifiers/r206_readback.py eval/verifiers/opening_stability.py; do
+  python3 -m coverage run --append --branch --include="$INCLUDE" "$f" --self-test
+done
+python3 -m coverage json -o /tmp/cov.json --include="$INCLUDE"
+python3 scripts/check-python-coverage.py /tmp/cov.json --min 95 --expect-files 4
+```

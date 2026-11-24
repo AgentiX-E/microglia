@@ -14,9 +14,26 @@ So this file reads what the two phases leave behind and writes the document a ve
                       simulation grid is the only place the trial index and the task id appear together
   the sidecar         the notes file the runner wrote between rounds, whose entries are the treatment
 
+## One task per invocation, and why the reading has to merge
+
+R206a measured the identity this arm was built on and it does not exist: τ² re-samples the opening on every
+attempt (exact key reuse 0.006 over 168 same-task pairs) and two retail tasks can share one scenario, so no
+threshold on the text can tell a task from its neighbour (`eval/verifiers/opening_stability.py`). R207 moves the
+identity to the file — one task per `run_split.py` invocation, one sidecar per task — which means an arm no
+longer leaves *one* log and *one* `results.json`: it leaves one of each per task. Every flag below therefore
+accepts a comma-separated list (or the flag repeated), and the merge is where three questions are answered:
+
+  * **the grid** — the union of the tasks and every `(task, trial)` exactly once, refused otherwise;
+  * **the bill** — summed, with the band kept only when every phase ran in the same one;
+  * **specificity** — recomputed over the merged corpus, because it is the one reading that is a property of the
+    corpus rather than of a phase. A note whose entities appear in its own task's failure and in no other task's
+    is specific; with one task in hand every note is trivially specific (share 1.0), which is why the runners
+    report a null and this file computes the number.
+
 Three refusals, each of them a state that would otherwise produce a number about nothing:
 
   `same-agent`        the two arms ran different agents, so their difference is the wrapper (R93's defect)
+  `mixed-model`       the phases of one arm ran different models, so the arm is two experiments
   `control-has-notes` the control's own summary carries a notes block, so the treatment leaked into it
   `no-pair`           the arms share no scoreable task, so there is no paired reading to take
 
@@ -25,9 +42,9 @@ And one rule that is arithmetic rather than policy: a task with fewer than `k` s
 `packages/eval/src/l4.ts` implements on the TypeScript side and for the same reason.
 
 Usage:
-  python3 eval/drivers/tau2/note_pilot.py --control /tmp/control.json --treatment /tmp/treatment.json \\
-    --control-results /tmp/control/results.json --treatment-results /tmp/treatment/results.json \\
-    --rounds 4 --tasks 1,2,3,4,5,6 --release v1.0.1 --out /tmp/note-pilot.json
+  python3 eval/drivers/tau2/note_pilot.py --control c-5.log,c-9.log --treatment t-5.log,t-9.log \\
+    --control-results c-5.json,c-9.json --treatment-results t-5.json,t-9.json \\
+    --notes t-5.json.notes,t-9.json.notes --rounds 4 --tasks 5,9 --release v1.0.1 --out /tmp/note-pilot.json
   python3 eval/drivers/tau2/note_pilot.py --self-test
 """
 
@@ -36,7 +53,20 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import sys
+
+from notes import (
+    SCHEMA as NOTES_SCHEMA,
+    load as load_notes,
+    load_trajectories,
+    merge_documents,
+    merge_sidecars,
+    merge_trajectories,
+    scope_of,
+    specificity,
+    trajectories_path,
+)
 
 SCHEMA = "microglia.note-pilot/1"
 
@@ -58,6 +88,23 @@ def number(value) -> float | None:
         return None
     value = float(value)
     return value if math.isfinite(value) else None
+
+
+def split_paths(values) -> list[str]:
+    """Every path a flag named, whether it was repeated or comma-separated.
+
+    R207 runs one task per invocation, so an arm's evidence is a *list* of files and every flag here takes one.
+    Both spellings are accepted because the workflow builds a comma list in one line of shell while an operator
+    debugging a single task types the flag once; a reader that accepted only one of them would be a reader that
+    silently dropped half a fold.
+    """
+    out: list[str] = []
+    for value in values or []:
+        for entry in str(value).split(","):
+            stripped = entry.strip()
+            if stripped and stripped not in out:
+                out.append(stripped)
+    return out
 
 
 def last_json_line(text: str) -> dict:
@@ -239,6 +286,23 @@ def fits_window(now, minutes: float, card: dict, step: float = 1.0) -> tuple[boo
     return (True, "")
 
 
+def _scope_tasks(notes: dict) -> list[str]:
+    """The tasks a notes block's sidecars declared, from either a merged log or a single one.
+
+    Two shapes, one answer. A merged log carries `tasks` because the merge is the only place that saw them all; a
+    single invocation's log carries the `scope` block `run_split.py` wrote, and reading only the first shape would
+    make an unmerged fold look unmeasured.
+    """
+    listed = notes.get("tasks")
+    if isinstance(listed, list):
+        return [str(task) for task in listed if str(task) != ""]
+    scope = notes.get("scope") if isinstance(notes.get("scope"), dict) else {}
+    task = scope.get("task")
+    if scope.get("kind") == "task" and isinstance(task, str) and task.strip() != "":
+        return [task.strip()]
+    return []
+
+
 def material_of(summary: dict) -> dict | None:
     """The treatment's material, or `None` when the phase has no notes block at all.
 
@@ -270,11 +334,20 @@ def material_of(summary: dict) -> dict | None:
         "unreadable": sum(int(number(entry.get("unreadable")) or 0) for entry in later),
         "unscored": sum(int(number(entry.get("unscored")) or 0) for entry in later),
         "collisions": int(number(notes.get("collisions")) or 0),
+        # R207. Which task each invocation's sidecar declared. The gate is that there is exactly one per task and
+        # that none of them is ambiguous: a sidecar naming zero tasks or several is a mis-scoped file, and a
+        # treatment whose files are mis-scoped is R206's defect wearing this arm's clothes. A merged log lists
+        # them; a single one carries its own `scope`, and both shapes answer the same question.
+        "scopeTasks": _scope_tasks(notes),
+        "scopeProblems": [str(problem) for problem in (notes.get("scopeProblems") or [])],
         "specificity": notes.get("specificity"),
         # The agent's own counters, which say whether the file was asked for and found rather than whether it
-        # was written: a treatment whose `hits` is zero is a file nobody read.
-        "lookups": int(number(own.get("hits")) is not None and number(own.get("lookups")) or 0),
+        # was written: a treatment whose `hits` is zero is a file nobody read. `keyHits` and `taskHits` say which
+        # identity produced the note — the opening text or the file's scope — because only the second is R207's.
+        "lookups": int(number(own.get("lookups")) or 0),
         "hits": int(number(own.get("hits")) or 0),
+        "keyHits": int(number(own.get("keyHits")) or 0),
+        "taskHits": int(number(own.get("taskHits")) or 0),
         "problem": own.get("problem"),
         "promptChars": sum(int(number(entry.get("promptChars")) or 0) for entry in rounds),
         "noteChars": sum(int(number(entry.get("noteChars")) or 0) for entry in rounds),
@@ -294,6 +367,108 @@ def bill_of(summary: dict) -> dict:
         "usd": number(cost.get("usd")),
         "band": cost.get("band"),
     }
+
+
+def merge_notes_blocks(blocks) -> dict | None:
+    """One arm's material census out of one per-task block each, or `None` when none of them had one.
+
+    Coverage adds because every term of it adds: `written` and `failed` are counts over rounds, and the rounds of
+    six tasks are six independent schedules. `tasks` is the list of scopes rather than a count, because the gate
+    that reads it has to name the file that was mis-scoped, and `specificity` is deliberately null — a share
+    computed per invocation is a share over one task, and `note_pilot.build` computes the real one from the
+    sidecars once the corpus is in hand.
+    """
+    blocks = [block for block in blocks or [] if isinstance(block, dict) and block]
+    if not blocks:
+        return None
+    rounds: list = []
+    tasks: list = []
+    problems: list = []
+    for block in blocks:
+        path = block.get("path")
+        for entry in block.get("rounds") or []:
+            if isinstance(entry, dict):
+                rounds.append({**entry, "sidecar": path})
+        scope = block.get("scope") if isinstance(block.get("scope"), dict) else {"kind": "none"}
+        task = scope.get("task")
+        if scope.get("kind") == "task" and isinstance(task, str) and task.strip() != "":
+            if task.strip() not in tasks:
+                tasks.append(task.strip())
+        else:
+            problems.append(f"{path}: scope is {scope.get('kind')!r}")
+    return {
+        "path": [block.get("path") for block in blocks],
+        "rounds": rounds,
+        "tasks": tasks,
+        "scopeProblems": problems,
+        "collisions": sum(int(number(block.get("collisions")) or 0) for block in blocks),
+        "attempts": sum(int(number(block.get("attempts")) or 0) for block in blocks),
+        "specificity": None,
+    }
+
+
+def merge_summaries(summaries, *, side: str) -> dict:
+    """One phase out of one log per task: the agent, the models, the bill and the census.
+
+    Refuses a fold whose phases disagree about the agent or the model. Both are properties of the *arm* and not of
+    the task, so a difference between two of them is a run that measured two things — the defect R93's control
+    gate exists for, one level down, and the reason the band is reported as `mixed` rather than as the first
+    phase's.
+    """
+    summaries = [summary for summary in summaries or [] if isinstance(summary, dict)]
+    if not summaries:
+        raise SystemExit(f"tau2-note-pilot-no-{side}")
+    first = summaries[0]
+    for other in summaries[1:]:
+        for field in ("agent", "model", "judge", "thinking"):
+            if other.get(field) != first.get(field):
+                raise SystemExit(f"tau2-note-pilot-mixed-{field}:{first.get(field)}:{other.get(field)}")
+
+    calls = prompt = completion = cached = 0
+    usd = 0.0
+    bands = set()
+    for summary in summaries:
+        usage = summary.get("usage") if isinstance(summary.get("usage"), dict) else {}
+        calls += int(number(usage.get("calls")) or 0)
+        prompt += int(number(usage.get("prompt_tokens")) or 0)
+        completion += int(number(usage.get("completion_tokens")) or 0)
+        cached += int(number(usage.get("cached_tokens")) or 0)
+        cost = usage.get("cost") if isinstance(usage.get("cost"), dict) else {}
+        usd += number(cost.get("usd")) or 0.0
+        if cost.get("band") is not None:
+            bands.add(cost.get("band"))
+
+    own = None
+    for summary in summaries:
+        diagnostics = summary.get("diagnostics") if isinstance(summary.get("diagnostics"), dict) else {}
+        notes = (diagnostics.get("memory") or {}).get("notes") if isinstance(diagnostics.get("memory"), dict) else None
+        if not isinstance(notes, dict):
+            continue
+        own = own or {"lookups": 0, "hits": 0, "keyHits": 0, "taskHits": 0, "chars": 0, "problem": None}
+        for field in ("lookups", "hits", "keyHits", "taskHits", "chars"):
+            own[field] += int(number(notes.get(field)) or 0)
+        if own["problem"] is None and notes.get("problem") is not None:
+            own["problem"] = notes.get("problem")
+
+    merged = {
+        "phase": first.get("phase"),
+        "agent": first.get("agent"),
+        "model": first.get("model"),
+        "judge": first.get("judge"),
+        "thinking": first.get("thinking"),
+        "usage": {
+            "calls": calls,
+            "prompt_tokens": prompt,
+            "completion_tokens": completion,
+            "cached_tokens": cached,
+            "cost": {"usd": round(usd, 4), "band": bands.pop() if len(bands) == 1 else ("mixed" if bands else None)},
+        },
+        "diagnostics": {**({"memory": {"notes": own}} if own is not None else {})},
+    }
+    notes = merge_notes_blocks([summary.get("notes") for summary in summaries])
+    if notes is not None:
+        merged["notes"] = notes
+    return merged
 
 
 def _paired(control: dict, treatment: dict, key: str, passed_of) -> dict:
@@ -356,8 +531,9 @@ def build(
     configuration: dict,
     claim: str = "none",
     claim_reason: str = "",
+    specificity_measurement: dict | None = None,
 ) -> dict:
-    """The pilot's document. Refuses the two states that would make its comparison about something else."""
+    """The pilot's document. Refuses the states that would make its comparison about something else."""
     control_agent = control_summary.get("agent")
     treatment_agent = treatment_summary.get("agent")
     if control_agent != treatment_agent:
@@ -373,6 +549,11 @@ def build(
     comparison = pair_of(control, treatment)
     if comparison["passK"]["paired"] == 0:
         raise SystemExit("tau2-note-pilot-no-pair")
+    if specificity_measurement is not None:
+        # Over the merged corpus, which is the only level at which the question has an answer. The per-invocation
+        # number is a null by construction (`notes.specificity`), and substituting it here would be publishing
+        # 1.0 for a corpus of one.
+        material = {**material, "specificity": specificity_measurement}
     return {
         "schema": SCHEMA,
         "registered": "R206",
@@ -406,10 +587,15 @@ def build(
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description="assemble R206a's pilot artefact from two phases")
-    parser.add_argument("--control", help="the control phase's log, or `-` for stdin")
-    parser.add_argument("--treatment", help="the treatment phase's log")
-    parser.add_argument("--control-results", help="the control arm's results.json")
-    parser.add_argument("--treatment-results", help="the treatment arm's results.json")
+    # Each of these takes a comma list (or the flag repeated), because R207 runs one task per invocation and an
+    # arm is therefore several phases. A single path is the same list of length one, so the pilot's own grid and
+    # the fold's are read by one code path rather than two.
+    parser.add_argument("--control", action="append", default=[], help="the control phase's log(s), or `-`")
+    parser.add_argument("--treatment", action="append", default=[], help="the treatment phase's log(s)")
+    parser.add_argument("--control-results", action="append", default=[], help="the control arm's results.json(s)")
+    parser.add_argument("--treatment-results", action="append", default=[], help="the treatment arm's results.json(s)")
+    parser.add_argument("--notes", action="append", default=[],
+                        help="the treatment's sidecar(s), from which specificity is recomputed over the corpus")
     parser.add_argument("--domain", default="retail")
     parser.add_argument("--tasks", default="")
     parser.add_argument("--rounds", type=int, default=4)
@@ -454,7 +640,11 @@ def main(argv: list[str]) -> int:
         # is a failure in one place instead of a shell script that silently ran the builder on nothing.
         print(json.dumps(write_fixtures(arguments.fixtures, rounds=arguments.rounds or 4)))
         return 0
-    if not (arguments.control and arguments.treatment and arguments.control_results and arguments.treatment_results):
+    control_logs = split_paths(arguments.control)
+    treatment_logs = split_paths(arguments.treatment)
+    control_results = split_paths(arguments.control_results)
+    treatment_results = split_paths(arguments.treatment_results)
+    if not (control_logs and treatment_logs and control_results and treatment_results):
         parser.error("both logs and both results files are required")
     if not arguments.out:
         parser.error("--out is required: a pilot with nowhere to write is a run that produced no artefact")
@@ -472,8 +662,26 @@ def main(argv: list[str]) -> int:
             raise SystemExit(f"tau2-note-pilot-bad-document:{path}")
         return document
 
-    control_summary = last_json_line(read(arguments.control))
-    treatment_summary = last_json_line(read(arguments.treatment))
+    control_summary = merge_summaries([last_json_line(read(path)) for path in control_logs], side="control")
+    treatment_summary = merge_summaries([last_json_line(read(path)) for path in treatment_logs], side="treatment")
+    # The sidecars and the failed attempts beside them. Both are lists because an arm's evidence is per task; a
+    # fold with no sidecar is `no-material`, and one whose attempts are unreadable is a specificity that says so
+    # rather than a share over nothing.
+    sidecars, attempts, sidecar_problems = [], [], []
+    for path in split_paths(arguments.notes):
+        document, problem = load_notes(path)
+        if problem is not None:
+            sidecar_problems.append(f"{path}: {problem}")
+        sidecars.append(document)
+        loaded, attempt_problem = load_trajectories(trajectories_path(path))
+        if attempt_problem is not None:
+            sidecar_problems.append(f"{trajectories_path(path)}: {attempt_problem}")
+        attempts.append(loaded)
+    specificity_measurement = None
+    if sidecars:
+        corpus, shared_keys = merge_trajectories(attempts)
+        measurement = specificity(merge_sidecars(sidecars), corpus)
+        specificity_measurement = {**measurement, "sharedKeyPairs": shared_keys, "problems": sidecar_problems}
     configuration = {
         "domain": arguments.domain,
         "tasks": [entry for entry in arguments.tasks.split(",") if entry],
@@ -485,14 +693,18 @@ def main(argv: list[str]) -> int:
         # had no sidecar" is a fact about the comparison and not an absence in the file.
         "material": "notes",
         "controlMaterial": None,
+        # R207: how many invocations the arm was split into. One per task, and the gate that reads the scopes
+        # compares this against the number of sidecars that named a task.
+        "invocations": len(treatment_logs),
     }
     document = build(
         control_summary=control_summary,
         treatment_summary=treatment_summary,
-        control_results=load(arguments.control_results),
-        treatment_results=load(arguments.treatment_results),
+        control_results=merge_documents([load(path) for path in control_results]),
+        treatment_results=merge_documents([load(path) for path in treatment_results]),
         configuration=configuration,
         claim_reason=arguments.claim_reason,
+        specificity_measurement=specificity_measurement,
     )
     with open(arguments.out, "w", encoding="utf-8") as stream:
         json.dump(document, stream, indent=2, sort_keys=True)
@@ -503,7 +715,9 @@ def main(argv: list[str]) -> int:
         f"{(document['arms']['treatment']['passK'] or 0) * 100:.1f}% — "
         f"delta {document['comparison']['passK']['deltaPp']} pp, "
         f"coverage {(document['notes']['coverage'] or 0) * 100:.1f}%, "
-        f"hits {document['notes']['hits']}",
+        f"hits {document['notes']['hits']} (key {document['notes']['keyHits']}, "
+        f"task {document['notes']['taskHits']}), "
+        f"scopes {len(document['notes']['scopeTasks'])}",
         file=sys.stderr,
     )
     return 0
@@ -523,10 +737,26 @@ def _results(rows: list[tuple[str, bool]], k: int = 4, unscored: tuple[str, ...]
 
 
 def _summary(*, agent: str = "microglia_agent", notes: dict | None = None, calls: int = 100, prompt: int = 1_000_000,
-             usd: float = 1.0, hits: int = 0, lookups: int = 0, problem: str | None = None) -> dict:
+             usd: float = 1.0, hits: int = 0, lookups: int = 0, problem: str | None = None,
+             key_hits: int = 0, task_hits: int | None = None, band: str = "off_peak") -> dict:
+    """One phase's summary line, with the agent's own note counters when it had any.
+
+    `keyHits` and `taskHits` are set so that they add up to `hits`, because that is the invariant the real agent
+    maintains (`note_for` increments exactly one of them per hit) and a fixture where they did not would test a
+    reader against a document no run can produce.
+    """
     diagnostics: dict = {"usage": {}}
     if hits or lookups or problem:
-        diagnostics["memory"] = {"notes": {"lookups": lookups, "hits": hits, "problem": problem}}
+        diagnostics["memory"] = {
+            "notes": {
+                "lookups": lookups,
+                "hits": hits,
+                "keyHits": key_hits,
+                "taskHits": (hits - key_hits) if task_hits is None else task_hits,
+                "chars": 0,
+                "problem": problem,
+            }
+        }
     return {
         "phase": "eval",
         "agent": agent,
@@ -538,15 +768,20 @@ def _summary(*, agent: str = "microglia_agent", notes: dict | None = None, calls
             "prompt_tokens": prompt,
             "completion_tokens": 2_000,
             "cached_tokens": 0,
-            "cost": {"usd": usd, "band": "off_peak"},
+            "cost": {"usd": usd, "band": band},
         },
         "diagnostics": diagnostics,
         **({} if notes is None else {"notes": notes}),
     }
 
 
-def _notes(rounds: list[tuple[int, int, int]], *, collisions: int = 0, specificity: dict | None = None) -> dict:
-    """A notes block of the shape `run_split.py` prints: `(round, failed, written)` per round."""
+def _notes(rounds: list[tuple[int, int, int]], *, collisions: int = 0, specificity: dict | None = None,
+           task: str = "1", scope: dict | None = None) -> dict:
+    """A notes block of the shape `run_split.py` prints: `(round, failed, written)` per round.
+
+    One task's block, because one invocation writes one. The scope is the block's own — `{kind: task, task: T}` —
+    and the merged shape is built by `merge_notes_blocks`, which is what the fold's log looks like.
+    """
     entries = [
         {
             "round": index,
@@ -563,49 +798,107 @@ def _notes(rounds: list[tuple[int, int, int]], *, collisions: int = 0, specifici
         for index, failed, written in rounds
     ]
     return {
-        "path": "/tmp/notes.json",
+        "path": f"/tmp/notes-{task}.json",
         "rounds": entries,
         "written": sum(entry["written"] for entry in entries),
         "refused": 0,
         "providerFailures": 0,
         "collisions": collisions,
-        "specificity": specificity if specificity is not None else {"graded": 18, "specific": 15, "share": 0.8333},
+        "scope": scope if scope is not None else {"kind": "task", "task": task},
+        "attempts": 1,
+        "specificity": specificity if specificity is not None else {"graded": 1, "specific": 1, "share": None},
     }
+
+
+#: The token each fixture task's failure contains and no other task's does. Long enough to survive
+#: `notes.entities`' four-character floor, which is the whole reason it is spelled out rather than counted.
+FIXTURE_ENTITY = "ORDER{}000"
 
 
 def write_fixtures(directory: str, *, rounds: int = 4, tasks: int = 6) -> dict:
-    """A synthetic pair of phases, in the shape the two commands read.
+    """A synthetic pair of phases, in the shape the two commands read: one file per task, per arm.
 
-    It exists for the free half of `.github/workflows/note-pilot.yml`: the paid job runs four commands in
-    sequence, and a push that breaks the CSV of `--tasks` or the path convention between them should fail on a
-    fixture rather than on a dispatch that has already bought 48 simulations. The fixture is *not* a result —
-    nothing here is written under `eval/results/`, and the artefact it produces is graded as a pilot the way a
-    real one would be, which is the point: the grading path is what is under test.
+    It exists for the free half of `.github/workflows/note-pilot.yml`: the paid job runs two commands per task and
+    then one builder over all of them, and a push that breaks the CSV of `--tasks`, the per-task path convention or
+    the merge should fail on a fixture rather than on a dispatch that has already bought 48 simulations. The
+    fixture is *not* a result — nothing here is written under `eval/results/`, and the artefact it produces is
+    graded as a pilot the way a real one would be, which is the point: the grading path is what is under test.
+
+    Every sidecar declares its own task and every attempt names an entity that appears in no other task's, so the
+    artefact's specificity is a real share (1.0) rather than the null a corpus of one produces. A fixture whose
+    notes were indistinguishable would let a broken recomputation pass.
     """
-    import os
-
     os.makedirs(directory, exist_ok=True)
     total = max(1, tasks)
-    control_rows = [(str(index + 1), index < total // 2) for index in range(total)]
-    treatment_rows = [(str(index + 1), index < total // 2 + 1) for index in range(total)]
-    paths = {
-        "control": os.path.join(directory, "control.log"),
-        "treatment": os.path.join(directory, "treatment.log"),
-        "controlResults": os.path.join(directory, "control-results.json"),
-        "treatmentResults": os.path.join(directory, "treatment-results.json"),
-        "out": os.path.join(directory, "note-pilot.json"),
-    }
+    ids = [str(index + 1) for index in range(total)]
+    control_rows = {task: index < total // 2 for index, task in enumerate(ids)}
+    treatment_rows = {task: index < total // 2 + 1 for index, task in enumerate(ids)}
     later = [(index + 1, 4, 4) for index in range(rounds - 1)]
-    with open(paths["control"], "w", encoding="utf-8") as stream:
-        stream.write(json.dumps(_summary(calls=100, prompt=1_000_000, usd=1.0)) + "\n")
-    with open(paths["treatment"], "w", encoding="utf-8") as stream:
-        stream.write(json.dumps(_summary(notes=_notes(later), hits=tasks * 3, lookups=tasks * rounds,
-                                         calls=120, prompt=1_100_000, usd=1.2)) + "\n")
-    with open(paths["controlResults"], "w", encoding="utf-8") as stream:
-        json.dump(_results(control_rows, k=rounds), stream)
-    with open(paths["treatmentResults"], "w", encoding="utf-8") as stream:
-        json.dump(_results(treatment_rows, k=rounds), stream)
-    return paths
+    paths: dict = {"control": [], "treatment": [], "controlResults": [], "treatmentResults": [], "notes": []}
+    for index, task in enumerate(ids):
+        control_log = os.path.join(directory, f"control-{task}.log")
+        treatment_log = os.path.join(directory, f"treatment-{task}.log")
+        control_results = os.path.join(directory, f"control-{task}.json")
+        treatment_results = os.path.join(directory, f"treatment-{task}.json")
+        sidecar = os.path.join(directory, f"notes-{task}.json")
+        entity = FIXTURE_ENTITY.format(index + 1)
+        with open(control_log, "w", encoding="utf-8") as stream:
+            stream.write(json.dumps(_summary(calls=100, prompt=1_000_000, usd=1.0 / total)) + "\n")
+        with open(treatment_log, "w", encoding="utf-8") as stream:
+            stream.write(
+                json.dumps(
+                    _summary(
+                        notes=_notes(later, task=task),
+                        hits=rounds,
+                        lookups=rounds + 1,
+                        calls=120,
+                        prompt=1_100_000,
+                        usd=1.2 / total,
+                    )
+                )
+                + "\n"
+            )
+        with open(control_results, "w", encoding="utf-8") as stream:
+            json.dump(_results([(task, control_rows[task])], k=rounds), stream)
+        with open(treatment_results, "w", encoding="utf-8") as stream:
+            json.dump(_results([(task, treatment_rows[task])], k=rounds), stream)
+        # The sidecar and the attempt it was distilled from: one entry, keyed by the attempt's opening text, and
+        # the token that makes it specific to this task.
+        with open(sidecar, "w", encoding="utf-8") as stream:
+            json.dump(
+                {
+                    "schema": NOTES_SCHEMA,
+                    "notes": {
+                        f"USER: please fix order {entity} today": {
+                            "note": f"Confirm {entity} is handled before promising anything.",
+                            "attempt": 1,
+                            "reward": 0.0,
+                            "task": task,
+                            "chars": 52,
+                        }
+                    },
+                    "collisions": {},
+                    "scope": {"kind": "task", "task": task},
+                },
+                stream,
+            )
+        with open(trajectories_path(sidecar), "w", encoding="utf-8") as stream:
+            json.dump(
+                {
+                    "schema": "microglia.notes-trajectories/1",
+                    "trajectories": {f"USER: please fix order {entity} today": f"USER: please fix order {entity} today"},
+                },
+                stream,
+            )
+        paths["control"].append(control_log)
+        paths["treatment"].append(treatment_log)
+        paths["controlResults"].append(control_results)
+        paths["treatmentResults"].append(treatment_results)
+        paths["notes"].append(sidecar)
+    paths["out"] = os.path.join(directory, "note-pilot.json")
+    # Comma strings rather than arrays: the workflow passes them straight back as one flag each, which is the
+    # spelling an operator uses too.
+    return {key: (",".join(value) if isinstance(value, list) else value) for key, value in paths.items()}
 
 
 CASES: list[tuple[str, dict, str]] = []
@@ -733,6 +1026,72 @@ def self_test() -> int:
     check("the band is carried", bill["band"] == "off_peak")
     check("a phase with no usage reports zero tokens rather than a guess", bill_of({})["promptTokens"] == 0)
 
+    # --- the merge: one arm out of one phase per task -------------------------------------------------
+
+    check("no paths is no list", split_paths([]) == [])
+    check("a comma list splits", split_paths(["a.log,b.log"]) == ["a.log", "b.log"])
+    check("a repeated flag concatenates", split_paths(["a.log", "b.log"]) == ["a.log", "b.log"])
+    check("a path named twice is one path", split_paths(["a.log,a.log"]) == ["a.log"])
+    check("blank entries are not paths", split_paths([" a.log , ,b.log "]) == ["a.log", "b.log"])
+
+    two = merge_summaries(
+        [_summary(calls=10, prompt=100, usd=0.5, hits=2, lookups=3), _summary(calls=20, prompt=200, usd=0.25, hits=1, lookups=4)],
+        side="treatment",
+    )
+    check("the merge sums the calls", two["usage"]["calls"] == 30, str(two["usage"]))
+    check("the merge sums the prompt", two["usage"]["prompt_tokens"] == 300, str(two["usage"]))
+    check("the merge sums the bill", two["usage"]["cost"]["usd"] == 0.75, str(two["usage"]["cost"]))
+    check("one band is kept", two["usage"]["cost"]["band"] == "off_peak", str(two["usage"]["cost"]))
+    check("the merge sums the lookups", two["diagnostics"]["memory"]["notes"]["lookups"] == 7, str(two["diagnostics"]))
+    check("the merge sums the hits", two["diagnostics"]["memory"]["notes"]["hits"] == 3)
+    check("the merge keeps the agent", two["agent"] == "microglia_agent")
+    mixed_band = merge_summaries([_summary(band="peak"), _summary(band="off_peak")], side="treatment")
+    check("two bands are mixed rather than the first's", mixed_band["usage"]["cost"]["band"] == "mixed", str(mixed_band["usage"]["cost"]))
+    check("a phase with no band reports none", merge_summaries([{"usage": {}}], side="control")["usage"]["cost"]["band"] is None)
+    failing = merge_summaries(
+        [_summary(lookups=1), {"phase": "eval", "agent": "microglia_agent", "model": "deepseek/deepseek-flash",
+                               "judge": "deepseek/deepseek-chat", "thinking": "disabled",
+                               "usage": {}, "diagnostics": {"memory": {"notes": {"lookups": 1, "problem": "boom"}}}}],
+        side="treatment",
+    )
+    check("the first named problem travels", failing["diagnostics"]["memory"]["notes"]["problem"] == "boom", str(failing["diagnostics"]))
+    for name, summaries, code in (
+        ("two models are two experiments",
+         [_summary(), _summary() | {"model": "zhipu/glm-4"}], "tau2-note-pilot-mixed-model:deepseek/deepseek-flash:zhipu/glm-4"),
+        ("two agents are two experiments",
+         [_summary(), _summary(agent="llm_agent")], "tau2-note-pilot-mixed-agent:microglia_agent:llm_agent"),
+        ("no phase at all is refused", [], "tau2-note-pilot-no-control"),
+    ):
+        raised = False
+        try:
+            merge_summaries(summaries, side="control")
+        except SystemExit as error:
+            raised = str(error) == code
+        check(name, raised)
+
+    merged_notes = merge_notes_blocks([_notes([(1, 4, 4), (2, 2, 2)], task="5"), _notes([(1, 3, 3), (2, 3, 3)], task="9")])
+    check("no notes block is no material", merge_notes_blocks([None, {}]) is None)
+    check("the merge counts every round", len(merged_notes["rounds"]) == 4, str(len(merged_notes["rounds"])))
+    check("each round names its sidecar", merged_notes["rounds"][0]["sidecar"].endswith("notes-5.json"))
+    check("the merge lists both scopes", merged_notes["tasks"] == ["5", "9"], str(merged_notes["tasks"]))
+    check("and names no problem", merged_notes["scopeProblems"] == [], str(merged_notes["scopeProblems"]))
+    check("a merged specificity is not computed per phase", merged_notes["specificity"] is None)
+    unscoped = merge_notes_blocks([_notes([(1, 1, 1)], task="5", scope={"kind": "none"})])
+    check("a phase with no scope is a problem", len(unscoped["scopeProblems"]) == 1, str(unscoped["scopeProblems"]))
+    check("and names the file", "notes-5.json" in unscoped["scopeProblems"][0], str(unscoped["scopeProblems"]))
+    check("a many-scoped phase is a problem too",
+          len(merge_notes_blocks([_notes([(1, 1, 1)], scope={"kind": "many", "tasks": ["5"]})])["scopeProblems"]) == 1)
+    check("collisions add across phases",
+          merge_notes_blocks([_notes([(1, 1, 1)], collisions=1), _notes([(1, 1, 1)], collisions=2)])["collisions"] == 3)
+    whole = material_of(_summary(notes=merged_notes, hits=5, lookups=8))
+    check("the merged census is readable as material", whole["failed"] == 5 and whole["written"] == 5, str(whole))
+    check("and carries both scopes", whole["scopeTasks"] == ["5", "9"], str(whole["scopeTasks"]))
+    check("the two identities are reported apart", (whole["keyHits"], whole["taskHits"]) == (0, 5), str(whole))
+    single_block = material_of(_summary(notes=_notes([(1, 1, 1)], task="7")))
+    check("a single phase's scope is read from its own block", single_block["scopeTasks"] == ["7"], str(single_block["scopeTasks"]))
+    no_task = material_of(_summary(notes=_notes([(1, 1, 1)], scope={"kind": "none"})))
+    check("a block that names no task lists none", no_task["scopeTasks"] == [], str(no_task["scopeTasks"]))
+
     # --- the pair -------------------------------------------------------------------------------------
 
     control_results = _results([("1", True), ("2", False), ("3", False), ("4", True)])
@@ -848,6 +1207,88 @@ def self_test() -> int:
             refused = error.code
         check("a pilot with no output path is refused", refused == 2, str(refused))
 
+        # --- the fixture, which is the fold's shape: one phase per task -----------------------------
+        # Not a second copy of the case above. That one runs *one* phase per arm; this one runs six, which is what
+        # R207 dispatches, and it is the only exercise of the merge, the per-task path convention and the
+        # specificity recomputation over a real corpus. The contract job in `note-pilot.yml` runs exactly this.
+
+        fixtures = os.path.join(directory, "fixtures")
+        code = main(["--fixtures", fixtures, "--rounds", "4"])
+        check("the fixture writer reports its paths", code == 0)
+        written_fixtures = write_fixtures(os.path.join(directory, "fixtures-check"), rounds=4, tasks=3)
+        check("the fixture names one phase per task", len(written_fixtures["treatment"].split(",")) == 3,
+              str(written_fixtures["treatment"]))
+        check("the fixture names one sidecar per task", len(written_fixtures["notes"].split(",")) == 3)
+
+        fold = os.path.join(directory, "fold.json")
+        code = main([
+            "--control", written_fixtures["control"], "--treatment", written_fixtures["treatment"],
+            "--control-results", written_fixtures["controlResults"],
+            "--treatment-results", written_fixtures["treatmentResults"],
+            "--notes", written_fixtures["notes"],
+            "--domain", "retail", "--tasks", "1,2,3", "--rounds", "4",
+            "--seeds", "300,301,302,303", "--release", "v1.0.1", "--out", fold,
+        ])
+        check("the fold assembles", code == 0 and os.path.isfile(fold))
+        with open(fold, encoding="utf-8") as stream:
+            document = json.load(stream)
+        check("the fold's bill is the sum of its phases", abs(document["bill"]["controlUsd"] - 1.0) < 1e-6,
+              str(document["bill"]))
+        check("the fold's census closes over every phase",
+              document["notes"]["written"] + document["notes"]["refused"] == document["notes"]["failed"],
+              str({key: document["notes"][key] for key in ("written", "refused", "failed")}))
+        check("the fold's coverage is complete", document["notes"]["coverage"] == 1.0, str(document["notes"]["coverage"]))
+        check("every task's scope arrived", document["notes"]["scopeTasks"] == ["1", "2", "3"],
+              str(document["notes"]["scopeTasks"]))
+        check("and none was ambiguous", document["notes"]["scopeProblems"] == [], str(document["notes"]["scopeProblems"]))
+        check("the notes were served by the file rather than by the text",
+              document["notes"]["taskHits"] > 0 and document["notes"]["keyHits"] == 0, str(document["notes"]))
+        check("specificity is recomputed over the corpus", document["notes"]["specificity"]["share"] == 1.0,
+              str(document["notes"]["specificity"]))
+        check("and graded every note", document["notes"]["specificity"]["graded"] == 3,
+              str(document["notes"]["specificity"]))
+        check("the fold's invocations are counted", document["configuration"]["invocations"] == 3,
+              str(document["configuration"]))
+        check("the fold's pass^4 is over three tasks", document["comparison"]["passK"]["paired"] == 3,
+              str(document["comparison"]["passK"]))
+
+        # A fold whose sidecars are absent still grades the mechanism: an unmeasured diagnostic is not a finding
+        # about the material, and refusing to write the artefact would throw away the pass^k the run paid for.
+        bare = os.path.join(directory, "bare.json")
+        code = main([
+            "--control", written_fixtures["control"], "--treatment", written_fixtures["treatment"],
+            "--control-results", written_fixtures["controlResults"],
+            "--treatment-results", written_fixtures["treatmentResults"],
+            "--tasks", "1,2,3", "--rounds", "4", "--out", bare,
+        ])
+        with open(bare, encoding="utf-8") as stream:
+            without = json.load(stream)
+        check("no sidecar still writes the artefact", code == 0 and os.path.isfile(bare))
+        check("and leaves specificity unmeasured", without["notes"]["specificity"] is None, str(without["notes"]["specificity"]))
+        check("while the arm's own gates survive", without["notes"]["scopeTasks"] == ["1", "2", "3"])
+
+        # A sidecar that cannot be read is named in the artefact rather than dropped: a specificity computed over
+        # a corpus that lost one task's attempts is a share of a denominator nobody can reconstruct.
+        broken_sidecar = os.path.join(directory, "broken-notes.json")
+        with open(broken_sidecar, "w", encoding="utf-8") as stream:
+            stream.write("{ not json")
+        named = os.path.join(directory, "named.json")
+        code = main([
+            "--control", written_fixtures["control"], "--treatment", written_fixtures["treatment"],
+            "--control-results", written_fixtures["controlResults"],
+            "--treatment-results", written_fixtures["treatmentResults"],
+            "--notes", f"{written_fixtures['notes']},{broken_sidecar}",
+            "--tasks", "1,2,3", "--rounds", "4", "--out", named,
+        ])
+        with open(named, encoding="utf-8") as stream:
+            unreadable = json.load(stream)
+        check("an unreadable sidecar does not stop the artefact", code == 0)
+        check("it is named as a problem", any("broken-notes.json" in problem for problem in
+                                              unreadable["notes"]["specificity"]["problems"]),
+              str(unreadable["notes"]["specificity"]["problems"]))
+        check("and the readable ones are still graded", unreadable["notes"]["specificity"]["graded"] == 3,
+              str(unreadable["notes"]["specificity"]))
+
     # --- the window -----------------------------------------------------------------------------------
     # The guard's clock is a parameter because a function that read the wall clock would make this suite pass or
     # fail depending on the hour it ran, which is a check that cannot say no on a Tuesday afternoon (the lesson
@@ -867,6 +1308,31 @@ def self_test() -> int:
     check("the weekend has no band", fits_window(saturday, 30, card)[0])
     check("a zero-minute run at a boundary is judged on its start",
           not fits_window(monday.replace(hour=1, minute=0), 0, card)[0])
+
+    # The guard as the workflow runs it: through `main`, against a card read from disk. Both cards are chosen so
+    # the answer cannot depend on the hour or the day the suite runs — a band covering every hour of every day,
+    # and a band covering none — because a check that passes on Tuesday morning and fails on Saturday night is a
+    # check that cannot say no.
+    import tempfile as _tempfile
+
+    with _tempfile.TemporaryDirectory() as guard_directory:
+        def card_at(name: str, windows: list, weekdays_only: bool) -> str:
+            path = os.path.join(guard_directory, name)
+            with open(path, "w", encoding="utf-8") as stream:
+                json.dump({"peakWindows": windows, "peakWeekdaysOnly": weekdays_only}, stream)
+            return path
+
+        always = card_at("always.json", [{"fromHourUtc": 0, "toHourUtc": 24}], False)
+        never = card_at("never.json", [{"fromHourUtc": 24, "toHourUtc": 25}], False)
+        none_declared = card_at("none.json", [], False)
+        check("a card with no off-peak hour refuses the run", main(["--window-minutes", "20", "--rate-card", always]) == 3)
+        check("a card with no band at all lets it through", main(["--window-minutes", "20", "--rate-card", never]) == 0)
+        raised = False
+        try:
+            main(["--window-minutes", "20", "--rate-card", none_declared])
+        except SystemExit as error:
+            raised = str(error) == "tau2-note-pilot-no-windows"
+        check("a card that declares no windows is refused rather than guessed", raised)
 
     print(f"\n{checks} checks, {failures} failure(s)")
     return 0 if failures == 0 else 1

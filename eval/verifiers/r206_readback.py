@@ -143,6 +143,31 @@ def grade(artefact: dict[str, Any]) -> tuple[str, Report]:
         report.note("another arm: the numbers in this file are about a different treatment")
         return ("DISCARDED", report)
 
+    # N5, before any reading: the identity this arm moves to the file is only an identity if every sidecar names
+    # exactly one task. A file that names none or several is R206's defect wearing this arm's clothes — the agent
+    # would be serving a sentence it cannot attribute — and the registration says such a fold is discarded rather
+    # than graded, because every number below would be about a file nobody can address.
+    expected = configuration.get("tasks") if isinstance(configuration.get("tasks"), list) else []
+    listed = notes.get("scopeTasks")
+    scope_tasks = [str(task) for task in listed] if isinstance(listed, list) else []
+    named = notes.get("scopeProblems")
+    scope_problems = (
+        [str(problem) for problem in named]
+        if isinstance(named, list) and named
+        else ([] if isinstance(named, list) else ["the artefact carries no scope census"])
+    )
+    report.predict("N5 every sidecar declares exactly one task", not scope_problems, "; ".join(scope_problems)[:240])
+    one_each = len(scope_tasks) == len(expected) and set(scope_tasks) == {str(task) for task in expected}
+    report.predict("N5 and there is one per task", one_each,
+                   f"{len(scope_tasks)} scope(s) for {len(expected)} task(s)")
+    if scope_problems:
+        report.note("a mis-scoped sidecar cannot be graded: the material has no file to belong to")
+        return ("DISCARDED", report)
+    if not one_each:
+        # Not a discard: this is the arm, with a task missing — an instrument fault rather than another treatment.
+        report.note("the grid and the scopes disagree, so the fold covers fewer tasks than its title says")
+        return ("NO_MEASUREMENT", report)
+
     control_rows = rows_of(control)
     treatment_rows = rows_of(treatment)
     if control_rows is None or treatment_rows is None or rounds is None or rounds < 2:
@@ -292,10 +317,15 @@ def notes_block(
     provider_failures: int = 0,
     hits: int = 11,
     lookups: int = 16,
+    key_hits: int = 0,
+    task_hits: int = 11,
     collisions: int = 0,
     specificity: float | None = 0.75,
     problem: str | None = None,
     gap: int = 0,
+    tasks: int = 6,
+    scope_tasks: list[str] | None = None,
+    scope_problems: list[str] | None = None,
 ) -> dict[str, Any]:
     """The material census, with its four states summing to the failure count by construction.
 
@@ -303,6 +333,10 @@ def notes_block(
     unclosed one whenever it set a provider failure would have tested the closure instead of the gate it was
     aimed at. `gap` subtracts from the failure count it does not account for, which is the one way to build a
     document whose census is short.
+
+    `scopeTasks` and `scopeProblems` default to the arm's healthy state — one sidecar per task, none ambiguous —
+    because every other gate in this file is about the material and a fixture that was mis-scoped by default
+    would test N5 instead of whatever the case was written for.
     """
     failed = 20
     written = min(int((coverage or 0.0) * failed), failed - provider_failures)
@@ -311,6 +345,10 @@ def notes_block(
     return {
         "lookups": lookups,
         "hits": hits,
+        # R207: the two identities. The fixture's default is that every hit came from the file, which is the
+        # mechanism this arm claims; a case that wants the older reading sets `key_hits`.
+        "keyHits": key_hits,
+        "taskHits": task_hits,
         "coverage": coverage,
         "failed": failed - gap,
         "written": written,
@@ -320,6 +358,8 @@ def notes_block(
         "specificity": {"graded": 20, "specific": int((specificity or 0.0) * 20), "share": specificity},
         "problem": problem,
         "materialTokens": 3_000,
+        "scopeTasks": [str(index + 1) for index in range(tasks)] if scope_tasks is None else scope_tasks,
+        "scopeProblems": [] if scope_problems is None else scope_problems,
     }
 
 
@@ -345,6 +385,8 @@ def _artefact(
     episodes: int | None = None,
     interval: list[float] | None = None,
     census_gap: int = 0,
+    scope_tasks: list[str] | None = None,
+    scope_problems: list[str] | None = None,
 ) -> dict[str, Any]:
     """A pilot artefact of the shape `note_pilot.py` writes, with only the fields this file reads.
 
@@ -400,7 +442,8 @@ def _artefact(
             },
         },
         "notes": notes_block(coverage=coverage, provider_failures=provider_failures, hits=hits, lookups=lookups,
-                             collisions=collisions, specificity=specificity, problem=problem, gap=census_gap),
+                             collisions=collisions, specificity=specificity, problem=problem, gap=census_gap,
+                             tasks=tasks, scope_tasks=scope_tasks, scope_problems=scope_problems),
         "comparison": {
             "passK": {
                 "paired": tasks,
@@ -418,6 +461,16 @@ CASES: list[tuple[str, dict[str, Any], str]] = [
     ("a stock agent is another arm", _artefact(agent="llm_agent"), "DISCARDED"),
     ("a facade is another arm", _artefact(facade=True), "DISCARDED"),
     ("a block body is another arm", _artefact(material="rendered"), "DISCARDED"),
+    # N5, the arm's own gate. A sidecar that names no task is R206's defect wearing R207's fix, so it is not this
+    # arm at all; a fold with fewer scopes than tasks is this arm with a hole in it.
+    ("a sidecar that names no task is discarded",
+     _artefact(scope_problems=["/tmp/notes-5.json: scope is 'none'"]), "DISCARDED"),
+    ("a sidecar that lists several tasks is discarded",
+     _artefact(scope_problems=["/tmp/notes-5.json: scope is 'many'"]), "DISCARDED"),
+    ("a fold with fewer scopes than tasks is unmeasured",
+     _artefact(scope_tasks=["1", "2", "3", "4", "5"]), "NO_MEASUREMENT"),
+    ("a fold whose scopes name another task is unmeasured",
+     _artefact(scope_tasks=["1", "2", "3", "4", "5", "7"]), "NO_MEASUREMENT"),
     ("a treatment that read nothing abandons the pilot", _artefact(hits=0, lookups=16), "ABANDONED"),
     ("a sidecar the agent never asked for abandons the pilot", _artefact(hits=0, lookups=0), "ABANDONED"),
     ("a control that found a note is a leak", _artefact(control_notes={"lookups": 4, "hits": 2}), "ABANDONED"),
@@ -457,40 +510,134 @@ def _without(artefact: dict[str, Any], path: tuple[str, ...]) -> dict[str, Any]:
     return artefact
 
 
-def self_test() -> int:
-    failures = 0
-    for name, artefact, expected in CASES:
-        state, report = grade(artefact)
-        if state != expected:
-            failures += 1
-            print(f"FAIL  {name}: expected {expected}, got {state}\n{report.render()}")
-        else:
-            print(f"PASS  {name}")
+BROKEN_ROWS: list[tuple[str, Any, str]] = [
+    ("a row that is not an object is unmeasured", ["x"], "NO_MEASUREMENT"),
+    ("a row with no rewards is unmeasured", [{"id": "1"}], "NO_MEASUREMENT"),
+    ("a row with no id is unmeasured", [{"rewards": [1.0]}], "NO_MEASUREMENT"),
+    ("a row with an unscored trial is unmeasured", [{"id": "1", "rewards": [None]}], "NO_MEASUREMENT"),
+]
 
+
+def _rows_artefact(rows: Any) -> dict[str, Any]:
+    """An artefact whose treatment carries these rows instead of the fixture's.
+
+    The rows are the level `rows_of` guards, and a gate that read a malformed row as a score would publish a
+    `pass^k` over a task nobody attempted. Each case here is one branch of that guard.
+    """
+    artefact = _artefact()
+    artefact["arms"]["treatment"]["perTask"] = rows
+    return artefact
+
+
+def _cases() -> list[tuple[str, Any, str]]:
+    """Every case this file grades itself on, in one list so one runner reports them all.
+
+    Assembled rather than declared as a literal because three of the five groups are derived — an absence is the
+    fixture with one key deleted, a broken row is the fixture with its rows replaced — and a list built by hand
+    twice is the list that drifts from the cases it is supposed to run.
+    """
+    cases: list[tuple[str, Any, str]] = list(CASES)
     for name, path in ABSENCES:
-        state, _report = grade(_without(_artefact(), path))
-        if state != "NO_MEASUREMENT":
-            failures += 1
-            print(f"FAIL  {name}: got {state}")
-        else:
-            print(f"PASS  {name}")
+        cases.append((name, _without(_artefact(), path), "NO_MEASUREMENT"))
+    for name, rows, expected in BROKEN_ROWS:
+        cases.append((name, _rows_artefact(rows), expected))
+    cases.extend([
+        ("an artefact from another round is not measured", {"schema": "microglia.pack-ledgers/2"}, "NO_MEASUREMENT"),
+        ("a document that is not an object is not measured", [], "NO_MEASUREMENT"),
+    ])
+    # An R206 artefact — one with a material census and no scopes at all — is another arm and not a broken one.
+    # The distinction is why N5 reports `DISCARDED` and not `NO_MEASUREMENT`: a document that predates the field
+    # is a document from before this arm existed, and grading it as unmeasured would blame the instrument for the
+    # record's own history.
+    unscoped = _artefact()
+    del unscoped["notes"]["scopeTasks"]
+    del unscoped["notes"]["scopeProblems"]
+    cases.append(("an artefact with no scope census is another arm", unscoped, "DISCARDED"))
+    cases.append(("an artefact whose scopes are all its tasks is this arm", _artefact(), "GRADED"))
+    return cases
 
-    # Not this file's arm at all: an artefact from another round must not be graded as a broken pilot, because
-    # "no measurement" is a statement about the instrument and this is a statement about the file.
-    for name, document in (
-        ("an artefact from another round is not measured", {"schema": "microglia.pack-ledgers/2"}),
-        ("a document that is not an object is not measured", []),
-    ):
-        state, _report = grade(document)  # type: ignore[arg-type]
-        if state != "NO_MEASUREMENT":
-            failures += 1
-            print(f"FAIL  {name}: got {state}")
-        else:
-            print(f"PASS  {name}")
 
-    total = len(CASES) + len(ABSENCES) + 2
-    print(f"\n{total} cases, {failures} failure(s)")
-    return 0 if failures == 0 else 1
+def run_cases(cases: list[tuple[str, Any, str]]) -> "tuple[list[str], list[str]]":
+    """`(passed, failed)` with each failure carrying the state and the report that produced it.
+
+    The reporter is a function rather than a loop inside `self_test` for one reason: its *failure* path is the
+    half that matters — a suite that cannot fail is a suite whose green means nothing — and the only way to
+    exercise it is to hand it a case that must not pass. `self_test` does exactly that below, which is why these
+    lines are measured rather than assumed.
+    """
+    passed: list[str] = []
+    failed: list[str] = []
+    for name, artefact, expected in cases:
+        state, report = grade(artefact)
+        if state == expected:
+            passed.append(name)
+        else:
+            failed.append(f"{name}: expected {expected}, got {state}\n{report.render()}")
+    return passed, failed
+
+
+def self_test() -> int:
+    cases = _cases()
+    passed, failed = run_cases(cases)
+    for name in passed:
+        print(f"PASS  {name}")
+    for line in failed:
+        print(f"FAIL  {line}")
+
+    checks = len(cases)
+    # The reporter's own failure path, driven deliberately and required to fire: a case whose expectation is
+    # wrong must be reported as a failure, naming the state it produced instead.
+    probe_passed, probe_failed = run_cases([("a case that must not pass", _artefact(), "NO_MEASUREMENT")])
+    checks += 1
+    if probe_passed or len(probe_failed) != 1 or "expected NO_MEASUREMENT, got GRADED" not in probe_failed[0]:
+        failed.append(f"the reporter did not report a wrong expectation: {probe_passed}, {probe_failed}")
+        print("FAIL  a wrong expectation is reported")
+    else:
+        print("PASS  a wrong expectation is reported")
+
+    # The command line, which is what the workflow runs: `--dir` finds the artefact or says it is not there, and
+    # the state is printed last so `tail -n 1` — the spelling both callers use — is the answer.
+    import contextlib
+    import io
+    import json as _json
+    import tempfile
+
+    def check(name: str, condition: bool, detail: str = "") -> None:
+        nonlocal checks
+        checks += 1
+        if condition:
+            print(f"PASS  {name}")
+        else:
+            failed.append(f"{name}{': ' + detail if detail else ''}")
+            print(f"FAIL  {name}{'' if not detail else f'  ({detail})'}")
+
+    with tempfile.TemporaryDirectory() as directory:
+        check("a directory with no artefact exits 2", main(["--dir", directory]) == 2)
+        path = Path(directory) / "note-pilot.json"
+        path.write_text(_json.dumps(_artefact()), encoding="utf-8")
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            code = main(["--dir", directory])
+        lines = [line for line in printed.getvalue().splitlines() if line.strip()]
+        check("a directory holding a graded pilot exits 0", code == 0, str(code))
+        check("the state is the last line", bool(lines) and lines[-1] == "GRADED", str(lines[-1:]))
+        # An artefact that cannot answer is a non-zero exit, which is the difference between a job that reads and
+        # a job that re-dispatches: `DISCARDED` and `NO_MEASUREMENT` are both "fix the fold", not "try again".
+        path.write_text(_json.dumps(_artefact(hits=0, lookups=0)), encoding="utf-8")
+        with contextlib.redirect_stdout(io.StringIO()):
+            check("an abandoned pilot exits 0", main(["--dir", directory]) == 0)
+        path.write_text(_json.dumps({"schema": "microglia.pack-ledgers/2"}), encoding="utf-8")
+        with contextlib.redirect_stdout(io.StringIO()):
+            check("an unmeasured document exits 1", main(["--dir", directory]) == 1)
+        refused = None
+        try:
+            main([])
+        except SystemExit as error:
+            refused = error.code
+        check("no directory and no self-test is refused", refused == 2, str(refused))
+
+    print(f"\n{checks} cases, {len(failed)} failure(s)")
+    return 0 if not failed else 1
 
 
 if __name__ == "__main__":

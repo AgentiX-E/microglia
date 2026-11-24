@@ -2387,3 +2387,31 @@ text binds almost never.
 than its most similar pair of attempts at two different tasks. No threshold can then tell a task from its
 neighbour; on τ² retail two tasks can share a scenario (a water bottle and a desk lamp, for different users), which
 is what makes paraphrases of one closer to the other's opening.
+
+**Scope (sidecar)** — the field that says which task a sidecar describes: `{kind: task, task: "5"}` on every R207
+invocation, `{kind: many, tasks: [...]}` on a merge of several, `{kind: none}` on a file that names no task. It is
+the identity R207 moves out of the opening text and into the file, and `broken` is a state apart from `none` because
+a scope that claims to name a task and does not is a writer defect rather than a store-free arm.
+
+**Single-task fallback** — what the agent does on a key miss when the sidecar declares one task: it serves the entry
+from the latest attempt, because every entry in that file is about the task this episode is in. It does **not** fire
+for `many` or `none`, which are exactly the states in which the identity is unknown again. A file that declares one
+task and holds an entry for another poisons itself: the fallback serves nothing rather than a neighbour's sentence.
+
+**Key hit / task hit** — the two identities, counted apart. A key hit is the opening text matching the one the
+runner wrote the note under (R206's mechanism, which `opening_stability.py` measured at 0.006 reuse); a task hit is
+the file naming the task (R207's). `hits` is their sum, so a reader of the older field reads the same quantity.
+
+**Trajectories sidecar** — `<notes>.trajectories.json`, the failed attempt each note was distilled from, written
+beside the sidecar for one reason: specificity is a property of the corpus and one invocation holds one task, so the
+cross-task share can only be computed after the tasks are merged. Never read by the agent — a sentence is 40 words
+and an attempt is 2,000 characters.
+
+**Merged phase** — an arm's log after `note_pilot.merge_summaries` has summed its per-task phases: the bill adds,
+the agent's counters add, the band survives only if every phase ran in the same one (`mixed` otherwise), and two
+models or two agents inside one arm are refused. The merge of the *grid* (`notes.merge_documents`) is the other
+half: the union of the tasks with every `(task, trial)` exactly once.
+
+**N5** — R207's gate: every sidecar declares exactly one task and there is one per task in the grid. A mis-scoped
+file is `DISCARDED` (another arm), a grid with fewer scopes than tasks is `NO_MEASUREMENT` (this arm, with a hole),
+and an artefact carrying no scope census is `DISCARDED` because it predates the field.

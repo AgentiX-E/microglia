@@ -9,14 +9,21 @@ name: note-pilot
 # what "the same scaffold" means; running the phases here keeps this arm's control checkable by reading four
 # lines of YAML.
 #
+# R207 changes the schedule, not the arm: **one task per `run_split.py` invocation**. The sidecar is the identity
+# now (`scope: {kind: task, task: T}`) and a file holding two tasks would answer nothing, so an arm is one phase
+# per task and the builder merges them. The cost is one τ² import per invocation, about ten seconds, which is
+# cheaper than one wrong-note serving.
+#
 # Two jobs, and the split is the cost model:
 #
-#   contract  free, on every push that touches the material. Runs both self-checks, then the *same* four
-#             commands the paid job runs, over a generated fixture pair, and requires the reading to come back
-#             `GRADED`. A push that breaks the task list, the path convention or the schema fails here rather
-#             than on a dispatch that has already bought forty-eight simulations.
-#   pilot     dispatch only. Two phases at the lane's measured ~26 s an episode: 6 tasks x 4 rounds x 2 arms =
-#             48 simulations, about 25 minutes of model time and roughly ¥1.5 at off-peak rates.
+#   contract  free, on every push that touches the material. Runs the four self-checks, then the *same* commands
+#             the paid job runs, over a generated fixture pair, and requires the reading to come back `GRADED`;
+#             then measures the four files the lane's instrument is made of and fails below 95% on any of them. A
+#             push that breaks the task list, the path convention, the schema or the merge fails here rather than
+#             on a dispatch that has already bought forty-eight simulations.
+#   pilot     dispatch only. Two arms at one task per process, at the lane's measured ~26 s an episode: 6 tasks x
+#             4 rounds x 2 arms = 48 simulations, about 25 minutes of model time, ~2 minutes of imports, and
+#             roughly ¥0.7 at off-peak rates.
 #
 # The phases are separate processes on purpose. The agent's note counters live at module level, so two arms in
 # one process would report one arm's lookups against the other's hits — and the arm's first gate is exactly
@@ -32,7 +39,9 @@ on:
       tasks:
         description: 'Comma-separated task ids. The pilot runs six; the fold runs forty.'
         required: false
-        default: '1,2,3,4,5,6'
+        # R206a's grid, unchanged: R207 has to be comparable to it line for line, which it is only on the same
+        # six tasks — the two tasks that share a scenario (5 and 9) are in it deliberately.
+        default: '5,9,12,17,18,26'
       rounds:
         description: 'Attempts per task, scheduled as rounds (a note needs two)'
         required: false
@@ -53,6 +62,8 @@ on:
       - 'eval/drivers/tau2/microglia_agent.py'
       - 'eval/drivers/tau2/run_split.py'
       - 'eval/verifiers/r206_readback.py'
+      - 'eval/verifiers/opening_stability.py'
+      - 'scripts/check-python-coverage.py'
       - '.github/workflows/note-pilot.yml'
 
 permissions:
@@ -97,29 +108,67 @@ jobs:
           set -euo pipefail
           FIXTURES="${RUNNER_TEMP}/note-pilot-fixtures"
           rm -rf "$FIXTURES"
-          # The builder writes the fixture pair and prints its four paths, so a rename fails here instead of
-          # becoming a shell script that ran over nothing and a reading of an empty directory.
-          python3 eval/drivers/tau2/note_pilot.py --fixtures "$FIXTURES" --rounds 4 | tee "${RUNNER_TEMP}/fixtures.json"
+          # The builder writes one phase per task and prints the six comma-separated path lists, so a rename fails
+          # here instead of becoming a shell script that ran over nothing and a reading of an empty directory.
+          python3 eval/drivers/tau2/note_pilot.py --fixtures "$FIXTURES" --rounds 4 > "${RUNNER_TEMP}/fixtures.json"
+          eval "$(python3 - "${RUNNER_TEMP}/fixtures.json" <<'PY'
+          import json, sys
+          paths = json.load(open(sys.argv[1]))
+          for key in ("control", "treatment", "controlResults", "treatmentResults", "notes", "out"):
+              print(f'{key.upper()}="{paths[key]}"')
+          PY
+          )"
           python3 eval/drivers/tau2/note_pilot.py \
-            --control "${FIXTURES}/control.log" \
-            --treatment "${FIXTURES}/treatment.log" \
-            --control-results "${FIXTURES}/control-results.json" \
-            --treatment-results "${FIXTURES}/treatment-results.json" \
+            --control "$CONTROL" --treatment "$TREATMENT" \
+            --control-results "$CONTROLRESULTS" --treatment-results "$TREATMENTRESULTS" \
+            --notes "$NOTES" \
             --domain retail --tasks 1,2,3,4,5,6 --rounds 4 --seeds 300,301,302,303 \
-            --release v1.0.1 --out "${FIXTURES}/note-pilot.json"
+            --release v1.0.1 --out "$FIXTURES/note-pilot.json"
           # `ABANDONED` is a result and this step would accept it, so the fixture requires `GRADED`: the
           # fixture's mechanism demonstrably ran, and a reading that says otherwise is a broken grader.
           python3 eval/verifiers/r206_readback.py --dir "$FIXTURES" | tee "${RUNNER_TEMP}/reading.txt"
           tail -n 1 "${RUNNER_TEMP}/reading.txt" | grep -qx GRADED
+          # R207: the merge is what the fold adds to the pilot, and it is only exercised by a fixture with more
+          # than one task. The artefact must show one scope per task and a specificity recomputed over the corpus.
+          python3 - "${FIXTURES}/note-pilot.json" <<'PY'
+          import json, sys
+          document = json.load(open(sys.argv[1]))
+          notes = document["notes"]
+          assert len(notes["scopeTasks"]) == 6, notes["scopeTasks"]
+          assert notes["scopeProblems"] == [], notes["scopeProblems"]
+          assert notes["specificity"]["share"] == 1.0, notes["specificity"]
+          assert notes["taskHits"] > 0, notes["taskHits"]
+          assert document["bill"]["controlUsd"] > 0, document["bill"]
+          print("merge: 6 scopes, specificity 1.0, task hits", notes["taskHits"])
+          PY
+
+      - name: The instrument, measured
+        # The four files this lane's evidence is made of had **no** coverage gate: the self-checks above say the
+        # cases pass and nothing said how much of each file they reach. Measured before this step existed, the
+        # lane stood at 89.4% with r206_readback.py at 86.6% and opening_stability.py at 80.0% — which is why the
+        # R207 cases above are as many as they are, and why this floor is here rather than in a report.
+        run: |
+          set -euo pipefail
+          INCLUDE="*/eval/drivers/tau2/notes.py,*/eval/drivers/tau2/note_pilot.py,*/eval/verifiers/r206_readback.py,*/eval/verifiers/opening_stability.py"
+          rm -f .coverage
+          python3 -m coverage run --branch --include="$INCLUDE" eval/drivers/tau2/notes.py --self-test
+          python3 -m coverage run --append --branch --include="$INCLUDE" eval/drivers/tau2/note_pilot.py --self-test
+          python3 -m coverage run --append --branch --include="$INCLUDE" eval/verifiers/r206_readback.py --self-test
+          python3 -m coverage run --append --branch --include="$INCLUDE" eval/verifiers/opening_stability.py --self-test
+          python3 -m coverage json -o "${RUNNER_TEMP}/coverage-notes.json" --include="$INCLUDE"
+          # `--expect-files 4`: a run that measured nothing reports 100% of nothing, which is the one failure mode
+          # a percentage cannot express.
+          python3 scripts/check-python-coverage.py "${RUNNER_TEMP}/coverage-notes.json" --min 95 --expect-files 4
 
   pilot:
     name: pilot — the note carried from attempt k to attempt k+1
     needs: contract
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    # Install (8 min) plus two arms at 24 simulations each plus the reading. Generous rather than tight: a step
-    # killed mid-phase writes no artefact, which is the one outcome this job cannot afford.
-    timeout-minutes: 75
+    # Install (8 min) plus two arms at 24 simulations each plus twelve τ² imports plus the reading. Generous
+    # rather than tight: a step killed mid-phase writes no artefact, which is the one outcome this job cannot
+    # afford.
+    timeout-minutes: 90
     env:
       DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
       # The release a pass^k is comparable to. R92: v0.2.0 and v1.0.1 share no retail task ids, so a number
@@ -160,9 +209,10 @@ jobs:
           MINUTES="$(python3 -c "
           tasks = len('${PILOT_TASKS}'.split(','))
           rounds = int('${PILOT_ROUNDS}')
-          # 26 s a simulation, measured in R206's pilot (48 in 21 minutes), plus eight for the install and one for
-          # the reading. Rounded up: a guard that under-estimates is a guard that refuses nothing.
-          print(int((tasks * rounds * 2 * 26) / 60) + 9 + 1)
+          # 26 s a simulation, measured in R206's pilot (48 in 21 minutes), plus 10 s of τ² import per invocation
+          # — R207 runs one task per process, so two per task — plus eight for the install and one for the
+          # reading. Rounded up: a guard that under-estimates is a guard that refuses nothing.
+          print(int((tasks * rounds * 2 * 26 + tasks * 2 * 10) / 60) + 9 + 1)
           ")"
           echo "estimated ${MINUTES} min for this pilot" >> "$GITHUB_STEP_SUMMARY"
           python3 eval/drivers/tau2/note_pilot.py --window-minutes "${MINUTES}"
@@ -191,7 +241,7 @@ jobs:
           uv pip install mcp || { echo "tau2-mcp-missing:$REF"; exit 24; }
           uv run tau2 check-data || { echo "tau2-data-missing:$REF"; exit 23; }
 
-      - name: The two arms, in sequence, with the seeds written down
+      - name: The two arms, one task per process, with the seeds written down
         env:
           # The summariser's own environment. `run_split.py` reads the model through `TAU_MODEL` and derives
           # the note writer's model from it, so there is one string rather than two that can disagree.
@@ -206,32 +256,57 @@ jobs:
           echo "seeds ${SEEDS}" >> "$GITHUB_STEP_SUMMARY"
           echo "PILOT_SEEDS=${SEEDS}" >> "$GITHUB_ENV"
 
-          run_arm () {
-            local arm="$1"; shift
+          # R207: one task per invocation, because the sidecar is the identity. `--tasks "$TASK"` is what makes the
+          # scope a single task; `--notes` names the file this task's notes live in, and the runner declares the
+          # scope in it before the first episode rather than leaving the agent to recognise the opening text.
+          run_task () {
+            local arm="$1" task="$2"
+            local extra=()
+            if [ "$arm" = "treatment" ]; then
+              extra=(--notes "${PILOT_DIR}/notes-${task}.json")
+            fi
             # `--require-off-peak` on both arms: the same workload costs exactly double inside the provider's
             # peak windows, and a pilot is the cheapest run in the lane to move. The guard refuses before the
             # first call rather than reporting a bill after it.
             "$PYTHON" eval/drivers/tau2/run_split.py \
               --phase eval --agent microglia_agent \
-              --domain "${PILOT_DOMAIN}" --tasks "${PILOT_TASKS}" --rounds "${PILOT_ROUNDS}" \
+              --domain "${PILOT_DOMAIN}" --tasks "${task}" --rounds "${PILOT_ROUNDS}" \
               --max-steps "${PILOT_MAX_STEPS}" --seed "${PILOT_SEED}" --require-off-peak \
-              --out "${PILOT_DIR}/${arm}/results.json" "$@" \
-              2>&1 | tee "${PILOT_DIR}/${arm}.log"
+              --out "${PILOT_DIR}/${arm}/results-${task}.json" "${extra[@]}" \
+              2>&1 | tee "${PILOT_DIR}/${arm}-${task}.log"
+          }
+
+          run_arm () {
+            local arm="$1"
+            for task in $(echo "${PILOT_TASKS}" | tr ',' ' '); do
+              echo "::group::${arm} task ${task}"
+              run_task "$arm" "$task"
+              echo "::endgroup::"
+            done
           }
 
           # Control first. If it fails, nothing has been spent on a treatment whose comparison would have no
           # other side; if the treatment fails, the control's artefact is still a pass^k on this grid.
           run_arm control
-          run_arm treatment --notes "${PILOT_DIR}/notes.json"
+          run_arm treatment
 
       - name: Assemble the pilot's document
         run: |
           set -euo pipefail
+          # One flag per arm, comma-separated: the builder merges the phases and refuses two documents that hold
+          # the same task or the same attempt, which is the shape a half-finished loop leaves behind.
+          CONTROL_LOGS=""; TREATMENT_LOGS=""; CONTROL_RESULTS=""; TREATMENT_RESULTS=""; SIDECARS=""
+          for task in $(echo "${PILOT_TASKS}" | tr ',' ' '); do
+            CONTROL_LOGS="${CONTROL_LOGS}${CONTROL_LOGS:+,}${PILOT_DIR}/control-${task}.log"
+            TREATMENT_LOGS="${TREATMENT_LOGS}${TREATMENT_LOGS:+,}${PILOT_DIR}/treatment-${task}.log"
+            CONTROL_RESULTS="${CONTROL_RESULTS}${CONTROL_RESULTS:+,}${PILOT_DIR}/control/results-${task}.json"
+            TREATMENT_RESULTS="${TREATMENT_RESULTS}${TREATMENT_RESULTS:+,}${PILOT_DIR}/treatment/results-${task}.json"
+            SIDECARS="${SIDECARS}${SIDECARS:+,}${PILOT_DIR}/notes-${task}.json"
+          done
           python3 eval/drivers/tau2/note_pilot.py \
-            --control "${PILOT_DIR}/control.log" \
-            --treatment "${PILOT_DIR}/treatment.log" \
-            --control-results "${PILOT_DIR}/control/results.json" \
-            --treatment-results "${PILOT_DIR}/treatment/results.json" \
+            --control "$CONTROL_LOGS" --treatment "$TREATMENT_LOGS" \
+            --control-results "$CONTROL_RESULTS" --treatment-results "$TREATMENT_RESULTS" \
+            --notes "$SIDECARS" \
             --domain "${PILOT_DOMAIN}" --tasks "${PILOT_TASKS}" --rounds "${PILOT_ROUNDS}" \
             --seeds "${PILOT_SEEDS}" --release "${TAU_VERSION:-v1.0.1}" \
             --out "${PILOT_DIR}/note-pilot.json"
@@ -245,7 +320,7 @@ jobs:
           # document cannot answer — and both cost nothing to fix compared with another dispatch.
           python3 eval/verifiers/r206_readback.py --dir "${PILOT_DIR}" | tee "${PILOT_DIR}/reading.txt"
           {
-            echo "### R206a — the note, carried one attempt forward"
+            echo "### R207 — the note, bound to its task by the file"
             echo
             echo '```'
             cat "${PILOT_DIR}/reading.txt"
@@ -256,15 +331,24 @@ jobs:
           path = os.path.join(os.environ["PILOT_DIR"], "note-pilot.json")
           document = json.load(open(path))
           arms, notes = document["arms"], document["notes"]
-          print(f"| reading | value |")
-          print(f"|---|---|")
-          print(f"| pass^{document['configuration']['rounds']} control | {arms['control']['passK']:.3f} |")
-          print(f"| pass^{document['configuration']['rounds']} treatment | {arms['treatment']['passK']:.3f} |")
+          k = document["configuration"]["rounds"]
+
+          def share(value, digits=3):
+              # A null is a state, not a zero: a coverage of `None` is a fold that failed nothing, and a
+              # specificity of `None` is a fold whose sidecars were not read. Printing either as 0.000 would be the
+              # absence-as-zero defect this lane has paid for twice.
+              return "absent" if value is None else f"{value:.{digits}f}"
+
+          print("| reading | value |")
+          print("|---|---|")
+          print(f"| pass^{k} control | {share(arms['control']['passK'])} |")
+          print(f"| pass^{k} treatment | {share(arms['treatment']['passK'])} |")
           print(f"| delta (withheld) | {document['comparison']['passK']['deltaPp']} pp "
                 f"over {document['comparison']['passK']['paired']} task(s) |")
-          print(f"| note coverage | {notes['coverage']:.3f} of {notes['failed']} failure(s) |")
-          print(f"| specificity | {notes['specificity'].get('share')} |")
-          print(f"| hits / lookups | {notes['hits']} / {notes['lookups']} |")
+          print(f"| note coverage | {share(notes['coverage'])} of {notes['failed']} failure(s) |")
+          print(f"| specificity | {share((notes.get('specificity') or {}).get('share'))} |")
+          print(f"| hits: file / text | {notes['taskHits']} / {notes['keyHits']} of {notes['lookups']} lookup(s) |")
+          print(f"| scopes | {len(notes['scopeTasks'])} task(s), {len(notes['scopeProblems'])} problem(s) |")
           print(f"| collisions | {notes['collisions']} |")
           print(f"| bill | ${document['bill']['controlUsd']} + ${document['bill']['treatmentUsd']} |")
           print(f"| material tokens | {document['bill']['materialTokens']} |")
@@ -299,12 +383,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: note-pilot
+          # The per-task pattern rather than a list: R207 writes one log, one results file and one sidecar per
+          # task, and a hand-written list of forty paths is a list that silently misses the forty-first.
           path: |
-            eval/results/note-pilot/note-pilot.json
+            eval/results/note-pilot/**/*.json
+            eval/results/note-pilot/*.log
             eval/results/note-pilot/reading.txt
-            eval/results/note-pilot/control.log
-            eval/results/note-pilot/treatment.log
-            eval/results/note-pilot/control/results.json
-            eval/results/note-pilot/treatment/results.json
-            eval/results/note-pilot/notes.json
           if-no-files-found: warn

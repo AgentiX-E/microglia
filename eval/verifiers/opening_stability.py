@@ -285,6 +285,67 @@ def self_test() -> int:
     check("the block names the state", "NOT_SEPARABLE" in block)
     check("the block carries the reuse share", "exact key reuse: 0.000" in block)
     check("the block carries the threshold's price", "θ=" in block)
+    check("a share that was never measured renders as absent rather than as zero",
+          "absent" in render({**census_of(openings_by_task([paraphrased])), "exactReuse": None}))
+
+    # The readers' guards: every shape a document can take that is not a simulation with an opening. Each one is a
+    # skip rather than a raise, because this file is handed whatever a fold wrote and half a corpus read as a
+    # whole one is the defect it exists to prevent.
+    check("a message that is not an object is skipped",
+          opening_of({"messages": ["a string", {"role": "user", "content": "kept"}]}) == "kept")
+    check("a document with no grid contributes no openings", openings_by_task([{"no": "simulations"}]) == {})
+    check("a simulation that is not an object is skipped",
+          openings_by_task([{"simulations": ["x", {"task_id": "1", "messages": [{"role": "user", "content": "a b"}]}]}]) != {})
+    check("a simulation with no task id is skipped",
+          openings_by_task([{"simulations": [{"task_id": "", "messages": [{"role": "user", "content": "a"}]}]}]) == {})
+    check("a simulation with no opening is skipped",
+          openings_by_task([{"simulations": [{"task_id": "1", "messages": [{"role": "user", "content": "  "}]}]}]) == {})
+    check("an integer task id is a task id",
+          list(openings_by_task([{"simulations": [{"task_id": 7, "messages": [{"role": "user", "content": "a b"}]}]}])) == ["7"])
+
+    # The command line: two shapes of input, one of output.
+    import contextlib
+    import io
+    import os
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as directory:
+        def write(name: str, payload) -> str:
+            path = os.path.join(directory, name)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as stream:
+                json.dump(payload, stream)
+            return path
+
+        write("arm/results.json", fixed)
+        write("results.json", paraphrased)
+        check("both files are read", len(load([os.path.join(directory, "arm", "results.json"),
+                                               os.path.join(directory, "results.json")])) == 2)
+        write("list.json", [])
+        check("a document that is not an object is dropped", len(load([os.path.join(directory, "list.json")])) == 0)
+
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            code = main(["--dir", directory])
+        check("--dir reads both shapes and measures them", code == 0, str(code))
+        check("and prints the block", "opening stability:" in printed.getvalue(), printed.getvalue()[:80])
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            code = main([os.path.join(directory, "arm", "results.json"), "--json"])
+        check("--json prints the census", code == 0 and '"state"' in printed.getvalue(), printed.getvalue()[:80])
+        # A corpus with one attempt per task has nothing to compare within, and the exit code is the one place
+        # that is said to a shell rather than to a reader.
+        write("single.json", _doc([("1", "only attempt"), ("2", "another single")]))
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            code = main([os.path.join(directory, "single.json")])
+        check("a corpus with no pair exits 2", code == 2, str(code))
+        refused = None
+        try:
+            main([])
+        except SystemExit as error:
+            refused = error.code
+        check("no input at all is refused", refused == 2, str(refused))
 
     print(f"\n{checks} checks, {failures} failure(s)")
     return 0 if failures == 0 else 1

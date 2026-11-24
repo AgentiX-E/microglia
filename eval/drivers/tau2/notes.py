@@ -14,13 +14,27 @@ nothing else reads it. A file rather than a service because the two writers are 
 runner drives `run_tasks` and the agent runs inside it — and a round boundary the runner owns is the one
 ordering guarantee a thread pool cannot give.
 
-## The key, and why it is the opening message
+## The key, and why it is no longer the only identity
 
-The agent is never told which task it is in (R136), so the only identity both sides hold is the text of the
-request that opened the episode. The runner takes it from the simulation's first user message, the agent from
-the message τ² handed it, and **both call `note_key`**: an identity defined in one place cannot drift the way a
-prefix match between two normalisations does. `notes_keyed_by_task` is what makes a collision visible instead of
-silent — two task ids that reduce to one key are counted, and the count travels into the artefact.
+The agent is never told which task it is in (R136), so R206 bound the note to the text of the request that
+opened the episode. The runner takes it from the simulation's first user message, the agent from the message τ²
+handed it, and **both call `note_key`**: an identity defined in one place cannot drift the way a prefix match
+between two normalisations does. `keyed_by_task` is what makes a collision visible instead of silent — two task
+ids that reduce to one key are counted, and the count travels into the artefact.
+
+R206a measured that key on 168 same-task pairs and it does not identify a task: exact reuse was 0.006, and two
+retail tasks can share one scenario, so the nearest text to a paraphrase of task 5 was sometimes task 9's
+opening (`eval/verifiers/opening_stability.py`, `NOT_SEPARABLE`). R207 therefore moves the identity from the
+message to the **file**: the workflow runs one task per invocation, the sidecar declares `scope: {kind: task,
+task: T}`, and the agent serves the file's single entry on a key miss — but *only* when the file declares one
+task. `lookup` returns which of the two identities produced the note, because "the text matched" and "the file
+was pointed at this task" are different mechanisms and only the second is this arm's.
+
+A sidecar that declares one task and holds an entry for a *different* one is the cross-task defect wearing this
+arm's clothes: `lookup` serves nothing rather than serving a neighbour's note, and the count of that state is in
+the artefact. `trajectories.json` is the failed attempt each note was distilled from, written beside the sidecar
+for one reason only — specificity is a property of a corpus, and one invocation sees one task, so the
+cross-task share can only be computed after the tasks are merged (`note_pilot.py`).
 
 ## The three refusals
 
@@ -45,7 +59,12 @@ import os
 import re
 import sys
 
-SCHEMA = "microglia.notes/1"
+SCHEMA = "microglia.notes/2"
+
+#: The failed attempts beside the notes. A second document rather than a second field, because the sidecar is
+#: read by the agent on every turn and the attempts must never be: a sentence is 40 words and an attempt is
+#: 2,000 characters, and a reader that could confuse the two is a treatment nobody registered.
+TRAJECTORIES_SCHEMA = "microglia.notes-trajectories/1"
 
 #: How much of the opening message identifies the task. Long enough that two retail tasks cannot share it
 #: (their openings differ in the first twenty words), short enough that a sidecar of 160 entries stays small.
@@ -98,31 +117,129 @@ def note_key(text) -> str:
     return collapsed[:KEY_CHARS]
 
 
+def scope_of(notes) -> dict:
+    """Which task a sidecar describes: `{"kind": "task", "task": "5"}`, `{"kind": "none"}`, or broken.
+
+    R207's whole mechanism is this field. The runner runs one task per invocation and declares it, so the agent
+    can serve the file's entry without knowing which task τ² put it in — the identity the harness never gives it
+    and the message text cannot carry. `many` is a legitimate value for a merge of several tasks' files, and it
+    is exactly the state in which the identity is unknown again, so it serves nothing.
+
+    `broken` is separate from `none` on purpose: a scope that claims to name a task and does not is a writer
+    defect, and collapsing it into `none` would make a mis-scoped sidecar look like a store-free one.
+    """
+    scope = notes.get("scope") if isinstance(notes, dict) else None
+    if not isinstance(scope, dict):
+        return {"kind": "none"}
+    kind = scope.get("kind")
+    if kind == "task":
+        task = scope.get("task")
+        if isinstance(task, str) and task.strip() != "":
+            return {"kind": "task", "task": task.strip()}
+        return {"kind": "broken", "reason": "kind is 'task' and task is empty"}
+    if kind in ("none", "many"):
+        listed = scope.get("tasks")
+        return {"kind": kind, "tasks": [str(entry) for entry in listed] if isinstance(listed, list) else []}
+    return {"kind": "broken", "reason": f"kind is {kind!r}"}
+
+
+def set_scope(notes, task: str) -> dict:
+    """Declare the one task this sidecar describes, in the document the caller then saves.
+
+    A path reused for a second task is refused rather than rebound. That is not defensive: the file is the
+    identity in this arm, so a runner that pointed task 9 at task 5's file would serve task 5's sentence to task
+    9 and every reading of the phase would be about the wrong task — the exact defect R206 measured, arriving
+    by the one route R207 opens. The workflow gives each task its own path, so this fires on an operator error
+    and not on a normal run.
+    """
+    task = str(task or "").strip()
+    if task == "":
+        raise SystemExit("tau2-notes-scope-empty")
+    if not isinstance(notes, dict) or notes.get("schema") != SCHEMA:
+        notes = empty()
+    held = scope_of(notes)
+    if held["kind"] == "task" and held["task"] != task:
+        raise SystemExit(f"tau2-notes-scope-changed:{held['task']}->{task}")
+    notes["scope"] = {"kind": "task", "task": task}
+    return notes
+
+
+def _note_in(entry) -> str:
+    """The sentence in one entry, or `""`. One reader, because four places ask this question."""
+    note = entry.get("note") if isinstance(entry, dict) else None
+    return note if isinstance(note, str) and note.strip() != "" else ""
+
+
+def _attempt_in(entry) -> int:
+    attempt = entry.get("attempt") if isinstance(entry, dict) else None
+    return attempt if isinstance(attempt, int) and not isinstance(attempt, bool) else 0
+
+
+def lookup(notes, text) -> "tuple[str, str]":
+    """`(note, how)`, where `how` is `"key"`, `"task"` or `"none"`.
+
+    Two identities in one function because they are one lookup: the key first, because it is a statement about
+    *this* request, and the file's scope second, because that is the identity the harness can actually give. A
+    note that arrived under the key and a note served because the file names the task are different mechanisms,
+    and R207's first prediction is about the second one — a counter that merged them could not tell the new
+    binding from R206's broken one.
+
+    The fallback serves the entry from the **latest** attempt: a task that failed twice has two sentences (or
+    one, rewritten), and the one written after the most recent failure is the one about the attempt before this
+    one. Entries are compared by `attempt` rather than by insertion order, because a dictionary's order is a
+    property of the writer and the attempt number is a property of the run.
+    """
+    key = note_key(text)
+    entries = notes.get("notes") if isinstance(notes, dict) else None
+    if not isinstance(entries, dict):
+        return "", "none"
+    if key != "":
+        found = _note_in(entries.get(key))
+        if found:
+            return found, "key"
+    scope = scope_of(notes)
+    if scope["kind"] != "task":
+        return "", "none"
+    task = scope["task"]
+    best: "tuple[int, str] | None" = None
+    for entry in entries.values():
+        note = _note_in(entry)
+        if note == "":
+            continue
+        held = entry.get("task")
+        if isinstance(held, str) and held != "" and held != task:
+            # An entry about another task inside a file that declares this one. Either the runner wrote two
+            # tasks into one sidecar or the file was pointed at the wrong task; serving this sentence is the
+            # cross-task mechanism R41 and R204 measured, and it is the one thing this arm must not be.
+            return "", "none"
+        attempt = _attempt_in(entry)
+        if best is None or attempt >= best[0]:
+            best = (attempt, note)
+    return ("", "none") if best is None else (best[1], "task")
+
+
 def note_of(notes, text) -> str:
     """The note written for this task's last failed attempt, or an empty string.
 
-    `""` is three facts — no key, no entry, an entry whose `note` is not a string — and the caller counts them
-    apart from a note that was found, because "the agent served nothing" and "the file had nothing for this
-    task" are different sentences about the treatment.
+    `""` is five facts — no key, no entry, an entry whose `note` is not a string, a file that names no task, a
+    file that names a different task than its own entries — and the caller counts them through `lookup`'s second
+    return, because "the agent served nothing" and "the file had nothing for this task" are different sentences
+    about the treatment.
     """
-    key = note_key(text)
-    if key == "":
-        return ""
-    entries = notes.get("notes") if isinstance(notes, dict) else None
-    if not isinstance(entries, dict):
-        return ""
-    entry = entries.get(key)
-    if not isinstance(entry, dict):
-        return ""
-    note = entry.get("note")
-    return note if isinstance(note, str) else ""
+    return lookup(notes, text)[0]
 
 
 # --------------------------------------------------------------------------- the sidecar
 
 
 def empty() -> dict:
-    return {"schema": SCHEMA, "notes": {}, "collisions": {}}
+    """A sidecar with nothing in it. `kind: none` is the scope of a file that names no task.
+
+    The scope is part of the empty document rather than added by the writer, because `load` returns this for a
+    file that does not exist yet (round one) and the agent must be able to ask `scope_of` the same question of
+    every document it is handed.
+    """
+    return {"schema": SCHEMA, "notes": {}, "collisions": {}, "scope": {"kind": "none"}}
 
 
 def load(path: str):
@@ -148,6 +265,10 @@ def load(path: str):
     if not isinstance(document.get("notes"), dict):
         return empty(), "`notes` is not an object"
     document.setdefault("collisions", {})
+    # A document written by a reader that did not know about scopes describes no task, which is the safe reading:
+    # the key is still consulted and the fallback does not fire. Absent is not the same as broken, and only
+    # `scope_of`'s `broken` state is a writer defect.
+    document.setdefault("scope", {"kind": "none"})
     return document, None
 
 
@@ -206,6 +327,112 @@ def keyed_by_task(pairs) -> dict:
         if str(task) not in groups[key]:
             groups[key].append(str(task))
     return {key: sorted(tasks) for key, tasks in groups.items() if len(tasks) > 1}
+
+
+# --------------------------------------------------------------------------- the attempts beside the notes
+
+
+def trajectories_path(path: str) -> str:
+    """Where one sidecar's failed attempts are written. Beside it, and derived, so it cannot be forgotten."""
+    return f"{path}.trajectories.json" if path else ""
+
+
+def save_trajectories(path: str, trajectories) -> int:
+    """Write `{key: attempt text}` beside the sidecar, one rename, and return how many were kept.
+
+    Kept because specificity is the arm's third gate and it needs the *other* tasks: an invocation that ran one
+    task cannot compute a cross-task share, and a `share` of 1.0 from a corpus of one is a number no reader could
+    reproduce. This file is what lets the builder compute it over the merged corpus without the runner having to
+    invent a second arithmetic.
+    """
+    if path == "":
+        return 0
+    kept = {
+        str(key): str(text)
+        for key, text in (trajectories or {}).items()
+        if isinstance(key, str) and key.strip() != "" and isinstance(text, str) and text.strip() != ""
+    }
+    directory = os.path.dirname(os.path.abspath(path))
+    os.makedirs(directory, exist_ok=True)
+    scratch = f"{path}.tmp"
+    with open(scratch, "w", encoding="utf-8") as stream:
+        json.dump({"schema": TRAJECTORIES_SCHEMA, "trajectories": kept}, stream, indent=2, sort_keys=True)
+        stream.write("\n")
+    os.replace(scratch, path)
+    return len(kept)
+
+
+def load_trajectories(path: str) -> "tuple[dict, str | None]":
+    """`(trajectories, problem)`. A missing file is round one; anything else unreadable is a problem.
+
+    Same pairing as `load`, for the same reason: `{}` for a corrupted file would make specificity a share over a
+    corpus that lost its failures, and the gate that reads it would pass on nothing.
+    """
+    if path == "" or not os.path.exists(path):
+        return {}, None
+    try:
+        with open(path, encoding="utf-8") as stream:
+            document = json.load(stream)
+    except Exception as error:  # noqa: BLE001 - any unreadable document means no attempts
+        return {}, f"{type(error).__name__}: {error}"
+    if not isinstance(document, dict) or document.get("schema") != TRAJECTORIES_SCHEMA:
+        found = document.get("schema") if isinstance(document, dict) else type(document).__name__
+        return {}, f"schema is {found!r}, expected {TRAJECTORIES_SCHEMA!r}"
+    trajectories = document.get("trajectories")
+    if not isinstance(trajectories, dict):
+        return {}, "`trajectories` is not an object"
+    return {str(key): text for key, text in trajectories.items() if isinstance(text, str)}, None
+
+
+def merge_trajectories(documents) -> "tuple[dict, int]":
+    """One corpus out of one per-task file each, and how many keys two tasks both produced.
+
+    A shared key across two tasks is exactly the collision `keyed_by_task` reports inside one task, one level up:
+    the attempt text of two tasks reducing to one key. It is counted rather than refused, because the reading it
+    damages — specificity — is a diagnostic and not the arm's gate.
+    """
+    merged: dict = {}
+    collisions = 0
+    for document in documents or []:
+        for key, text in (document or {}).items():
+            if key in merged:
+                collisions += 1
+                continue
+            merged[key] = text
+    return merged, collisions
+
+
+
+
+def merge_sidecars(documents) -> dict:
+    """One sidecar out of one per-task file each, with the scope it now honestly has: `many`.
+
+    The merged document is what specificity needs — a share over the corpus rather than over one task — and what
+    a reader needs to see that the merge happened. A key two tasks both produced is recorded as a collision
+    rather than dropped: it is the one state in which the material could cross tasks, and the gate that reads
+    collisions is the gate that would otherwise be fooled by the merge.
+    """
+    merged = empty()
+    tasks: list = []
+    for document in documents or []:
+        if not isinstance(document, dict):
+            continue
+        scope = scope_of(document)
+        if scope["kind"] == "task" and scope["task"] not in tasks:
+            tasks.append(scope["task"])
+        for key, entry in (document.get("notes") or {}).items():
+            if key in merged["notes"]:
+                held = merged["notes"][key]
+                pair = sorted({str((held or {}).get("task", "")), str((entry or {}).get("task", ""))})
+                merged["collisions"][key] = [task for task in pair if task != ""]
+                continue
+            merged["notes"][key] = entry
+        for key, group in (document.get("collisions") or {}).items():
+            merged["collisions"].setdefault(key, group)
+    merged["scope"] = {"kind": "many", "tasks": tasks} if tasks else {"kind": "none"}
+    return merged
+
+
 
 
 # --------------------------------------------------------------------------- the trajectory
@@ -381,7 +608,16 @@ def specificity(notes, trajectories) -> dict:
     return {
         "graded": graded,
         "specific": specific,
-        "share": specific / graded if graded else None,
+        # A share needs a corpus. `specific` is computed against the *other* tasks in the phase, so a phase of one
+        # task — which is every R207 invocation — would report 1.0 for every note by construction: the note's own
+        # task is trivially the only task, and its entities are trivially unique. R207 computes this again over
+        # the merged corpus (`note_pilot.merge_trajectories` + this function), and the null here is what stops the
+        # per-invocation number from being quoted by mistake.
+        "share": (specific / graded) if graded and len(per_task) >= 2 else None,
+        "reason": None
+        if len(per_task) >= 2
+        else f"a corpus of {len(per_task)} task(s) has no cross-task share",
+        "tasks": len(per_task),
         "entitiesPerNote": (sum(lengths) / len(lengths)) if lengths else None,
     }
 
@@ -527,6 +763,72 @@ def merge_rounds(paths, out: str, rounds: int) -> None:
         stream.write("\n")
 
 
+
+
+def merge_documents(documents) -> dict:
+    """The merged grid, in memory: the union of the tasks and every simulation exactly once.
+
+    Two refusals, and both are states a reader downstream would otherwise read as a grid:
+
+      * one task listed by two documents — the same task simulated twice, whose rewards would enter the pairing
+        twice and whose `pass^k` would be decided by whichever copy came second;
+      * one `(task, trial)` pair from two documents — the same attempt counted twice, which is precisely what
+        `parseTauResults` refuses on the TypeScript side. Caught here as well because the merge is the last place
+        that knows which file a duplicate came from.
+
+    The task list is the union in first-seen order, and every other key of the first document is kept: `domain`
+    and the release belong to the arm rather than to the task, and rebuilding the document would drop them.
+    """
+    base = None
+    merged: list = []
+    tasks: dict = {}
+    pairs: set = set()
+    for document in documents or []:
+        if not isinstance(document, dict):
+            raise SystemExit(f"tau2-merge-bad-document:{type(document).__name__}")
+        if base is None:
+            base = document
+        for entry in document.get("tasks") or []:
+            if not isinstance(entry, dict):
+                continue
+            task = str(entry.get("id"))
+            if task in tasks:
+                raise SystemExit(f"tau2-merge-duplicate-task:{task}")
+            tasks[task] = entry
+        for entry in document.get("simulations") or []:
+            if not isinstance(entry, dict):
+                continue
+            pair = (str(entry.get("task_id")), entry.get("trial"))
+            if pair in pairs:
+                raise SystemExit(f"tau2-merge-duplicate-trial:{pair[0]}/{pair[1]}")
+            pairs.add(pair)
+            merged.append(entry)
+    if base is None:
+        raise SystemExit("tau2-merge-no-tasks")
+    base = dict(base)
+    base["tasks"] = list(tasks.values())
+    base["simulations"] = merged
+    return base
+
+
+def merge_tasks(paths, out: str) -> int:
+    """`merge_documents` over files, written to `out`, and the number of simulations it holds.
+
+    R207 runs one task per invocation, so an arm's six invocations leave six documents, each already merged over
+    its rounds. This is the reader that joins them for a caller that holds paths rather than documents.
+    """
+    documents = []
+    for path in paths:
+        with open(path, encoding="utf-8") as stream:
+            document = json.load(stream)
+        if not isinstance(document, dict):
+            raise SystemExit(f"tau2-merge-bad-document:{path}")
+        documents.append(document)
+    base = merge_documents(documents)
+    with open(out, "w", encoding="utf-8") as stream:
+        json.dump(base, stream)
+        stream.write("\n")
+    return len(base["simulations"])
 
 
 # --------------------------------------------------------------------------- self-test
@@ -778,6 +1080,178 @@ def _self_test() -> int:
     check("no notes is no share", specificity(empty(), trajectories)["share"] is None)
     check("entities keep ids whole", "w2378156" in entities("Cancel W2378156 now"))
     check("entities drop short words", entities("to be or not") == set(), str(entities("to be or not")))
+
+    # The scope: which task a sidecar describes, and the one state that is a writer defect.
+    check("no scope describes no task", scope_of({}) == {"kind": "none"})
+    check("a scope of none says so", scope_of({"scope": {"kind": "none"}})["kind"] == "none")
+    check("a scope of one task names it", scope_of({"scope": {"kind": "task", "task": "5"}}) == {"kind": "task", "task": "5"})
+    check("the scope's task is stripped", scope_of({"scope": {"kind": "task", "task": " 5 "}})["task"] == "5")
+    broken_scope = scope_of({"scope": {"kind": "task", "task": "  "}})
+    check("a task scope with no task is broken", broken_scope["kind"] == "broken", str(broken_scope))
+    check("so is an unknown kind", scope_of({"scope": {"kind": "several"}})["kind"] == "broken")
+    many = scope_of({"scope": {"kind": "many", "tasks": ["5", "9"]}})
+    check("a merged scope lists its tasks", many == {"kind": "many", "tasks": ["5", "9"]}, str(many))
+    check("a scope that is not an object describes no task", scope_of({"scope": []})["kind"] == "none")
+    check("a document that is not an object describes no task", scope_of(None)["kind"] == "none")
+
+    # Declaring it: the writer's half, including the one refusal that stops a reused path.
+    declared = set_scope(empty(), "5")
+    check("declaring a scope names the task", declared["scope"] == {"kind": "task", "task": "5"})
+    check("declaring it twice is idempotent", set_scope(declared, "5")["scope"] == declared["scope"])
+    rebound = False
+    try:
+        set_scope(declared, "9")
+    except SystemExit as error:
+        rebound = str(error) == "tau2-notes-scope-changed:5->9"
+    check("a path reused for another task is refused", rebound)
+    blank = False
+    try:
+        set_scope(empty(), "")
+    except SystemExit as error:
+        blank = str(error) == "tau2-notes-scope-empty"
+    check("a scope with no task is refused", blank)
+    check("a bad document is rebuilt with a scope", set_scope({"schema": "other"}, "7")["scope"]["task"] == "7")
+    kept = empty()
+    record(kept, "a task", "Do the thing.", attempt=1, reward=0.0, task="5")
+    check("declaring a scope keeps the notes", note_of(set_scope(kept, "5"), "a task") == "Do the thing.")
+
+    # The two identities, told apart by what they returned.
+    keyed = empty()
+    record(keyed, "the opening", "Ask for the id first.", attempt=1, reward=0.0, task="5")
+    check("a key hit is reported as one", lookup(keyed, "the opening") == ("Ask for the id first.", "key"))
+    scoped = set_scope(empty(), "5")
+    record(scoped, "an opening the agent will paraphrase", "Ask for the id first.", attempt=1, reward=0.0, task="5")
+    check("a paraphrase is served by the file", lookup(scoped, "a paraphrase of that opening") == ("Ask for the id first.", "task"))
+    check("and `note_of` is the same answer", note_of(scoped, "a paraphrase of that opening") == "Ask for the id first.")
+    later = set_scope(empty(), "5")
+    record(later, "first", "First sentence.", attempt=1, reward=0.0, task="5")
+    record(later, "second", "Second sentence.", attempt=3, reward=0.0, task="5")
+    check("the fallback serves the latest attempt", lookup(later, "unrelated text")[0] == "Second sentence.")
+    crossed = set_scope(empty(), "5")
+    record(crossed, "task five", "Five's sentence.", attempt=1, reward=0.0, task="5")
+    record(crossed, "task nine", "Nine's sentence.", attempt=2, reward=0.0, task="9")
+    check("an entry for another task is not served", lookup(crossed, "neither opening") == ("", "none"))
+    check("a merged file serves nothing on a miss", lookup({"schema": SCHEMA, "notes": {"k": {"note": "x", "task": "5"}},
+                                                            "scope": {"kind": "many", "tasks": ["5"]}}, "other") == ("", "none"))
+    check("an untyped entry is not evidence of another task",
+          lookup({"schema": SCHEMA, "notes": {"k": {"note": "x"}}, "scope": {"kind": "task", "task": "5"}}, "o") == ("x", "task"))
+    check("a blank note is not served from the file",
+          lookup({"schema": SCHEMA, "notes": {"k": {"note": "  ", "task": "5"}}, "scope": {"kind": "task", "task": "5"}}, "o") == ("", "none"))
+
+    # The attempts beside the notes: written in one rename, read back, and reported when unreadable.
+    with tempfile.TemporaryDirectory() as directory:
+        sidecar = os.path.join(directory, "notes", "notes-5.json")
+        attempts = trajectories_path(sidecar)
+        check("the attempts live beside the sidecar", attempts == f"{sidecar}.trajectories.json")
+        check("no sidecar means no attempts path", trajectories_path("") == "")
+        check("nothing to write is nothing written", save_trajectories("", {"k": "v"}) == 0)
+        written = save_trajectories(attempts, {"k": "USER: x", "": "junk", "j": 7})
+        check("only the attempts that are text are kept", written == 1, str(written))
+        loaded, problem = load_trajectories(attempts)
+        check("the attempts read back", loaded == {"k": "USER: x"} and problem is None, str(problem))
+        check("no scratch file is left beside them", not os.path.exists(f"{attempts}.tmp"))
+        check("a missing file is round one", load_trajectories(os.path.join(directory, "absent.json")) == ({}, None))
+        check("no path is no attempts", load_trajectories("") == ({}, None))
+        with open(attempts, "w", encoding="utf-8") as stream:
+            stream.write("{ truncated")
+        _, problem = load_trajectories(attempts)
+        check("a corrupt attempts file is a problem", problem is not None and "JSONDecodeError" in problem, str(problem))
+        with open(attempts, "w", encoding="utf-8") as stream:
+            json.dump({"schema": "microglia.notes-trajectories/0", "trajectories": {}}, stream)
+        _, problem = load_trajectories(attempts)
+        check("an attempts file from another writer is a problem", problem is not None and "trajectories/0" in problem, str(problem))
+        with open(attempts, "w", encoding="utf-8") as stream:
+            json.dump({"schema": TRAJECTORIES_SCHEMA, "trajectories": []}, stream)
+        _, problem = load_trajectories(attempts)
+        check("attempts that are not an object are a problem", problem is not None and "`trajectories`" in problem, str(problem))
+
+    merged_attempts, collisions = merge_trajectories([{"a": "one", "b": "two"}, {"b": "other", "c": "three"}])
+    check("attempts merge across tasks", sorted(merged_attempts) == ["a", "b", "c"], str(merged_attempts))
+    check("the first task's attempt wins a shared key", merged_attempts["b"] == "two")
+    check("a shared key is counted", collisions == 1, str(collisions))
+    check("no attempts is no collision", merge_trajectories([]) == ({}, 0))
+
+    # The sidecars of several tasks into the corpus specificity needs.
+    five = set_scope(empty(), "5")
+    record(five, "five's opening", "Five's sentence.", attempt=1, reward=0.0, task="5")
+    nine = set_scope(empty(), "9")
+    record(nine, "nine's opening", "Nine's sentence.", attempt=1, reward=0.0, task="9")
+    corpus = merge_sidecars([five, nine])
+    check("the merged corpus lists both tasks", corpus["scope"] == {"kind": "many", "tasks": ["5", "9"]}, str(corpus["scope"]))
+    check("and holds both notes", len(corpus["notes"]) == 2, str(corpus))
+    overlap = set_scope(empty(), "9")
+    record(overlap, "five's opening", "Nine's sentence.", attempt=1, reward=0.0, task="9")
+    crossed_corpus = merge_sidecars([five, overlap])
+    check("a key two tasks produced is a collision", list(crossed_corpus["collisions"]) == [note_key("five's opening")], str(crossed_corpus["collisions"]))
+    check("a collision keeps the first task's sentence", len(crossed_corpus["notes"]) == 1)
+    check("no sidecars is no evidence", merge_sidecars([])["scope"]["kind"] == "none")
+
+    # Specificity over a corpus of one: the note's own task is the only task, so the share is not a measurement.
+    lonely = empty()
+    record(lonely, "only task", "Cancel W2378156 before refunding.", attempt=1, reward=0.0, task="5")
+    single = specificity(lonely, {"only task": "USER: cancel W2378156"})
+    check("one task has no cross-task share", single["share"] is None, str(single))
+    check("and says why", "corpus of 1" in (single["reason"] or ""), str(single.get("reason")))
+    check("it still grades the note", single["graded"] == 1 and single["specific"] == 1, str(single))
+    pair_reading = specificity(graded, trajectories)
+    check("two tasks have a share", pair_reading["share"] is not None and pair_reading["tasks"] == 2, str(pair_reading))
+
+    # The cross-task merge: one arm's per-task documents into one grid.
+    with tempfile.TemporaryDirectory() as directory:
+        def per_task(task: str, trials: int = 2) -> str:
+            path = os.path.join(directory, f"results-{task}.json")
+            with open(path, "w", encoding="utf-8") as stream:
+                json.dump(
+                    {
+                        "domain": "retail",
+                        "tasks": [{"id": task}],
+                        "simulations": [
+                            {"task_id": task, "trial": index, "reward_info": {"reward": 1.0}} for index in range(trials)
+                        ],
+                    },
+                    stream,
+                )
+            return path
+
+        joined = os.path.join(directory, "merged.json")
+        count = merge_tasks([per_task("5"), per_task("9")], joined)
+        with open(joined, encoding="utf-8") as stream:
+            document = json.load(stream)
+        check("the merge counts every simulation", count == 4, str(count))
+        check("the merge keeps both tasks", [entry["id"] for entry in document["tasks"]] == ["5", "9"])
+        check("the merge keeps the arm's own keys", document["domain"] == "retail")
+        check("the merge keeps the trial indices", sorted(entry["trial"] for entry in document["simulations"]) == [0, 0, 1, 1])
+
+        for name, paths, code in (
+            ("a task two documents both list is refused", [per_task("5"), per_task("5")], "tau2-merge-duplicate-task:5"),
+            ("a document with no tasks is refused", [], "tau2-merge-no-tasks"),
+        ):
+            raised = False
+            try:
+                merge_tasks(paths, joined)
+            except SystemExit as error:
+                raised = str(error) == code
+            check(name, raised)
+
+        twice = os.path.join(directory, "second-5.json")
+        with open(twice, "w", encoding="utf-8") as stream:
+            json.dump({"tasks": [{"id": "7"}], "simulations": [{"task_id": "5", "trial": 0}]}, stream)
+        raised = False
+        try:
+            merge_tasks([per_task("5"), twice], joined)
+        except SystemExit as error:
+            raised = str(error) == "tau2-merge-duplicate-trial:5/0"
+        check("an attempt two documents both hold is refused", raised)
+
+        broken = os.path.join(directory, "list.json")
+        with open(broken, "w", encoding="utf-8") as stream:
+            json.dump([], stream)
+        raised = False
+        try:
+            merge_tasks([broken], joined)
+        except SystemExit as error:
+            raised = str(error).startswith("tau2-merge-bad-document:")
+        check("a document that is not an object is refused", raised)
 
     for failure in failures:
         print(f"FAIL {failure}", file=sys.stderr)
