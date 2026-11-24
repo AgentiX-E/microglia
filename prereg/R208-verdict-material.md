@@ -131,3 +131,47 @@ have one.
 `serveBody` remains host-side and is not a knob of this arm: the note is served as a guidance line, the same way R206
 and R207 served it. Nothing here changes what the library renders. What changes is what the *distiller* is shown, and
 the distiller is `eval/drivers/tau2/notes.py` — one caller, one prompt, one flag.
+
+## Measured, and the two amendments the measurement forced
+
+**Built and dispatched three times** against the bank (`note-bank` 45329752184), 85 paired failures, each run
+≈ $0.042.
+
+| run | what changed | attempt | verdict | P2 | P3 | state |
+|---|---|---|---|---|---|---|
+| 45345191995 | as registered | 3 written / 82 refused | 1 / 84 | 0 of 82 | 0.0% | REFUTED |
+| 45347478669 | thinking disabled on the summariser call | 84 / 1 | 85 / 0 | 1 of 1 | 1.2% / 4.7% | P3 refuted |
+| 45349096717 | the verdict's content (actions, justifications, failures first) | 83 / 2 | 85 / 0 | 2 of 2 | 15.7% / 16.5% (registered measure) | P3 refuted |
+
+**Amendment 1 — `P0`, and the reason for it.** The first run's 96.0 completion tokens per call were a truncation, not
+a refusal: `deepseek-flash` thinks by default and bills the reasoning against `max_tokens`, and the note call was
+the one call that did not disable it. `P0 — no call was cut off` now runs before every other prediction and the
+reading is `exit 2` if it fails. A budget fact reported as a judgement is how this lane spent three rounds
+believing a model had declined 96% of failures the evaluator had explained in writing (AUDIT 34.304).
+
+**Amendment 2 — `P3` is measured against chance.** As registered, `P3` asked for a token the note's own failure held
+and no other's. On this bank that measure has a **ceiling of 9.4%** (77 of 85 failures have an empty exclusive
+vocabulary) and it inverts the incentive: the action a note most needs to name — `exchange_delivered_order_items` —
+is an action other failures name too. The amended measure is stated in advance of the number it produced and is
+reported beside the registered one:
+
+- a note is *specific* if it shares a token with its own failure's **failing lines** (`ACTION not met: …`,
+  `DB CHECK not met`, `COMMUNICATE not met: …`);
+- its **chance rate** is the same note against the other 84 failures' failing lines, which is what a note that named
+  nothing in particular would reach;
+- the **paired contrast** is McNemar's exact over the two materials on the same failures.
+
+**What the amended measure reads, paired on 85 failures:** attempt 28.9% (chance 22.5%), verdict **44.7%** (chance
+23.2%), 23 both, **15 verdict-only, 1 attempt-only**, 44 neither, **McNemar exact p = 0.0005**. The material
+therefore doubles the note's specificity over chance; the registered bar of 50% is missed by 5.3 points, so `P3`
+stays **refuted on its bar** while the effect it was written to detect is now measurable.
+
+**`P2` is answered by a defect rather than by the material.** With thinking off, the attempt arm declines 2 of 85,
+so there is nothing left for the verdict to rescue: 2 of 2 rescued, McNemar p = 0.5 on two discordant pairs. That is
+a direction and not evidence, and it is reported as such. R208's premise — that the summariser was declining for
+want of the evaluator's account — was true of the *bug*, not of the material.
+
+**What survives.** `P1` (85 of 85 explained) and `P4` (456 characters added, ceiling 667) both hold, and the
+material's qualitative effect is visible without any measure: on task 12 the attempt-only note says "confirm the
+refund method", and the verdict note says "process the return for order #W7387996 as well, since the user asked
+about multiple items and you only handled #W5490111".

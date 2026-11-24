@@ -4040,3 +4040,138 @@ than to read — and the repair is a harder grid, which is a different dispatch 
   `ACTION not met: return_delivered_order_items`, `DB CHECK not met`. That is R208's motivation, measured rather
   than assumed;
 - 48 episodes cost **$0.089** (¥0.64), which is $0.0019 an episode — the fold's price was never the obstacle.
+
+### 8.79 The bank: the first `pass^4` on the ladder's population, and what a population costs
+
+R207 could not measure the note lane because its grid never failed. R208 bought the population instead of the arm:
+one control-armed run over the retail split, four trials a task, no sidecar. It is the first number in this project
+that the published ladder's population can be compared with, and the bank of failed attempts the material ablation
+is computed on.
+
+| reading | value |
+|---|---|
+| tasks / episodes | 114 / **456** at four trials |
+| `pass^1` | **81.4%** |
+| `pass^4` | **56.1%** over 114 tasks |
+| tasks with a failure | 50 |
+| failed attempts | **85** |
+| failures the evaluator explained | **85 (100.0%)** |
+| verdict characters | mean 169, max 428 |
+| cost | **$2.0103** (agent $1.5863, simulator $0.4240) |
+| cost per episode | **$0.0044** |
+| mean episode | 23.3 s |
+
+**Two of those numbers are instrument repairs and not findings.**
+
+*The bill was not in the census.* Pricing this bank took a throwaway script, and the estimate it replaced had been
+argued at **$0.30** from the pilot's `$0.0019` an episode. The pilot's six tasks all pass, so they are the cheapest
+population the lane has: an easy episode is short, and a short episode is cheap. The full split costs **2.4× more an
+episode** and 6.5× the estimate in total. `note_bank.bill_of` now reads τ²'s own `agent_cost`, `user_cost` and
+`duration` per simulation, so the census answers what the bank cost, what an episode costs and how long one takes —
+the number the window guard's arithmetic assumes and the number the next dispatch has to be planned from. A fact
+that takes a throwaway script is a fact that gets estimated instead.
+
+*The guard estimated from a fallback.* With no `--tasks` the runner resolves the domain's split, which holds **114**
+retail tasks, while the guard's arithmetic assumed **forty**. That is the one direction a window guard must never be
+wrong in, and it was mine. The guard now refuses against a per-domain ceiling before the install and re-checks
+against the count the split actually lists, before the first paid call.
+
+**The reading itself.** 85 failed attempts, every one of them with a verdict — the material R208 registers is not a
+hope about τ²'s evaluator, it is 100% coverage of a measured population with a mean of 169 characters per verdict.
+That is `P1` measured before the ablation was dispatched, which is why the ablation could be dispatched at all.
+
+`pass^4 56.1%` is the control arm: the stock microglia agent on DeepSeek with no memory and no sidecar. It is not a
+memory result and it is not comparable with the ladder's submissions line for line — they run frontier models — but
+it is the first denominator this lane has, and every later arm is measured against it on the same 456 episodes.
+
+### 8.80 The material ablation: paired by construction, and the `n/a` that keeps a zero out of a bar
+
+`note_material_ablation.py` shows each failed attempt to the summariser twice — the attempt alone (R207's material)
+and the attempt plus the verdict (R208's) — and measures the four registered predictions on the pair.
+
+```
+P1  the evaluator explained         every failure renders at least one line            ≥ 80%
+P2  the verdict rescues             of what the attempt arm declined, how many it wrote ≥ 50%
+P3  the note names its own check    a token only its own failure's verdict holds        ≥ 50%
+P4  the block is cheap              added prompt characters, against the attempt's ceiling ≤ 667
+```
+
+Three decisions make it an experiment rather than a comparison of two runs:
+
+- **Paired.** Same failures, same model, same ceiling, one call each side, `temperature=0`. Only the material moves,
+  and it moves inside one process so no schedule can differ.
+- **McNemar's exact test, not a difference of proportions.** In a paired binary outcome only the discordant pairs
+  carry information: `rescued` (refused then written) against `lost` (written then refused). Under the null the two
+  are equally likely, so the count is binomial with `p = 1/2` and the two-sided exact p-value is twice the smaller
+  tail. A normal approximation would be the wrong instrument at the discordant counts a bank this size produces.
+- **A zero denominator is `n/a`, never `0.0`.** P2 with nothing declined is a question the bank did not ask, and it
+  fails rather than passes: a material cannot be credited for rescuing nothing. This is the same rule `N0b` was
+  added for, one level down — R207's three false refutations were all a `None` compared as zero by `(value or 0.0)`.
+
+**The job runs no simulator, so no window guard bounds it.** Instead the tool prices itself before the first call,
+in the band it is actually billed in — `band_of` reads the card's peak windows and applies them on weekdays only,
+because a hardcoded hour comparison is wrong in one direction on a weekend and over-bills in the other. `usd_of`
+prices the plan from the card and names the row it used (`pricedAs`), so a model the card does not hold is billed
+at `defaultModel` with its assumption attached. Above `--max-usd` the tool refuses and returns 2 — before the first
+call, which is the only place a budget can be enforced. 170 calls over the whole bank is about two cents.
+
+### 8.81 Three defects in one lane, and the order they had to be found in
+
+The material ablation was dispatched three times against the same bank. The first two answered nothing, and the
+reason is the round's substance: the lane's instruments were reporting three different things as if they were one.
+
+| run | what changed | attempt arm | verdict arm | P2 | P3 | state |
+|---|---|---|---|---|---|---|
+| 45345191995 | as registered | 3 written / 82 refused | 1 / 84 | 0 of 82 rescued | 0.0% | REFUTED |
+| 45347478669 | thinking disabled | **84 / 1** | **85 / 0** | 1 of 1 | 1.2% / 4.7% | P3 refuted |
+| 45349096717 | the verdict's content | 83 / 2 | 85 / 0 | 2 of 2 (p 0.5) | **15.7% / 16.5%** | P3 refuted |
+
+**Defect one — the call.** Every note call spent its whole 96-token budget before writing: `deepseek-flash` thinks
+by default and bills the reasoning against `max_tokens`, and the note call was the one call in the driver that did
+not pass the thinking body its own agent and simulator calls pass. The empty message was read as the model
+declining. The tell was in the bill: 8,156 completion tokens over 85 paired calls is 96.0 a call, on an answer that
+`NONE` would cost two tokens for. `notes.call_note_model` is now the only summariser call — one copy, thinking off,
+with the provider's counters and `finish_reason` returned so a caller can tell a decision from a cut-off.
+
+**Defect two — the state.** `sentence_of` answers `""` to both "declined" and "cut off", and `note_round` counted
+both as `refused`. `truncated` is now its own state and its own counter, the census closes as
+`written + refused + truncated == failed`, and the ablation refuses to grade a reading with one in it (**P0**, exit
+2). A budget fact reported as a judgement is how three rounds went by without asking why a model refused 82 of 85
+real failures that the evaluator had explained in writing.
+
+**Defect three — the content.** With the call fixed the notes were written and P3 was 4.7%, so the next question
+was whether P3 could see specificity at all on this bank. It could not: 77 of the 85 failures had an **empty
+exclusive vocabulary**, which put P3's ceiling at 9.4% and made its 50% bar unreachable by construction. The cause
+was a reader that wanted a string where τ² sends an object — `action_checks[].action` is `{"name", "arguments"}` —
+so every failure rendered `ACTION not met` and nothing else, and the evaluator's `justification` field ("the agent
+told the user there are 12 options, not 10") was dropped entirely. Rendering the action as `name(arguments)`,
+quoting the justification, and emitting **failures before passes** inside the ceiling took the mean verdict from
+169 to 439 characters and the empty-vocabulary population from 77 to 30 of 85. P3's ceiling is 64.7% now, so the
+bar of 50% is a bar.
+
+**What the third run measured.** The notes are written (98% and 100%), the verdict is quoted, and P4 costs 456
+characters a failure against a ceiling of 667. P2 is satisfied trivially — with thinking off the attempt arm
+declines 2 of 85, so there is nothing for the verdict to rescue, and McNemar's exact p is 0.5 on two discordant
+pairs: a direction, not evidence, and reported as such. P3 is the live question: 16.5% of the verdict arm's notes
+name a token only their own failure's verdict holds.
+
+**The order matters and it was forced.** Each defect hid the next: the truncation made every note absent, so the
+degenerate verdict had nothing to be degenerate *in*, and the degeneracy capped the measure that would have caught
+the truncation's effect on quality. The instrument that broke the chain was the bill — added one round earlier for a
+different reason, and the only part of the reading that says what a call spent rather than what it said.
+
+### 8.82 What the verdict renders now
+
+The verdict is the only place the requirement appears, so its content is the material. Four decisions:
+
+- **an action is rendered by name and arguments.** `ACTION not met: exchange_delivered_order_items(order_id=#W2378156,
+  item_ids=['4983901480'], …)` — the arguments are where a retail failure's entities appear in the evaluator's own
+  words, and they are what a note can repeat;
+- **the evaluator's justification is quoted** when it says something the detail does not, and never twice;
+- **failures come before passes.** A block cut off at 600 characters that shows twelve `ACTION met` lines and loses
+  the one `not met` is worse than no block: it tells the summariser the attempt was fine;
+- **the head is the reward and the database verdict**, kept before either list, because they are what decide the
+  episode rather than what explains it.
+
+Measured on the bank with no model call: mean 439 characters, max 598 against the 600 ceiling, and 55 of 85
+failures now carry at least one token no other failure's verdict carries.
