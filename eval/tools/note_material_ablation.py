@@ -400,6 +400,8 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--dry-run", action="store_true", help="render the prompts and bill nothing")
     parser.add_argument("--max-usd", type=float, default=0.5,
                         help="refuse before the first call when the estimate exceeds this")
+    parser.add_argument("--keep-notes", action="store_true",
+                        help="carry the sentences and their verdicts into the reading, so they can be read")
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args(argv)
 
@@ -456,6 +458,17 @@ def main(argv: list[str]) -> int:
             print(f"[ablation] {index}/{len(failures)} failure(s)", file=sys.stderr)
 
     result = measure(rows, band)
+    if args.keep_notes:
+        # The reading is normally a census, and a census cannot tell a note that names the check from one that
+        # paraphrases it. This carries the text so a reader can judge, and it is opt-in because a bank's verdicts
+        # quote customer data.
+        result["notes"] = [
+            {"task": row["task"], "trial": row["trial"],
+             "attempt": (row["materials"].get("attempt") or {}).get("sentence", ""),
+             "verdict": (row["materials"].get("verdict") or {}).get("sentence", ""),
+             "evaluator": row.get("verdictText", "")}
+            for row in rows
+        ]
     print(render(result))
     if args.json:
         Path(args.json).write_text(json.dumps(result, indent=1) + "\n", encoding="utf-8")
@@ -736,6 +749,12 @@ def self_test() -> int:
         check("a dry run reads the bank and bills nothing", code == 0, str(code))
         check("a dry run writes the reading when asked", json.loads(out.read_text())["failures"] == 2,
               out.read_text()[:120])
+        check("a reading carries no notes unless asked", "notes" not in json.loads(out.read_text()))
+        with contextlib.redirect_stdout(io.StringIO()):
+            main(["--bank", str(path), "--dry-run", "--keep-notes", "--json", str(out)])
+        kept = json.loads(out.read_text())["notes"]
+        check("the notes are kept when asked", len(kept) == 2 and "evaluator" in kept[0], str(kept[:1]))
+        check("a dry run's note is empty", kept[0]["attempt"] == "", str(kept[0]))
         check("a dry run calls no provider",
               json.loads(out.read_text())["materials"]["verdict"]["dry"] == 2
               and json.loads(out.read_text())["tokens"]["verdict"]["prompt"] == 0,

@@ -32,6 +32,10 @@ on:
         description: 'Refuse before the first call above this estimate'
         required: false
         default: '0.5'
+      keep_notes:
+        description: 'Carry the sentences and their verdicts into the reading, for a qualitative read'
+        required: false
+        default: 'false'
 
 permissions:
   contents: read
@@ -128,6 +132,7 @@ jobs:
       ABLATION_LIMIT: ${{ github.event.inputs.limit || '0' }}
       ABLATION_MODEL: ${{ github.event.inputs.model || '' }}
       ABLATION_MAX_USD: ${{ github.event.inputs.max_usd || '0.5' }}
+      ABLATION_KEEP_NOTES: ${{ github.event.inputs.keep_notes || 'false' }}
       ABLATION_DIR: eval/results/note-ablation
     steps:
       - uses: actions/checkout@v4
@@ -168,6 +173,7 @@ jobs:
           set +e
           READING="$(python3 eval/tools/note_material_ablation.py --bank "${ABLATION_DIR}/control.json" \
             --limit "${ABLATION_LIMIT}" --model "${ABLATION_MODEL}" --max-usd "${ABLATION_MAX_USD}" \
+            ${{ github.event.inputs.keep_notes == 'true' && '--keep-notes' || '' }} \
             --json "${ABLATION_DIR}/ablation.json" 2>&1)"
           STATUS=$?
           set -e
