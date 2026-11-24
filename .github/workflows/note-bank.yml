@@ -4,13 +4,14 @@ name: note-bank
 #
 # The note lane distils a sentence from a *failed* attempt, so an arm run on a grid that never fails measures
 # nothing — R207's pilot failed one episode in forty-eight and the summariser declined it. This job buys the
-# population instead of the arm: one control-armed run over the whole retail test split at four trials, which is
-# both the first `pass^4` this project has on the split the board reports and the bank of failed attempts (with
-# their transcripts and their verdicts) that R208's material ablation is computed on.
+# population instead of the arm: one control-armed run over the domain's split at four trials, which is both the
+# first `pass^4` this project has on the population the published ladder reports and the bank of failed attempts
+# (with their transcripts and their verdicts) that R208's material ablation is computed on.
 #
 # It is deliberately not a fold. A fold is two arms on a grid chosen for difficulty; a bank is one arm on the whole
 # split to find out where the difficulty is. The price difference is the reason the order is this way round:
-# 160 episodes ≈ ¥2.2 here against ¥4.3 for the fold, and the bank is what makes the fold's grid choosable.
+# 456 episodes ≈ ¥6.2 here against ¥4.3 for a fold that would have been dispatched on a grid chosen by guesswork,
+# and the bank is what makes the fold's grid choosable.
 #
 # No `push` trigger: this file runs when someone decides to spend money, and a census on every push is a census
 # nobody reads.
@@ -23,7 +24,7 @@ on:
         required: false
         default: retail
       tasks:
-        description: 'Comma-separated task ids, or empty for the whole split (retail: 40 test tasks)'
+        description: 'Comma-separated task ids, or empty for the domain split as the runner resolves it'
         required: false
         default: ''
       trials:
@@ -54,7 +55,7 @@ jobs:
     runs-on: ubuntu-latest
     # Install (8 min) plus the episodes at the measured 26 s each divided by the concurrency, plus the census.
     # Generous: a step killed mid-run writes no artefact, and the artefact is the whole point of the purchase.
-    timeout-minutes: 240
+    timeout-minutes: 300
     env:
       DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
       TAU_VERSION: ${{ vars.TAU_VERSION }}
@@ -80,20 +81,23 @@ jobs:
             exit 1
           fi
 
-      - name: Does the whole job fit in the off-peak window?
-        # The same guard the pilot uses, with the bank's own arithmetic: one invocation, so one τ² import, and the
-        # episodes divided by the concurrency because that is what the wall clock actually divides by. A guard
-        # that ignored concurrency would refuse every bank large enough to be worth running.
+      - name: The window, before the install spends eight minutes inside it
+        # A **ceiling**, not an estimate: with no `--tasks` the runner resolves the domain's own split, and the
+        # number that matters is the largest one it could be. R208's first bank was estimated from a hardcoded forty
+        # while the runner's default split holds 114 — a three-fold under-estimate, which is the direction a guard
+        # must never be wrong in. The authoritative check runs again below, on the count the split actually lists.
         run: |
           set -euo pipefail
-          MINUTES="$(python3 -c "
-          tasks = len([entry for entry in '${BANK_TASKS}'.split(',') if entry]) or 40
+          CEILING="$(python3 -c "
+          named = len([entry for entry in '${BANK_TASKS}'.split(',') if entry])
+          base = {'retail': 114, 'airline': 50, 'telecom': 114}
+          tasks = named or base.get('${BANK_DOMAIN}', 114)
           trials = int('${BANK_TRIALS}')
           concurrency = max(1, int('${BANK_CONCURRENCY}'))
           print(int(tasks * trials * 26 / concurrency / 60) + 9 + 1)
           ")"
-          echo "estimated ${MINUTES} min for this bank" >> "$GITHUB_STEP_SUMMARY"
-          python3 eval/drivers/tau2/note_pilot.py --window-minutes "${MINUTES}"
+          echo "ceiling estimate ${CEILING} min (count confirmed after the install)" >> "$GITHUB_STEP_SUMMARY"
+          python3 eval/drivers/tau2/note_pilot.py --window-minutes "${CEILING}"
 
       - name: Cache the tau2 environment
         uses: actions/cache@v4
@@ -117,13 +121,32 @@ jobs:
           uv pip install mcp || { echo "tau2-mcp-missing:$REF"; exit 24; }
           uv run tau2 check-data || { echo "tau2-data-missing:$REF"; exit 23; }
 
-      - name: The split, so the census can say what it covered
+      - name: The split, so the guard and the census count the same population
         run: |
           set -euo pipefail
           PYTHON="${GITHUB_WORKSPACE}/.tau2-bench/.venv/bin/python"
+          test -x "$PYTHON" || { echo "tau2-venv-missing"; exit 25; }
           mkdir -p "${BANK_DIR}"
           "$PYTHON" eval/drivers/tau2/run_split.py --phase list --domain "${BANK_DOMAIN}" \
             --tasks "${BANK_TASKS}" --out "${BANK_DIR}/split.json"
+          COUNT="$(python3 -c "import json; print(len(json.load(open('${BANK_DIR}/split.json'))['tasks']))")"
+          echo "BANK_TASK_COUNT=${COUNT}" >> "$GITHUB_ENV"
+          echo "the split holds ${COUNT} task(s)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Does the whole job fit in the off-peak window? The authoritative check
+        # On the count the split lists, before the first paid call. Free to fail: eight minutes of install are sunk
+        # and nothing else is.
+        run: |
+          set -euo pipefail
+          MINUTES="$(python3 -c "
+          tasks = int('${BANK_TASK_COUNT}')
+          trials = int('${BANK_TRIALS}')
+          concurrency = max(1, int('${BANK_CONCURRENCY}'))
+          print(int(tasks * trials * 26 / concurrency / 60) + 1)
+          ")"
+          echo "measured estimate ${MINUTES} min for ${BANK_TASK_COUNT} task(s) at ${BANK_TRIALS} trial(s)" \
+            >> "$GITHUB_STEP_SUMMARY"
+          python3 eval/drivers/tau2/note_pilot.py --window-minutes "${MINUTES}"
 
       - name: One control arm over the split
         env:
@@ -132,7 +155,6 @@ jobs:
         run: |
           set -euo pipefail
           PYTHON="${GITHUB_WORKSPACE}/.tau2-bench/.venv/bin/python"
-          test -x "$PYTHON" || { echo "tau2-venv-missing"; exit 25; }
           # No `--notes`: this arm is the control by construction, and a bank written with a sidecar would be a
           # treatment whose material came from nowhere. `--trials 4` and `--rounds 1` is one `run_tasks` call at
           # four seeds, which is the pass^4 the board reports.
@@ -151,47 +173,8 @@ jobs:
             echo "### The failure bank"
             echo
             echo '```'
-            python3 - "${BANK_DIR}/control.json" "${BANK_TRIALS}" <<'PY'
-          import json, sys
-
-          path, trials = sys.argv[1], int(sys.argv[2])
-          try:
-              document = json.load(open(path))
-          except (OSError, ValueError) as error:
-              print(f"no bank to read: {error}")
-              raise SystemExit(0)
-          simulations = document.get("simulations") or []
-          by_task: dict[str, list[float | None]] = {}
-          for simulation in simulations:
-              info = simulation.get("reward_info")
-              reward = info.get("reward") if isinstance(info, dict) else None
-              by_task.setdefault(str(simulation.get("task_id")), []).append(reward)
-          scored = {task: [r for r in rewards if isinstance(r, (int, float))] for task, rewards in by_task.items()}
-          episodes = sum(len(rewards) for rewards in scored.values())
-          passes = sum(1 for rewards in scored.values() for reward in rewards if reward >= 1.0)
-          held = sum(1 for rewards in scored.values() if rewards and all(r >= 1.0 for r in rewards))
-          failed = [task for task, rewards in scored.items() if any(r < 1.0 for r in rewards)]
-          explained = 0
-          for simulation in simulations:
-              info = simulation.get("reward_info") or {}
-              reward = info.get("reward") if isinstance(info, dict) else None
-              if isinstance(reward, (int, float)) and reward < 1.0:
-                  checks = (info.get("action_checks") or []) + (info.get("communicate_checks") or []) \
-                      + (info.get("nl_assertions") or []) + (info.get("env_assertions") or [])
-                  if info.get("db_check") or checks:
-                      explained += 1
-          print("| reading | value |")
-          print("|---|---|")
-          print(f"| tasks | {len(scored)} |")
-          print(f"| episodes | {episodes} at {trials} trial(s) |")
-          print(f"| pass^1 | {passes / episodes * 100:.1f}% |" if episodes else "| pass^1 | absent |")
-          print(f"| pass^{trials} | {held / len(scored) * 100:.1f}% over {len(scored)} task(s) |")
-          print(f"| tasks with a failure | {len(failed)} |")
-          print(f"| failed attempts a summariser could be shown | {episodes - passes} |")
-          print(f"| failures the evaluator explained | {explained} |")
-          if failed:
-              print(f"| failing tasks | {','.join(sorted(failed, key=lambda t: (len(t), t)))} |")
-          PY
+            python3 eval/tools/note_bank.py --bank "${BANK_DIR}/control.json" --trials "${BANK_TRIALS}" \
+              --json "${BANK_DIR}/bank.json" || true
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
