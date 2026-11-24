@@ -165,11 +165,8 @@ jobs:
           with tempfile.TemporaryDirectory() as temporary:
               directory = Path(temporary)
               for index, task in enumerate(failing):
-                  # The bank's own shape: twenty-three of the fifty fail attempt 0, so the drift check is silent
-                  # and the reading is about the rate rather than about a population that moved.
-                  at_zero = 0.0 if index < 23 else 1.0
                   (directory / f"{index:02d}.json").write_text(json.dumps({"simulations": [
-                      {"task_id": task, "trial": 0, "reward_info": {"reward": at_zero}},
+                      {"task_id": task, "trial": 0, "reward_info": {"reward": 0.0}},
                       {"task_id": task, "trial": 1, "reward_info": {"reward": 1.0 if index % 2 == 0 else 0.0}},
                   ]}))
               # No baseline here on purpose: fifty tasks that all fail attempt 0 cannot pass the drift check
