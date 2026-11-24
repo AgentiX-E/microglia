@@ -103,6 +103,46 @@ def census(document, trials: int) -> dict:
         "verdictCharsMean": round(sum(verdict_chars) / len(verdict_chars)) if verdict_chars else None,
         "verdictCharsMax": max(verdict_chars) if verdict_chars else None,
         "trajectoryCharsMean": None,
+        "bill": bill_of(document),
+    }
+
+
+def bill_of(document) -> dict:
+    """What the run cost, from τ²'s own per-simulation counters rather than from a script written afterwards.
+
+    A bank's price is the number that decides whether the next population is affordable, so it belongs in the
+    census beside the rewards: `perEpisodeUsd` is what a dispatch of a given size can be planned from, and
+    `meanSeconds` is what the window guard's arithmetic assumes. R208's bank was priced with a throwaway script
+    because this reader had no bill, and a fact that takes a throwaway script is a fact that will be estimated
+    instead — which is how a ¥2.2 bank came to cost ¥14.5.
+    """
+    simulations = document.get("simulations") if isinstance(document, dict) else None
+    agent = 0.0
+    user = 0.0
+    seconds: list[float] = []
+    counted = 0
+    for simulation in simulations if isinstance(simulations, list) else []:
+        if not isinstance(simulation, dict):
+            continue
+        counted += 1
+        for field, target in (("agent_cost", "agent"), ("user_cost", "user")):
+            value = simulation.get(field)
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                if target == "agent":
+                    agent += float(value)
+                else:
+                    user += float(value)
+        duration = simulation.get("duration")
+        if isinstance(duration, (int, float)) and not isinstance(duration, bool):
+            seconds.append(float(duration))
+    total = agent + user
+    return {
+        "episodes": counted,
+        "agentUsd": round(agent, 4),
+        "userUsd": round(user, 4),
+        "totalUsd": round(total, 4),
+        "perEpisodeUsd": round(total / counted, 6) if counted else None,
+        "meanSeconds": round(sum(seconds) / len(seconds), 1) if seconds else None,
     }
 
 
@@ -129,6 +169,15 @@ def render(census_of: dict, trials: int) -> str:
         f"| failures the evaluator explained | {census_of['explained']} ({share(census_of['explainedShare'])}) |",
         f"| verdict characters | mean {census_of['verdictCharsMean']}, max {census_of['verdictCharsMax']} |",
     ]
+    bill = census_of.get("bill") or {}
+    if bill.get("episodes"):
+        per_episode = bill.get("perEpisodeUsd")
+        mean_seconds = bill.get("meanSeconds")
+        lines += [
+            f"| cost | ${bill.get('totalUsd')} (agent ${bill.get('agentUsd')}, user ${bill.get('userUsd')}) |",
+            f"| cost per episode | {'absent' if per_episode is None else f'${per_episode:.4f}'} |",
+            f"| mean episode | {'absent' if mean_seconds is None else f'{mean_seconds} s'} |",
+        ]
     if census_of["failedTasks"]:
         lines.append(f"| failing tasks | {', '.join(census_of['failedTasks'])} |")
     return "\n".join(lines)
@@ -251,6 +300,33 @@ def self_test() -> int:
             refused = True
         check("neither a bank nor the self-test is refused", refused)
 
+    for name in failed:
+        print(f"FAIL  {name}")
+    # The bill: a bank's price is what decides whether the next population is affordable, so it is read from τ²'s
+    # own counters and rendered rather than computed by a script written afterwards. The case is R208's: a ¥2.2
+    # estimate became a ¥14.5 bank because nothing in the instrument said what an episode costs.
+    billed = {"simulations": [
+        {"task_id": "5", "trial": 0, "reward_info": {"reward": 0.0}, "agent_cost": 0.004, "user_cost": 0.001,
+         "duration": 20.0},
+        {"task_id": "5", "trial": 1, "reward_info": {"reward": 1.0}, "agent_cost": 0.006, "user_cost": 0.001,
+         "duration": 40.0},
+        {"task_id": "9", "trial": 0, "reward_info": {"reward": 1.0}, "agent_cost": True, "duration": "slow"},
+    ]}
+    bill = bill_of(billed)
+    check("the bill adds both arms", bill["totalUsd"] == 0.012, str(bill))
+    check("the bill separates the simulator", bill["userUsd"] == 0.002, str(bill))
+    check("the bill is per episode", bill["perEpisodeUsd"] == 0.004, str(bill["perEpisodeUsd"]))
+    check("the bill ignores what is not a cost", bill["agentUsd"] == 0.01, str(bill["agentUsd"]))
+    check("the bill averages only real durations", bill["meanSeconds"] == 30.0, str(bill["meanSeconds"]))
+    check("a bank with no bill has no per-episode price", bill_of({"simulations": []})["perEpisodeUsd"] is None)
+    check("a document that is not a document has no bill", bill_of(None)["totalUsd"] == 0.0)
+    check("the census carries the bill", census(_document({"5": [0.0]}), 4)["bill"]["episodes"] == 1)
+    check("the table states the price", "cost per episode" in render(census(billed, 4), 4),
+          render(census(billed, 4), 4))
+    check("a bank with no episode states no price", "cost |" not in render(census({"simulations": []}, 4), 4))
+
+    for name in failed:
+        print(f"FAIL  {name}")
     print(f"{checks} case(s), {len(failed)} failure(s)")
     return 0 if not failed else 1
 
