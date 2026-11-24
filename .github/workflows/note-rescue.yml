@@ -73,6 +73,9 @@ on:
     branches: [master]
     paths:
       - 'eval/tools/rescue_rate.py'
+      # R213. The reader that separates a repair from a break is gated by the same workflow, and a path that
+      # is not listed here is a file whose coverage gate never runs on the push that changed it.
+      - 'eval/tools/memory_debit.py'
       - 'eval/manifests/note-bank-baseline.json'
       - 'eval/drivers/tau2/notes.py'
       - 'eval/drivers/tau2/run_split.py'
