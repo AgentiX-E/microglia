@@ -166,17 +166,31 @@ jobs:
             --out "${BANK_DIR}/control.json" 2>&1 | tee "${BANK_DIR}/control.log"
 
       - name: What the bank holds
+        # `if: always()` because the census of a failed run is still the census of what it bought. The reader's
+        # exit code is read rather than masked: 1 is a bank that failed nothing — a saturated split, and a fact the
+        # step must record rather than hide — and anything else is an artefact this step could not read, which is
+        # the run being broken and is reported as an error.
         if: always()
         run: |
           set -euo pipefail
+          set +e
+          READING="$(python3 eval/tools/note_bank.py --bank "${BANK_DIR}/control.json" \
+            --trials "${BANK_TRIALS}" --json "${BANK_DIR}/bank.json" 2>&1)"
+          STATUS=$?
+          set -e
           {
             echo "### The failure bank"
             echo
             echo '```'
-            python3 eval/tools/note_bank.py --bank "${BANK_DIR}/control.json" --trials "${BANK_TRIALS}" \
-              --json "${BANK_DIR}/bank.json" || true
+            echo "${READING}"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$STATUS" -eq 1 ]; then
+            echo "::warning::the bank failed nothing — a saturated split, so no material to distil"
+          elif [ "$STATUS" -ne 0 ]; then
+            echo "::error::the bank artefact could not be read (exit ${STATUS})"
+            exit "$STATUS"
+          fi
 
       - name: Upload the bank
         if: always()
