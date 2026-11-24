@@ -6427,3 +6427,129 @@ is why it is the comparable population and not the identical one). 160 episodes 
 episode is about **$0.30**, and the artefact is a bank: every failed attempt with its transcript and its verdict, the
 population R208's material ablation is computed on. Four trials rather than one because the same 160 episodes answer
 both questions — where the failures are, and how reliably the arm that has no memory solves the split.
+
+### 32.60 Reading a failure bank
+
+A bank is one control arm over the whole split, at several trials, with no sidecar. It answers two questions and
+neither of them is about the memory:
+
+- **how reliably does the arm solve this population** — `pass^1` and `pass^k` over the held-out tasks, which is the
+  first reading this project has that the published ladder's population can be compared with;
+- **what does a population cost** — the bill, the price of an episode and the length of one, which together decide
+  whether the next dispatch is affordable.
+
+```
+gh workflow run note-bank.yml -f domain=retail -f trials=4 -f concurrency=2
+```
+
+The job downloads nothing and depends on nothing: it resolves the split, checks the window, runs one arm and
+uploads `control.json`. Read it with the census, which needs no provider:
+
+```
+python3 eval/tools/note_bank.py --bank control.json --trials 4 --json bank.json
+```
+
+```
+| tasks | 114 |
+| episodes | 456 at 4 trial(s) |
+| pass^1 | 81.4% |
+| pass^4 | 56.1% over 114 task(s) |
+| tasks with a failure | 50 |
+| failed attempts | 85 |
+| failures the evaluator explained | 85 (100.0%) |
+| verdict characters | mean 169, max 428 |
+| cost | $2.0103 (agent $1.5863, user $0.4240) |
+| cost per episode | $0.0044 |
+| mean episode | 23.3 s |
+```
+
+**Plan the next dispatch from `cost per episode`, never from a previous run's total.** A grid that fails is a grid
+whose episodes are long, and a long episode costs more: this lane's six-task pilot came in at $0.0019 an episode
+and the full split at $0.0044, because the pilot's tasks all passed. A budget derived from a signature that never
+fails under-estimates by whatever the failures cost.
+
+**A bank that failed nothing exits 1, not 0.** A saturated split is not a clean bill of health — it is a population
+with no material in it, and the step that runs the census reads the status and warns rather than failing, because
+the repair is a harder grid and not a fix.
+
+### 32.61 The material ablation, and what its four numbers mean
+
+The ablation spends a bank: every failed attempt is shown to the summariser twice, once as the attempt alone and
+once with the evaluator's verdict, and four predictions are measured on the pair.
+
+```
+gh workflow run note-ablation.yml -f bank_run=<the note-bank run id>
+```
+
+No simulator runs, so there is no window to wait for; the job prices itself from the rate card in the band it is
+actually billed in and refuses above `--max-usd` (default `$0.50`) **before the first call**. 170 calls over an
+85-failure bank is about two cents. To see the population without spending anything:
+
+```
+python3 eval/tools/note_material_ablation.py --bank control.json --dry-run
+```
+
+| prediction | what it reads | bar | what a failure of it means |
+|---|---|---|---|
+| `P1` the evaluator explained | failures whose verdict renders a line | ≥ 80% | the material does not exist; τ² is not reporting enough |
+| `P2` the verdict rescues | of what the attempt arm declined, how many it wrote | ≥ 50% | the verdict is not what the summariser was missing |
+| `P3` the note names its own check | notes holding a token only their own verdict holds | ≥ 50% | the notes are written but not from the verdict |
+| `P4` the block is cheap | added prompt characters per failure | ≤ 667 | the block is a second trajectory |
+
+`n/a` in `P2` means nothing was declined — a question the bank did not ask, not a material that did not work — and
+it **fails** rather than passing, because a material cannot be credited for rescuing nothing. The paired test is
+McNemar's exact, over the pairs that changed: `rescued` against `lost`, two-sided.
+
+### 32.62 When the summariser "refuses", check the call before the material
+
+Four numbers decide whether a note lane is even running, and three of them are in the bill rather than in the notes:
+
+| reading | what it should look like | what a broken call looks like |
+|---|---|---|
+| completion tokens per call | 5–40 for one sentence | **exactly `max_tokens` on every call** |
+| `truncated` in the census | 0 | equal to the number of "refusals" |
+| notes written / failures | most of them | a few percent |
+| `P0` | pass | `exit 2`, `tau2-ablation-truncated` |
+
+`deepseek-flash` answers in thinking mode by default and **bills the reasoning against `max_tokens`**. The note call
+therefore has to pass `extra_body={"thinking": {"type": "disabled"}}`, which `notes.call_note_model` does; a copy of
+that call without it spends the whole budget before writing and returns an empty message that is indistinguishable
+from `NONE`. If a lane reports a refusal rate above 90% on failures the evaluator explained in writing, read the
+token counters before rewriting the prompt.
+
+`truncated` is a separate state from `refused` everywhere the census closes (`written + refused + truncated ==
+failed`), and the ablation refuses to grade a reading that contains one.
+
+### 32.63 Re-measuring without re-billing
+
+A reading dispatched with `--keep-notes` carries the sentences, their paired sentence and the evaluator's verdict.
+A change of *measure* can then be recomputed from it:
+
+```
+python3 eval/tools/note_material_ablation.py --from-reading ablation.json --json recomputed.json
+```
+
+Only `P3` and its paired contrast are recomputed, because a reading does not carry the prompt sizes or the
+provider's counters; `P0`, `P1`, `P2` and `P4` keep the values the calls produced, and the reading says so in a
+`recomputed` field. A measure that changes should not cost another dispatch to test — and one that *can* be
+recomputed from a kept artefact is a measure whose ceiling can be checked before anything is spent.
+
+### 32.64 Reading `P3`, and why its chance rate is printed beside it
+
+`P3` asks whether a note names the check its own attempt failed. Two rates are printed for each material: the
+**share** of notes that share a token with their own failure's failing lines, and the **chance** rate — the same
+note against the other failures' failing lines. A note that says "confirm the details with the customer" hits chance
+and nothing else; the lift over chance is what the material is worth.
+
+```
+| P3 a note names its own failing lines | attempt 28.9% (chance 22.5%), verdict 44.7% (chance 23.2%) of 85 | >= 50% | FAIL |
+Specificity, paired: 23 both, 15 verdict only, 1 attempt only, 44 neither, p = 0.0005.
+```
+
+The paired line is McNemar's exact over the two materials on the same failures, and it is the line to read: a
+material can miss its bar and still be doing something real (15 against 1, p = 0.0005), and a material can pass a
+share bar by writing a long sentence about nothing.
+
+The reader this replaces — a token only the note's own failure held — is still reported as `exclusive`, and on a
+bank where most failures share an action its ceiling is low enough to be useless: measure the ceiling before
+trusting the share.

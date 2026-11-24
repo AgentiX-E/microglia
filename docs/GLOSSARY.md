@@ -2440,3 +2440,34 @@ file that had never held a sentence.
 
 **Serviceable sidecar** — a sidecar that holds at least one note (`written > 0`). Only a serviceable sidecar can be
 "found": with `written == 0` a zero hit count is the writer's silence, not the reader's.
+
+**Bank (failure bank)** — one control-armed run over a whole split at several trials, with no sidecar, kept as the
+population every later round of the note lane is drawn from. Its two readings are `pass^k` over the held-out tasks
+and the failed attempts together with their verdicts.
+
+**`pass^k` population** — the set of tasks a `pass^k` is computed over. A reading is only comparable with another
+reading over the same population, which is why the bank runs the split's own 114 retail tasks rather than a chosen
+six.
+
+**Material ablation** — showing the same failures to the summariser twice, once from the attempt alone and once from
+the attempt plus the verdict, and measuring the difference on the pair. Paired by construction: same failures, same
+model, same ceiling, so the only thing that moves is the material.
+
+**Rescued / lost** — in a paired binary outcome, the pairs that changed. `rescued` is refused-then-written, `lost` is
+written-then-refused, and only these carry information about the change; McNemar's exact test is computed over them.
+
+**Price band (`band_of`)** — `peak` or `off_peak`, from the rate card's windows applied on weekdays only. A job that
+runs no simulator has no window guard over it, so it prices itself in the band it is billed in rather than assuming
+one.
+
+**Chance rate (of a note)** — the rate at which the same note would appear to name a check if it were written about
+some other failure. It is the baseline `P3` is reported against, because a share of 30% means nothing without it: a
+note made of the words every failure shares reaches chance and no further.
+
+**Truncated** — a summariser call cut off at its token ceiling, which is *not* a refusal. `deepseek-flash` bills its
+reasoning against `max_tokens`, so a call that leaves thinking on returns an empty message for a failure it never
+finished reading; `notes.call_note_model` disables thinking and returns `finish_reason` so the two can be told
+apart. Counted apart everywhere the census closes, and graded as `P0` by the ablation.
+
+**Kept notes (`--keep-notes`)** — a reading that carries the sentences, their paired sentence and the evaluator's
+verdict, so a change of measure can be recomputed with `--from-reading` instead of re-billed.

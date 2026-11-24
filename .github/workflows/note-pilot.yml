@@ -178,10 +178,11 @@ jobs:
     needs: contract
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    # Install (8 min) plus two arms at 24 simulations each plus twelve τ² imports plus the reading. Generous
-    # rather than tight: a step killed mid-phase writes no artefact, which is the one outcome this job cannot
-    # afford.
-    timeout-minutes: 90
+    # Install (8 min) plus the episodes divided by the concurrency plus one τ² import per invocation plus the
+    # reading. Generous rather than tight: a step killed mid-phase writes no artefact, which is the one outcome
+    # this job cannot afford — and R210 found the previous ninety minutes too short for a fifty-task grid by a
+    # factor of two.
+    timeout-minutes: 180
     env:
       DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
       # The release a pass^k is comparable to. R92: v0.2.0 and v1.0.1 share no retail task ids, so a number
@@ -223,12 +224,13 @@ jobs:
         run: |
           set -euo pipefail
           MINUTES="$(python3 -c "
-          tasks = len('${PILOT_TASKS}'.split(','))
+          tasks = len([entry for entry in '${PILOT_TASKS}'.split(',') if entry])
           rounds = int('${PILOT_ROUNDS}')
           # 26 s a simulation, measured in R206's pilot (48 in 21 minutes), plus 10 s of τ² import per invocation
           # — R207 runs one task per process, so two per task — plus eight for the install and one for the
           # reading. Rounded up: a guard that under-estimates is a guard that refuses nothing.
-          print(int((tasks * rounds * 2 * 26 + tasks * 2 * 10) / 60) + 9 + 1)
+          concurrency = max(1, int('${PILOT_CONCURRENCY}'))
+          print(int((tasks * rounds * 2 * 26 + tasks * 2 * 10) / concurrency / 60) + 9 + 1)
           ")"
           echo "estimated ${MINUTES} min for this pilot" >> "$GITHUB_STEP_SUMMARY"
           python3 eval/drivers/tau2/note_pilot.py --window-minutes "${MINUTES}"
@@ -261,6 +263,7 @@ jobs:
         env:
           # The summariser's own environment. `run_split.py` reads the model through `TAU_MODEL` and derives
           # the note writer's model from it, so there is one string rather than two that can disagree.
+          # The same number the guard divided by, so the estimate and the wall clock cannot disagree.
           TAU_CONCURRENCY: ${{ github.event.inputs.concurrency || '1' }}
           TAU_RETRIES: '4'
         run: |
@@ -275,35 +278,42 @@ jobs:
           # R207: one task per invocation, because the sidecar is the identity. `--tasks "$TASK"` is what makes the
           # scope a single task; `--notes` names the file this task's notes live in, and the runner declares the
           # scope in it before the first episode rather than leaving the agent to recognise the opening text.
-          run_task () {
-            local arm="$1" task="$2"
-            local extra=()
-            if [ "$arm" = "treatment" ]; then
-              extra=(--notes "${PILOT_DIR}/notes-${task}.json")
-              # R208. The verdict is treatment-only: the control has no summariser and so nothing to show it to,
-              # and a control that carried the material would be the defect N1 exists for.
-              if [ "${PILOT_NOTE_VERDICT}" = "true" ]; then
-                extra+=(--note-verdict)
-              fi
+          #
+          # R210: the invocations run `TAU_CONCURRENCY` at a time. The loop was sequential and a fifty-task grid at
+          # four rounds and two arms is 400 episodes — 173 minutes of simulation against a 90-minute job, which
+          # would have been killed mid-run with a half-written grid and the money spent. The two passes stay
+          # ordered: every control invocation finishes before the first treatment one starts, so a control that
+          # fails still costs nothing downstream.
+          cat > "${RUNNER_TEMP}/run_task.sh" <<'SCRIPT'
+          #!/usr/bin/env bash
+          # One invocation: an arm and a task, in its own process, writing its own results and its own log.
+          set -uo pipefail
+          arm="$1"; task="$2"
+          extra=()
+          if [ "$arm" = "treatment" ]; then
+            extra=(--notes "${PILOT_DIR}/notes-${task}.json")
+            # R208. The verdict is treatment-only: the control has no summariser and so nothing to show it to, and
+            # a control that carried the material would be the defect N1 exists for.
+            if [ "${PILOT_NOTE_VERDICT}" = "true" ]; then
+              extra+=(--note-verdict)
             fi
-            # `--require-off-peak` on both arms: the same workload costs exactly double inside the provider's
-            # peak windows, and a pilot is the cheapest run in the lane to move. The guard refuses before the
-            # first call rather than reporting a bill after it.
-            "$PYTHON" eval/drivers/tau2/run_split.py \
-              --phase eval --agent microglia_agent \
-              --domain "${PILOT_DOMAIN}" --tasks "${task}" --rounds "${PILOT_ROUNDS}" \
-              --max-steps "${PILOT_MAX_STEPS}" --seed "${PILOT_SEED}" --require-off-peak \
-              --out "${PILOT_DIR}/${arm}/results-${task}.json" "${extra[@]}" \
-              2>&1 | tee "${PILOT_DIR}/${arm}-${task}.log"
-          }
+          fi
+          # `--require-off-peak` on both arms: the same workload costs exactly double inside the provider's peak
+          # windows. The guard refuses before the first call rather than reporting a bill after it.
+          "${PYTHON}" eval/drivers/tau2/run_split.py \
+            --phase eval --agent microglia_agent \
+            --domain "${PILOT_DOMAIN}" --tasks "${task}" --rounds "${PILOT_ROUNDS}" \
+            --max-steps "${PILOT_MAX_STEPS}" --seed "${PILOT_SEED}" --require-off-peak \
+            --out "${PILOT_DIR}/${arm}/results-${task}.json" "${extra[@]}" \
+            > "${PILOT_DIR}/${arm}-${task}.log" 2>&1
+          SCRIPT
+          chmod +x "${RUNNER_TEMP}/run_task.sh"
+          export PILOT_DIR PILOT_DOMAIN PILOT_ROUNDS PILOT_MAX_STEPS PILOT_SEED PILOT_NOTE_VERDICT PYTHON
 
           run_arm () {
             local arm="$1"
-            for task in $(echo "${PILOT_TASKS}" | tr ',' ' '); do
-              echo "::group::${arm} task ${task}"
-              run_task "$arm" "$task"
-              echo "::endgroup::"
-            done
+            echo "${PILOT_TASKS}" | tr ',' '\n' \
+              | xargs -P "${TAU_CONCURRENCY}" -n 1 "${RUNNER_TEMP}/run_task.sh" "$arm"
           }
 
           # Control first. If it fails, nothing has been spent on a treatment whose comparison would have no
