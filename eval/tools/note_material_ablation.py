@@ -86,6 +86,23 @@ def failures_of(document) -> list:
     return kept
 
 
+def failing_text(verdict: str) -> set:
+    """The tokens of a verdict's *failing* lines, which is the requirement the note should name.
+
+    The whole verdict is the wrong denominator for specificity: `REWARD`, `DB CHECK`, `ACTION met` and every
+    passing check appear in nearly every failure, so a note that mentions them is naming the schema rather than
+    the mistake. R210 measured what that costs — with the whole verdict as the vocabulary, 77 of 85 failures had an
+    empty exclusive set and P3's ceiling was 9.4%, a bar no material could reach.
+    """
+    lines = [line for line in (verdict or "").split("\n") if "not met" in line]
+    return notes.entities(" ".join(lines))
+
+
+def names_own_check(note: str, verdict: str) -> bool:
+    """Whether a note shares a token with its own failure's failing lines."""
+    return bool(notes.entities(note) & failing_text(verdict))
+
+
 def specificity_of(note: str, own: str, others) -> bool:
     """Whether a note names something only its own failure's verdict names.
 
@@ -251,24 +268,53 @@ def measure(rows, band: str = "off_peak") -> dict:
     p2 = {"declined": declined, "rescued": rescued, "lost": lost, "share": p2_share, "bar": P2_BAR,
           "pass": p2_share is not None and p2_share >= P2_BAR}
 
-    # P3: whether the note names something only its own failure's verdict names. Graded over the notes that exist,
-    # because a refusal has no content to be specific with and counting it as vague would confuse "did not write"
-    # with "wrote nothing useful" — P2 already names the first.
+    # P3: whether the note names a token of its own failure's *failing* lines. Three numbers, and the third is the
+    # one that makes it a measurement: the same note against the other failures' failing lines is the rate a note
+    # that named nothing in particular would reach, so `lift` is what the material is worth and `share` alone is
+    # not. The exclusive-token reader this replaces is kept as `exclusive` for continuity: it caps at 64.7% on this
+    # bank and inverts the incentive, because the action a note most needs to name is the one other failures name.
     p3 = {}
     for name in MATERIALS:
-        specific = 0
+        own_hits = 0
+        exclusive = 0
         graded = 0
+        chances: list = []
         for index, row in enumerate(rows):
             sentence = str(((row.get("materials") or {}).get(name) or {}).get("sentence") or "").strip()
             if sentence == "":
                 continue
             graded += 1
-            others = [text for position, text in enumerate(verdicts) if position != index]
-            if specificity_of(sentence, verdicts[index], others):
-                specific += 1
-        share = (specific / graded) if graded else None
-        p3[name] = {"specific": specific, "graded": graded, "share": share,
+            verdict = verdicts[index]
+            if names_own_check(sentence, verdict):
+                own_hits += 1
+            if specificity_of(sentence, verdict, [text for position, text in enumerate(verdicts)
+                                                  if position != index]):
+                exclusive += 1
+            note_tokens = notes.entities(sentence)
+            against = [1.0 if note_tokens & failing_text(text) else 0.0
+                       for position, text in enumerate(verdicts) if position != index]
+            chances.append(sum(against) / len(against) if against else 0.0)
+        share = (own_hits / graded) if graded else None
+        chance = (sum(chances) / len(chances)) if chances else None
+        p3[name] = {"own": own_hits, "graded": graded, "share": share, "chance": chance,
+                    "lift": (share / chance) if share is not None and chance else None,
+                    "exclusive": (exclusive / graded) if graded else None,
                     "pass": share is not None and share >= P3_BAR}
+
+    # The paired contrast between the materials, which is the question: does the verdict make a note more specific
+    # on the failures both arms saw? Only the discordant pairs carry information, so it is McNemar again.
+    paired = {"both": 0, "verdictOnly": 0, "attemptOnly": 0, "neither": 0, "p": 1.0}
+    for index, row in enumerate(rows):
+        attempt_note = str(((row.get("materials") or {}).get("attempt") or {}).get("sentence") or "")
+        verdict_note = str(((row.get("materials") or {}).get("verdict") or {}).get("sentence") or "")
+        if attempt_note == "" or verdict_note == "":
+            continue
+        a = names_own_check(attempt_note, verdicts[index])
+        v = names_own_check(verdict_note, verdicts[index])
+        key = {(True, True): "both", (False, True): "verdictOnly",
+               (True, False): "attemptOnly", (False, False): "neither"}[(a, v)]
+        paired[key] += 1
+    paired["p"] = mcnemar_exact(paired["verdictOnly"], paired["attemptOnly"])
 
     # P4: what the block adds, per failure, against the attempt's own ceiling.
     added = []
@@ -299,6 +345,7 @@ def measure(rows, band: str = "off_peak") -> dict:
         "p1": p1,
         "p2": p2,
         "p3": p3,
+        "paired": paired,
         "p4": p4,
         "mcnemar": {"rescued": rescued, "lost": lost, "p": mcnemar_exact(rescued, lost)},
         "bars": bars,
@@ -323,6 +370,7 @@ def render(result) -> str:
     p1 = result.get("p1") or {}
     p2 = result.get("p2") or {}
     p3 = result.get("p3") or {}
+    paired = result.get("paired") or {}
     p4 = result.get("p4") or {}
     mcnemar = result.get("mcnemar") or {}
     attempt = materials.get("attempt") or {}
@@ -358,13 +406,18 @@ def render(result) -> str:
         f"| P2 the verdict rescues what the attempt declined | {p2.get('rescued', 0)} of {p2.get('declined', 0)} "
         f"declined ({_percent(p2.get('share'))}), {p2.get('lost', 0)} lost | >= {P2_BAR * 100:.0f}% "
         f"| {_pass(p2.get('pass'))} |",
-        f"| P3 a note names its own check | attempt {_percent((p3.get('attempt') or {}).get('share'))}, verdict "
-        f"{_percent((p3.get('verdict') or {}).get('share'))} of {graded} | >= {P3_BAR * 100:.0f}% "
+        f"| P3 a note names its own failing lines | attempt {_percent((p3.get('attempt') or {}).get('share'))} "
+        f"(chance {_percent((p3.get('attempt') or {}).get('chance'))}), verdict "
+        f"{_percent((p3.get('verdict') or {}).get('share'))} "
+        f"(chance {_percent((p3.get('verdict') or {}).get('chance'))}) of {graded} | >= {P3_BAR * 100:.0f}% "
         f"| {_pass((p3.get('verdict') or {}).get('pass'))} |",
         f"| P4 the block is cheap | {p4_reading} | <= {P4_BAR:.0f} | {_pass(p4.get('pass'))} |",
         "",
         f"McNemar exact over the discordant pairs: {mcnemar.get('rescued', 0)} rescued, {mcnemar.get('lost', 0)} "
         f"lost, p = {mcnemar.get('p', 1.0):.4f}.",
+        f"Specificity, paired: {paired.get('both', 0)} both, {paired.get('verdictOnly', 0)} verdict only, "
+        f"{paired.get('attemptOnly', 0)} attempt only, {paired.get('neither', 0)} neither, "
+        f"p = {paired.get('p', 1.0):.4f}.",
         "",
         f"**State.** {'GRADED' if all(bar.get('pass') for bar in result.get('bars') or []) else 'REFUTED'}",
     ]
@@ -390,6 +443,55 @@ def _report(checks: int, failures) -> int:
     return 0 if not failures else 1
 
 
+def _rows_from_reading(previous) -> list:
+    """The rows a reading kept, as the rows `measure` takes.
+
+    Only P3 and its paired contrast are recomputed from these: a reading does not carry the prompt sizes or the
+    provider's counters, so P0, P1, P2 and P4 keep the values the calls actually produced. A measure that changes
+    is a measure that should not be re-billed to test.
+    """
+    rows = []
+    for note in previous.get("notes") or []:
+        if not isinstance(note, dict):
+            continue
+        rows.append({
+            "task": note.get("task"), "trial": note.get("trial"), "reward": None,
+            "verdictText": str(note.get("evaluator") or ""),
+            "materials": {name: {"sentence": str(note.get(name) or ""),
+                                 "state": "sentence" if note.get(name) else "refused",
+                                 "promptChars": 0, "usage": {}}
+                          for name in MATERIALS},
+        })
+    return rows
+
+
+def _recompute(args) -> int:
+    """Recompute P3 from a kept reading: `--from-reading reading.json`."""
+    try:
+        with open(args.from_reading, encoding="utf-8") as stream:
+            previous = json.load(stream)
+    except (OSError, ValueError) as error:
+        print(f"no reading to recompute: {error}", file=sys.stderr)
+        return 2
+    rows = _rows_from_reading(previous)
+    if not rows:
+        print("the reading kept no notes — dispatch it with --keep-notes", file=sys.stderr)
+        return 2
+    fresh = measure(rows, previous.get("tokens", {}).get("verdict", {}).get("band", "off_peak")
+                    if isinstance(previous.get("tokens"), dict) else "off_peak")
+    result = dict(previous)
+    result["p3"] = fresh["p3"]
+    result["paired"] = fresh["paired"]
+    result["bars"] = sorted([bar for bar in previous.get("bars") or [] if bar.get("name") != "P3"]
+                            + [{"name": "P3", "pass": fresh["p3"]["verdict"]["pass"],
+                                "reading": fresh["p3"]}], key=lambda bar: bar.get("name", ""))
+    result["recomputed"] = "P3 and its paired contrast only; the calls are the reading's own"
+    print(render(result))
+    if args.json:
+        Path(args.json).write_text(json.dumps(result, indent=1) + "\n", encoding="utf-8")
+    return 0 if all(bar.get("pass") for bar in result["bars"]) else 1
+
+
 def main(argv: list[str]) -> int:
     """0 measured and every bar met, 1 measured and a bar failed, 2 cannot measure."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -400,6 +502,8 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--dry-run", action="store_true", help="render the prompts and bill nothing")
     parser.add_argument("--max-usd", type=float, default=0.5,
                         help="refuse before the first call when the estimate exceeds this")
+    parser.add_argument("--from-reading", default="",
+                        help="recompute P3 from a reading that kept its notes, without a provider call")
     parser.add_argument("--keep-notes", action="store_true",
                         help="carry the sentences and their verdicts into the reading, so they can be read")
     parser.add_argument("--self-test", action="store_true")
@@ -407,6 +511,8 @@ def main(argv: list[str]) -> int:
 
     if args.self_test:
         return self_test()
+    if args.from_reading:
+        return _recompute(args)
     if not args.bank:
         print("usage: note_material_ablation.py --bank <control.json> | --self-test", file=sys.stderr)
         return 2
@@ -755,6 +861,34 @@ def self_test() -> int:
         kept = json.loads(out.read_text())["notes"]
         check("the notes are kept when asked", len(kept) == 2 and "evaluator" in kept[0], str(kept[:1]))
         check("a dry run's note is empty", kept[0]["attempt"] == "", str(kept[0]))
+        # A reading can be re-measured without re-billing: only P3 is recomputed, and the calls stay the ones the
+        # reading paid for. A measure that changes should not cost another dispatch to test.
+        previous = {"failures": 2, "materials": {}, "tokens": {}, "p1": {"pass": True}, "p2": {"pass": True},
+                    "p4": {"pass": True}, "p0": {"pass": True},
+                    "bars": [{"name": name, "pass": True, "reading": {}} for name in ("P0", "P1", "P2", "P4")],
+                    "notes": [{"task": "5", "trial": 0, "attempt": "Call cancel_order_5.",
+                               "verdict": "Cancel order 5 with cancel_order_5.",
+                               "evaluator": "REWARD 0\nACTION not met: cancel_order_5"},
+                              {"task": "9", "trial": 0, "attempt": "Check the reward.",
+                               "verdict": "Call cancel_order_9.", "evaluator": ""}]}
+        reading_path = Path(directory) / "previous.json"
+        reading_path.write_text(json.dumps(previous), encoding="utf-8")
+        recomputed_path = Path(directory) / "recomputed.json"
+        with contextlib.redirect_stdout(io.StringIO()):
+            code = main(["--from-reading", str(reading_path), "--json", str(recomputed_path)])
+        recomputed = json.loads(recomputed_path.read_text())
+        check("a reading is recomputed without a provider", code == 0, str(code))
+        check("the recomputed reading says so", "P3" in str(recomputed.get("recomputed")), str(recomputed.get("recomputed")))
+        check("the other bars are the reading's own",
+              [bar["name"] for bar in recomputed["bars"]] == ["P0", "P1", "P2", "P3", "P4"],
+              str([bar["name"] for bar in recomputed["bars"]]))
+        check("P3 is recomputed over the kept notes", recomputed["p3"]["attempt"]["graded"] == 2,
+              str(recomputed["p3"]))
+        with contextlib.redirect_stderr(io.StringIO()):
+            bare = Path(directory) / "bare.json"
+            bare.write_text(json.dumps({"notes": []}), encoding="utf-8")
+            check("a reading with no notes is refused", main(["--from-reading", str(bare)]) == 2)
+            check("a missing reading exits 2", main(["--from-reading", str(Path(directory) / "gone.json")]) == 2)
         check("a dry run calls no provider",
               json.loads(out.read_text())["materials"]["verdict"]["dry"] == 2
               and json.loads(out.read_text())["tokens"]["verdict"]["prompt"] == 0,
