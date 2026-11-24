@@ -4318,11 +4318,15 @@ Two derived readings make it actionable rather than merely negative:
   whole is net-negative and a filter would have to beat it by 3.6 points to invert the sign. This is R34's bar
   (`b / (r + b)`) arriving on a second corpus — BIRD then, τ² retail now — and it says the same thing: a filter on
   this material has almost no headroom.
-- **the naming association**: the notes name 40 of the 82 unmet requirements of the attempt they came from
-  (48.8%), and a requirement that is named is repaired 22/40 (55.0%) against 17/42 (40.5%) when it is not. That
+- **the naming association**: the notes name 41 of the 82 unmet requirements of the attempt they came from
+  (50.0%), and a requirement that is named is repaired 22/41 (53.7%) against 17/41 (41.5%) when it is not. That
   association is not causal — a note may name the easy requirements — but it is the largest movement in this lane
   and it has a mechanical explanation: a summariser writing a sentence about a conversation can miss the one check
   that decides the episode.
+
+The lexical test keeps two-letter tokens (`db`, `id`) rather than three: a threshold of three made the database
+  requirement unnameable, and a requirement that cannot be named is one the association can never count — the
+  refinement moved one requirement in 82 and is recorded rather than applied quietly.
 
 **So the material is pointed at the wrong requirement half the time.** R208 added the verdict to the summariser's
 prompt and the sentence improved; R212 shows it still misses half. The verdict already names 100% of the unmet

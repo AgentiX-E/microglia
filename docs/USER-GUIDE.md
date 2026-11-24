@@ -6668,8 +6668,8 @@ python3 eval/tools/memory_debit.py \
 | `broken` | **met** requirements the next attempt missed | 43/334 (12.9%) |
 | `net` | repaired − broken | **−3** (control +1) |
 | admission bar | `breaks/(repairs+breaks)`: the precision a gate must beat | 51.8% vs base 48.2% |
-| requirements named | of those the attempt missed, how many the note mentions | 48.8% |
-| repaired when named | the association between naming and repair | 55.0% vs 40.5% |
+| requirements named | of those the attempt missed, how many the note mentions | 50.0% |
+| repaired when named | the association between naming and repair | 53.7% vs 41.5% |
 
 Four states, and they are not the same null:
 

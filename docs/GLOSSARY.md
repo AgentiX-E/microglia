@@ -2525,8 +2525,8 @@ appears is the one a rescue would have moved. R212's paraphrase broke 43 require
 worth more than admitting everything. When it sits above the base repair rate the population is net-negative and a
 filter has to beat the population by that margin. R212's paraphrase: 51.8% against a base of 48.2%.
 
-**Naming association** — of the requirements an attempt missed, the share its own note mentions (48.8% for the
-paraphrase), and the repair rate among the named ones against the silent ones (55.0% against 40.5%). A blunt
+**Naming association** — of the requirements an attempt missed, the share its own note mentions (50.0% for the
+paraphrase), and the repair rate among the named ones against the silent ones (53.7% against 41.5%). A blunt
 lexical test on purpose: an embedding would make the reading depend on a model that changes, and a note that never
 writes the words is not about them.
 

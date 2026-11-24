@@ -53,8 +53,11 @@ STOP = frozenset(
     must have has had before after instead then only every each other another same""".split()
 )
 
-#: The shortest useful requirement word. `id` and `ok` name nothing; `ids` and `order` do.
-MIN_WORD = 3
+#: The shortest useful requirement word. Two, not three, because `db` and `id` are requirement tokens: a
+#: threshold of three silently made the database requirement unnameable, and a requirement that cannot be named
+#: is one the association can never count. The refinement moved exactly one requirement in R212's 82 and is
+#: recorded here rather than applied quietly.
+MIN_WORD = 2
 
 
 def content_words(text) -> set:
@@ -572,7 +575,7 @@ def self_test() -> int:
     def check(name: str, condition: bool, detail: str = "") -> None:
         _record(results, name, condition, detail)
 
-    check("content words drop stop words", content_words("the order and the id") == {"order"})
+    check("content words drop stop words", content_words("the order and the id") == {"order", "id"})
     check("content words keep digits", "#w4316152" in content_words("#W4316152"))
     check("content words survive None", content_words(None) == set())
 
