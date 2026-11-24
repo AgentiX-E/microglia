@@ -2545,3 +2545,58 @@ or two runs at different times. The drift check exists to catch it and the noise
 **Verdict material** — the evaluator's verdict served as the note itself (`--note-source verdict`), naming 100% of
 the unmet requirements for zero tokens. R213 measured it at +4.0 pp repair over the control against the
 paraphrase's +12.3: naming is not the lever, which is why the material was not the defect.
+
+**Goal board** — the state channel's material: the asks a request states, each ticked only when a tool receipt of
+the same family names the product the ask names. Recomputed on every turn from the episode's own messages, so it
+describes what has been proved rather than what was intended. Distinct from a *note*, which is a sentence written
+after a failure and read at the next attempt.
+
+**Ask** — one thing the user wants changed, as the board reads it: a **family** (exchange, return, cancel,
+modify, address, payment, transfer) plus the content words that name the object. "return the cleaner, headphone,
+and smart watch" is three asks and one call, which is why the board counts objects rather than calls.
+
+**Receipt** — a state-changing tool call that succeeded, together with the product names of the items it touched.
+A call with no result, or a result carrying an error, is not a receipt: the environment did not change.
+
+**Attribution** — the rule that decides whether a receipt settles an ask: the receipt must name the product the
+ask names, by containment in either direction ("the keyboard" settles a Mechanical Keyboard). A receipt that
+names no product is reported as **unattributed**, never credited to the nearest open ask. Attribution is what
+separates state from a hint.
+
+**Unattributed** — a successful change the board could not tie to an ask, either because the episode never read
+the product's name or because nobody asked for it. It has its own line in the board and its own count in the
+artefact, because a reader who could not tell a limit from a result would read one as the other.
+
+**Working memory** — memory that is a function of the episode in progress rather than of a failure that ended it.
+The board is the instance here; the term is the literature's (Recuris prices it at +23.9 on τ²-retail, against
++2.0 for a library of lessons).
+
+**State channel** — the half of memory that carries what is done and what is pending, as opposed to the **lesson
+channel**, which carries advice distilled from a failure. This repository measured the lesson channel for four
+rounds and found no effect larger than the grid's variance; the state channel is what R214 builds.
+
+**Census** — the offline measurement that licenses the goal-board parser: required objects found, required
+families mentioned, asks no required object accounts for, tasks fully covered. It reads the text the user
+simulator was given, so it is an upper bound on what the run will see; the run's own counters are what a reading
+quotes.
+
+**Seed world** — the single seed an attempt draws for every task in it. Two arms in one world are comparable; two
+arms at different seeds are two draws of a process whose per-attempt rate moves further than a binomial standard
+error. The drift check exists because of it (ARCHITECTURE 8.84).
+
+**Emission cadence** — how often a served block is rewritten. The cost knob that no length measurement sees: a
+block rewritten every turn invalidates the provider's prefix cache and re-bills the whole conversation at the miss
+rate, while the same block written once an episode costs its own tokens once. R214 measured 23 tokens a turn at
++67% bill.
+
+**Prefix cache hit rate** — `usage.cache.cache_hit_rate`, the share of the prompt the provider billed at the hit
+rate. 90.4% against 75.1% on the same prompt is a 67% difference in the bill, which is why this lane now prices a
+material by its cadence rather than by its size.
+
+**Cache-stable emission** — writing a block only when its content changes, so the prefix in front of it survives.
+The design constraint that follows from the state channel's measurement, and the reason R215 writes the board from
+the write path rather than re-rendering it per turn.
+
+**Checker** — the component that decides whether a state change happened, from a tool receipt rather than from a
+transcript. The literature's word for the half of a memory system that made state worth +23.9; the half this lane
+built as a renderer first, and measured at −5.3 points.

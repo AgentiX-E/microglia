@@ -6709,3 +6709,77 @@ Three habits:
   points instead of 20.
 
 The lane's rule after R213: **no behavioural claim is made from a 24-task grid, whatever its arms.**
+
+### 32.70 Running the state channel, and reading its counters
+
+The board arm is a dispatch argument, not a second driver:
+
+```bash
+python3 eval/tools/goal_board.py --self-test          # 60 cases, no provider, no harness
+python3 eval/tools/goal_board.py --census             # what the parser finds in the 114 retail requests
+python3 eval/tools/goal_board.py --messages run.json  # the board an episode actually served
+python3 eval/tools/goal_board.py --compare control.json board.json   # the paired one-attempt reading
+```
+
+On a dispatch, `.github/workflows/working-memory.yml` runs the pair: `control`, then `board` with
+`--note-source board`. Six things to know before you read its output.
+
+- **The board takes no sidecar.** `--note-source board` and `--notes` are refused together, because a board
+  computed from the episode and a note written between attempts are two different treatments and an arm
+  carrying both would be a third nobody registered.
+- **One invocation is the whole population.** The sidecar's identity was what forced one task per process in
+  earlier rounds; the board has no sidecar, so 114 tasks run inside one `run_tasks` call and the import is paid
+  once.
+- **Read the counters before the rate.** The phase line carries
+  `diagnostics.memory.board = {renders, items, settled, charsTotal, charsMean}`. `renders: 0` is a wiring
+  defect and not a null about the channel; `items` high with `settled: 0` is the parser's own limit, and the
+  round's report must say which of the two it is.
+- **A tick means a receipt named it.** Open lines are not failures. An ask stays open when the episode never
+  touched the product it names, and the *unattributed* line is what separates "nothing happened" from "this
+  board could not tell what happened".
+- **Price the block.** `charsMean` is charged on every turn of every episode. At 720 characters a turn the
+  board is a real cost against a free note, and the registration bars it at 800.
+- **Compare like with like.** `--compare` pairs by task, so both arms must have run the same tasks in the same
+  seed world. Two arms at different seed bases are two worlds, which is what R211's drift check refused.
+
+The census is the parser's licence and it is gated: 180 of 226 required objects, 152 of 180 required families,
+255 asks no required object accounts for, 86 of 114 tasks fully covered. If you change the parser, the gate in
+`working-memory.yml` will tell you which of those numbers you moved — and a moved number is a change to the
+material, to be registered rather than merged quietly.
+
+One habit, unchanged from §32.69 and now cheaper to keep: **read the floor before the delta.** A 114-task grid
+resolves about nine points; the registration's bar is ten. An effect of five points on this grid is not a small
+effect, it is an unmeasurable one, and the honest report says so.
+
+### 32.71 What the state channel cost, and the one number to read first
+
+The board arm of R214 scored **80.7% against the control's 86.0%** over 114 tasks, at **$0.0080 an episode against
+$0.0045**: −5.3 points for 77% more money. Two things about that are worth carrying to your own designs.
+
+**Read the cache hit rate before the token count.** The board was 200 characters a turn — 23 tokens, 0.2% of the
+prompt — and it cost 67% more, because a system block that changes every turn invalidates the provider's prefix
+cache. In the phase summary:
+
+```
+control:  prompt 4,727/call  hit 90.4%  bill $0.3044
+board:    prompt 4,717/call  hit 75.1%  bill $0.5094
+```
+
+`usage.cache.cache_hit_rate` is on every phase. It is not a health check; it is the price. If your material moves
+every turn you are re-buying the whole conversation every turn, whatever its length.
+
+**A list that never closes is not a memory.** At the last turn of each episode the board held 10.6 asks and 1.58
+ticks, and 30 of 114 episodes ended with nothing ticked at all. The parser collected asks from every user message,
+and a simulated user's clarifications are sentences that name objects. The census predicted 3.8 asks because it
+read one message; the run read eleven.
+
+**What to keep.** The attribution rule is sound and reusable: a line is ticked only when a receipt of the same
+family names the product the ask names, and a receipt that names nothing is reported as unattributed rather than
+credited to the nearest open ask. It attributed 79.2% of the episodes that changed something.
+
+**What to do instead.** Emit state on the event that changes it — a successful write — and not on the turn. That
+is `R215`, and it is the configuration the literature's +23.9 actually describes: a checker in the write path, not
+a renderer on the read path.
+
+Habit for the next design: **cost a memory arm in three terms, not two** — the episode, the material's own calls,
+and the prefix the material invalidates. The third is the one that surprises.

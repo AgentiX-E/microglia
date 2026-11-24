@@ -1246,6 +1246,39 @@ Read the [user guide](docs/USER-GUIDE.md) for the integration contract, the
 [architecture](docs/ARCHITECTURE.md) for how the pieces fit, and the
 [glossary](docs/GLOSSARY.md) for the vocabulary.
 
+### The state channel: what is done, what is pending, and what a receipt proves
+
+Every memory arm in this repository until now served a **sentence about a failure**. Four rounds of that
+measured no effect larger than the grid's own variance, and the published ablation of the system holding the
+SOTA on τ²-retail prices the same channel at **+2.0 points with an interval that includes zero** — against
+**+23.9** for verified working state.
+
+`eval/tools/goal_board.py` is that second channel, and it costs nothing to serve: it reads the asks out of the
+user's messages (a family — exchange, return, cancel, modify, address, payment, transfer — and the words that
+name the object) and the receipts out of the agent's own tool calls (state-changing calls that succeeded, with
+the product names their results proved), then recomputes the board on every turn. A line is ticked only when a
+receipt of the same family **names the product the ask names**; a receipt that names nothing is reported as
+*unattributed* rather than credited to the nearest open ask.
+
+Measured against the evaluator's own list of required changes, over all 114 retail requests, the parser finds
+**180 of 226 required objects (79.6%)**, mentions **152 of 180 required families (84.4%)**, and reports 255
+asks that no required object accounts for — 3.8 lines a task, at 41.4% precision. What it cannot do is stated
+rather than hidden: it reads what the user *said*, so a scripted user who changes their mind mid-call gets a
+board that lists both asks.
+
+The grid is one attempt over 114 tasks with both arms in one seed world, which is the cheapest powered
+behavioural design in this lane: a floor near 9 points, against 20 for the 24-task grid every earlier reading
+was taken through.
+
+**Result (R214, 228 episodes, $1.4261).** Control **98/114 (86.0%)**, board **92/114 (80.7%)**: −5.3 pp
+[−15.0, +4.5], McNemar p = 0.26, thirteen tasks broken against seven moved. The board was served on every turn
+and attributed 84 of the 106 changing episodes correctly — and it still lost, for two measured reasons. It is 23
+tokens a turn and it raised the bill **77%**, because a system block that is rewritten every turn invalidates the
+provider's prefix cache (hit rate 90.4% → 75.1%). And the list grew to 10.6 asks while closing 1.58 of them,
+because asks were collected from every user message rather than from the request. The channel's next form is
+therefore a **checker** — state written by the write path and emitted only when it changes — which is both the
+cheap design and the one the literature's +23.9 describes.
+
 ## Repository layout
 
 ```

@@ -4392,3 +4392,92 @@ The consequence for design is not "buy more power on this population" but "measu
 The bank already holds 456 episodes over 114 tasks at four trials; a 114-task arm has a floor near 9 points, and a
 one-attempt-per-task paired reading there costs 114 episodes — **$0.60** — which is the cheapest powered design
 this lane has ever had.
+
+### 8.88 The unit of memory is state, and a tick has to be earned by a receipt
+
+Section 8.87 ends with a measurement rather than a conclusion: three dispatches served a sentence about a
+failure, the sentence was made cheaper and then made exact, and none of it moved the pass rate beyond the
+grid's own variance. What that leaves open is not "which sentence" but "why a sentence at all".
+
+The published ablation of the system that holds the SOTA on this benchmark answers the question with a price
+list (Recuris, arXiv 2608.24876, ablation on τ²-retail): **experiential skills alone +2.0 points with an
+interval that includes zero; verified working state alone +23.9**. The channel this repository has been
+measuring for four rounds is the +2.0 one. The +23.9 one had never been built here.
+
+`eval/tools/goal_board.py` is that channel, and it is a parser rather than a model call for the reason the
+verdict arm was a parser: the request is in front of the agent on the first turn and the receipts are in front
+of it on every turn, so neither has to be paraphrased to be useful. Three readings come out of the same
+messages:
+
+| reading | source | cost |
+|---|---|---|
+| **asks** — a family (exchange, return, cancel, modify, address, payment, transfer) and the words naming the object | the user's messages | 0 |
+| **receipts** — state-changing calls that succeeded, with the product names of the items they touched | the agent's tool calls and the `item_id → name` pairs its own reads returned | 0 |
+| **settled** — an ask and a receipt of its family whose touched name the ask names | both | 0 |
+
+The design decision worth recording is the **refusal**. An ask is never ticked because something of the same
+kind happened. Two exchanges in one order, one performed, is the shape this benchmark fails on, and a board
+that ticked both would remove the agent's reason to look — the harm channel R213 measured at 8.5% of met
+requirements. So containment is required, in either direction, because a user says "the keyboard" about a
+Mechanical Keyboard; a receipt whose product the episode never named is reported on its own line as
+*unattributed* rather than credited to the nearest open ask; and an ask that names no object ("cancel the
+order") is settled by the first receipt of its family and by nothing else. The board says what it does not
+know instead of guessing, which is the difference between a state channel and a hint.
+
+**Recomputed, not held.** A note is written once, after a failure, and read at the next attempt; a board is a
+function of the messages the episode already carries, so the board at turn nine knows what turn nine's
+receipts proved. `MicrogliaAgent.board_for` therefore re-renders on every turn — no memo — and the previous
+turn's board is removed by the same test that removes a repeated pack (R137), extended to a second tag so the
+store's pack and the board cannot be confused. The cost is bounded in the parser (720 characters, eight asks)
+rather than in the prompt, because a state channel that costs a fifth of the episode budget has to clear a
+higher bar than one that is free.
+
+Two properties of the corpus are stated rather than hidden. The board reads what the user **said**, not what
+the script meant — task 5 asks for an exchange and then changes its mind and asks for a return, and a board
+listing both is faithful and wrong. And the census that licenses the parser (79.6% of the evaluator's required
+objects, 84.4% of required families, 41.4% precision, 3.8 asks a task) runs over `reason_for_call`, the text
+the simulator was given, while the run reads the simulator's paraphrase. The run-time readings — how often the
+board rendered, how many asks it listed, how many a receipt settled — are the ones the artefact quotes.
+
+The grid moves with the channel. A 114-task one-attempt arm has a floor near 9 points against the 24-task
+grid's 20, and it is *cheaper*: 228 episodes at the bank's $0.0044 is ≈ $1.0, and the board itself adds no
+model call at all.
+
+### 8.89 What the state channel measured: −5.3 points, and the cache explains the bill
+
+R214 ran the board over the whole population: 114 tasks, one attempt, two arms in one seed world, 228 episodes,
+$1.4261.
+
+| arm | pass^1 | bill / episode | cache hit rate |
+|---|---|---|---|
+| control | **98/114 (86.0%)** | $0.0045 | 90.4% |
+| board | 92/114 (80.7%) | $0.0080 | 75.1% |
+
+Paired by task: **−5.3 pp** [−15.0, +4.5], McNemar p = 0.2632, with 13 tasks broken against 7 moved. The board
+was served (1,155 renders, an ask listed in 113 of 114 episodes) and it attributed as designed (84 of the 106
+episodes that changed something ended with a receipt-ticked line, 79.2%). It was not inert; it was wrong.
+
+**Two causes, and neither of them is the idea.**
+
+*The price.* The board is 23 tokens a turn, +0.2% of a 4,728-token prompt, and it raised the bill 67%. An injected
+block lives in the system message, the system message is the front of the prompt, and a prefix cache is a function
+of the longest unchanged prefix: rewriting the block every turn shortens that prefix to nothing, so every request
+is billed at the miss rate. The provider's own `prompt_cache_hit_tokens` fell 15.3 points. **The cost of a
+material is not its size; it is how often it moves**, and this repository has recorded the size on every artefact
+since R136 and the movement on none of them.
+
+*The content.* The list grew to **10.6 asks** an episode and closed **1.58** of them. The census that licensed the
+parser predicted 3.8, because it read one message; the run reads eleven, and a simulated user's clarifications
+("yes, the blue one") are sentences that name an object after a verb. A supply rule of "everything the user has
+said" produces a to-do list that grows monotonically, and a list that grows and does not close is not a memory.
+
+**What survives.** The attribution rule — a line is ticked only when a receipt of the same family names the
+product the ask names — worked at 79.2% of changing episodes and never over-credited a settled ask in the reading.
+The channel is therefore open in one configuration this round did not test: state written by the **write path**
+and emitted **only when it changes**, which is both the cheaper design and the one the published +23.9 describes
+(a checker, not a renderer). The lesson channel stays closed by three measurements; the state channel is closed
+only in its per-turn form.
+
+For the product this is a decision rather than an experiment: **no per-turn context block ships.** The serve
+profile's five fields are unchanged, and the sixth — the state channel — is now a measured `off` rather than an
+unexamined absence.
