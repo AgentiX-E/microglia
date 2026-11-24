@@ -772,7 +772,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     # R213. What the note *is*: a model's paraphrase of the failure (`model`, every arm before this one) or the
     # evaluator's verdict served as written (`verdict`, which needs no model, no tokens and no summariser call).
     # A dispatch argument rather than a default, because the two materials are the experiment.
-    parser.add_argument("--note-source", choices=("model", "verdict"), default="model")
+    parser.add_argument("--note-source", choices=("model", "verdict", "board"), default="model")
     # A full-quality run is six hours and four arms; at double price that is a doubled bill for a
     # number that does not improve. The guard is off by default because a smoke run is cheap enough
     # to be worth running whenever the operator is awake, and on for every dispatch that is not.
@@ -1233,6 +1233,18 @@ def main(argv: list[str]) -> int:
     os.environ.setdefault("MICROGLIA_DOMAIN", args.domain)
     # R206: the sidecar's path is set before every episode is constructed, because the agent reads the
     # environment once at its first turn and a path assigned afterwards is a path the treatment never sees.
+    # R214. The board is not a sidecar: it is recomputed from the messages of the episode, so it needs no file, no
+    # round boundary and no writer. The environment is set here rather than left to the dispatch for the same reason
+    # the note path is: the agent reads it once, at its first turn, and an arm that says it served a board while the
+    # variable was never set is the wiring defect this lane has counted five times.
+    if args.note_source == "board":
+        if args.notes:
+            raise SystemExit("tau2-board-takes-no-notes")
+        os.environ["MICROGLIA_BOARD"] = "1"
+        if "MICROGLIA_NOTES" in os.environ:
+            del os.environ["MICROGLIA_NOTES"]
+    elif "MICROGLIA_BOARD" in os.environ:
+        del os.environ["MICROGLIA_BOARD"]
     if args.notes:
         os.environ["MICROGLIA_NOTES"] = args.notes
     elif not args.rounds and "MICROGLIA_NOTES" in os.environ:

@@ -67,6 +67,15 @@ from tau2.data_model.message import Message, SystemMessage
 # needs no harness.
 from notes import lookup, scope_of, sentence_of, load as load_notes
 
+# R214. The goal board. `eval/tools` is not on the path of a τ² invocation, so this module puts it there — one
+# insert, beside the one import that needs it, rather than an environment variable every dispatch has to remember.
+# The parser imports nothing outside the standard library, so an arm that turns the board on adds no dependency to
+# the harness the benchmark installs.
+_TOOLS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "tools")
+if _TOOLS not in sys.path:
+    sys.path.insert(0, _TOOLS)
+from goal_board import BOARD_TAG, board_of as goal_board_of, render as render_goal_board  # noqa: E402
+
 # `ValidAgentInputMessage` moved in τ² v1.0.0: it lived in `tau2.agent.base` and now lives in
 # `tau2.agent.base_agent`, beside the `HalfDuplexAgent` that `LLMAgent` extends. Both are tried
 # because R92 runs one τ² and the arms before it ran another, and an import that names only one of
@@ -221,6 +230,17 @@ _guidance_first_failure: str | None = None
 # phase whose sidecar was unreadable and `hits: 0` on a phase whose first round had nothing to read yet are
 # different findings, and only the second is the mechanism working as registered.
 NOTES_ENV = "MICROGLIA_NOTES"
+
+# R214. The working-memory arm's own account. A board is recomputed on every turn from the messages the episode
+# already carries, so the three numbers that decide whether a reading is about the mechanism are how many turns it
+# was served on, how many asks it listed, and how many of those a receipt had settled by then. An arm whose board
+# never rendered is a null about the wiring; an arm whose board rendered and settled nothing is the parser's own
+# limit, and the two must not be read as the same null.
+BOARD_ENV = "MICROGLIA_BOARD"
+_board_renders = 0
+_board_items = 0
+_board_settled = 0
+_board_chars = 0
 _note_lookups = 0
 _note_hits = 0
 _note_chars = 0
@@ -236,6 +256,11 @@ _note_document: dict = {}
 # Sentinel rather than `None`, because "" is a real answer: a facade that was asked
 # and had nothing to say must not be asked again on the next turn.
 _UNSET = object()
+
+
+def board_mode() -> bool:
+    """Whether this arm serves the goal board instead of a note."""
+    return os.environ.get(BOARD_ENV, "").strip().lower() in ("1", "true", "yes")
 
 
 def _memory_url() -> str:
@@ -567,10 +592,16 @@ def is_pack_message(message) -> bool:
     module writes and cannot match a policy prompt that never mentions the tag.
     """
     content = getattr(message, "content", None)
-    return isinstance(content, str) and content.lstrip().startswith(f"<{PACK_TAG}")
+    if not isinstance(content, str):
+        return False
+    head = content.lstrip()
+    # R214: two tags, one rule. The board is a different channel from the store's pack and is removed by the same
+    # test — a state that kept the previous turn's board would accumulate one board per turn, which is the defect
+    # R137 repaired for the pack.
+    return head.startswith(f"<{PACK_TAG}") or head.startswith(f"<{BOARD_TAG}")
 
 
-def injected_message(pack: str) -> SystemMessage:
+def injected_message(pack: str, tag: str = PACK_TAG) -> SystemMessage:
     """The recalled block as one system message, given an element only if it arrives without one.
 
     This used to wrap unconditionally, and `renderPack` already emits the element — so every memory
@@ -589,8 +620,8 @@ def injected_message(pack: str) -> SystemMessage:
     """
     body = (
         pack
-        if pack.lstrip().startswith(f"<{PACK_TAG}")
-        else f"<{PACK_TAG}>\n{pack}\n</{PACK_TAG}>"
+        if pack.lstrip().startswith(f"<{tag}")
+        else f"<{tag}>\n{pack}\n</{tag}>"
     )
     return SystemMessage(role="system", content=body)
 
@@ -606,8 +637,40 @@ class MicrogliaAgent(LLMAgent):
     _pack: object = _UNSET
     _turn: int = -1
 
-    def pack_for(self, state: LLMAgentState, text: str) -> str:
+    def board_for(self, state: LLMAgentState, text: str, role: str = "") -> str:
+        """The goal board this turn should carry: the asks so far, ticked by the receipts so far.
+
+        Recomputed rather than held, and that is the whole difference between this channel and the note. A note is
+        written once after a failure and read at the next attempt; a board is a function of the messages the episode
+        already holds, so the board at turn nine knows what turn nine's tool receipts proved and the note at turn
+        one could not. Nothing is memoised, because memoising it would make it the note again with a list inside.
+
+        The incoming message is read as a user turn only when it is one: τ² hands the tool results back through the
+        same method, and a board that parsed `get_order_details` output as a request would list the catalogue.
+        """
+        global _board_renders, _board_items, _board_settled, _board_chars
+        if self.__dict__.get("_turn") is None:
+            _open_episode()
+            _boundary_tasks.append((text or "")[:MAX_QUERY_CHARS])
+        self._turn = len(state.messages)
+        messages = list(state.messages)
+        if isinstance(text, str) and text.strip() and role in ("", "user", "human"):
+            messages = messages + [{"role": "user", "content": text}]
+        board = goal_board_of(messages)
+        body = render_goal_board(board)
+        if body == "":
+            return ""
+        items = board.get("items") or []
+        _board_renders += 1
+        _board_items += len(items)
+        _board_settled += sum(1 for item in items if item.get("settled_by"))
+        _board_chars += len(body)
+        return body
+
+    def pack_for(self, state: LLMAgentState, text: str, role: str = "") -> str:
         """The pack this turn should carry, recalling only when the episode changed."""
+        if board_mode():
+            return self.board_for(state, text, role)
         turn = len(state.messages)
         held = self.__dict__.get("_pack", _UNSET)
         if held is _UNSET or turn <= self.__dict__.get("_turn", -1):
@@ -654,7 +717,9 @@ class MicrogliaAgent(LLMAgent):
         global _injected_chars, _calls, _pack_copies_dropped
         _calls += 1
         text = getattr(message, "content", None)
-        pack = self.pack_for(state, text if isinstance(text, str) else "")
+        pack = self.pack_for(
+            state, text if isinstance(text, str) else "", str(getattr(message, "role", "") or "")
+        )
         # R137. The invariant is not "inject a block" but "the prompt carries at most one block, and it is
         # this episode's". A state that already carries one is a state this method wrote — tau2 threads the
         # state the agent returns — so the earlier copy is removed whether or not this turn has one of its
@@ -672,7 +737,7 @@ class MicrogliaAgent(LLMAgent):
             kept = [m for m in state.system_messages if not is_pack_message(m)]
             _pack_copies_dropped += len(state.system_messages) - len(kept)
             if pack:
-                injected = injected_message(pack)
+                injected = injected_message(pack, BOARD_TAG if board_mode() else PACK_TAG)
                 # R136: the length is taken from the message object rather than from the pack, because the
                 # question is what the prompt *carried* — the element `injected_message` adds is part of the
                 # bill, and a census that only knows the pack's length cannot see it.
@@ -692,6 +757,21 @@ def memory_stats() -> dict:
     """What the run should record about the sidecar, so a zero is explainable."""
     stats = {
         "recall_url": _memory_url(),
+        # R214: the board channel's own account. Absent on every arm that serves a note or a pack, present on the
+        # arm whose material is computed from the episode rather than written between attempts.
+        **(
+            {
+                "board": {
+                    "renders": _board_renders,
+                    "items": _board_items,
+                    "settled": _board_settled,
+                    "charsTotal": _board_chars,
+                    "charsMean": round(_board_chars / _board_renders, 1) if _board_renders else None,
+                }
+            }
+            if board_mode()
+            else {}
+        ),
         "recall_failures": _failures,
         "recalls": _recalls,
         # The population behind a treatment that withholds packs: `recalls - recall_empty` is what was

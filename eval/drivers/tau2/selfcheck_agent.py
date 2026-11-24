@@ -1646,6 +1646,46 @@ def a_note_written_between_rounds_is_read_by_the_next_episode(checks):
 
 
 @case
+def the_board_is_recomputed_and_never_accumulates(checks):
+    """R214's two properties in one case: the board is a function of the episode, and there is only ever one.
+
+    Both are the difference between a working memory and a note. A board that were held at the first turn would be
+    a note written before the failure; a board that were appended rather than replaced would cost its own length on
+    every turn of every episode, which is the defect R137 removed from the pack and this channel would have
+    reintroduced under a different tag.
+    """
+    saved = os.environ.get(subject.BOARD_ENV)
+    os.environ[subject.BOARD_ENV] = "1"
+    try:
+        agent, calls, original = fresh(pack="")
+        try:
+            state = LLMAgentState()
+            state = episode_step(agent, state, "I want to exchange the mechanical keyboard.")
+            first = state.system_messages[0].content
+            order = {"order_id": "#W2378156", "items": [{"item_id": "1151293680", "name": "Mechanical Keyboard"}]}
+            state.messages.append({"role": "assistant", "content": "", "tool_calls": [
+                {"name": "get_order_details", "arguments": {"order_id": "#W2378156"}},
+                {"name": "exchange_delivered_order_items", "arguments": {"item_ids": ["1151293680"]}},
+            ]})
+            state.messages.append({"role": "tool", "content": json.dumps(order)})
+            state.messages.append({"role": "tool", "content": json.dumps({"ok": True})})
+            state = episode_step(agent, state, "yes please")
+            second = state.system_messages[0].content
+        finally:
+            subject.recall = original
+    finally:
+        if saved is None:
+            os.environ.pop(subject.BOARD_ENV, None)
+        else:
+            os.environ[subject.BOARD_ENV] = saved
+    checks.equal(len(calls), 0, "the board arm does not consult the store")
+    checks.substring(first, subject.BOARD_TAG, "the first turn carries a board")
+    checks.substring(first, "[ ] exchange: mechanical keyboard", "and the ask is open")
+    checks.substring(second, "[x] exchange: mechanical keyboard", "the receipt settles it on the next turn")
+    checks.equal(len(state.system_messages), 1, "one board in the prompt, not one per turn")
+
+
+@case
 def a_pack_from_the_facade_wins_over_a_note(checks):
     """One material per arm. An arm carrying both would be a third treatment nobody registered."""
     with notes_arm({"I want a refund": "A note."}):

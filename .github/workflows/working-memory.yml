@@ -1,0 +1,358 @@
+name: working-memory
+
+# R214 — the state channel, which this lane has never built.
+#
+# Three dispatches served a sentence about a failure and measured a wash: R212 rescue +1.8 pp with exact p = 1.0,
+# R213 named 100% of the unmet requirements and repaired fewer of them than a sentence that named half. The
+# published ablation of the system that holds the SOTA on this benchmark prices that channel at **+2.0 points with
+# an interval that includes zero**, and prices *verified working state* at **+23.9** (Recuris, arXiv 2608.24876).
+# So this round changes the unit of memory. Not a sentence about a failure: a **goal board** — the asks the request
+# states, ticked only when a tool receipt names them, recomputed on every turn from the messages the episode
+# already carries (AUDIT 34.215).
+#
+# Two things make this affordable where the earlier rounds were not:
+#
+#   * the board is a **parser**, not a model call. It costs no tokens and no summariser, so the arm's material is
+#     free and the only bill is the episodes.
+#   * the grid is **one attempt over 114 tasks**, not four rounds over 24. R213 measured the 24-task grid's noise
+#     floor at ~20 points — larger than every effect it had been measuring — because at attempt 0 the arms differ in
+#     nothing but the provider's sampling. A 114-task one-attempt grid has a floor near 9 points, and it costs
+#     *less*: 228 episodes at the bank's $0.0044 is ≈ **$1.0 (¥7.2)**, against $1.53 for the 288-episode three-arm.
+#
+# Endpoint: pass^1, paired by task, bar **+10 pp with the interval excluding zero**. Both arms run the same 114
+# tasks in the same seed world, dispatched minutes apart, which is the common-random-numbers property R211's drift
+# check demanded and R212 paid for.
+
+on:
+  workflow_dispatch:
+    inputs:
+      arms:
+        description: 'both (control then board), board alone, or control alone'
+        required: false
+        default: 'both'
+      tasks:
+        description: 'Comma-separated task ids. Empty means every task the bank holds.'
+        required: false
+        # Empty on purpose: the population is the bank's, and a second copy of 114 ids in this file is the copy
+        # that goes stale the day the bank is re-read.
+        default: ''
+      trials:
+        description: 'Attempts per task. One is the registered grid; two turns the pairing into a best-of.'
+        required: false
+        default: '1'
+      seed:
+        description: 'The seed world both arms share'
+        required: false
+        default: '400'
+      max_steps:
+        description: 'Steps per episode'
+        required: false
+        default: '100'
+      concurrency:
+        description: 'Episodes at a time, inside one invocation'
+        required: false
+        default: '3'
+  push:
+    branches: [master]
+    paths:
+      - 'eval/tools/goal_board.py'
+      - 'eval/manifests/retail-goals.json'
+      - 'eval/drivers/tau2/microglia_agent.py'
+      - 'eval/drivers/tau2/run_split.py'
+      - 'eval/drivers/tau2/selfcheck_agent.py'
+      - '.github/workflows/working-memory.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  # One working-memory run at a time: the two arms are one measurement, and a second dispatch overlapping the first
+  # would have the control of one world paired against the board of another.
+  group: working-memory
+  cancel-in-progress: false
+
+jobs:
+  contract:
+    name: the parser and the agent, over documents whose answer is known (no model calls)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: The parser agrees with itself
+        run: |
+          set -euo pipefail
+          python3 eval/tools/goal_board.py --self-test
+
+      - name: The agent that serves the board still behaves
+        # R214. `selfcheck_agent.py` is 223 assertions about the agent every paid dispatch loads, and until this
+        # step existed **no workflow ran it**: the tau2 drivers were outside `ci.yml`'s coverage source and no job
+        # named them. A suite nobody runs is a suite that protects nothing, so the gate for the arm that changed the
+        # agent is the gate that runs the agent's own suite.
+        run: |
+          set -euo pipefail
+          python3 eval/drivers/tau2/selfcheck_agent.py --self-test
+          python3 eval/drivers/tau2/selfcheck_usage.py --self-test
+
+      - name: The census, and the numbers it was quoted at
+        # The extractor's licence is a measurement, so the measurement is a gate. These five numbers are R214's
+        # §2 exactly: 180 of 226 required objects found, 152 of 180 required families mentioned, 255 asks no
+        # required object accounts for, and 86 of 114 tasks fully covered. A parser change that moves any of them
+        # by more than the margin below is a change to the material and has to be registered as one.
+        run: |
+          set -euo pipefail
+          python3 eval/tools/goal_board.py --census --json | tee "${RUNNER_TEMP}/census.json"
+          python3 - "${RUNNER_TEMP}/census.json" <<'PY'
+          import json, sys
+
+          reading = json.load(open(sys.argv[1]))
+          assert reading["tasks"] == 114, reading["tasks"]
+          assert reading["required"] == 226, reading["required"]
+          assert reading["found"] >= 170, reading["found"]
+          assert reading["familyRecall"] >= 0.82, reading["familyRecall"]
+          assert reading["spurious"] <= 280, reading["spurious"]
+          assert reading["tasksCovered"] >= 82, reading["tasksCovered"]
+          print(f"ok  {reading['found']}/{reading['required']} objects, {reading['familyRecall']:.1%} of families, "
+                f"{reading['spurious']} spurious, {reading['tasksCovered']}/{reading['tasks']} tasks covered")
+          PY
+
+      - name: The parser, measured
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check --quiet coverage
+          INCLUDE="*/eval/tools/goal_board.py"
+          rm -f .coverage
+          python3 -m coverage run --branch --include="$INCLUDE" eval/tools/goal_board.py --self-test
+          python3 -m coverage json -o "${RUNNER_TEMP}/coverage-board.json" --include="$INCLUDE"
+          python3 scripts/check-python-coverage.py "${RUNNER_TEMP}/coverage-board.json" --min 95 --expect-files 1
+
+      - name: The paired reader, over grids whose answer is known
+        # A reader is only worth the numbers it refuses. Four fixtures: a clean sweep of thirty must clear the bar
+        # and be `BOARD_UP`, the same thirty inverted must be `BOARD_DOWN`, three moves must be a `MOVED` that does
+        # not clear it, and two arms with no task in common must be `UNPAIRED` rather than a rate over nothing.
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, subprocess, tempfile
+          from pathlib import Path
+
+          TOOL = "eval/tools/goal_board.py"
+
+          def grid(passes: int, total: int = 114) -> dict:
+              return {"simulations": [
+                  {"task_id": str(index), "trial": 0, "reward_info": {"reward": 1.0 if index < passes else 0.0}}
+                  for index in range(total)
+              ]}
+
+          def read(left: dict, right: dict):
+              with tempfile.TemporaryDirectory() as temporary:
+                  a = Path(temporary) / "control.json"
+                  b = Path(temporary) / "board.json"
+                  a.write_text(json.dumps(left))
+                  b.write_text(json.dumps(right))
+                  done = subprocess.run(["python3", TOOL, "--compare", str(a), str(b)],
+                                        capture_output=True, text=True)
+              return done.returncode, done.stdout + done.stderr
+
+          cases = [
+              ("a sweep of thirty clears the bar", grid(84), grid(114), "BOARD_UP"),
+              ("a drop of thirty is a loss", grid(114), grid(84), "BOARD_DOWN"),
+              ("three moves are real and short of the bar", grid(111), grid(114), "NO_LIFT"),
+          ]
+          for name, left, right, state in cases:
+              returned, output = read(left, right)
+              assert returned == 0, f"{name}: exit {returned}\n{output}"
+              assert state in output, f"{name}: {state} not in\n{output}"
+              print(f"ok  {name}")
+
+          left = {"simulations": [{"task_id": "0", "trial": 0, "reward_info": {"reward": 1.0}}]}
+          right = {"simulations": [{"task_id": "1", "trial": 0, "reward_info": {"reward": 1.0}}]}
+          returned, output = read(left, right)
+          assert "UNPAIRED" in output, output
+          print("ok  two arms with no task in common are unpaired")
+          PY
+
+  board:
+    name: board — one attempt over the whole population, two arms, the same seed world
+    needs: contract
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    # Install (8 min) plus 228 episodes divided by the concurrency plus two imports plus the reading. Generous
+    # rather than tight: a step killed mid-grid writes no document and the money is spent.
+    timeout-minutes: 150
+    env:
+      DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+      TAU_VERSION: ${{ vars.TAU_VERSION }}
+      TAU_MODEL: ${{ vars.TAU_MODEL || 'deepseek/deepseek-flash' }}
+      TAU2_DATA_DIR: ${{ github.workspace }}/.tau2-bench/data
+      BOARD_ARMS: ${{ github.event.inputs.arms || 'both' }}
+      BOARD_TASKS: ${{ github.event.inputs.tasks }}
+      BOARD_TRIALS: ${{ github.event.inputs.trials || '1' }}
+      BOARD_SEED: ${{ github.event.inputs.seed || '400' }}
+      BOARD_MAX_STEPS: ${{ github.event.inputs.max_steps || '100' }}
+      BOARD_CONCURRENCY: ${{ github.event.inputs.concurrency || '3' }}
+      BOARD_DIR: eval/results/working-memory
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require the provider key before the first call
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DEEPSEEK_API_KEY}" ]; then
+            echo "::error::DEEPSEEK_API_KEY is not configured for this repository"
+            exit 1
+          fi
+
+      - name: The population this dispatch will run
+        # Every task the bank holds, read from the bank rather than retyped. `114` is the number the floor of the
+        # grid is computed from, so it is printed here and asserted in the reading.
+        run: |
+          set -euo pipefail
+          TASKS="${BOARD_TASKS}"
+          if [ -z "${TASKS}" ]; then
+            TASKS="$(python3 -c "
+          import json
+          simulations = json.load(open('eval/manifests/note-bank-baseline.json'))['simulations']
+          print(','.join(sorted({str(entry['task_id']) for entry in simulations}, key=int)))
+          ")"
+          fi
+          COUNT="$(python3 -c "print(len([t for t in '${TASKS}'.split(',') if t]))")"
+          echo "BOARD_TASK_LIST=${TASKS}" >> "$GITHUB_ENV"
+          echo "${COUNT} task(s) in this population" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Does the whole job fit in the off-peak window?
+        run: |
+          set -euo pipefail
+          MINUTES="$(python3 -c "
+          tasks = len([entry for entry in '${BOARD_TASK_LIST}'.split(',') if entry])
+          trials = int('${BOARD_TRIALS}')
+          arms = 2 if '${BOARD_ARMS}' == 'both' else 1
+          concurrency = max(1, int('${BOARD_CONCURRENCY}'))
+          print(int((arms * tasks * trials * 26) / concurrency / 60) + 9 + 1)
+          ")"
+          echo "estimated ${MINUTES} min for this grid" >> "$GITHUB_STEP_SUMMARY"
+          python3 eval/drivers/tau2/note_pilot.py --window-minutes "${MINUTES}"
+
+      - name: Cache the tau2 environment
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            .tau2-bench
+          key: tau2-${{ vars.TAU_VERSION }}-${{ runner.os }}
+
+      - name: Install tau2-bench at the pinned ref
+        run: |
+          set -euo pipefail
+          REF="${TAU_VERSION:-v1.0.1}"
+          if [ ! -d .tau2-bench/.git ]; then
+            git clone --depth 1 --branch "$REF" https://github.com/sierra-research/tau2-bench .tau2-bench \
+              || { echo "tau2-clone-failed:$REF"; exit 21; }
+          fi
+          cd .tau2-bench
+          python -m pip install --upgrade pip uv
+          uv sync || { echo "tau2-sync-failed:$REF"; exit 22; }
+          uv pip install mcp || { echo "tau2-mcp-missing:$REF"; exit 24; }
+          uv run tau2 check-data || { echo "tau2-data-missing:$REF"; exit 23; }
+
+      - name: One invocation per arm, the whole population, the same seeds
+        # The sidecar's identity was why earlier rounds ran one task per process. This arm has no sidecar: the board
+        # is computed from the episode, so the population runs inside one `run_tasks` call and the 114 imports
+        # earlier rounds paid for are one. What must not change between the arms is the seed, the task order and the
+        # model — all three are arguments here and not defaults.
+        env:
+          TAU_CONCURRENCY: ${{ github.event.inputs.concurrency || '3' }}
+          TAU_RETRIES: '4'
+        run: |
+          set -euo pipefail
+          PYTHON="${GITHUB_WORKSPACE}/.tau2-bench/.venv/bin/python"
+          test -x "$PYTHON" || { echo "tau2-venv-missing"; exit 25; }
+          mkdir -p "${BOARD_DIR}"
+
+          run_arm () {
+            local arm="$1"; shift
+            "${PYTHON}" eval/drivers/tau2/run_split.py \
+              --phase eval --agent microglia_agent --domain retail \
+              --tasks "${BOARD_TASK_LIST}" --trials "${BOARD_TRIALS}" \
+              --max-steps "${BOARD_MAX_STEPS}" --seed "${BOARD_SEED}" --require-off-peak \
+              --out "${BOARD_DIR}/${arm}.json" "$@" \
+              > "${BOARD_DIR}/${arm}.log" 2>&1
+          }
+
+          case "${BOARD_ARMS}" in
+            both)
+              # Control first. The two arms are one measurement, and a control written after the board would be a
+              # control run in a world the board had already spent forty minutes in.
+              run_arm control
+              run_arm board --note-source board
+              ;;
+            board) run_arm board --note-source board ;;
+            *)     run_arm control ;;
+          esac
+
+      - name: What the board cost and whether it was served
+        # The arm's own counters before the rate. A board that rendered on no turn is a null about the wiring, and a
+        # board that rendered but settled nothing is the parser's own limit: the two must not be read as one null.
+        run: |
+          set -euo pipefail
+          python3 - "${BOARD_DIR}" <<'PY'
+          import json, sys
+          from pathlib import Path
+
+          root = Path(sys.argv[1])
+          episodes = usd = 0.0
+          for path in sorted(root.glob("*.json")):
+              document = json.loads(path.read_text())
+              arm_episodes = arm_usd = 0.0
+              for simulation in document.get("simulations") or []:
+                  arm_episodes += 1
+                  arm_usd += (simulation.get("agent_cost") or 0) + (simulation.get("user_cost") or 0)
+              episodes += arm_episodes
+              usd += arm_usd
+              print(f"{path.stem}: {int(arm_episodes)} episode(s), ${arm_usd:.4f}")
+          for path in sorted(root.glob("*.log")):
+              for line in path.read_text(errors="replace").splitlines():
+                  if not line.startswith('{"phase"'):
+                      continue
+                  summary = json.loads(line)
+                  memory = (summary.get("diagnostics") or {}).get("memory") or {}
+                  board = memory.get("board") or {}
+                  print(f"{path.stem}: {summary.get('simulations')} simulation(s), "
+                        f"board renders {board.get('renders')}, asks {board.get('items')}, "
+                        f"settled {board.get('settled')}, chars {board.get('charsTotal')}")
+          print(f"total {int(episodes)} episode(s), ${usd:.4f} ≈ ¥{usd * 7.2:.1f}")
+          PY
+
+      - name: The paired reading
+        run: |
+          set -euo pipefail
+          python3 eval/tools/goal_board.py \
+            --compare "${BOARD_DIR}/control.json" "${BOARD_DIR}/board.json" | tee "${RUNNER_TEMP}/reading.txt"
+          python3 eval/tools/goal_board.py \
+            --compare "${BOARD_DIR}/control.json" "${BOARD_DIR}/board.json" --json \
+            > "${RUNNER_TEMP}/reading.json"
+          python3 - "${RUNNER_TEMP}/reading.json" <<'PY'
+          import json, sys
+
+          reading = json.load(open(sys.argv[1]))
+          # The grid is the claim. A reading over half the population is a reading about a different experiment, and
+          # the floor it is quoted against is a function of the count.
+          assert reading["tasks"] >= 100, reading["tasks"]
+          assert reading["unpaired"] == 0, reading["unpaired"]
+          print(f"ok  paired over {reading['tasks']} task(s)")
+
+      - name: Upload the documents
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: working-memory
+          path: |
+            eval/results/working-memory/*.json
+            eval/results/working-memory/*.log
+          if-no-files-found: warn
