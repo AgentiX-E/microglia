@@ -352,6 +352,12 @@ def material_of(summary: dict) -> dict | None:
         "promptChars": sum(int(number(entry.get("promptChars")) or 0) for entry in rounds),
         "noteChars": sum(int(number(entry.get("noteChars")) or 0) for entry in rounds),
         "materialTokens": round(sum(int(number(entry.get("promptChars")) or 0) for entry in rounds) / CHARS_PER_TOKEN),
+        # R208. Whether the sentences were written from the attempt alone or from the attempt and the evaluator's
+        # verdict, and how much of the corpus the evaluator explained. A reading is only comparable to another
+        # when it states this, and the characters are the part of the material's cost that is not a sentence.
+        "verdict": bool(notes.get("verdict")),
+        "verdicts": int(number(notes.get("verdicts")) or 0),
+        "verdictChars": int(number(notes.get("verdictChars")) or 0),
     }
 
 
@@ -384,11 +390,15 @@ def merge_notes_blocks(blocks) -> dict | None:
     rounds: list = []
     tasks: list = []
     problems: list = []
+    shown = 0
     for block in blocks:
         path = block.get("path")
         for entry in block.get("rounds") or []:
             if isinstance(entry, dict):
                 rounds.append({**entry, "sidecar": path})
+        # R208. A block with no `verdict` key is a phase that ran before the material existed, which is the same
+        # fact as `false`: the summariser was shown the attempt and nothing else.
+        shown += 1 if block.get("verdict") else 0
         scope = block.get("scope") if isinstance(block.get("scope"), dict) else {"kind": "none"}
         task = scope.get("task")
         if scope.get("kind") == "task" and isinstance(task, str) and task.strip() != "":
@@ -396,6 +406,11 @@ def merge_notes_blocks(blocks) -> dict | None:
                 tasks.append(task.strip())
         else:
             problems.append(f"{path}: scope is {scope.get('kind')!r}")
+    # Refused rather than summed, for `merge_summaries`' reason one level down: the material is the arm, and a
+    # corpus half of whose notes were written from a verdict is a corpus that measured two things. The counts are
+    # in the code so the message says how badly the fold was mixed without a second read of the logs.
+    if 0 < shown < len(blocks):
+        raise SystemExit(f"tau2-note-pilot-mixed-verdict:{shown}:{len(blocks) - shown}")
     return {
         "path": [block.get("path") for block in blocks],
         "rounds": rounds,
@@ -403,6 +418,11 @@ def merge_notes_blocks(blocks) -> dict | None:
         "scopeProblems": problems,
         "collisions": sum(int(number(block.get("collisions")) or 0) for block in blocks),
         "attempts": sum(int(number(block.get("attempts")) or 0) for block in blocks),
+        # The arm's own statement about its material, and the two sums that make the verdict block's cost visible
+        # beside the sentences it produced.
+        "verdict": shown == len(blocks),
+        "verdicts": sum(int(number(block.get("verdicts")) or 0) for block in blocks),
+        "verdictChars": sum(int(number(block.get("verdictChars")) or 0) for block in blocks),
         "specificity": None,
     }
 
@@ -776,7 +796,8 @@ def _summary(*, agent: str = "microglia_agent", notes: dict | None = None, calls
 
 
 def _notes(rounds: list[tuple[int, int, int]], *, collisions: int = 0, specificity: dict | None = None,
-           task: str = "1", scope: dict | None = None) -> dict:
+           task: str = "1", scope: dict | None = None, verdict: bool = False, verdicts: int = 0,
+           verdict_chars: int = 0) -> dict:
     """A notes block of the shape `run_split.py` prints: `(round, failed, written)` per round.
 
     One task's block, because one invocation writes one. The scope is the block's own — `{kind: task, task: T}` —
@@ -806,6 +827,10 @@ def _notes(rounds: list[tuple[int, int, int]], *, collisions: int = 0, specifici
         "collisions": collisions,
         "scope": scope if scope is not None else {"kind": "task", "task": task},
         "attempts": 1,
+        # R208. The material the sentences were written from, and how much of the corpus the evaluator explained.
+        "verdict": verdict,
+        "verdicts": verdicts,
+        "verdictChars": verdict_chars,
         "specificity": specificity if specificity is not None else {"graded": 1, "specific": 1, "share": None},
     }
 
@@ -1083,10 +1108,36 @@ def self_test() -> int:
           len(merge_notes_blocks([_notes([(1, 1, 1)], scope={"kind": "many", "tasks": ["5"]})])["scopeProblems"]) == 1)
     check("collisions add across phases",
           merge_notes_blocks([_notes([(1, 1, 1)], collisions=1), _notes([(1, 1, 1)], collisions=2)])["collisions"] == 3)
+    # R208. The material is the arm: a fold whose phases disagree about it measured two things.
+    graded_notes = merge_notes_blocks(
+        [_notes([(1, 4, 4)], task="5", verdict=True, verdicts=3, verdict_chars=120),
+         _notes([(1, 3, 3)], task="9", verdict=True, verdicts=2, verdict_chars=80)]
+    )
+    check("a verdict fold says it is one", graded_notes["verdict"] is True)
+    check("the explained failures add", graded_notes["verdicts"] == 5, str(graded_notes["verdicts"]))
+    check("the verdict's characters add", graded_notes["verdictChars"] == 200, str(graded_notes["verdictChars"]))
+    check("a fold that showed no verdict says so",
+          merge_notes_blocks([_notes([(1, 1, 1)], task="5"), _notes([(1, 1, 1)], task="9")])["verdict"] is False)
+    mixed_material = False
+    try:
+        merge_notes_blocks([_notes([(1, 1, 1)], task="5", verdict=True), _notes([(1, 1, 1)], task="9")])
+    except SystemExit as error:
+        mixed_material = str(error) == "tau2-note-pilot-mixed-verdict:1:1"
+    check("a fold of two materials is refused", mixed_material, "no refusal")
+    # An artefact written before R208 has no key at all, and that is `false` rather than a third state.
+    legacy = {key: value for key, value in _notes([(1, 1, 1)], task="5").items() if key != "verdict"}
+    check("a phase that predates the verdict is a phase without one",
+          merge_notes_blocks([legacy, _notes([(1, 1, 1)], task="9")])["verdict"] is False)
     whole = material_of(_summary(notes=merged_notes, hits=5, lookups=8))
     check("the merged census is readable as material", whole["failed"] == 5 and whole["written"] == 5, str(whole))
     check("and carries both scopes", whole["scopeTasks"] == ["5", "9"], str(whole["scopeTasks"]))
     check("the two identities are reported apart", (whole["keyHits"], whole["taskHits"]) == (0, 5), str(whole))
+    check("a material of attempts alone says it showed no verdict", whole["verdict"] is False and whole["verdicts"] == 0, str(whole))
+    graded_material = material_of(
+        _summary(notes=merge_notes_blocks([_notes([(1, 4, 4), (2, 3, 2)], task="5", verdict=True, verdicts=4, verdict_chars=150)]))
+    )
+    check("a verdict material counts what the evaluator explained", graded_material["verdicts"] == 4, str(graded_material))
+    check("and bills the verdict's characters", graded_material["verdictChars"] == 150, str(graded_material))
     single_block = material_of(_summary(notes=_notes([(1, 1, 1)], task="7")))
     check("a single phase's scope is read from its own block", single_block["scopeTasks"] == ["7"], str(single_block["scopeTasks"]))
     no_task = material_of(_summary(notes=_notes([(1, 1, 1)], scope={"kind": "none"})))

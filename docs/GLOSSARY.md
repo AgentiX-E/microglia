@@ -2415,3 +2415,28 @@ half: the union of the tasks with every `(task, trial)` exactly once.
 **N5** — R207's gate: every sidecar declares exactly one task and there is one per task in the grid. A mis-scoped
 file is `DISCARDED` (another arm), a grid with fewer scopes than tasks is `NO_MEASUREMENT` (this arm, with a hole),
 and an artefact carrying no scope census is `DISCARDED` because it predates the field.
+
+**Verdict (`verdict_text`)** — the evaluator's account of a failed episode: the reward, the database check, and
+every environment assertion, action check, communicate check and natural-language assertion with its outcome, as
+lines (`DB CHECK not met`, `COMMUNICATE not met: …`). Rendered into the summariser's prompt only when
+`--note-verdict` is passed, because it changes the material the note is written from. Never rendered for a pass: a
+pass is not distilled.
+
+**Material (of a note lane)** — what a note was written from: the **attempt** alone (R207) or the attempt plus the
+**verdict** (R208). It is a property of the arm and not of the task, so the fold refuses a corpus whose phases
+disagree (`tau2-note-pilot-mixed-verdict`).
+
+**Verdict census (`verdicts`, `verdictChars`)** — per round, how many failures the evaluator explained and how many
+characters the verdict block added to the prompt. `verdicts: 0` on a round that passed `--note-verdict` says the
+evaluator said nothing, which is a different fact from a summariser that did no better.
+
+**Saturated grid** — a task set on which an arm has nothing to learn: no failure arrives in a round a note is
+written from, so every downstream gate is untestable. Reported as `NO_MEASUREMENT` with the reason
+`no-distilled-failure`, never as `ABANDONED`: the material has not been refuted, it has not been tried.
+
+**Population gate (`N0b`)** — the gate that runs before `N1`–`N3` and asks whether the grid failed anything a note
+could be written from. Its absence is what let R207's pilot report "the treatment never read its sidecar" about a
+file that had never held a sentence.
+
+**Serviceable sidecar** — a sidecar that holds at least one note (`written > 0`). Only a serviceable sidecar can be
+"found": with `written == 0` a zero hit count is the writer's silence, not the reader's.

@@ -3920,3 +3920,123 @@ refactor could take the instrument from 95% to 80% with every job green. Measure
 **89.4%** overall, `r206_readback.py` 86.6%, `opening_stability.py` 80.0%. The contract job now runs the four
 self-checks under `coverage --branch` and fails below **95% per file** with `--expect-files 4` (a run that measured
 nothing reports 100% of nothing); R207's cases and the coverage work took the four to 96.9 / 95.7 / 98.1 / 96.6.
+
+### 8.77 The verdict joins the attempt, and the material becomes a dispatch argument
+
+R207 moved the identity into the file. R208 changes what the **summariser is shown**, and it is the smallest change
+in the lane that can move the two readings that were flat: note coverage (how many failures produce a sentence) and
+note quality (whether the sentence names the mistake).
+
+**Two documents describe one failure.** `notes.trajectory_text` is the agent's side — the user's request, every call
+with its arguments, the tool answers that came back wrong, and the last thing either side said. `notes.verdict_text`
+is the evaluator's: the reward, the database verdict, and every environment assertion, action check, communicate
+check and natural-language assertion **with its outcome**. R207 wrote its notes from the first alone, so a note could
+narrate a conversation accurately and never name the one thing that made it fail — the agent that said "I have
+cancelled your order" about a delivered parcel looks competent in its own transcript, and only the evaluator knows
+the required sentence was never said.
+
+| reader | says | ceiling |
+|---|---|---|
+| `trajectory_text` | `USER:` / `AGENT:` / `CALL name(arg=…)` / `FAILED …` / `RESULT …` | 2,000 chars, both ends kept |
+| `verdict_text` | `REWARD 0` / `DB CHECK not met` / `COMMUNICATE not met: …` / `ASSERTION met: …` | 600 chars, head kept |
+
+The verdict keeps its **head** on truncation where the trajectory keeps both ends, and for the same reason the
+trajectory keeps both: the head is the reward and the database verdict, which are the two lines that decide the
+episode, and a tail would keep whichever assertion the evaluator happened to append last. Both readers take the
+object τ² hands this process and the JSON an artefact holds — `reward_of` reads through `_field` now, a gap R208
+found by asking the two shapes the same question and getting different answers.
+
+**The prompt is byte-identical when no verdict is offered.** `note_prompt(trajectory, verdict="")` returns exactly
+what R207 sent, which is what makes a verdict run *comparable to the pilot before it* rather than merely similar to
+it. The block is quoted and separate because everything inside it is text a model wrote in a previous episode:
+
+```
+ATTEMPT
+<<<
+USER: I want to cancel order W2378156.
+  CALL cancel_pending_order(order_id="W2378156", reason="no longer needed")
+  FAILED Order W2378156 has already been delivered and cannot be cancelled.
+AGENT: I have cancelled your order.
+>>>
+VERDICT
+<<<
+REWARD 0
+DB CHECK not met
+COMMUNICATE not met: The agent must inform the user that the order cannot be cancelled because it has already been delivered.
+ASSERTION met: The agent apologises for the inconvenience.
+>>>
+```
+
+**A change of material is a dispatch argument, not a new default.** `run_split.py --note-verdict` is off unless a
+dispatch passes it, and `note-pilot.yml` forwards `note_verdict`, which defaults to `false`. Three consequences, each
+recorded rather than assumed:
+
+- the round census gains `verdict` (was one shown at all), `verdicts` (how many failures the evaluator explained) and
+  `verdictChars` (what the block added to the prompt — the part of the material's cost that is not a sentence), so a
+  round that asked for the verdict and got none is visible as that rather than as a summariser doing no better;
+- the phase's notes block and the fold's merged census carry the same three, and `merge_notes_blocks` **refuses** a
+  corpus whose phases disagree (`tau2-note-pilot-mixed-verdict:6:1`) instead of summing them. The material is the
+  arm; a fold half of whose notes were written from a verdict measured two things, which is `merge_summaries`'
+  refusal one level down;
+- an artefact written before the field existed reads as `false`, because "the summariser was shown the attempt and
+  nothing else" is the same fact as a phase that ran before the material existed. A fold that mixed a pre-R208 phase
+  with a verdict phase is refused for the same reason, and the counts are in the code so the message says how badly
+  the fold was mixed.
+
+**Only a failure's verdict is shown.** A pass is not distilled, so a passing episode's verdict is never rendered —
+the summariser has nothing to explain and the block would be paid for nothing. The self-check asserts that directly
+(`a pass is not shown to the summariser`), because the cheapest way to waste the material would be to render it for
+episodes the mechanism does not read.
+
+### 8.78 The population is a gate, and three refutations that were about nothing
+
+R207's pilot came back with three refutations fired: *the treatment never read its sidecar*, *the summariser wrote
+notes for too few failures*, *the notes restate the request*. All three were false statements about the mechanism.
+The pilot ran 48 episodes across six tasks and four rounds; **one** episode failed (task 5, treatment, round 1 — the
+agent escalated a routine exchange to a human on its second turn), and a failure in the last round is never
+distilled. So the population the gates are conditioned on was empty, and each gate read an absence it could not
+distinguish from its own failure:
+
+| gate | what it said | what was true |
+|---|---|---|
+| `N1 and found one` (`hits > 0`) | the file was never served | the file held no note, because none was written |
+| `N2 coverage ≥ 0.6` | the summariser wrote for too few failures | there were no failures to write for |
+| `N3 specificity ≥ 0.5` | the notes restate the request | there were no notes |
+
+**`N0b` grades the population first.** At least one failure must arrive in a round a note is written from. When it
+does not, `N1`'s "and found one", `N2`'s coverage and `N3`'s specificity are reported `n/a` rather than `FAIL`, the
+refutations below them are conditioned on the same fact, and the state is `NO_MEASUREMENT` with one greppable line:
+
+```
+context (not graded):
+  reason: no-distilled-failure — the grid failed nothing after round 1, so N1-N3 were not testable.
+  This is a saturated grid, not a refuted mechanism: dispatch a harder one.
+```
+
+`NO_MEASUREMENT` and not `ABANDONED`, because those two states ask an operator for different things: `ABANDONED`
+says do not buy this material, and `NO_MEASUREMENT` says this run did not try. A saturated grid is the second, and
+the pilot's pair is still printed (control 100.0% vs treatment 83.3%, delta −16.7 pp, ±29.8 pp over six tasks —
+withheld) because the number a reader wants from a saturated grid is how saturated it was.
+
+**Two populations, two names.** `failed == 0` is a grid with nothing to learn from; `failed > 0 and written == 0` is
+a summariser that declined every attempt, and that one *is* a refutation of the material's premise — it fires on
+`N2`'s coverage, which names the right cause. The refutation called "the treatment never read its sidecar" is now
+conditioned on a note existing (`serviceable = written > 0`), because an empty sidecar serves nothing and blaming
+the reader for the writer's silence is the same defect one level down.
+
+**The workflow treats the state as a warning, not a failure.** The grading step reads the reason line, prints
+`::warning::`, keeps the artefact, and exits zero. A red job here would teach an operator to re-dispatch rather
+than to read — and the repair is a harder grid, which is a different dispatch rather than a fix.
+
+**What the pilot did establish**, and it is not nothing:
+
+- the identity binding is unexercised rather than broken: `lookups: 24` (one per episode after the first) with
+  `hits: 0`, `keyHits: 0`, `taskHits: 0` and six scopes for six tasks. The file was named, declared and read; it
+  had nothing in it;
+- the material is free: `materialShareOfTreatmentPrompt` 0.0295% — 495 tokens of material against 1.68M of prompt;
+- the summariser **refused** the one failure it was shown (`refused: 1`, the model answering `NONE`). The attempt
+  was a premature transfer: the trajectory shows `transfer_to_human_agents` succeeding and the agent announcing the
+  hand-off, and nothing in the transcript says a routine exchange may not be escalated. The evaluator does:
+  `ACTION not met: return_delivered_order_items`, `DB CHECK not met`. That is R208's motivation, measured rather
+  than assumed;
+- 48 episodes cost **$0.089** (¥0.64), which is $0.0019 an episode — the fold's price was never the obstacle.

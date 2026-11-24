@@ -6354,3 +6354,67 @@ done
 python3 -m coverage json -o /tmp/cov.json --include="$INCLUDE"
 python3 scripts/check-python-coverage.py /tmp/cov.json --min 95 --expect-files 4
 ```
+
+### 32.58 Showing the summariser what the evaluator said
+
+A note is written from one failed attempt. Until R208 it was written from the **transcript alone**, which is the
+agent's own account of what happened — and an agent that told the user "I have cancelled your order" about a
+delivered parcel reads as competent in its own transcript. The evaluator is the only party that knows the required
+sentence was never said.
+
+`--note-verdict` adds the evaluator's side. It is off by default, and a dispatch turns it on:
+
+```bash
+# what the model sees, without the flag: R207's prompt, byte for byte
+python3 eval/drivers/tau2/run_split.py --phase eval --agent microglia_agent \
+  --domain retail --tasks 5 --rounds 4 --notes eval/results/note-pilot/notes-5.json \
+  --out eval/results/note-pilot/treatment/results-5.json
+
+# the same run with the evaluator's verdict quoted beside the attempt
+python3 eval/drivers/tau2/run_split.py --phase eval --agent microglia_agent \
+  --domain retail --tasks 5 --rounds 4 --notes eval/results/note-pilot/notes-5.json --note-verdict \
+  --out eval/results/note-pilot/treatment/results-5.json
+```
+
+Through the workflow, name it as an input; the default is `false`:
+
+```
+gh workflow run note-pilot.yml -f tasks=5,9,12,17,18,26 -f rounds=4 -f note_verdict=true
+```
+
+What the round log then says, per round, is the census of the material rather than a promise about it:
+
+```
+[tau2] notes round 1: 4 written, 1 refused, 0 provider failure(s), 6 failure(s) of 6 episode(s), verdict shown for 6
+```
+
+`verdict shown for N` is the number of failures the evaluator actually explained. A round that asked for the verdict
+and shows `0` is a run whose evaluator said nothing — the material was not written from a verdict, and the reading
+is R207's whether or not the flag was passed. The artefact carries the same three numbers (`verdict`, `verdicts`,
+`verdictChars`) in the phase's notes block and in the fold's merged census, and the fold **refuses** a corpus whose
+phases disagree about them (`tau2-note-pilot-mixed-verdict`): half a corpus written from a verdict is two
+experiments, not one.
+
+The block costs what it says: about 200 characters on a retail failure, roughly a tenth of the attempt's 2,000, and
+it is billed inside the arm's own prompt tokens rather than by a second instrument.
+
+### 32.59 Reading a `NO_MEASUREMENT` that is not a broken document
+
+`r206_readback.py` prints one of four states on its last line. Three of them are about the document; one is about
+the grid:
+
+| state | what it means | what to do |
+|---|---|---|
+| `GRADED` | the mechanism was observed and the material is quotable | read the pair, then decide the fold |
+| `ABANDONED` | a refutation fired | do not buy this material |
+| `NO_MEASUREMENT` with `reason: no-distilled-failure` | **the grid failed nothing after round 1** | dispatch a harder grid |
+| `NO_MEASUREMENT` (any other reason) | the document cannot answer (no rows, no census, a headline its rows cannot produce) | fix the fold |
+| `DISCARDED` | another arm: a stock agent, a facade, a control carrying the material, a sidecar naming no task | read the wrong artefact |
+
+A saturated grid is the state R207's pilot came back in: 48 episodes, one failure, and that failure in the last
+round. `grep "reason: no-distilled-failure"` is the check the workflow uses to keep the job green and print a
+warning, because the repair is a harder dispatch and not a fix.
+
+Pick the harder grid by measurement, not by hunch: run the **control** over the split you intend to use, one round,
+and take the tasks it failed. At the lane's measured $0.0019 an episode, the retail split's 114 tasks cost about
+$0.21 to census, which is cheaper than one fold dispatched on a grid that was never going to say anything.

@@ -766,6 +766,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     # anything) is only ever set on the treatment.
     parser.add_argument("--rounds", type=int, default=0)
     parser.add_argument("--notes", default="")
+    # R208. Whether the summariser is shown the evaluator's verdict alongside the attempt. Off by default so a
+    # phase is R207's arm unless a dispatch says otherwise: the trajectory and the verdict are two documents about
+    # one failure, and adding the second is a change to the material that has to be a dispatch argument rather
+    # than a change every later run inherits silently.
+    parser.add_argument("--note-verdict", action="store_true")
     # A full-quality run is six hours and four arms; at double price that is a doubled bill for a
     # number that does not improve. The guard is off by default because a smoke run is cheap enough
     # to be worth running whenever the operator is awake, and on for every dispatch that is not.
@@ -1164,8 +1169,8 @@ def note_writer():
     facts that decide whether a note-free round is the mechanism working or the run being broken.
     """
 
-    def write(trajectory: str):
-        prompt = note_prompt(trajectory)
+    def write(trajectory: str, verdict: str = ""):
+        prompt = note_prompt(trajectory, verdict)
         try:
             import litellm  # noqa: PLC0415 - τ²'s dependency, absent in the self-check
 
@@ -1337,12 +1342,15 @@ def main(argv: list[str]) -> int:
             # Between the rounds, which is the only place a reward is known and the next attempt has not
             # started. The counters travel into the artefact rather than a log line: a round that distilled
             # nothing is the arm's own gate, and a round whose provider failed is the run being broken.
-            counted = note_round(round_simulations, args.notes, index + 1, summarize, trajectories)
+            counted = note_round(
+                round_simulations, args.notes, index + 1, summarize, trajectories, verdict=args.note_verdict
+            )
             note_rounds.append(counted)
             print(
                 f"[tau2] notes round {index + 1}: {counted['written']} written, {counted['refused']} refused, "
                 f"{counted['providerFailures']} provider failure(s), {counted['failed']} failure(s) of "
-                f"{counted['episodes']} episode(s)",
+                f"{counted['episodes']} episode(s)"
+                + (f", verdict shown for {counted['verdicts']}" if counted["verdict"] else ""),
                 file=sys.stderr,
             )
     if rounds > 1:
@@ -1384,6 +1392,12 @@ def main(argv: list[str]) -> int:
                             # carries the field so the gate can say so rather than infer it from a failure count.
                             "scope": scope_of(load_notes(args.notes)[0]),
                             "task": tasks[0].id,
+                            # R208: which material the sentences were written from. A reading is only comparable
+                            # to another when both say this, and a phase that silently gained the verdict would be
+                            # a better number nobody could attribute.
+                            "verdict": bool(args.note_verdict),
+                            "verdicts": sum(entry["verdicts"] for entry in note_rounds),
+                            "verdictChars": sum(entry["verdictChars"] for entry in note_rounds),
                             # The attempts, and how many of them were kept: the builder recomputes specificity
                             # over the merged corpus from these files, and a count of zero is a corpus whose
                             # cross-task share will be a share of nothing.

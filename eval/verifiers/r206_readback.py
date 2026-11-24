@@ -13,6 +13,10 @@ Five gates, in the order the registration ordered them:
   N0  the control is the same scaffold   both arms `microglia_agent`, same rounds, same seeds, no facade; the
                                          only difference is the sidecar. R93's defect was comparing across a
                                          wrapper and quoting the difference as the memory's.
+  N0b the grid failed something          at least one failure arrived in a round a note is written from. R207's
+                                         pilot had none — 48 episodes, one failure, in the last round — and the
+                                         gates below read that absence as the mechanism's, which is why the
+                                         population is graded first and reported as `NO_MEASUREMENT`.
   N1  the handoff happened               the treatment found a note and the control found none, over the same
                                          number of episodes. A treatment with `hits: 0` is a file nobody read.
   N2  coverage is quotable               `written / failed ≥ 0.6` over the rounds after the first. R204 measured
@@ -190,23 +194,65 @@ def grade(artefact: dict[str, Any]) -> tuple[str, Report]:
     if not honest:
         return ("NO_MEASUREMENT", report)
 
-    # N1: the handoff. Three facts, and the third is what separates "the file was never read" from "the file was
-    # read and empty": the control must carry no census at all, the treatment must have found something, and the
-    # two arms must have run the same episodes or their difference is a difference in what was attempted.
+    def quote_pair() -> None:
+        """The paired reading, printed as `withheld` with the interval that explains why.
+
+        Defined here rather than written twice: the population gate below returns before N4, and a reading that
+        dropped the pair on a saturated grid would hide the one number a reader wants from it — that the two arms
+        differed by 16.7 pp on six tasks, which at six tasks is noise.
+        """
+        passk = comparison.get("passK") if isinstance(comparison.get("passK"), dict) else {}
+        paired = number(passk.get("paired"))
+        delta = number(passk.get("deltaPp"))
+        interval = passk.get("intervalPp")
+        if not (isinstance(interval, list) and len(interval) == 2):
+            return
+        width = (number(interval[1]) or 0.0) - (number(interval[0]) or 0.0)
+        report.note(
+            f"pass^{k}: control {control_passk * 100:.1f}% vs treatment {treatment_passk * 100:.1f}%, "
+            f"delta {delta} pp, interval ±{width / 2:.1f} pp over {int(paired or 0)} task(s) — withheld"
+        )
+        report.note(
+            f"episode rate: control {control_rate * 100:.1f}% vs treatment {treatment_rate * 100:.1f}% "
+            f"(the level at which this n has resolution)"
+        )
+
+    # N0b: the population. Every gate below is conditioned on there being something to serve, and R207's pilot is
+    # the case that proved the gates could not tell "the mechanism failed" from "the mechanism was never given
+    # anything": 48 episodes, one failure, and that failure arrived in the last round, so `failed` over the rounds
+    # a note is written from was **0** — and N1's "and found one" fired as a refutation of a file that had never
+    # held a sentence. A gate that fires on a cause it cannot distinguish from the arm's own failure is the defect
+    # this file's header warns about, so the population is graded first.
+    #
+    # Two populations, and they are different findings. No distilled failure is a **saturated grid**: the task set
+    # cannot say anything about the material and the next dispatch is a harder one. No written note is a
+    # **summariser that declined every attempt**, which N2's coverage refutation already names correctly.
+    distilled = number(notes.get("failed")) or 0
+    written = number(notes.get("written")) or 0
+    no_failure = distilled <= 0
+    serviceable = written > 0
+    report.predict("N0b the grid failed something a note could be written from", not no_failure,
+                   f"{int(distilled)} failure(s) after round 1")
+
     control_has_notes = control.get("notes") is not None or number(control.get("lookups")) not in (None, 0)
     hits = number(notes.get("hits"))
     lookups = number(notes.get("lookups"))
     same_episodes = number(control.get("episodes")) == number(treatment.get("episodes"))
     report.predict("N1 the control found no note", not control_has_notes)
     report.predict("N1 the treatment asked for one", (lookups or 0) > 0, f"lookups={lookups}")
-    report.predict("N1 and found one", (hits or 0) > 0, f"hits={hits}")
+    # `n/a` rather than `FAIL` when no note was ever written: the file cannot have served what nobody put in it,
+    # and a red line here would name the reader for the writer's refusal.
+    report.predict("N1 and found one", None if not serviceable else (hits or 0) > 0, f"hits={hits}")
     report.predict("N1 both arms ran the same episodes", same_episodes,
                    f"{number(control.get('episodes'))} vs {number(treatment.get('episodes'))}")
     # A hit of zero is an abandonment whether or not the agent asked: "asked and found nothing" and "never
     # asked" are two ways for the treatment to not have run, and both make every reading below about a control.
     # The two are named apart in the detail because the repair differs — the first is a sidecar the runner wrote
     # where the agent was not looking, the second is an environment variable that never reached the process.
-    report.refute("the treatment never read its sidecar", (hits or 0) == 0, f"lookups={lookups}, hits={hits}")
+    # Conditioned on a note existing for the same reason the prediction is: an empty sidecar serves nothing, and
+    # calling that "the treatment never read its sidecar" is a false statement about the agent.
+    report.refute("the treatment never read its sidecar", serviceable and (hits or 0) == 0,
+                  f"lookups={lookups}, hits={hits}")
     report.refute("the material leaked into the control", bool(control_has_notes))
     report.refute("the arms attempted different amounts", not same_episodes)
 
@@ -221,10 +267,10 @@ def grade(artefact: dict[str, Any]) -> tuple[str, Report]:
     # N2: coverage, over the rounds after the first, because a note written at the end of round one is read
     # starting in round two.
     coverage = number(notes.get("coverage"))
-    report.predict("N2 coverage clears the bar", (coverage or 0.0) >= COVERAGE_BAR,
+    report.predict("N2 coverage clears the bar", None if no_failure else (coverage or 0.0) >= COVERAGE_BAR,
                    f"{coverage if coverage is None else round(coverage * 100, 1)}% of {int(number(notes.get('failed')) or 0)} failure(s)")
-    report.refute("the summariser wrote notes for too few failures", (coverage or 0.0) < COVERAGE_BAR,
-                  f"coverage {coverage}")
+    report.refute("the summariser wrote notes for too few failures",
+                  not no_failure and (coverage or 0.0) < COVERAGE_BAR, f"coverage {coverage}")
     # The census has to close: every failed attempt ended in exactly one of four states, because a round that
     # lost one of them would report a coverage that is a share of a number nobody can reconstruct. It is the
     # same identity the pack gate needed, one round later.
@@ -248,13 +294,24 @@ def grade(artefact: dict[str, Any]) -> tuple[str, Report]:
     # N3: specificity, the check that the note is about this task rather than a restatement of the request.
     specificity = notes.get("specificity") if isinstance(notes.get("specificity"), dict) else {}
     share = number(specificity.get("share"))
-    report.predict("N3 the notes name their own failure", (share or 0.0) >= SPECIFICITY_BAR,
+    report.predict("N3 the notes name their own failure", None if not serviceable else (share or 0.0) >= SPECIFICITY_BAR,
                    f"share={share} over {int(number(specificity.get('graded')) or 0)} graded")
-    report.refute("the notes restate the request", (share or 0.0) < SPECIFICITY_BAR, f"share {share}")
+    report.refute("the notes restate the request", serviceable and (share or 0.0) < SPECIFICITY_BAR, f"share {share}")
     # A collision is two task ids reduced to one key, which is the material crossing tasks — the one thing this
     # arm exists to not be.
     report.refute("two tasks shared a key", (number(notes.get("collisions")) or 0) > 0,
                   f"{int(number(notes.get('collisions')) or 0)} collision(s)")
+
+    if no_failure:
+        # The one place this document leaves the measurement states for a reason that is not an instrument fault.
+        # Nothing below can be tested: with no failure to distil there is no note, with no note there is no hit,
+        # no coverage and no specificity — and every one of those absences would have read as the mechanism's.
+        # The state is `NO_MEASUREMENT` and not `ABANDONED` because the material has not been refuted, it has not
+        # been tried; the line below is the one an operator greps to tell the two apart.
+        report.note("reason: no-distilled-failure — the grid failed nothing after round 1, so N1-N3 were not "
+                    "testable. This is a saturated grid, not a refuted mechanism: dispatch a harder one.")
+        quote_pair()
+        return ("NO_MEASUREMENT", report)
 
     # N4: the comparison, quoted last and quoted as withheld. The pilot's own interval is printed so the reader
     # can see *why* it cannot be a claim rather than being told that it cannot.
@@ -270,15 +327,7 @@ def grade(artefact: dict[str, Any]) -> tuple[str, Report]:
         # the next reader of this log is the one deciding whether to quote it.
         report.note(f"the artefact states claim {claim!r} over {int(paired or 0)} task(s), which is not quotable")
     if isinstance(interval, list) and len(interval) == 2:
-        width = (number(interval[1]) or 0.0) - (number(interval[0]) or 0.0)
-        report.note(
-            f"pass^{k}: control {control_passk * 100:.1f}% vs treatment {treatment_passk * 100:.1f}%, "
-            f"delta {delta} pp, interval ±{width / 2:.1f} pp over {int(paired or 0)} task(s) — withheld"
-        )
-        report.note(
-            f"episode rate: control {control_rate * 100:.1f}% vs treatment {treatment_rate * 100:.1f}% "
-            f"(the level at which this n has resolution)"
-        )
+        quote_pair()
     else:
         return ("NO_MEASUREMENT", report)
 
@@ -323,6 +372,7 @@ def notes_block(
     specificity: float | None = 0.75,
     problem: str | None = None,
     gap: int = 0,
+    failed: int = 20,
     tasks: int = 6,
     scope_tasks: list[str] | None = None,
     scope_problems: list[str] | None = None,
@@ -338,7 +388,7 @@ def notes_block(
     because every other gate in this file is about the material and a fixture that was mis-scoped by default
     would test N5 instead of whatever the case was written for.
     """
-    failed = 20
+    failed = int(failed)
     written = min(int((coverage or 0.0) * failed), failed - provider_failures)
     written = max(0, written)
     refused = max(0, failed - written - provider_failures)
@@ -373,10 +423,12 @@ def _artefact(
     treatment_passes: int = 4,
     hits: int = 11,
     lookups: int = 16,
+    task_hits: int = 11,
     coverage: float | None = 0.8,
     specificity: float | None = 0.75,
     collisions: int = 0,
     provider_failures: int = 0,
+    failed: int = 20,
     problem: str | None = None,
     control_notes: dict | None = None,
     claim: str = "none",
@@ -442,8 +494,9 @@ def _artefact(
             },
         },
         "notes": notes_block(coverage=coverage, provider_failures=provider_failures, hits=hits, lookups=lookups,
-                             collisions=collisions, specificity=specificity, problem=problem, gap=census_gap,
-                             tasks=tasks, scope_tasks=scope_tasks, scope_problems=scope_problems),
+                             task_hits=task_hits, collisions=collisions, specificity=specificity, problem=problem,
+                             gap=census_gap, failed=failed, tasks=tasks, scope_tasks=scope_tasks,
+                             scope_problems=scope_problems),
         "comparison": {
             "passK": {
                 "paired": tasks,
@@ -472,6 +525,14 @@ CASES: list[tuple[str, dict[str, Any], str]] = [
     ("a fold whose scopes name another task is unmeasured",
      _artefact(scope_tasks=["1", "2", "3", "4", "5", "7"]), "NO_MEASUREMENT"),
     ("a treatment that read nothing abandons the pilot", _artefact(hits=0, lookups=16), "ABANDONED"),
+    # N0b. R207's own pilot, to the number: six tasks, four rounds, one failure, and that failure in the last
+    # round — so the failure count over the rounds a note is written from is zero and the sidecar was never given
+    # a sentence. The reading must be `NO_MEASUREMENT` and not `ABANDONED`: nothing about the material was tried.
+    ("a grid that failed nothing after round one is unmeasured",
+     _artefact(failed=0, coverage=None, hits=0, lookups=24, task_hits=0, specificity=None), "NO_MEASUREMENT"),
+    # The two populations are different findings, and the second is a real refutation of the material's premise:
+    # failures existed and the summariser declined all of them. It must fail on coverage, not on the reader.
+    ("a summariser that declined every failure fails on coverage", _artefact(coverage=0.0, hits=0), "ABANDONED"),
     ("a sidecar the agent never asked for abandons the pilot", _artefact(hits=0, lookups=0), "ABANDONED"),
     ("a control that found a note is a leak", _artefact(control_notes={"lookups": 4, "hits": 2}), "ABANDONED"),
     ("a control that only asked is a leak too", _artefact(control_notes={"lookups": 4, "hits": 0}), "ABANDONED"),
@@ -610,6 +671,31 @@ def self_test() -> int:
         else:
             failed.append(f"{name}{': ' + detail if detail else ''}")
             print(f"FAIL  {name}{'' if not detail else f'  ({detail})'}")
+
+    # N0b, read from the report rather than from the state. A saturated grid must produce **no** refutation: the
+    # whole defect was that three of them fired, in words that blamed the agent for reading an empty file and the
+    # summariser for a corpus it was never given. The state alone cannot show that, so these two cases read the
+    # rendered lines and are the reason the fix is a fix rather than a relabelling.
+    saturated_state, saturated = grade(
+        _artefact(failed=0, coverage=None, hits=0, lookups=24, task_hits=0, specificity=None)
+    )
+    saturated_text = saturated.render()
+    check("a saturated grid refutes nothing", "FIRED" not in saturated_text, saturated_text)
+    check("a saturated grid still reports that the file was asked for", "N1 the treatment asked for one" in saturated_text)
+    check("a saturated grid names the population as the reason",
+          "reason: no-distilled-failure" in saturated_text, saturated_text)
+    coverage_line = next(
+        (line for line in saturated_text.splitlines() if "N2 coverage clears the bar" in line), ""
+    )
+    check("a saturated grid marks coverage not-applicable rather than failed",
+          coverage_line.strip().startswith("n/a"), coverage_line)
+    refused_state, refused = grade(_artefact(coverage=0.0, hits=0))
+    refused_text = refused.render()
+    check("a summariser that declined everything abandons on the coverage gate",
+          refused_state == "ABANDONED" and "the summariser wrote notes for too few failures" in refused_text,
+          refused_text)
+    check("and is not blamed on a file nobody wrote to",
+          "clear the treatment never read its sidecar" in refused_text, refused_text)
 
     with tempfile.TemporaryDirectory() as directory:
         check("a directory with no artefact exits 2", main(["--dir", directory]) == 2)

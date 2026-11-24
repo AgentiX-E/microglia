@@ -54,6 +54,12 @@ on:
         description: 'Tasks at a time. The provider limits requests, and one episode holds three.'
         required: false
         default: '1'
+      note_verdict:
+        description: 'Show the summariser the evaluator verdict as well as the attempt (R208)'
+        required: false
+        # Off, so a dispatch that does not name it runs R207's arm. Turning it on is a change to the material and
+        # therefore to what the reading is comparable to: the fold refuses a corpus whose phases disagree.
+        default: 'false'
   push:
     branches: [master]
     paths:
@@ -184,6 +190,9 @@ jobs:
       PILOT_ROUNDS: ${{ github.event.inputs.rounds || '4' }}
       PILOT_MAX_STEPS: ${{ github.event.inputs.max_steps || '100' }}
       PILOT_CONCURRENCY: ${{ github.event.inputs.concurrency || '1' }}
+      # R208. Empty unless the dispatch asked for it, so the shell can append the flag conditionally rather than
+      # passing `--note-verdict false`, which argparse would refuse for a `store_true` option.
+      PILOT_NOTE_VERDICT: ${{ github.event.inputs.note_verdict || 'false' }}
       # The base seed, named once. `run_split.py` derives round i's seed as `base + i`, and the artefact states
       # the same list so a reader can re-run the fold without guessing what "four rounds" meant.
       PILOT_SEED: '300'
@@ -267,6 +276,11 @@ jobs:
             local extra=()
             if [ "$arm" = "treatment" ]; then
               extra=(--notes "${PILOT_DIR}/notes-${task}.json")
+              # R208. The verdict is treatment-only: the control has no summariser and so nothing to show it to,
+              # and a control that carried the material would be the defect N1 exists for.
+              if [ "${PILOT_NOTE_VERDICT}" = "true" ]; then
+                extra+=(--note-verdict)
+              fi
             fi
             # `--require-off-peak` on both arms: the same workload costs exactly double inside the provider's
             # peak windows, and a pilot is the cheapest run in the lane to move. The guard refuses before the
@@ -321,7 +335,20 @@ jobs:
           # the state is in the outcome and in the summary, and a red job would teach an operator to re-dispatch
           # rather than to read. `NO_MEASUREMENT` and `DISCARDED` are the two that fail, because both mean the
           # document cannot answer — and both cost nothing to fix compared with another dispatch.
+          #
+          # One exception, and it is R207's own result: a **saturated grid** (`no-distilled-failure`) is a
+          # `NO_MEASUREMENT` that a red job would misdescribe. Nothing about the document is broken — the task set
+          # is too easy for the arm, so there was no failure to distil and N1-N3 were never testable. The step
+          # warns, keeps the artefact, and stays green, because the repair is a harder dispatch and not a fix.
+          set +e
           python3 eval/verifiers/r206_readback.py --dir "${PILOT_DIR}" | tee "${PILOT_DIR}/reading.txt"
+          STATUS=${PIPESTATUS[0]}
+          set -e
+          if grep -q "reason: no-distilled-failure" "${PILOT_DIR}/reading.txt"; then
+            echo "::warning::the grid produced no failure after round 1 — a saturated grid, not a refuted mechanism"
+            STATUS=0
+          fi
+          if [ "$STATUS" -ne 0 ]; then exit "$STATUS"; fi
           {
             echo "### R207 — the note, bound to its task by the file"
             echo
@@ -351,6 +378,8 @@ jobs:
           print(f"| note coverage | {share(notes['coverage'])} of {notes['failed']} failure(s) |")
           print(f"| specificity | {share((notes.get('specificity') or {}).get('share'))} |")
           print(f"| hits: file / text | {notes['taskHits']} / {notes['keyHits']} of {notes['lookups']} lookup(s) |")
+          print(f"| material | attempt{' + verdict' if notes.get('verdict') else ' only'} "
+                f"({notes.get('verdicts', 0)} failure(s) explained) |")
           print(f"| scopes | {len(notes['scopeTasks'])} task(s), {len(notes['scopeProblems'])} problem(s) |")
           print(f"| collisions | {notes['collisions']} |")
           print(f"| bill | ${document['bill']['controlUsd']} + ${document['bill']['treatmentUsd']} |")

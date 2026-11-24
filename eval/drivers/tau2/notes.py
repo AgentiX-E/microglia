@@ -81,6 +81,23 @@ NOTE_TIMEOUT_S = 30.0
 #: retail failure (the user's complaint, the wrong call, and the tool's answer) without a second call.
 TRAJECTORY_CHARS = 2_000
 
+#: How much of the evaluator's verdict the summariser is shown. R208: the trajectory says what the agent did and
+#: the verdict says what was wrong with it, and a summariser shown only the first has to infer the second — which
+#: is the difference between a note that names the mistake and one that narrates the conversation. Six hundred
+#: characters is the four check families at their natural length: a database verdict, one unmet communicate check,
+#: one natural-language assertion, and the reward.
+VERDICT_CHARS = 600
+
+#: The names a check's own description arrives under. τ² spells them per check type — `info` for a communicate
+#: check, `nl_assertion` for a natural-language one, `env_type` for an environment assertion — and a reader that
+#: knew one name would print `not met:` with nothing after it, which is a verdict the summariser cannot use.
+CHECK_TEXT_KEYS = ("info", "nl_assertion", "env_type", "action", "name", "description")
+
+#: The names a check's outcome arrives under, for the same reason: `met` on three of the four families and
+#: `action_match` on the fourth. A reader that knew only `met` would drop every action check silently, and a
+#: verdict missing a family looks exactly like a verdict that family had nothing to say about.
+CHECK_STATE_KEYS = ("met", "match", "action_match")
+
 #: The instruction. The three properties the material is supposed to have are stated as requirements and each
 #: one is checked against the artefact: *specific* (it names what went wrong, not that something did), *about
 #: this task* (no restatement of the request), and *actionable* (an imperative for the next attempt). `NONE` is
@@ -523,14 +540,88 @@ def trajectory_text(simulation, ceiling: int = TRAJECTORY_CHARS) -> str:
     return f"{body[:half]}\n…\n{body[-half:]}"
 
 
-def note_prompt(trajectory: str) -> str:
-    """The user turn: the attempt, quoted as data.
+def _check_line(kind: str, entry) -> str:
+    """One check as `<kind> met` / `<kind> not met: <description>`, or `""` when it carries no verdict.
+
+    Both spellings of the outcome are read — τ²'s `RewardInfo` says `met` on three of the four check families and
+    `db_match` on the fourth — and a check with no outcome is dropped rather than guessed at, because a line that
+    invented `met` would tell the summariser the opposite of what the evaluator said.
+    """
+    met = None
+    for key in CHECK_STATE_KEYS:
+        value = _field(entry, key)
+        if isinstance(value, bool):
+            met = value
+            break
+    if not isinstance(met, bool):
+        return ""
+    detail = ""
+    for key in CHECK_TEXT_KEYS:
+        value = _field(entry, key)
+        if isinstance(value, str) and value.strip():
+            detail = " ".join(value.split())[:200]
+            break
+    return f"{kind} {'met' if met else 'not met'}" + (f": {detail}" if detail else "")
+
+
+def verdict_text(simulation, ceiling: int = VERDICT_CHARS) -> str:
+    """What the evaluator said was wrong, as lines the summariser can read, or `""` when it said nothing.
+
+    R208. `trajectory_text` is the agent's side of the failure and this is the evaluator's: the reward, the
+    database verdict, and every assertion or communicate check with its outcome. They are different documents
+    about the same episode, and R207's notes were written from the first alone — which is why a note could
+    describe a conversation accurately and still not name the one thing that made it fail.
+
+    The head is kept on truncation, not both ends as the trajectory keeps them: the first line is the reward and
+    the second the database verdict, and a tail would keep whichever assertion the evaluator happened to append
+    last. `""` is not an error — an episode graded by a stock judge carries no `reward_info` — so the caller
+    counts it rather than treating it as a failure.
+    """
+    info = _field(simulation, "reward_info")
+    if info is None:
+        return ""
+    lines = []
+    reward = reward_of(simulation)
+    if reward is not None:
+        lines.append(f"REWARD {reward:g}")
+    db = _field(info, "db_check")
+    if db is not None:
+        match = _field(db, "db_match")
+        if isinstance(match, bool):
+            lines.append(f"DB CHECK {'met' if match else 'not met'}")
+    for kind, key in (
+        ("ENV", "env_assertions"),
+        ("ACTION", "action_checks"),
+        ("COMMUNICATE", "communicate_checks"),
+        ("ASSERTION", "nl_assertions"),
+    ):
+        entries = _field(info, key)
+        if not isinstance(entries, list):
+            continue
+        for entry in entries:
+            line = _check_line(kind, entry)
+            if line:
+                lines.append(line)
+    if not lines:
+        return ""
+    body = "\n".join(lines)
+    return body if len(body) <= ceiling else body[:ceiling]
+
+
+def note_prompt(trajectory: str, verdict: str = "") -> str:
+    """The user turn: the attempt, quoted as data, and — when one is offered — the verdict, quoted too.
 
     One block rather than two messages, and quoted, because everything inside it is text a model wrote in a
-    previous episode — the same rule R204's guidance prompt applies to records.
+    previous episode — the same rule R204's guidance prompt applies to records. With `verdict` empty the bytes are
+    exactly R207's, which is what keeps a verdict run comparable to the pilot it extends rather than merely
+    similar to it.
     """
     clipped = trajectory.strip()[:TRAJECTORY_CHARS]
-    return f"ATTEMPT\n<<<\n{clipped}\n>>>\n"
+    prompt = f"ATTEMPT\n<<<\n{clipped}\n>>>\n"
+    explained = verdict.strip()[:VERDICT_CHARS]
+    if explained:
+        prompt += f"VERDICT\n<<<\n{explained}\n>>>\n"
+    return prompt
 
 
 # --------------------------------------------------------------------------- the reply
@@ -632,9 +723,12 @@ def reward_of(simulation):
     `bool` is excluded on purpose: `True` would enter as a pass and a phase whose rewards were all flags would
     read as a perfect one. `None` is not zero — an unscored episode is an infrastructure fact and the note
     census counts it apart, exactly as `toPassAtK` leaves it out of the denominator.
+
+    Read through `_field`, so the JSON shape an artefact holds answers exactly as the object τ² hands this process
+    does. R208 found the gap: `verdict_text` is called on both shapes and the reward line vanished on one of them.
     """
-    info = getattr(simulation, "reward_info", None)
-    reward = getattr(info, "reward", None)
+    info = _field(simulation, "reward_info")
+    reward = _field(info, "reward")
     if isinstance(reward, bool) or not isinstance(reward, (int, float)):
         return None
     return float(reward)
@@ -661,12 +755,18 @@ def first_user_text(simulation) -> str:
 
 
 
-def note_round(simulations, path: str, attempt: int, summarize, trajectories) -> dict:
+def note_round(simulations, path: str, attempt: int, summarize, trajectories, verdict: bool = False) -> dict:
     """Distil every failed attempt of one round into the sidecar the next round reads.
 
     Only failures are distilled, and only a failure's *own* trajectory is shown: the reward is the runner's to
     know, which is why this cannot live in the agent, and the material is the attempt rather than a summary of
     the store, which is the one thing that separates this arm from R204's.
+
+    `verdict` is R208's material and it is off by default, because turning it on changes the arm: the summariser
+    is shown what the evaluator said as well as what the agent did. What it does *not* change is the schedule, the
+    model, or the selection of failures, which is what makes a verdict round comparable to the pilot before it.
+    `verdicts` counts the failures the evaluator actually explained, so a round that asked for the verdict and got
+    none is visible as that rather than as a summariser mysteriously doing no better.
 
     `trajectories` accumulates the last failed attempt per key so the specificity check can be computed over the
     phase rather than guessed at from one round.
@@ -683,6 +783,11 @@ def note_round(simulations, path: str, attempt: int, summarize, trajectories) ->
         "unreadable": 0,
         "promptChars": 0,
         "noteChars": 0,
+        # R208. Whether this round showed a verdict at all, how many failures came with one, and the characters
+        # that block added to the prompt — the last is the part of the material's cost that is not a sentence.
+        "verdict": bool(verdict),
+        "verdicts": 0,
+        "verdictChars": 0,
         "problem": problem,
         "firstProviderFailure": None,
     }
@@ -702,7 +807,11 @@ def note_round(simulations, path: str, attempt: int, summarize, trajectories) ->
             continue
         if text:
             trajectories[note_key(text)] = trajectory
-        sentence, state, detail, prompt_chars = summarize(trajectory)
+        explained = verdict_text(simulation) if verdict else ""
+        if explained:
+            counters["verdicts"] += 1
+            counters["verdictChars"] += len(explained)
+        sentence, state, detail, prompt_chars = summarize(trajectory, explained)
         counters["promptChars"] += prompt_chars
         if state == "failed":
             counters["providerFailures"] += 1
@@ -975,6 +1084,85 @@ def _self_test() -> int:
     check("a boolean reward is not a reward", reward_of(type("_S", (), {"reward_info": _Info(True)})()) is None)
     check("a missing reward is None", reward_of(type("_S", (), {"reward_info": _Info(None)})()) is None)
 
+    # R208. The verdict: what the evaluator said was wrong with the attempt, which the trajectory cannot say.
+    # The four check families τ² reports, a passing check, and the shapes an artefact carries them in.
+    class _Check:
+        def __init__(self, **fields):
+            self.__dict__.update(fields)
+
+    graded = type(
+        "_S",
+        (),
+        {
+            "reward_info": _Check(
+                reward=0.0,
+                db_check=_Check(db_match=False, db_reward=0.0),
+                communicate_checks=[_Check(info="the agent must tell the user the refund total", met=False)],
+                nl_assertions=[_Check(nl_assertion="the agent apologises", met=True)],
+                env_assertions=[_Check(env_type="retail", met=False)],
+            )
+        },
+    )()
+    verdict = verdict_text(graded)
+    check("verdict names the reward", "REWARD 0" in verdict, verdict)
+    check("verdict names the db check", "DB CHECK not met" in verdict, verdict)
+    check(
+        "verdict names the unmet communicate check",
+        "COMMUNICATE not met: the agent must tell the user the refund total" in verdict,
+        verdict,
+    )
+    check("verdict names an unmet environment assertion", "ENV not met: retail" in verdict, verdict)
+    check("verdict names a met assertion as met", "ASSERTION met: the agent apologises" in verdict, verdict)
+    check(
+        "a passing db check says so",
+        "DB CHECK met" in verdict_text({"reward_info": {"db_check": {"db_match": True}}}),
+        verdict_text({"reward_info": {"db_check": {"db_match": True}}}),
+    )
+    check(
+        "a check without a description still says which kind failed",
+        verdict_text({"reward_info": {"communicate_checks": [{"met": False}]}}) == "COMMUNICATE not met",
+        verdict_text({"reward_info": {"communicate_checks": [{"met": False}]}}),
+    )
+    check(
+        "a check with no verdict is dropped",
+        verdict_text({"reward_info": {"communicate_checks": [{"info": "x"}]}}) == "",
+        verdict_text({"reward_info": {"communicate_checks": [{"info": "x"}]}}),
+    )
+    check(
+        "json and objects read the same verdict",
+        verdict_text({"reward_info": {"reward": 0.0, "db_check": {"db_match": False}}})
+        == verdict_text(type("_S", (), {"reward_info": _Check(reward=0.0, db_check=_Check(db_match=False))})()),
+    )
+    check("no reward info is no verdict", verdict_text(object()) == "")
+    check("an empty reward info is no verdict", verdict_text({"reward_info": {}}) == "")
+    check(
+        "a verdict of one reward is still a verdict",
+        verdict_text({"reward_info": {"reward": 0.5}}) == "REWARD 0.5",
+        verdict_text({"reward_info": {"reward": 0.5}}),
+    )
+    check(
+        "an action check's outcome is read from its own spelling",
+        verdict_text({"reward_info": {"action_checks": [{"action": "cancel_pending_order", "action_match": False}]}})
+        == "ACTION not met: cancel_pending_order",
+        verdict_text({"reward_info": {"action_checks": [{"action": "cancel_pending_order", "action_match": False}]}}),
+    )
+    check("a non-numeric reward is not cited", verdict_text({"reward_info": {"reward": True}}) == "")
+    check(
+        "the verdict ceiling is honoured",
+        len(verdict_text({"reward_info": {"reward": 0.0, "nl_assertions": [{"met": False, "nl_assertion": "z" * 900}]}}, ceiling=80)) <= 80,
+    )
+
+    # The prompt: the same bytes R207 sent when no verdict is offered, and a second quoted block when one is.
+    check(
+        "no verdict leaves the prompt byte for byte as R207 sent it",
+        note_prompt("ATTEMPT-BODY") == "ATTEMPT\n<<<\nATTEMPT-BODY\n>>>\n",
+        repr(note_prompt("ATTEMPT-BODY")),
+    )
+    check("a blank verdict is no verdict", note_prompt("x", "   ") == note_prompt("x"))
+    check("the verdict is a quoted block of its own", note_prompt("x", "DB CHECK not met").count("<<<") == 2)
+    check("the prompt names the verdict block", "\nVERDICT\n<<<\nDB CHECK not met\n>>>\n" in note_prompt("x", "DB CHECK not met"))
+    check("the verdict block is bounded", len(note_prompt("x", "v" * 5000)) <= VERDICT_CHARS + 200, str(len(note_prompt("x", "v" * 5000))))
+
     # A round: failures are distilled, passes are not, and the three ways of producing no note are counted apart.
     with tempfile.TemporaryDirectory() as directory:
         path = os.path.join(directory, "notes.json")
@@ -995,10 +1183,12 @@ def _self_test() -> int:
             )()
 
         seen = []
+        seen_verdicts = []
         states = {"fail here": ("Ask for the id first.", "sentence"), "refuse here": ("", "refused"), "fail hard": ("", "failed")}
 
-        def summarise(trajectory):
+        def summarise(trajectory, verdict=""):
             seen.append(trajectory)
+            seen_verdicts.append(verdict)
             for needle, (sentence, state) in states.items():
                 if needle in trajectory:
                     return sentence, state, None, len(trajectory)
@@ -1019,6 +1209,9 @@ def _self_test() -> int:
         check("round counts the provider failure", first["providerFailures"] == 1, str(first))
         check("round counts the unscored episode", first["unscored"] == 1, str(first))
         check("round did not see the pass", not any("passed" in text for text in seen))
+        check("a round without the verdict shows none", first["verdict"] is False, str(first))
+        check("a round without the verdict shows no verdict text", first["verdicts"] == 0, str(first))
+        check("the summariser was offered no verdict", seen_verdicts == ["" for _ in seen_verdicts], str(seen_verdicts))
         stored, problem = load(path)
         check("round wrote the note to the file", note_of(stored, "fail here") == "Ask for the id first.", str(problem))
         check("round kept the attempt", stored["notes"][note_key("fail here")]["attempt"] == 1)
@@ -1033,6 +1226,20 @@ def _self_test() -> int:
         collided = note_round([sim("7", 0.0, "same"), sim("8", 0.0, "same")], path, 3, summarise, {})
         check("collision counted", collided["collisions"] == 1, str(collided))
         check("collision recorded", load(path)[0]["collisions"] != {}, str(load(path)[0].get("collisions")))
+
+        # R208. A round asked for the verdict shows it to the summariser, counts what it showed, and bills its
+        # characters — because the prompt is the bill and a block added to it is a block paid for.
+        seen_verdicts.clear()
+        graded_round = note_round([sim("9", 0.0, "fail here")], path, 4, summarise, {}, verdict=True)
+        check("a verdict round says it showed one", graded_round["verdict"] is True, str(graded_round))
+        check("a verdict round counts the failures it could explain", graded_round["verdicts"] == 1, str(graded_round))
+        check("a verdict round bills the verdict", graded_round["verdictChars"] > 0, str(graded_round))
+        check("the summariser was shown the verdict", seen_verdicts == ["REWARD 0"], str(seen_verdicts))
+        # Only a failure is distilled, so only a failure's verdict is shown: a pass has nothing to explain.
+        seen_verdicts.clear()
+        passed_round = note_round([sim("10", 1.0, "passed")], path, 5, summarise, {}, verdict=True)
+        check("a pass is not shown to the summariser", seen_verdicts == [], str(seen_verdicts))
+        check("a verdict round with no failure shows no verdict", passed_round["verdicts"] == 0, str(passed_round))
 
     # The merge: one document, one trial index per round, and a refusal for a task no round listed.
     with tempfile.TemporaryDirectory() as directory:
