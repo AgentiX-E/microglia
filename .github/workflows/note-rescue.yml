@@ -317,7 +317,6 @@ jobs:
           set -euo pipefail
           PYTHON="${GITHUB_WORKSPACE}/.tau2-bench/.venv/bin/python"
           test -x "$PYTHON" || { echo "tau2-venv-missing"; exit 25; }
-          mkdir -p "${RESCUE_DIR}/treatment"
           SEEDS="$(python3 -c "print(','.join(str(int('${RESCUE_SEED}') + index) for index in range(int('${RESCUE_ROUNDS}'))))")"
           echo "seeds ${SEEDS}" >> "$GITHUB_STEP_SUMMARY"
           echo "RESCUE_SEEDS=${SEEDS}" >> "$GITHUB_ENV"
@@ -434,11 +433,11 @@ jobs:
           for arm, (arm_episodes, arm_usd, arm_seconds) in per_arm.items():
               print(f"| {arm} | {arm_episodes} episode(s), ${arm_usd:.4f}, "
                     f"{(arm_seconds / arm_episodes if arm_episodes else 0):.1f} s an episode |")
-          print(f"| bill, both arms | ${usd:.4f} |")
+          print(f"| bill, every arm | ${usd:.4f} |")
           print(f"| mean episode | {(seconds / episodes if episodes else 0):.1f} s |")
           PY
 
-      - name: Keep both arms
+      - name: Keep every arm
         # The documents, not just the summary. R211's treatment arm was read from its log and the per-task rows were
         # lost with the runner, which is why its reading could not be recomputed and why the next run has to buy
         # both arms again. An arm that cannot be re-read is a number with a screenshot.
@@ -460,8 +459,9 @@ jobs:
           if [ "${RESCUE_ROUNDS}" -ge 3 ]; then extra+=(--pooled); fi
           STATUS=0
           set +e
+          arm_documents () { compgen -G "${RESCUE_DIR}/$1/results-*.json" > /dev/null; }
           for arm in treatment paraphrase verdict; do
-            [ -d "${RESCUE_DIR}/${arm}" ] || continue
+            arm_documents "${arm}" || { echo "::notice::${arm} produced no document; not read"; continue; }
             if [ -d "${RESCUE_DIR}/control" ]; then
               python3 eval/tools/rescue_rate.py \
                 --dir "${RESCUE_DIR}/${arm}" --baseline-dir "${RESCUE_DIR}/control" "${extra[@]}" \
@@ -499,8 +499,12 @@ jobs:
           set -euo pipefail
           arms=(--arm "control=${RESCUE_DIR}/control")
           notes=()
+          # A directory is not an arm: R213's first dispatch lost its whole reading to a `mkdir -p` left over from
+          # the two-arm version, which made `rescue_rate` refuse an empty `treatment/` with exit 4 and turned the
+          # job red after every document had been written. The test is for a document.
+          arm_documents () { compgen -G "${RESCUE_DIR}/$1/results-*.json" > /dev/null; }
           for arm in treatment paraphrase verdict; do
-            [ -d "${RESCUE_DIR}/${arm}" ] || continue
+            arm_documents "${arm}" || continue
             arms+=(--arm "${arm}=${RESCUE_DIR}/${arm}")
             notes+=(--notes "${arm}=${RESCUE_DIR}/${arm}")
           done

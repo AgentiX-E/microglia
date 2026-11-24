@@ -6682,3 +6682,30 @@ Four states, and they are not the same null:
 Two habits. **Name the harm before you ablate it**: `break` was in every artefact this lane wrote and no reader
 counted it. **Check the bar before you build the gate**: if `breaks/(repairs+breaks)` sits above the base repair
 rate, no filter on this material pays for itself, and the defect is the material rather than the selection.
+
+### 32.69 When a null is the grid's noise, not the material
+
+Three dispatches in this lane returned three different stories about the same material. R212: the note broke more
+than it repaired. R213: the same note broke less. The difference was the seed base, not the material.
+
+The tell is in the drift line of every run:
+
+```
+| drift check: attempt 0 | 9/20 vs baseline 13/20 (tolerance 4) |
+```
+
+**Attempt 0 cannot differ between arms.** No note exists before it, every arm sends the same prompt, and the seed
+is the same. So a four-task gap there is the base agent's own sampling, measured: **20 points on a 24-task grid**.
+Any effect smaller than that cannot be attributed, in either direction.
+
+Three habits:
+
+- **read the drift line before the verdict.** A gap of two or three tasks means the reading is a comparison of two
+  worlds; a gap of four means it is a comparison of two worlds *and the gate let it through*.
+- **quote the interval, not the point.** R213's paraphrase is +12.3 pp with [−3.5, +27.2]: consistent with nothing
+  and with a large effect, and neither is the reading.
+- **buy tasks, not rounds.** The floor scales with the number of tasks, and a one-attempt arm over 114 tasks costs
+  114 episodes (~$0.60) — less than the 96-episode, 24-task arms this lane kept buying, and with a floor near 9
+  points instead of 20.
+
+The lane's rule after R213: **no behavioural claim is made from a 24-task grid, whatever its arms.**

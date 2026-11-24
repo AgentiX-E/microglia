@@ -4344,3 +4344,51 @@ Three design consequences:
 - **the material's cost is now a dispatch argument.** `--note-source model|verdict` makes the material a property
   of the run rather than of the driver, and the verdict arm is the cheaper of the two because it spends no tokens
   on a paraphrase.
+
+### 8.87 Naming the requirement is not what repairs it, and the grid's noise is louder than the effect
+
+R213 ran three arms in one world: no material, the paraphrase every previous arm served, and the evaluator's
+verdict served as written. 288 episodes, **$1.5334**, 25.9 s an episode, 63 notes written and every one read (201
+sidecar lookups, 93 key hits, 93 task hits).
+
+| arm | pass^1 | rescue (registered population) | repaired | broken | net |
+|---|---|---|---|---|---|
+| control | 54.2% | 10/30 (33.3%) | 33/79 (41.8%) | 43/338 (12.7%) | −10 |
+| paraphrase | 59.4% | 11/27 (40.7%) | 40/74 (54.1%) | 29/343 (8.5%) | **+11** |
+| verdict | 57.3% | 11/31 (35.5%) | 38/83 (45.8%) | 31/334 (9.3%) | +7 |
+
+**The verdict names everything and repairs less.** Its notes name 82 of 82 unmet requirements (100%), against the
+paraphrase's 38 of 73 (52.1%) — the mechanical prediction held exactly. And it repaired **45.8% against the
+paraphrase's 54.1%**, +4.0 pp over the control with an interval of [−11.1, +18.8] and p = 0.64. Naming a
+requirement is not what repairs it. The association this lane measured in R212 — 53.7% repaired when named against
+41.5% when not — was confounding, and the registered refutation for exactly this outcome now stands: the material
+is inert whatever its selection, and the fix is not a different sentence.
+
+Two smaller facts point the same way. The verdict's break rate (9.3%) is *above* the paraphrase's (8.5%), so a
+block that lists what already passed does not prevent breaks. And both materials sit below the control's break
+rate (12.7%), which is the opposite of R212's reading.
+
+**That reversal is the more important result.** In R212 the control's net was +1 and the paraphrase's −3; in R213
+the control's is −10 and the paraphrase's +11. Same tasks, same code, same driver; the only difference is the seed
+base. The requirement-level net therefore moves by more than ten checks between two worlds — larger than every
+effect this lane has been trying to resolve. And the mechanism is visible in the same run's drift check: at
+**attempt 0, where no arm has a note and every arm sends the same prompt at the same seed**, the verdict arm passed
+9 of the 20 tasks the control failed, against the control's 13. Four tasks, 20 points, with nothing different
+between the arms but the provider's own sampling.
+
+So the noise floor of a 24-task, four-round grid is about 20 points, and every design in this lane has been
+measuring a 5-to-15-point effect through it:
+
+- **a null here is not evidence about the material.** Three dispatches produced three different stories from
+  overlapping arms, and the honest summary of the lane's behavioural work is "no effect larger than the grid's own
+  variance has been demonstrated, positive or negative";
+- **the drift tolerance of four tasks is itself at the noise floor**, which is why it has fired once and passed
+  twice on the same code;
+- **only an effect above roughly 15 points is detectable at this n.** The published memory result on this
+  benchmark is +15.6 to +23.3 points, which is exactly the size that clears it; the +2.0 points its own ablation
+  attributes to a skill library is below it, and the authors say the interval includes zero.
+
+The consequence for design is not "buy more power on this population" but "measure where the noise is smaller".
+The bank already holds 456 episodes over 114 tasks at four trials; a 114-task arm has a floor near 9 points, and a
+one-attempt-per-task paired reading there costs 114 episodes — **$0.60** — which is the cheapest powered design
+this lane has ever had.

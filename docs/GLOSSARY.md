@@ -2533,3 +2533,15 @@ writes the words is not about them.
 **Verdict material** — the evaluator's verdict served as the note itself (`--note-source verdict`). It names every
 unmet requirement by construction, costs no model call, and is the ceiling a material could reach with a perfect
 checker rather than a deployable configuration.
+
+**Noise floor (of a grid)** — the movement a run produces with nothing changed. Measured directly at attempt 0,
+where no arm has a note and every arm sends the same prompt at the same seed: R213's verdict arm passed 9 of the 20
+tasks the control failed, against the control's 13 — **four tasks, 20 points on 24**. An effect below the floor is
+not measurable on that grid, whatever its p-value.
+
+**Blind comparison** — a reading whose two sides differ by more than the intervention: two arms at different seeds,
+or two runs at different times. The drift check exists to catch it and the noise floor is how large it is.
+
+**Verdict material** — the evaluator's verdict served as the note itself (`--note-source verdict`), naming 100% of
+the unmet requirements for zero tokens. R213 measured it at +4.0 pp repair over the control against the
+paraphrase's +12.3: naming is not the lever, which is why the material was not the defect.
