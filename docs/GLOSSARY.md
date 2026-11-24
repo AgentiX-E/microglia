@@ -2492,3 +2492,15 @@ widened.
 **Baseline document** — `eval/manifests/note-bank-baseline.json`: R208's bank reduced to `task_id`, `trial`, `seed`
 and `reward`, with the commit, the grid and the bill beside them. A counterfactual that lives in a paid run is
 committed in the shape its reader reads.
+
+**Seed world** — one attempt's seed, shared by every task in that attempt (`base + i`, one `i` per round). Because
+the tasks are not independent draws of the process, the unit of replication is the world and not the task: two arms
+run at different seeds are two worlds, and their per-attempt rates differ by far more than a binomial standard
+error. R211 measured 38 of 50 against the bank's 27 of 50 on the same tasks.
+
+**Paired rescue (`--baseline-dir`)** — both arms from one dispatch, at the same seeds. The only comparison that
+holds the world fixed, and the reason one run can be its own counterfactual.
+
+**Pooled transition (`--pooled`)** — every consecutive pair of attempts summed rather than the first pair only. On a
+four-round arm that is three transitions per task, all of them the event a note acts on; the reading prints
+`pooled` so the claim stays legible.

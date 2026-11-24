@@ -4209,3 +4209,36 @@ when the arm's Clopper-Pearson upper limit sits below baseline + 25, so an under
 refutation; everything between is `INCONCLUSIVE`, which is a statement about 23 opportunities. The arm is fifty
 tasks, two rounds, one arm — 100 episodes, **$0.44 ≈ ¥3.1** — a quarter of the folded price and able to exclude the
 effect it registers.
+
+### 8.84 The seed is a random effect, and a baseline from another run is a different world
+
+R211's arm ran as designed — fifty tasks, two rounds, one arm, 100 episodes, $0.4820 — and the mechanism worked end
+to end for the first time: **12 failures, 12 notes, 12 verdicts, 103 sidecar lookups, 13 task hits**. Every note
+that was written was read.
+
+The comparison was refused, by the gate that was built to refuse it. The treatment's attempt 0 passed **38 of 50**
+where the bank passed **27 of 50** — same tasks, same release, same `max_steps`. The drift tolerance had been
+described as "one standard error at fifty", and that description was wrong for a reason worth carrying:
+
+- `run_split.py` derives round *i*'s seed as `base + i`, and **every task in that round gets the same seed**;
+- so the fifty tasks in an attempt are not fifty independent draws of the process — they are one draw of a world,
+  observed fifty times;
+- the unit of replication is the attempt's seed, and there is one of them per arm.
+
+Eleven tasks of movement between two seeds is therefore not a four-sigma event; it is the between-world variance
+that a binomial standard error cannot see. The consequence is a rule about baselines, not about tolerances: **a
+counterfactual has to be bought inside the same dispatch, at the same seeds.** That is common random numbers, and
+it is what makes a difference attributable to the material rather than to the draw.
+
+Two design consequences follow, and both are cheaper than the alternative:
+
+- **the population moves to where the opportunities are.** Fifty tasks at two rounds yield 23 opportunities — the
+  only thing a rescue rate buys — while the twenty-four tasks the bank failed twice of four yield 44 at four
+  rounds, at 192 episodes instead of 400. The baseline moves with the population: 20 of 44 (45.5%), because harder
+  tasks recover less, and a bar that stayed at 65.2% would be measuring the population rather than the note;
+- **`--pooled` sums every consecutive pair.** On four rounds that is three transitions per task instead of one, and
+  they are the same event: an attempt that follows a failure, with a note that has accumulated by round three. The
+  reading prints `pooled` rather than `0->1`, so the claim is legible.
+
+The instrument now reads either a document or a directory on each side (`--baseline-dir`), which is what lets one
+dispatch be its own counterfactual. 63 self-check cases, 99% line and branch coverage.

@@ -6585,3 +6585,39 @@ exit code says which of the two nulls you are holding.
 
 The cost is a hundred episodes — about ¥3.1 and thirteen minutes at concurrency 3 — because one arm is enough once
 round 0 is recognised as its own control.
+
+### 32.66 When the drift check fires, buy the control — do not widen the tolerance
+
+A drift failure reads like this:
+
+```
+| drift check: attempt 0 | 38/50 vs bank 27/50 (tolerance 4) |
+| verdict | **DRIFT** — the arm's first attempt passed 38/50 against the bank's 27 |
+```
+
+The instinct is to widen the tolerance. Do not. The tolerance was calibrated on a false premise, and widening it
+would hide the premise rather than repair it.
+
+**Every task in an attempt shares one seed.** `run_split.py` derives round *i*'s seed as `base + i`, so a round is
+one draw of a world observed fifty times, not fifty independent draws. The between-world spread is much larger than
+a binomial standard error, and it is what the 38-versus-27 gap is made of.
+
+So when the check fires, the repair is the design, not the number:
+
+```bash
+# one dispatch, both arms, the same seeds: the control is the same world
+gh workflow run note-rescue.yml -f arms=both -f rounds=4 -f population=hard
+python3 eval/tools/rescue_rate.py --dir eval/results/note-rescue/treatment \
+    --baseline-dir eval/results/note-rescue/control --pooled
+```
+
+Three habits this teaches:
+
+- **`--baseline-dir` over `--baseline`** whenever both arms exist: with both sides from one run the drift check
+  compares two arms that share a seed, and a gap then means the run did not do what its argv says.
+- **`--pooled` on four rounds.** Three transitions per task instead of one, all the same event — an attempt after a
+  failure — which is how 192 episodes buy 44 opportunities per arm instead of 23 for 400.
+- **The population sets the bar.** The bank rescues 65.2% of the fifty failing tasks and 45.5% of the hard
+  twenty-four; a bar carried across populations measures the population.
+
+`DRIFT` is exit 3 and stays red in CI: no reading exists, so nothing may be quoted from the run.
