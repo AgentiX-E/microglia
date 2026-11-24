@@ -131,7 +131,7 @@ merges the grid (`merge_documents`), the phase (`merge_summaries`) and the corpu
 
 **Specificity moved to the merge.** A share over one task is 1.0 by construction, so `notes.specificity` returns
 `null` with a reason below two tasks and the runner writes each task's failed attempt to
-`<notes>.trajectories.json`; the builder recomputes the share over all six. Without `--notes` the artefact carries
+`notes-TASK.json.trajectories.json`; the builder recomputes the share over all six. Without `--notes` the artefact carries
 `specificity: null` and N3 is reported as unmeasured, not refuted: an absent diagnostic is not a finding about the
 material, and turning it into an abandonment would throw away a paid fold over a missing file.
 
