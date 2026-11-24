@@ -47,6 +47,11 @@ export type PackLedger = {
   readonly artefact: string;
   /** The canonical treatment key; `unstated` for an artefact written before the block existed. */
   readonly treatment: string;
+  /**
+   * R206: what the pack was made of at serve time — `rendered` for every arm before R204, `guidance` for the
+   * transient one, and whatever a later material names. The pool is scoped by it; the key only separates it.
+   */
+  readonly body: string;
   readonly renders: number;
   readonly opportunity: number;
   readonly repaired: number;
@@ -116,6 +121,26 @@ export function treatmentKeyOf(treatment: unknown): string {
     parts.push(`${field}=${String(value)}`);
   }
   return parts.length === 0 ? 'unstated' : parts.join('/');
+}
+
+/**
+ * What the pack was made of at serve time, as a *material* rather than as part of the key.
+ *
+ * `treatmentKeyOf` already carries `serveBody`, so a guidance fold pools apart from a rendered one; what the key
+ * cannot do is stop `headlineOf` from *averaging* them, and R204's fold is the case that proves it matters: its
+ * `renders` are the summariser's inputs, not served packs, so adding it to the 291-pack corpus would change the
+ * denominator of the one number this module exists to publish. The body is therefore read on its own and the
+ * headline is scoped to it.
+ *
+ * Absent means `rendered`, which is not a guess: every artefact before R204 injected the block the facade
+ * rendered, and `serveBody` is the field that named the alternative.
+ */
+export function serveBodyOf(treatment: unknown): string {
+  if (isObject(treatment)) {
+    const body = treatment['serveBody'];
+    if (typeof body === 'string' && body.trim() !== '') return body.trim();
+  }
+  return 'rendered';
 }
 
 /** The tolerance the percentage identities are closed at. Four places is what the artefacts print. */
@@ -294,6 +319,8 @@ export function ledgerOf(artefact: unknown, file: string): LedgerRead {
     ledger: {
       artefact: file,
       treatment: treatmentKeyOf(root['treatment']),
+      // R204/R206: the material, which the pool is scoped by and the key only separates.
+      body: serveBodyOf(root['treatment']),
       renders: r,
       opportunity: opportunity as number,
       repaired: repairedN,
@@ -314,6 +341,8 @@ export function ledgerOf(artefact: unknown, file: string): LedgerRead {
 /** A pool of folds that share one treatment, or the whole corpus when the caller asks for that. */
 export type PooledLedger = {
   readonly treatment: string;
+  /** The material these folds served. `mixed` is impossible for one treatment and refused for the corpus. */
+  readonly body: string;
   readonly folds: readonly string[];
   readonly renders: number;
   readonly measured: number;
@@ -341,6 +370,9 @@ export type PooledLedger = {
 
 function poolOf(treatment: string, folds: readonly PackLedger[]): PooledLedger {
   const renders = folds.reduce((total, fold) => total + fold.renders, 0);
+  // One treatment cannot mix bodies — `serveBody` is in the key — but the *corpus* pool can, and a pool that
+  // reported one of its two materials would be a number about whichever fold happened to be first.
+  const bodies = [...new Set(folds.map((fold) => fold.body))];
   const measured = folds.reduce((total, fold) => total + fold.measured, 0);
   const repaired = folds.reduce((total, fold) => total + fold.repaired, 0);
   const broke = folds.reduce((total, fold) => total + fold.broke, 0);
@@ -351,6 +383,7 @@ function poolOf(treatment: string, folds: readonly PackLedger[]): PooledLedger {
   const interval = wilsonInterval({ accuracy: inert / renders, n: renders });
   return {
     treatment,
+    body: bodies.length === 1 ? (bodies[0] as string) : 'mixed',
     folds: folds.map((fold) => fold.artefact),
     renders,
     measured,
@@ -391,16 +424,38 @@ export function pooledOf(ledgers: readonly PackLedger[]): readonly PooledLedger[
 export type PackHeadline = PooledLedger & { readonly treatments: readonly string[] };
 
 /**
- * The corpus-level reading.
+ * The corpus-level reading, **scoped to one material**.
  *
  * It pools across treatments on purpose — the question "is this memory mostly inert?" is about the pack, not
- * about one arm of it — and it carries the list of keys so a reader can see that it did. A corpus with no
- * fold is refused rather than pooled to zero: an empty headline would print `0% inert`, which is the most
- * misleading number this module could produce.
+ * about one arm of it — and it carries the list of keys so a reader can see that it did. A corpus with no fold
+ * is refused rather than pooled to zero: an empty headline would print `0% inert`, which is the most misleading
+ * number this module could produce.
+ *
+ * R206 adds the second refusal. `renders` counts served packs, and a guidance fold's renders are the
+ * summariser's *inputs*, so pooling the two would move the corpus share by changing what its denominator means
+ * while looking like a fold that was added. A corpus that mixes bodies must therefore say which one it is
+ * asking about: the caller passes `body`, or the function refuses and names both. The alternative — silently
+ * keeping the larger population — is how a published share stops being about one mechanism.
  */
-export function headlineOf(ledgers: readonly PackLedger[]): PackHeadline {
+export function headlineOf(ledgers: readonly PackLedger[], body?: string): PackHeadline {
   if (ledgers.length === 0) {
     throw new MicrogliaError('MG_E_CONFIG', 'a headline needs at least one fold to pool', { folds: 0 });
+  }
+  const bodies = [...new Set(ledgers.map((ledger) => ledger.body))];
+  if (body !== undefined) {
+    const scoped = ledgers.filter((ledger) => ledger.body === body);
+    if (scoped.length === 0) {
+      throw new MicrogliaError('MG_E_CONFIG', `no fold served the body '${body}'`, { bodies, body });
+    }
+    const treatments = [...new Set(scoped.map((ledger) => ledger.treatment))];
+    return { ...poolOf('all', scoped), treatments };
+  }
+  if (bodies.length > 1) {
+    throw new MicrogliaError(
+      'MG_E_CONFIG',
+      `the corpus mixes serve bodies (${bodies.join(', ')}); name the one this headline is about`,
+      { bodies },
+    );
   }
   const treatments = [...new Set(ledgers.map((ledger) => ledger.treatment))];
   return { ...poolOf('all', ledgers), treatments };
@@ -531,7 +586,9 @@ export function pooledLine(pooled: PooledLedger): string {
 
 /** The corpus line, which names what it mixed. */
 export function headlineLine(headline: PackHeadline): string {
-  return `${pooledLine(headline)} — pooled over ${headline.treatments.length} treatment(s)`;
+  // The body is named, not implied: a share over the rendered block and a share over the summariser's inputs are
+  // two different measurements of two different populations, and the line a reader quotes has to say which.
+  return `${pooledLine(headline)} — over the ${headline.body} body, pooled over ${headline.treatments.length} treatment(s)`;
 }
 
 /** The price line, which says the state of both bills even when it cannot price them. */
@@ -613,13 +670,20 @@ export function packLedgersRecord(sources: readonly LedgerSource[]): RecordRead 
         : inertPriceOf(read.ledger, bills);
   }
   if (refusals.length > 0) return { record: undefined, refusals };
+  // R206: the headline is scoped to the body the corpus is mostly made of, and the scope travels in the record.
+  // Refusing a mixed corpus outright was the first shape of this and it was wrong: a fold that adds the transient
+  // material would have made the whole gate red, which teaches an operator to not commit the fold. The refusal is
+  // kept where it belongs — in `headlineOf`, for a *caller* that has not said which material it is asking about.
+  const bodies = new Map<string, number>();
+  for (const fold of folds) bodies.set(fold.body, (bodies.get(fold.body) ?? 0) + 1);
+  const primary = [...bodies.entries()].sort((left, right) => right[1] - left[1])[0]?.[0] ?? 'rendered';
   return {
     record: {
       schema: PACK_LEDGERS_SCHEMA,
-      updatedBy: 'R200',
+      updatedBy: 'R206',
       folds,
       pooled: pooledOf(folds),
-      headline: headlineOf(folds),
+      headline: headlineOf(folds, primary),
       price,
     },
     refusals,

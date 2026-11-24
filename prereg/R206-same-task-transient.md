@@ -103,3 +103,66 @@ failed trial. The engineering is the sidecar key and the runner's write, not a d
 Whether the note should be *validated* before it is injected — the inference-time critic that MemTrapBench's
 AdaptiveMem describes. If this arm shows a real effect, the critic is the next arm; if it shows none, the critic is
 not worth building.
+
+## Amendment 1 (2026-11-24) — the gates this material can actually be graded by
+
+Written after the engineering, before any dispatch, and it changes no claim — it changes what the run is
+*checked* against, because the header inherited six gates from the pack lane and none of them can grade an arm
+with no pack in it.
+
+- `V1` asks whether the served block was non-empty. This arm has no facade, no store and no block: `recalls` is
+  zero by construction, and a gate that reads a zero as a defect would fail every clean run of the arm.
+- `V2`, `V3` and `V5` are about the pack's *census* — items served, units shaped, coverage of the retrieve set.
+  There is exactly one item here and it is a sentence about one task.
+- `V0` and `V8` survive, and they are the two that matter: the run's specification is that the treatment is
+  wired at all, and its calls must not fail. `V8` is the reason a note-free round cannot be quoted as the
+  material being inert.
+
+The arm's own gates, registered now:
+
+- **N0 — the control is the same scaffold.** Both arms run `microglia_agent` with the same rounds, the same four
+  seeds and no facade. The only difference is `--notes`. An arm whose control is τ²'s stock agent would measure
+  the wrapper, which is R93's defect and R101's correction.
+- **N1 — the handoff happened.** `notes.hits > 0` on the treatment and `0` on the control, and the two arms ran
+  the same number of episodes. A treatment with no hit is a file the agent never read.
+- **N2 — coverage is quotable.** `written / failed ≥ 0.6` over the rounds after the first. R204 measured 6 of 40
+  (15%) with records retrieved from other tasks; the prediction is that the same summariser, shown the task's
+  own failure, clears this bar. Below 40% is the registration's first refutation.
+- **N3 — the note is specific.** `specificity.share ≥ 0.5`: at least half the notes name an entity that appears
+  in their own task's failure and in no other task's. Below that, the summariser copied the request.
+- **N4 — the reading is paired and the interval decides.** pass^4 per arm over the same tasks, and the
+  difference is quoted only if its interval clears the ±11 pp resolution R200 published for 40 tasks.
+
+`arms: both` and `claimRuler: interval` are unchanged; `sample: 40` is unchanged for the fold. The pilot below
+runs on 6 tasks and is a *wiring* run — it grades N0/N1 and reports N2/N3, and it makes no claim about pass^4.
+
+## Amendment 2 (2026-11-24) — the pilot, because a 320-episode first dispatch is the expensive way to find a typo
+
+**R206a, ≈ ¥1.5, ~50 minutes.** 6 held-out retail tasks × 4 rounds × 2 arms = 48 simulations, both arms
+`microglia_agent`, the treatment carrying `--notes`. What it buys:
+
+1. the handoff observed in a real harness rather than in a fixture — the sidecar written by the runner between
+   two `run_tasks` calls, and read by an agent in the next one;
+2. the summariser's own coverage and specificity on real retail failures, which is the registration's first
+   prediction and the one that decides whether the material is worth 320 episodes;
+3. the bill, per arm, for the fold's price estimate — `usage.promptTokens` with the summariser's share visible,
+   because its calls go through the same litellm callback the episodes do.
+
+It cannot and does not decide the fold. The fold is 40 tasks, and 6 tasks have a resolution of ±30 pp, which is
+why the pilot's artefact says `claim: none` in as many words.
+
+## What the engineering changed about the mechanism, stated plainly
+
+- **Rounds, not trials.** τ²'s `run_tasks(trials=k)` runs every task's k attempts inside one thread pool, so
+  there is no point at which a runner holds a reward and the next attempt has not started. The phase therefore
+  runs `--rounds k` — k separate `run_tasks` calls with seeds `base .. base+k-1` — and merges them into one
+  `results.json` with each round written as that trial's index. Both arms get the same four seeds, which
+  `--trials` on two arms cannot give.
+- **The key is the opening message on both sides.** The runner takes it from the simulation's first user
+  message, the agent from the message τ² handed it, and both call `notes.note_key`. Collisions are counted by
+  the runner (it holds the task id) and travel in the sidecar.
+- **The file is re-read between rounds.** Rounds share one process, so a document cached at the first read
+  would serve round one's notes to round four; the cache is keyed on `(mtime, size)` and the case that proves it
+  is in `selfcheck_agent.py`.
+- **One material per arm.** A facade pack wins over a note, because an arm carrying both is a third treatment
+  nobody registered.

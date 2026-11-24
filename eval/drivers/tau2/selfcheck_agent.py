@@ -1422,6 +1422,192 @@ def an_unreachable_facade_is_a_failure_and_not_a_crash(checks):
             os.environ["MICROGLIA_MEMORY_URL"] = saved_url
 
 
+# ------------------------------------------------------------------ R206, the notes arm
+
+
+class notes_arm:
+    """A sidecar in a temporary directory, with the environment pointed at it and put back on exit.
+
+    Three things are undone on every exit path: the environment variable, the directory, and the module's
+    cached document. The last is the one that would poison the file: the agent caches by `(mtime, size)`, and a
+    case that left a document cached would make the *next* case's first read return this case's notes — a
+    treatment leaking between tests, in the one test file whose subject is a treatment that must not leak
+    between tasks.
+    """
+
+    def __init__(self, notes: dict | None = None, *, corrupt: bool = False):
+        self.notes = dict(notes or {})
+        self.corrupt = corrupt
+
+    def __enter__(self):
+        import tempfile
+
+        self.saved = os.environ.get(subject.NOTES_ENV)
+        self.directory = tempfile.TemporaryDirectory()
+        self.path = os.path.join(self.directory.name, "notes.json")
+        os.environ[subject.NOTES_ENV] = self.path
+        subject._note_document = {}  # noqa: SLF001
+        subject._note_loaded_at = None  # noqa: SLF001
+        if self.corrupt:
+            with open(self.path, "w", encoding="utf-8") as stream:
+                stream.write("{ not json")
+        elif self.notes:
+            self.write(self.notes)
+        self.lookups = subject._note_lookups  # noqa: SLF001
+        self.hits = subject._note_hits  # noqa: SLF001
+        return self
+
+    def write(self, notes: dict) -> None:
+        """Write the sidecar in the runner's own shape, at a new mtime.
+
+        The entry is `{note, attempt, reward, task, chars}` and not a bare string, because the format is what
+        `notes.record` writes and a fixture that spoke a simpler one would test a reader nobody runs.
+        """
+        import json as _json
+
+        document = {
+            "schema": "microglia.notes/1",
+            "notes": {
+                key: {"note": value, "attempt": 1, "reward": 0.0, "task": "1", "chars": len(value)}
+                for key, value in notes.items()
+            },
+        }
+        with open(self.path, "w", encoding="utf-8") as stream:
+            _json.dump(document, stream)
+
+    def __exit__(self, *exc_info):
+        if self.saved is None:
+            os.environ.pop(subject.NOTES_ENV, None)
+        else:
+            os.environ[subject.NOTES_ENV] = self.saved
+        subject._note_document = {}  # noqa: SLF001
+        subject._note_loaded_at = None  # noqa: SLF001
+        subject._note_problem = None  # noqa: SLF001
+        self.directory.cleanup()
+        return False
+
+
+@case
+def a_note_from_the_sidecar_is_the_pack_that_episode_reads(checks):
+    """R206's mechanism in one assertion: no store, no retrieval, one sentence keyed by the opening message."""
+    with notes_arm({"I want a refund for order 42": "Ask for the order id before quoting a refund."}) as arm:
+        agent, recalls, original = fresh(pack="")
+        try:
+            state = LLMAgentState()
+            for index in range(3):
+                state = episode_step(agent, state, "I want a refund for order 42" if index == 0 else f"t{index}")
+        finally:
+            subject.recall = original
+        contents = [message.content for message in state.system_messages]
+        stats = subject.memory_stats()
+    checks.equal(len(recalls), 1, "the facade is still asked once per episode")
+    checks.equal(len(contents), 1, "and one message reached the prompt")
+    checks.substring(contents[0], "Ask for the order id before quoting a refund.", "which is the note")
+    checks.equal(arm_hits(arm), 1, "one lookup found the note")
+    checks.equal(stats["notes"]["hits"], 1, "and the artefact carries it")
+    checks.equal(stats["notes"]["lookups"] - arm.lookups, 1, "one lookup for one episode, not one per turn")
+    checks.equal(subject._pack_copies_dropped, 2, "the held note is re-injected by replacement, not appended")
+
+
+def arm_hits(arm):
+    return subject._note_hits - arm.hits  # noqa: SLF001
+
+
+@case
+def a_task_without_a_note_serves_nothing_and_says_so(checks):
+    """The first round: no sidecar entry exists yet, and that is a lookup with no hit rather than an error."""
+    with notes_arm({"another task": "Ask for the order id."}) as arm:
+        agent, _, original = fresh(pack="")
+        try:
+            state = LLMAgentState()
+            state = episode_step(agent, state, "I want a refund for order 42")
+        finally:
+            subject.recall = original
+        stats = subject.memory_stats()
+    checks.equal(len(state.system_messages), 0, "no note means no second system message")
+    checks.equal(stats["notes"]["lookups"] - arm.lookups, 1, "the lookup happened")
+    checks.equal(arm_hits(arm), 0, "and found nothing")
+    checks.equal(stats["notes"]["problem"], None, "which is not a fault")
+
+
+@case
+def an_unreadable_sidecar_is_a_problem_and_not_a_silence(checks):
+    """A corrupted file must not read as "the material was tried and had nothing".
+
+    This is the collapse the repository has repaired ten times: `hits: 0` from a sidecar nobody could parse is
+    a treatment that never ran, and an artefact that could not tell it from round one would publish a mechanism
+    as inert when the mechanism had not been executed.
+    """
+    with notes_arm(corrupt=True) as arm:
+        agent, _, original = fresh(pack="")
+        try:
+            state = LLMAgentState()
+            state = episode_step(agent, state, "I want a refund for order 42")
+        finally:
+            subject.recall = original
+        stats = subject.memory_stats()
+    checks.equal(len(state.system_messages), 0, "nothing is served")
+    checks.equal(stats["notes"]["problem"] is not None, True, "and the artefact names the problem")
+    checks.substring(str(stats["notes"]["problem"]), "JSONDecodeError", "with the reason a reader can act on")
+    checks.equal(arm_hits(arm), 0, "no hit is claimed")
+
+
+@case
+def a_note_written_between_rounds_is_read_by_the_next_episode(checks):
+    """The staleness defect, as a case: a document cached at the first read would serve round one forever.
+
+    Rounds share one process — that is what makes the handoff possible at all — so a cache keyed on nothing
+    would make the treatment constant and the arm would measure a note the first round could not have had.
+    """
+    with notes_arm() as arm:
+        agent, _, original = fresh(pack="")
+        try:
+            first = LLMAgentState()
+            first = episode_step(agent, first, "I want a refund for order 42")
+            arm.write({"I want a refund for order 42": "Ask for the order id first."})
+            second = LLMAgentState()
+            second = episode_step(agent, second, "I want a refund for order 42")
+        finally:
+            subject.recall = original
+    checks.equal(len(first.system_messages), 0, "round one had nothing to read")
+    checks.equal(len(second.system_messages), 1, "round two read what round one wrote")
+    checks.substring(second.system_messages[0].content, "Ask for the order id first.", "and it is the note")
+
+
+@case
+def a_pack_from_the_facade_wins_over_a_note(checks):
+    """One material per arm. An arm carrying both would be a third treatment nobody registered."""
+    with notes_arm({"I want a refund": "A note."}):
+        agent, _, original = fresh(pack="BLOCK-FROM-THE-STORE")
+        try:
+            state = LLMAgentState()
+            state = episode_step(agent, state, "I want a refund")
+        finally:
+            subject.recall = original
+    content = state.system_messages[0].content
+    checks.substring(content, "BLOCK-FROM-THE-STORE", "the store's block is served")
+    checks.equal(content.count("A note."), 0, "and the note is not stacked beside it")
+
+
+@case
+def the_notes_block_is_absent_without_a_sidecar(checks):
+    """A phase that never named a notes file must not publish a coverage of zero for a material it never read."""
+    saved = os.environ.pop(subject.NOTES_ENV, None)
+    try:
+        agent, _, original = fresh(pack="")
+        try:
+            state = LLMAgentState()
+            state = episode_step(agent, state, "anything")
+        finally:
+            subject.recall = original
+        stats = subject.memory_stats()
+    finally:
+        if saved is not None:
+            os.environ[subject.NOTES_ENV] = saved
+    checks.equal("notes" in stats, False, "no notes block")
+    checks.equal(len(state.system_messages), 0, "and nothing served")
+
+
 def main(argv: list[str]) -> int:
     if "--dump-stats" in argv:
         return dump_stats()

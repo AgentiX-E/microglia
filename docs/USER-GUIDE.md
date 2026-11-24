@@ -6119,3 +6119,69 @@ rate replicated (11.9% here against 15.0% on the first fold), and the delta repr
 p = 0.69). The share cannot be resolved: nine renders put the interval at 56.5–98.0%, which contains the pool and
 everything above it. A fold with 15% coverage buys a mechanism reading and a price, not a share — the arm that fixes
 coverage is a different material, and it is registered separately (R206).
+
+### 32.53 Running an arm whose material is a note, not a pack
+
+If you are here because a fold was produced by R206 — the same task twice, one sentence carried from a failed
+attempt into the next one — three things are different from every other reading in this guide, and each one changes
+what you are allowed to say about the number.
+
+**There is no pack, so the store's columns are not readings.** `recalls` is zero, `packChars` is the note's length
+and `serveYield` is absent. Do not read a zero there as a memory that was asked and had nothing: on this arm the
+facade was never configured. The block to read instead is `notes`:
+
+```jsonc
+"notes": {
+  "path": "/runner/_temp/r206-notes.json",
+  "rounds": [ { "round": 1, "episodes": 40, "failed": 26, "written": 24, "refused": 2,
+                "providerFailures": 0, "unscored": 0, "unreadable": 0, "collisions": 0 }, … ],
+  "written": 71, "refused": 3, "providerFailures": 0, "collisions": 0,
+  "specificity": { "graded": 71, "specific": 55, "share": 0.7746, "entitiesPerNote": 5.2 }
+}
+```
+
+* `written / failed` over the rounds after the first is **coverage**. R204 measured 15% with records retrieved
+  from other tasks; this arm's prediction is that the same summariser, shown the task's own failure, clears 60%.
+* `specificity.share` is the check that the note is *about this task*: the share of notes naming a token that
+  appears in their own task's failure and in no other task's. Below 0.5 the summariser copied the request.
+* `collisions` is how many keys named two task ids. Not zero means the material crossed tasks, which is the
+  mechanism this arm exists to not be.
+
+**The reading is pass^4, and it is paired.** Both arms ran the same rounds at the same seeds, so the difference is
+a paired difference over tasks and the interval is the one R200 published for the sample size — ±11 pp at 40 tasks.
+Quote the difference only if the interval clears it.
+
+**The agent's own counters say whether the handoff happened.** `notes.lookups` counts episodes that asked,
+`notes.hits` counts those that found a note. A treatment with `hits: 0` is a file the agent never read, and a
+control with `hits > 0` is a run where `--notes` leaked into the wrong arm.
+
+Where the block comes from, today: the phase's own summary line carries it, and so does
+
+```bash
+# the phase writes one JSON line; the notes block is inside its `memory` block
+python3 eval/drivers/tau2/run_split.py --phase eval --agent microglia_agent --domain retail \
+  --tasks 1,2,3 --rounds 4 --notes /tmp/notes.json --out /tmp/eval.json | tail -1 | python3 -m json.tool
+```
+
+An artefact file for this arm does not exist yet — R206a is the pilot that will write one, and this section is
+what to read when it does. Nothing above asks you to trust a file that has not been produced.
+
+### 32.54 Why a corpus headline now names its body
+
+`pnpm eval:pack-ledgers --print` used to end with one line pooling every fold the corpus holds. That line now says
+which material it is about:
+
+```
+corpus: 78.7% inert of 291 served pack(s) — over the rendered body, pooled over 3 treatment(s)
+```
+
+The reason is a defect the transient arms introduced. On a `guidance` fold, `renders` counts the summariser's
+*inputs* rather than served packs, so a corpus that pooled both would answer "is this memory inert?" with a
+denominator that means two things at once. `headlineOf` therefore refuses a corpus that mixes bodies and names
+them, and the record publishes the material it speaks about. If you are adding a fold whose `serveBody` is
+anything but `rendered`, expect the ledger gate to say so and pass the body you mean:
+
+```ts
+headlineOf(folds, 'guidance')   // the transient material's own share
+headlineOf(folds)               // refused when the corpus mixes — by design
+```

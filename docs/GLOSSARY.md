@@ -2332,3 +2332,29 @@ withheld, which is the same fact as the 85% refusal rate counted on the other si
 `storeGrowth: { before, after, grew }`. It exists because a mechanism whose claim is "the artefact is the defect"
 must be checkable against a file, and because an arm that writes during evaluation is a lesson arm with a step in
 front of it.
+
+**Note** — R206's material: one imperative sentence distilled from a *failed attempt at one task*, written by the
+runner between two rounds, read by the agent at the start of the next attempt at that same task, and dropped with
+the task. Not a stored lesson: nothing is written to a store, nothing is retrieved across tasks, and the sentence
+does not survive the phase. It exists because the largest published effect in this literature is a statement about
+the material rather than about retrieval.
+
+**Note sidecar** — the file the note lives in, `{ key → { note, attempt, reward, task, chars } }`, written by the
+runner at a round boundary and read by the agent when an episode opens. The key is the episode's opening request
+(`notes.note_key`), computed identically on both sides, so the identity cannot drift between a writer and a reader.
+
+**Round** — one `run_tasks` call: one attempt per task, at one seed. R206 schedules its four attempts as four
+rounds rather than as τ²'s `trials: 4`, because a round boundary is the only point at which a runner holds a
+reward and the next attempt has not started — which is exactly where a note has to be written.
+
+**Coverage (notes)** — `written / failed` over the rounds after the first: of the failed attempts, how many produced
+a sentence. The complement splits into three states that are not the same fact: `refused` (the summariser answered
+`NONE`), `providerFailures` (the call failed), and `unreadable` (the reader could not see the messages).
+
+**Specificity (notes)** — the share of notes naming at least one token that appears in their own task's failure and
+in no other task's. The check that separates a note about the failure from a restatement of the request.
+
+**Serve body** — what the injected material is made of, as opposed to where it came from: `rendered` (the block the
+store served), `guidance` (one sentence a summariser wrote from that block, R204), or a note (R206). It is the field
+the corpus headline is scoped by, because `renders` counts served packs on two of those and the summariser's
+*inputs* on the third.

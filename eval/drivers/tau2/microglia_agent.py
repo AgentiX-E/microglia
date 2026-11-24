@@ -61,6 +61,11 @@ import urllib.request
 from tau2.agent.llm_agent import LLMAgent, LLMAgentState
 from tau2.data_model.message import Message, SystemMessage
 
+# R206. The note sidecar: the material is a sentence distilled from this task's own failed attempt, carried one
+# attempt forward and discarded. It lives beside this module and imports nothing third-party, so the arm's
+# identity rule (`note_key`) is exercised by a self-check that needs no harness.
+from notes import note_key, note_of, sentence_of, load as load_notes
+
 # `ValidAgentInputMessage` moved in τ² v1.0.0: it lived in `tau2.agent.base` and now lives in
 # `tau2.agent.base_agent`, beside the `HalfDuplexAgent` that `LLMAgent` extends. Both are tried
 # because R92 runs one τ² and the arms before it ran another, and an import that names only one of
@@ -210,6 +215,18 @@ _guidance_chars = 0
 _guidance_sentences: list = []
 _guidance_first_failure: str | None = None
 
+# R206. The notes arm's own account: how often this agent looked for a note, how often it found one, how much
+# text it served, and whether the file could be read at all. Four numbers rather than one, because `hits: 0` on a
+# phase whose sidecar was unreadable and `hits: 0` on a phase whose first round had nothing to read yet are
+# different findings, and only the second is the mechanism working as registered.
+NOTES_ENV = "MICROGLIA_NOTES"
+_note_lookups = 0
+_note_hits = 0
+_note_chars = 0
+_note_problem: str | None = None
+_note_loaded_at: object = None
+_note_document: dict = {}
+
 # Sentinel rather than `None`, because "" is a real answer: a facade that was asked
 # and had nothing to say must not be asked again on the next turn.
 _UNSET = object()
@@ -271,26 +288,71 @@ def guidance_prompt(records: str, request: str) -> str:
     )
 
 
+def notes_path() -> str:
+    """The sidecar this arm reads, or an empty string when it is not the notes arm."""
+    return os.environ.get(NOTES_ENV, "").strip()
+
+
+def _notes_document() -> dict:
+    """The sidecar, reloaded when the file changed under this process.
+
+    Rounds share one process, so a document cached at import would serve round one's notes to round four and the
+    arm would be a constant — the treatment would look inert for a reason that has nothing to do with the
+    material. The stamp is `(mtime, size)`: the runner writes between rounds and never during one, so a change
+    means a new round rather than a race.
+    """
+    global _note_document, _note_problem, _note_loaded_at
+    path = notes_path()
+    if path == "":
+        return {}
+    try:
+        stamp = os.stat(path)
+        marker = (stamp.st_mtime_ns, stamp.st_size)
+    except OSError:
+        # No file yet: round one, and not a fault. The problem slot stays empty so a phase that never had a
+        # sidecar is distinguishable from one whose sidecar was broken.
+        _note_document = {}
+        _note_loaded_at = None
+        return {}
+    if _note_loaded_at == marker:
+        return _note_document
+    document, problem = load_notes(path)
+    _note_document = document
+    _note_loaded_at = marker
+    if problem is not None:
+        _note_problem = problem
+        print(f"[microglia] note sidecar unreadable ({problem}); serving no notes", file=sys.stderr)
+    return document
+
+
+def note_for(text: str) -> str:
+    """The note this task's last failed attempt earned, or an empty string.
+
+    Counted apart from the facade's recall: this arm has no store and no retrieval, so a `recalls` counter that
+    moved here would report a facade that was never asked. Three numbers instead — lookups, hits, characters —
+    and the share the registration's first prediction is about is `hits / lookups`.
+    """
+    global _note_lookups, _note_hits, _note_chars
+    if notes_path() == "":
+        return ""
+    _note_lookups += 1
+    note = note_of(_notes_document(), text)
+    if note == "":
+        return ""
+    _note_hits += 1
+    _note_chars += len(note)
+    return note
+
+
 def guidance_sentence(reply) -> str:
     """The sentence in a provider reply, or an empty string when the model declined.
 
-    `NONE` is the answer the prompt asks for when the records do not speak to the request, and it is
-    *not* a failure: it is the arm's gate doing its job, and a run that counted it as an error would
-    report an unreachable provider for a model that was working exactly as asked. Everything that is not
-    a usable sentence — an empty reply, a refusal, a wall of text — is emptied here and counted by the
-    caller, so the injected pack is always one sentence or nothing.
+    R206 moved the parser into `notes.py` and this is the one place that reads it: the two arms ask a model for
+    one sentence and decline with `NONE`, and a second copy of that rule is the copy that drifts the first time
+    the refusal token changes. `NONE` is *not* a failure — it is the arm's gate doing its job, and a run that
+    counted it as an error would report an unreachable provider for a model that behaved exactly as asked.
     """
-    choices = getattr(reply, "choices", None)
-    if not isinstance(choices, list) or not choices:
-        return ""
-    message = getattr(choices[0], "message", None)
-    content = getattr(message, "content", None)
-    if not isinstance(content, str):
-        return ""
-    text = " ".join(content.split())
-    if text == "" or text.strip(" .").upper() == "NONE":
-        return ""
-    return text[:GUIDANCE_MAX_CHARS]
+    return sentence_of(reply)[:GUIDANCE_MAX_CHARS]
 
 
 def parse_knobs(raw: str) -> dict[str, str]:
@@ -550,6 +612,11 @@ class MicrogliaAgent(LLMAgent):
                 global _recall_repeats
                 _recall_repeats += 1
             held = recall(text)
+            if held == "" and notes_path():
+                # R206. No store on this arm: the material is the sentence the runner distilled from this task's
+                # own last failed attempt. It is consulted only when the facade served nothing, because an arm
+                # that carried both a pack and a note would be a third treatment nobody registered.
+                held = note_for(text)
             if held:
                 # The pack as the facade rendered it, before this agent adds anything. The difference
                 # between this and the injected length is the wrapper's own carriage, and the difference
@@ -686,5 +753,16 @@ def memory_stats() -> dict:
             if _guidance_sentences
             else None,
             "firstFailure": _guidance_first_failure,
+        }
+    # R206: the notes arm's account, present only when this process was pointed at a sidecar. `hits / lookups`
+    # is the coverage the registration predicts will be high (unlike R204's 6 of 40) because the summariser is
+    # shown the task's own failure rather than records retrieved from other tasks.
+    if notes_path() != "":
+        stats["notes"] = {
+            "path": notes_path(),
+            "lookups": _note_lookups,
+            "hits": _note_hits,
+            "chars": _note_chars,
+            "problem": _note_problem,
         }
     return stats

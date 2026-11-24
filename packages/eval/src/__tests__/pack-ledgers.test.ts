@@ -287,6 +287,8 @@ function fold(artefact: string, overrides: Partial<PackLedger> = {}): PackLedger
   return {
     artefact,
     treatment: 'one',
+    // R206: every fold names its material, and every fixture before this round served the rendered block.
+    body: 'rendered',
     renders: 10,
     opportunity: 2,
     repaired: 2,
@@ -352,6 +354,32 @@ describe('headlineOf', () => {
 
   it('refuses an empty corpus rather than printing 0% inert', () => {
     expect(() => headlineOf([])).toThrow(/at least one fold/);
+  });
+
+  it('refuses to average two materials and names both', () => {
+    // R204's fold is the case: its `renders` are the summariser's inputs, so a corpus share that included it
+    // would be a percentage of two different denominators wearing one name.
+    const mixed = [fold('a'), fold('b', { body: 'guidance' })];
+    expect(() => headlineOf(mixed)).toThrow(/mixes serve bodies \(rendered, guidance\)/);
+  });
+
+  it('pools the material the caller named, and only that one', () => {
+    const mixed = [fold('a', { renders: 10, inert: 5 }), fold('b', { body: 'guidance', renders: 4, inert: 3 })];
+    const rendered = headlineOf(mixed, 'rendered');
+    expect(rendered.body).toBe('rendered');
+    expect(rendered.renders).toBe(10);
+    expect(rendered.folds).toEqual(['a']);
+    const guidance = headlineOf(mixed, 'guidance');
+    expect(guidance.renders).toBe(4);
+    expect(guidance.body).toBe('guidance');
+  });
+
+  it('refuses a body the corpus does not carry', () => {
+    expect(() => headlineOf([fold('a')], 'guidance')).toThrow(/no fold served the body 'guidance'/);
+  });
+
+  it('names the body on the line a reader quotes', () => {
+    expect(headlineLine(headlineOf([fold('a')]))).toContain('over the rendered body');
   });
 });
 

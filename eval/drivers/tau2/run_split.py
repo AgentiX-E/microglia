@@ -39,7 +39,23 @@ from tau2.registry import registry
 # without a provider, a harness, or a network, and a reader that only loads inside this process is a
 # reader whose contract with the TypeScript side can never be tested.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from turns import field as message_field, turn_census  # noqa: E402
+from turns import turn_census  # noqa: E402
+
+# R206's material, in its own module for `turns`' reason: `notes.py` imports nothing third-party, so its
+# identity rule, its sidecar and its specificity check are exercised by a self-check that needs no provider.
+from notes import (  # noqa: E402
+    NOTE_MAX_TOKENS,
+    NOTE_SYSTEM,
+    NOTE_TIMEOUT_S,
+    first_user_text,
+    load as load_notes,
+    merge_rounds,
+    note_model,
+    note_prompt,
+    note_round,
+    sentence_of,
+    specificity,
+)
 
 # Which τ² this is, decided by what the package exports rather than by a version string.
 #
@@ -736,6 +752,15 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--memory-url", default="")
     parser.add_argument("--max-steps", type=int, default=100)
     parser.add_argument("--seed", type=int, default=300)
+    # R206. How many rounds the phase is scheduled in, and whether a note is carried between them.
+    #
+    # `--trials` asks τ² for k repetitions inside one `run_tasks` call, which is one call under one thread pool:
+    # there is no point in it at which a runner could read a trial's reward and write something the next trial
+    # reads. Rounds are that point. Both arms run the same number of rounds with the same per-round seed, so the
+    # two differ in the material and not in the schedule, and `--notes` (which needs two rounds to mean
+    # anything) is only ever set on the treatment.
+    parser.add_argument("--rounds", type=int, default=0)
+    parser.add_argument("--notes", default="")
     # A full-quality run is six hours and four arms; at double price that is a doubled bill for a
     # number that does not improve. The guard is off by default because a smoke run is cheap enough
     # to be worth running whenever the operator is awake, and on for every dispatch that is not.
@@ -1075,25 +1100,13 @@ def _first_user_texts(simulations) -> list:
     """
     pairs = []
     for simulation in simulations or []:
-        reader = getattr(simulation, "get_messages", None)
-        if not callable(reader):
+        # R206: one reader for "the message that opened this episode", in `notes.py` because the note's key
+        # and this census must see the same string — two readers that agreed today would be two readers that
+        # disagree the first time one of them normalised whitespace.
+        text = first_user_text(simulation)
+        if text == "":
             continue
-        try:
-            messages = reader()
-        except Exception:  # noqa: BLE001 - upstream shape, not our error
-            continue
-        task = str(getattr(simulation, "task_id", "") or "")
-        for message in messages or []:
-            # Both shapes: τ² hands this process objects, and the same messages arrive as JSON when the
-            # runner is exercised from a document. A reader that knew only one would resolve nothing on the
-            # other and report an instrument fault.
-            role = message_field(message, "role")
-            if role not in ("user", "human"):
-                continue
-            content = message_field(message, "content")
-            if isinstance(content, str) and content.strip():
-                pairs.append((task, content))
-            break
+        pairs.append((str(getattr(simulation, "task_id", "") or ""), text))
     return pairs
 
 
@@ -1135,6 +1148,40 @@ def boundary_task_ids(texts, first_texts) -> "tuple[list, int]":
         else:
             ids.append(None)
     return ids, len(ids) - resolved
+
+
+def note_writer():
+    """A function that turns one failed attempt into the sentence the next attempt reads.
+
+    The call is made through litellm, in this process, so `_record_usage` counts it: the arm's bill carries the
+    summariser's prompt tokens rather than a second instrument having to attribute them. The three outcomes are
+    returned rather than collapsed, because "the model declined" and "the provider was unreachable" are the two
+    facts that decide whether a note-free round is the mechanism working or the run being broken.
+    """
+
+    def write(trajectory: str):
+        prompt = note_prompt(trajectory)
+        try:
+            import litellm  # noqa: PLC0415 - τ²'s dependency, absent in the self-check
+
+            reply = litellm.completion(
+                model=note_model(os.environ.get("TAU_MODEL", "")),
+                messages=[
+                    {"role": "system", "content": NOTE_SYSTEM},
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=0,
+                max_tokens=NOTE_MAX_TOKENS,
+                timeout=NOTE_TIMEOUT_S,
+            )
+        except Exception as error:  # noqa: BLE001 - any failure means "no note"
+            return "", "failed", f"{type(error).__name__}: {error}", len(prompt)
+        sentence = sentence_of(reply)
+        if sentence == "":
+            return "", "refused", None, len(prompt)
+        return sentence, "sentence", None, len(prompt)
+
+    return write
 
 
 def main(argv: list[str]) -> int:
@@ -1186,6 +1233,23 @@ def main(argv: list[str]) -> int:
     if args.memory_url:
         os.environ["MICROGLIA_MEMORY_URL"] = args.memory_url
     os.environ.setdefault("MICROGLIA_DOMAIN", args.domain)
+    # R206: the sidecar's path is set before every episode is constructed, because the agent reads the
+    # environment once at its first turn and a path assigned afterwards is a path the treatment never sees.
+    if args.notes:
+        os.environ["MICROGLIA_NOTES"] = args.notes
+    elif not args.rounds and "MICROGLIA_NOTES" in os.environ:
+        # A dispatch that unsets the flag must unset the treatment: a variable left in the environment by a
+        # previous step is how an arm ends up running a material nobody registered.
+        del os.environ["MICROGLIA_NOTES"]
+
+    # Two refusals before the first paid call. A note is written at the end of a round and read at the start of
+    # the next, so one round has no reader; and a note file nobody writes is a treatment that is off while the
+    # artefact says it is on.
+    rounds = max(1, args.rounds)
+    if args.notes and rounds < 2:
+        raise SystemExit("tau2-notes-need-two-rounds")
+    if args.rounds and args.trials > 1:
+        raise SystemExit("tau2-rounds-are-trials")
 
     model = os.environ.get("TAU_MODEL", "deepseek/deepseek-flash")
     # Before the first episode, because the judge is reached by the evaluator of eleven of R92's
@@ -1210,24 +1274,57 @@ def main(argv: list[str]) -> int:
     if os.path.exists(args.out):
         os.remove(args.out)
 
-    results = run_tasks(
-        domain=args.domain,
-        tasks=tasks,
-        agent=args.agent,
-        model=model,
-        # Upstream's `run_tasks` does `if "seed" in llm_args_agent`, so passing None
-        # raises `TypeError: argument of type 'NoneType' is not iterable` before the
-        # first episode. The parameters are optional in the signature and required by
-        # the body; two empty dicts are the difference between a run and a traceback.
-        llm_args=llm_args,
-        trials=args.trials,
-        max_steps=args.max_steps,
-        save_to=args.out,
-        out=args.out,
-        seed=args.seed,
-        concurrency=int(os.environ.get("TAU_CONCURRENCY", "4")),
-    )
-    simulations = getattr(results, "simulations", None)
+    # R206: the phase is one round unless a registration asks for more. A round is one attempt per task with its
+    # own seed, so `rounds` copies of the task list are the same grid `--trials` would have produced — the
+    # difference is that the runner gets a place between them to write what the next one reads.
+    simulations = []
+    round_paths = []
+    note_rounds = []
+    trajectories: dict = {}
+    summarize = note_writer() if args.notes else None
+    for index in range(rounds):
+        out_path = args.out if rounds == 1 else f"{args.out}.round{index}"
+        if os.path.exists(out_path):
+            os.remove(out_path)
+        results = run_tasks(
+            domain=args.domain,
+            tasks=tasks,
+            agent=args.agent,
+            model=model,
+            # Upstream's `run_tasks` does `if "seed" in llm_args_agent`, so passing None
+            # raises `TypeError: argument of type 'NoneType' is not iterable` before the
+            # first episode. The parameters are optional in the signature and required by
+            # the body; two empty dicts are the difference between a run and a traceback.
+            llm_args=llm_args,
+            # A round is one trial: `run_tasks` draws its seeds from `random.seed(config.seed)` and passes
+            # the trial's own into the simulation, so four rounds at four seeds are four attempts on the
+            # same grid — and the two arms can be handed the *same* four seeds, which is the
+            # common-random-numbers property a paired reading needs and `--trials` on two arms cannot give.
+            trials=1 if rounds > 1 else args.trials,
+            max_steps=args.max_steps,
+            save_to=out_path,
+            out=out_path,
+            seed=args.seed + index if rounds > 1 else args.seed,
+            concurrency=int(os.environ.get("TAU_CONCURRENCY", "4")),
+        )
+        round_simulations = getattr(results, "simulations", None) or []
+        simulations.extend(round_simulations)
+        if rounds > 1:
+            round_paths.append(out_path)
+        if summarize is not None and index + 1 < rounds:
+            # Between the rounds, which is the only place a reward is known and the next attempt has not
+            # started. The counters travel into the artefact rather than a log line: a round that distilled
+            # nothing is the arm's own gate, and a round whose provider failed is the run being broken.
+            counted = note_round(round_simulations, args.notes, index + 1, summarize, trajectories)
+            note_rounds.append(counted)
+            print(
+                f"[tau2] notes round {index + 1}: {counted['written']} written, {counted['refused']} refused, "
+                f"{counted['providerFailures']} provider failure(s), {counted['failed']} failure(s) of "
+                f"{counted['episodes']} episode(s)",
+                file=sys.stderr,
+            )
+    if rounds > 1:
+        merge_rounds(round_paths, args.out, rounds)
     # Computed once, before the diagnostics that consume it: the census needs the agent's injected lengths
     # and the artefact needs the agent's own counters, and two calls to a counter reader is two places for
     # a denominator to disagree with itself.
@@ -1238,10 +1335,29 @@ def main(argv: list[str]) -> int:
                 "phase": args.phase,
                 "out": args.out,
                 "tasks": len(tasks),
-                "trials": args.trials,
-                "simulations": len(simulations) if simulations is not None else None,
+                # What the run actually asked for: on a round-scheduled phase the grid is `rounds` attempts
+                # per task and `--trials` is not the number a reader should divide by.
+                "trials": rounds if rounds > 1 else args.trials,
+                "simulations": len(simulations),
                 "agent": args.agent,
                 "memory_url": args.memory_url,
+                # R206: absent on every phase before the material existed. The two blocks are what decide
+                # whether a flat reading is a result — notes written and asked for, and notes found.
+                **(
+                    {
+                        "notes": {
+                            "path": args.notes,
+                            "rounds": note_rounds,
+                            "written": sum(entry["written"] for entry in note_rounds),
+                            "refused": sum(entry["refused"] for entry in note_rounds),
+                            "providerFailures": sum(entry["providerFailures"] for entry in note_rounds),
+                            "collisions": sum(entry["collisions"] for entry in note_rounds),
+                            "specificity": specificity(load_notes(args.notes)[0], trajectories),
+                        }
+                    }
+                    if args.notes
+                    else {}
+                ),
                 "diagnostics": {
                     **diagnostics_of(simulations),
                     "usage": usage_stats(memory),

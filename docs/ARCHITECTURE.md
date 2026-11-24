@@ -3692,3 +3692,68 @@ number of calls, and that is a property of the simulator. When the denominators 
 claim is the one divided by the unit that stayed put: tokens per *agent call*, with the summariser's own input
 subtracted and the subtraction printed. The per-episode number stays in the report beside the call counts, because the
 confound is itself a reading — this arm changed the trajectory of the episode it served.
+
+### 8.71 The material is a field: rounds, a sidecar keyed by the request, and one note per task
+
+Every arm from R92 to R205 served a *block a store rendered*. Four rounds varied whether that block spoke (R123),
+how much of it (R151, R201) and what it was made of at serve time (R204). None of them varied **where the material
+comes from**, and the largest published effect in this literature is a statement about exactly that: on the same
+tasks, stored lessons reach 49.0, raw logs 53.5, and a summary of the attempt that just failed 59.9 — and the same
+paper's finding is that the last one is *not stored*.
+
+R206 therefore adds a third input to the agent and removes two. There is no facade, no store and no retrieval: the
+material is one sentence distilled from **this task's** last failed attempt, carried one attempt forward, and
+dropped with the task.
+
+**Rounds, because τ² has no seam inside `trials`.** `run_tasks(trials=k)` builds its argument list trial-major and
+then submits it to one thread pool, so a task's attempt k+1 may start before attempt k's reward exists — and nothing
+in the pool's contract promises otherwise. The phase is therefore scheduled as `--rounds k`: k separate
+`run_tasks` calls with seeds `base .. base+k-1`, merged into one `results.json` with each round written as that
+trial's index. Two properties come out of it that `--trials` cannot give:
+
+* **the runner holds the reward between two attempts**, which is the only place a note can be written, because the
+  agent is never told how the episode scored;
+* **both arms can be handed the same four seeds**, which is the common-random-numbers property a paired reading
+  needs — the control is the same agent, the same rounds and the same seeds, with `--notes` absent.
+
+**The key is the request, on both sides.** The agent is never told which task it is in (R136), so the identity both
+sides hold is the text that opened the episode: the runner reads it from the simulation's first user message, the
+agent from the message τ² handed it, and **both call `notes.note_key`** — collapse whitespace, keep case, bound at
+500 characters. Collisions (two task ids that reduce to one key) are counted by the runner, which is the side that
+knows the task id, and travel in the sidecar; the agent could not see one.
+
+**The file is re-read between rounds.** Rounds share one process, so a document cached at the first read would
+serve round one's notes to round four and the treatment would be a constant — an arm that looked inert for a reason
+that has nothing to do with the material. The cache is keyed on `(mtime, size)` and the case that proves it lives in
+`selfcheck_agent.py`.
+
+**One material per arm.** A facade pack wins over a note. An arm carrying both would be a third treatment nobody
+registered, and its delta would belong to neither.
+
+The three ways a note can fail to exist are counted apart, because they are three different sentences: the
+summariser declined (`NONE`, which is the arm's gate doing its job), the provider failed (the run is about an
+unreachable summariser), and the attempt was unreadable (the reader could not see the messages). A corrupted sidecar
+is a fourth: it serves nothing **and** records the problem, because `hits: 0` from a file nobody could parse is a
+treatment that never ran, and an artefact that could not tell that from round one would publish a mechanism as inert
+when the mechanism had not been executed.
+
+### 8.72 The corpus headline is scoped to a body, because a share is a share of something
+
+The ledger's headline answered one question — "is this memory mostly inert?" — by pooling every fold the corpus
+holds, and it carried the list of treatment keys so a reader could see that it had. R204's fold is what that
+construction cannot survive: on a transient arm `serveYield.renders` counts the *summariser's inputs*, not served
+packs, so adding the fold to a 291-pack pool would move the corpus share by changing what its denominator means
+while looking like a fold that was added.
+
+`serveBody` was already in the treatment key, so the pools were separate; the headline was not. It is now:
+
+* every ledger carries `body`, read from the artefact's `serveBody` and defaulting to `rendered` — which is a fact
+  rather than a guess, because every artefact before R204 injected the block the facade rendered;
+* `headlineOf(folds)` **refuses** a corpus that mixes bodies and names both, rather than averaging them;
+* `headlineOf(folds, body)` pools the named material only;
+* the committed record publishes the body it speaks about (`headline.body`) and the line a reader quotes says it:
+  *"over the rendered body, pooled over 3 treatment(s)"*.
+
+The refusal is the point. A corpus that mixes materials does not have one share, and a function that returned one
+anyway would be the most misleading number this module could produce — which is the same reason it refuses an empty
+corpus instead of printing `0% inert`.
