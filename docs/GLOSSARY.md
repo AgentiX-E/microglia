@@ -2513,3 +2513,23 @@ below its power ceiling has no behavioural work left that it would fund.
 **Population (of a reading)** — the tasks a share is taken over, printed in every reading because it moves the
 number: R212's two arms give +1.8 pp on the nineteen tasks the control failed and +7.5 pp on all twenty-four. The
 default is the tasks the baseline failed — the ones with a counterfactual — and any other choice must be named.
+
+**Repair (of a requirement)** — an unmet requirement that the next attempt meets. The benefit side of a material
+read at requirement resolution; the unit `memory_debit` counts instead of the episode.
+
+**Break (of a requirement)** — a requirement that was **met** and that the next attempt misses. The harm side, and
+the one a pass/fail endpoint cannot see: a single break turns the episode into a failure and the number that
+appears is the one a rescue would have moved. R212's paraphrase broke 43 requirements against the control's 37.
+
+**Admission bar** — `breaks / (repairs + breaks)`: the precision a gate must reach before admitting a case is
+worth more than admitting everything. When it sits above the base repair rate the population is net-negative and a
+filter has to beat the population by that margin. R212's paraphrase: 51.8% against a base of 48.2%.
+
+**Naming association** — of the requirements an attempt missed, the share its own note mentions (48.8% for the
+paraphrase), and the repair rate among the named ones against the silent ones (55.0% against 40.5%). A blunt
+lexical test on purpose: an embedding would make the reading depend on a model that changes, and a note that never
+writes the words is not about them.
+
+**Verdict material** — the evaluator's verdict served as the note itself (`--note-source verdict`). It names every
+unmet requirement by construction, costs no model call, and is the ceiling a material could reach with a perfect
+checker rather than a deployable configuration.

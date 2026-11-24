@@ -4283,3 +4283,60 @@ Three consequences:
   choice hidden inside it;
 - the drift line says `vs baseline` rather than `vs bank`: with both arms in one dispatch the baseline is the
   control, and a label that says otherwise invites the reader to compare across runs again.
+
+### 8.86 A rate that nets two movements cannot say whether memory did nothing or cancelled itself
+
+R212's reading was 12/30 against 13/34 and the honest word for it was `NO_LIFT`. Two facts it could not explain
+sat beside it: the treatment's `pass^4` fell from 5/24 to 2/24, and its per-requirement transitions moved **43
+breaks against the control's 37** while repairing 40 against 38. A pass/fail endpoint collapses all of that into
+one number per episode, and a rescue rate collapses it into one number per attempt. Neither can see a material
+that repairs a little and breaks a little.
+
+Every attempt is scored on a fixed set of **requirements** — the database match, the named actions, the
+assertions, the communicated facts. They are countable, stable across attempts of one task, and they move
+independently, so they are the natural unit for the question the lane actually has:
+
+| movement | meaning |
+|---|---|
+| **repair** | an unmet requirement the next attempt meets |
+| **persist** | an unmet requirement that stays unmet |
+| **break** | a **met** requirement the next attempt misses |
+
+`break` is the harm and it had no name. `eval/tools/memory_debit.py` reads it from the documents a paid run
+already wrote, with no model call, on 85 unmet and 332 met requirements per arm — 2.5× the observations the
+rescue rate's thirty opportunities provide, and every one of them attributable to a named requirement.
+
+**What R212 looks like at that resolution.** Control: 38/85 repaired (44.7%), 37/332 broken (11.1%), net +1.
+Paraphrase: 40/83 repaired (48.2%), 43/334 broken (12.9%), **net −3**. The material repairs 3.5 points more and
+breaks 1.7 points more; neither difference is resolved at this n (p = 0.76 and 0.55), and the net is negative. The
+honest sentence is not "memory does nothing" but **"memory moves work around, and slightly against us"**.
+
+Two derived readings make it actionable rather than merely negative:
+
+- **the admission bar** is `breaks / (repairs + breaks)` = 51.8%, against a base repair rate of 48.2%. A gate that
+  admits only the cases memory helps must find repairs at a rate above the break share, so the population as a
+  whole is net-negative and a filter would have to beat it by 3.6 points to invert the sign. This is R34's bar
+  (`b / (r + b)`) arriving on a second corpus — BIRD then, τ² retail now — and it says the same thing: a filter on
+  this material has almost no headroom.
+- **the naming association**: the notes name 40 of the 82 unmet requirements of the attempt they came from
+  (48.8%), and a requirement that is named is repaired 22/40 (55.0%) against 17/42 (40.5%) when it is not. That
+  association is not causal — a note may name the easy requirements — but it is the largest movement in this lane
+  and it has a mechanical explanation: a summariser writing a sentence about a conversation can miss the one check
+  that decides the episode.
+
+**So the material is pointed at the wrong requirement half the time.** R208 added the verdict to the summariser's
+prompt and the sentence improved; R212 shows it still misses half. The verdict already names 100% of the unmet
+requirements, in the evaluator's words, at 447 characters — the length the paraphrase spent 96 tokens
+approaching. `--note-source verdict` serves it as written, with no model call at all, and the three-arm dispatch
+(control, paraphrase, verdict) is what measures whether the paraphrase was the harm.
+
+Three design consequences:
+
+- **the unit of a reading is a requirement, not an episode.** A rescue rate answers "did this attempt pass"; the
+  debit answers "which requirement moved and in which direction", which is the question a product change can be
+  aimed at;
+- **a harm channel has to be named before it can be ablated.** `break` existed in every artefact this lane ever
+  wrote and no reader counted it, which is why three rounds of nulls were read as "the material does nothing";
+- **the material's cost is now a dispatch argument.** `--note-source model|verdict` makes the material a property
+  of the run rather than of the driver, and the verdict arm is the cheaper of the two because it spends no tokens
+  on a paraphrase.

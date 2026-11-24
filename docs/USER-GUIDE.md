@@ -6648,3 +6648,37 @@ python3 eval/tools/rescue_rate.py --dir eval/results/note-rescue/treatment \
 Two things to check before believing a null of this shape: the **population** line (19 tasks give +1.8 pp, 24 give
 +7.5 pp — same run) and the **counters** (35 notes, 99 lookups, 54 hits: a null with zero lookups would have been a
 statement about the plumbing).
+
+### 32.68 Reading what a material costs, per requirement
+
+A rescue rate tells you whether an attempt after a failure passed. It cannot tell you whether the material did
+nothing or whether it repaired one thing and broke another, and those are different products. The debit reads the
+same run at the resolution the evaluator already scores:
+
+```bash
+python3 eval/tools/memory_debit.py \
+    --arm control=eval/results/note-rescue/control \
+    --arm paraphrase=eval/results/note-rescue/paraphrase \
+    --notes paraphrase=eval/results/note-rescue/paraphrase
+```
+
+| reading | what it means | R212's value |
+|---|---|---|
+| `repaired` | unmet requirements the next attempt met | 40/83 (48.2%) |
+| `broken` | **met** requirements the next attempt missed | 43/334 (12.9%) |
+| `net` | repaired − broken | **−3** (control +1) |
+| admission bar | `breaks/(repairs+breaks)`: the precision a gate must beat | 51.8% vs base 48.2% |
+| requirements named | of those the attempt missed, how many the note mentions | 48.8% |
+| repaired when named | the association between naming and repair | 55.0% vs 40.5% |
+
+Four states, and they are not the same null:
+
+- **`REPAIRS`** — more repair, no more break. The material is doing what a lesson should.
+- **`BREAKS`** — more break with no more repair. This is harm, and it is the one state that obliges a product
+  change rather than another run.
+- **`BOTH`** — both movements are real. Work moved; neither rate is the reading.
+- **`WASH`** — neither movement is resolved at this n. Report the net and its sign, and do not quote "no effect".
+
+Two habits. **Name the harm before you ablate it**: `break` was in every artefact this lane wrote and no reader
+counted it. **Check the bar before you build the gate**: if `breaks/(repairs+breaks)` sits above the base repair
+rate, no filter on this material pays for itself, and the defect is the material rather than the selection.
