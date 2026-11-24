@@ -44,9 +44,13 @@ on:
         required: false
         default: '4'
       arms:
-        description: 'both or treatment. Both, unless a baseline has already been run in this world.'
+        description: 'three, both or treatment. Three is control, paraphrase and verdict in one world.'
         required: false
         default: 'both'
+      note_source:
+        description: 'What the note is: model (a paraphrase) or verdict (the evaluator text as written)'
+        required: false
+        default: 'model'
       population:
         description: 'hard (failed twice of four in the bank) or failing (failed at all)'
         required: false
@@ -192,12 +196,15 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m pip install --disable-pip-version-check --quiet coverage
-          INCLUDE="*/eval/tools/rescue_rate.py"
+          INCLUDE="*/eval/tools/rescue_rate.py,*/eval/tools/memory_debit.py"
           rm -f .coverage
           python3 -m coverage run --branch --include="$INCLUDE" eval/tools/rescue_rate.py --self-test
+          python3 -m coverage run --append --branch --include="$INCLUDE" eval/tools/memory_debit.py --self-test
           python3 -m coverage json -o "${RUNNER_TEMP}/coverage-rescue.json" --include="$INCLUDE"
           # One file, and the count is asserted: a run that measured nothing reports 100% of nothing.
-          python3 scripts/check-python-coverage.py "${RUNNER_TEMP}/coverage-rescue.json" --min 95 --expect-files 1
+          # `--expect-files 2`: R213 added the reader that separates a repair from a break, and a run that
+          # measured only one of the two would report 100% of half the instruments.
+          python3 scripts/check-python-coverage.py "${RUNNER_TEMP}/coverage-rescue.json" --min 95 --expect-files 2
 
   rescue:
     name: rescue — one arm, two rounds, the note served at the attempt after a failure
@@ -216,6 +223,7 @@ jobs:
       RESCUE_TASKS: ${{ github.event.inputs.tasks }}
       RESCUE_ROUNDS: ${{ github.event.inputs.rounds || '4' }}
       RESCUE_ARMS: ${{ github.event.inputs.arms || 'both' }}
+      RESCUE_NOTE_SOURCE: ${{ github.event.inputs.note_source || 'model' }}
       RESCUE_POPULATION: ${{ github.event.inputs.population || 'hard' }}
       RESCUE_MAX_STEPS: ${{ github.event.inputs.max_steps || '100' }}
       RESCUE_CONCURRENCY: ${{ github.event.inputs.concurrency || '3' }}
@@ -264,7 +272,7 @@ jobs:
           MINUTES="$(python3 -c "
           tasks = len([entry for entry in '${RESCUE_TASK_LIST}'.split(',') if entry])
           rounds = int('${RESCUE_ROUNDS}')
-          arms = 2 if '${RESCUE_ARMS}' == 'both' else 1
+          arms = {'three': 3, 'both': 2}.get('${RESCUE_ARMS}', 1)
           # 26 s a simulation (R206's pilot, 48 in 21 minutes) plus 10 s of τ² import per invocation, one
           # invocation per task, plus eight for the install and one for the reading. Rounded up.
           concurrency = max(1, int('${RESCUE_CONCURRENCY}'))
@@ -316,13 +324,21 @@ jobs:
           # One invocation: one task, one arm, the note carried across the boundary between the rounds.
           set -uo pipefail
           arm="$1"; task="$2"
+          # The material follows the arm. `treatment` and `paraphrase` are the same mechanism and differ only in
+          # the name their documents are kept under; `verdict` serves the evaluator's own text and makes no model
+          # call at all, which is why its round costs less than the paraphrase's.
           extra=()
-          if [ "$arm" = "treatment" ]; then
-            extra=(--notes "${RESCUE_DIR}/notes-${task}.json")
-            if [ "${RESCUE_NOTE_VERDICT}" = "true" ]; then
-              extra+=(--note-verdict)
-            fi
-          fi
+          case "$arm" in
+            treatment|paraphrase)
+              extra=(--notes "${RESCUE_DIR}/${arm}/notes-${task}.json")
+              if [ "${RESCUE_NOTE_VERDICT}" = "true" ]; then
+                extra+=(--note-verdict)
+              fi
+              ;;
+            verdict)
+              extra=(--notes "${RESCUE_DIR}/${arm}/notes-${task}.json" --note-source verdict)
+              ;;
+          esac
           "${PYTHON}" eval/drivers/tau2/run_split.py \
             --phase eval --agent microglia_agent \
             --domain "${RESCUE_DOMAIN}" --tasks "${task}" --rounds "${RESCUE_ROUNDS}" \
@@ -343,12 +359,15 @@ jobs:
           # check refused it (38/50 against 27/50 on the same fifty tasks). One seed is shared by every task of an
           # attempt, so two arms at different seeds are two draws of a process whose per-attempt rate moves by far
           # more than a binomial standard error. The world is a variable, so it has to be held.
-          if [ "${RESCUE_ARMS}" = "both" ]; then
-            mkdir -p "${RESCUE_DIR}/control"
-            run_arm control
-          fi
-          mkdir -p "${RESCUE_DIR}/treatment"
-          run_arm treatment
+          case "${RESCUE_ARMS}" in
+            three) ARM_LIST="control paraphrase verdict" ;;
+            both)  ARM_LIST="control treatment" ;;
+            *)     ARM_LIST="treatment" ;;
+          esac
+          for arm in ${ARM_LIST}; do
+            mkdir -p "${RESCUE_DIR}/${arm}"
+            run_arm "${arm}"
+          done
 
       - name: What the notes cost and whether they were served
         # The arm's own counters, before the rate. A rescue rate with zero lookups is a rate over attempts that
@@ -383,7 +402,8 @@ jobs:
           usd = 0.0
           seconds = 0.0
           per_arm = {}
-          for arm in ("control", "treatment"):
+          for arm in sorted(entry.name for entry in root.iterdir()
+                             if entry.is_dir() and entry.name in ("control", "treatment", "paraphrase", "verdict")):
               arm_documents = sorted((root / arm).glob("*.json")) if (root / arm).is_dir() else []
               if not arm_documents:
                   continue
@@ -428,31 +448,69 @@ jobs:
           retention-days: 14
 
       - name: The rate, against the transition nobody wrote
+        # Every material arm against the control that ran in the same dispatch, with the same seeds. R211 compared
+        # an arm with a baseline written at another time and its own drift gate refused the reading; this step
+        # therefore never falls back to the bank when a control exists.
         run: |
           set -euo pipefail
-          # One run, two arms: the control is the baseline, and the drift check then compares two arms that share
-          # a seed rather than an arm with a document written at another time. `--pooled` on a four-round arm sums
-          # every transition instead of the first, which is the same event measured three times.
-          set +e
           extra=()
           if [ "${RESCUE_ROUNDS}" -ge 3 ]; then extra+=(--pooled); fi
-          if [ -d "${RESCUE_DIR}/control" ]; then
-            python3 eval/tools/rescue_rate.py \
-              --dir "${RESCUE_DIR}/treatment" --baseline-dir "${RESCUE_DIR}/control" "${extra[@]}" \
-              --json "${RESCUE_DIR}/rescue.json" | tee "${RESCUE_DIR}/reading.txt"
-          else
-            python3 eval/tools/rescue_rate.py \
-              --dir "${RESCUE_DIR}/treatment" --baseline eval/manifests/note-bank-baseline.json "${extra[@]}" \
-              --json "${RESCUE_DIR}/rescue.json" | tee "${RESCUE_DIR}/reading.txt"
-          fi
-          STATUS=${PIPESTATUS[0]}
+          STATUS=0
+          set +e
+          for arm in treatment paraphrase verdict; do
+            [ -d "${RESCUE_DIR}/${arm}" ] || continue
+            if [ -d "${RESCUE_DIR}/control" ]; then
+              python3 eval/tools/rescue_rate.py \
+                --dir "${RESCUE_DIR}/${arm}" --baseline-dir "${RESCUE_DIR}/control" "${extra[@]}" \
+                --json "${RESCUE_DIR}/rescue-${arm}.json" > "${RESCUE_DIR}/reading-${arm}.txt"
+            else
+              python3 eval/tools/rescue_rate.py \
+                --dir "${RESCUE_DIR}/${arm}" --baseline eval/manifests/note-bank-baseline.json "${extra[@]}" \
+                --json "${RESCUE_DIR}/rescue-${arm}.json" > "${RESCUE_DIR}/reading-${arm}.txt"
+            fi
+            ARM_STATUS=$?
+            cat "${RESCUE_DIR}/reading-${arm}.txt"
+            # 2 is `NO_MEASUREMENT` (a grid too easy to buy a rate) and is a warning; 3 is `DRIFT`, which voids the
+            # reading and stays red. Two arms may disagree, so the worst exit code is the one the job carries.
+            if [ "$ARM_STATUS" -eq 2 ]; then
+              echo "::warning::${arm}: fewer than twelve opportunities"
+            elif [ "$ARM_STATUS" -ne 0 ]; then
+              STATUS=$ARM_STATUS
+            fi
+            {
+              echo "### ${arm} — the rescue rate"
+              echo
+              echo '```'
+              cat "${RESCUE_DIR}/reading-${arm}.txt"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          done
           set -e
+          exit "$STATUS"
+
+      - name: What the material costs, per requirement
+        # The reading this round exists for. A rescue rate nets two movements into one number and R212's came back
+        # a wash; this separates the requirements the material repaired from the ones it broke, and asks whether
+        # the note was even about the requirement that failed. Nothing here calls a model.
+        run: |
+          set -euo pipefail
+          arms=(--arm "control=${RESCUE_DIR}/control")
+          notes=()
+          for arm in treatment paraphrase verdict; do
+            [ -d "${RESCUE_DIR}/${arm}" ] || continue
+            arms+=(--arm "${arm}=${RESCUE_DIR}/${arm}")
+            notes+=(--notes "${arm}=${RESCUE_DIR}/${arm}")
+          done
+          if [ ${#arms[@]} -lt 4 ]; then
+            echo "::warning::no material arm ran; the debit needs one"
+            exit 0
+          fi
+          python3 eval/tools/memory_debit.py "${arms[@]}" "${notes[@]}" \
+            --json "${RESCUE_DIR}/debit.json" | tee "${RESCUE_DIR}/debit.txt"
           {
-            echo "### R211 — the rescue rate"
+            echo "### R213 — what the material costs, per requirement"
             echo
-            echo '```'
-            cat "${RESCUE_DIR}/reading.txt"
-            echo '```'
+            cat "${RESCUE_DIR}/debit.txt"
           } >> "$GITHUB_STEP_SUMMARY"
           # 2 is `NO_MEASUREMENT`: the grid failed attempt 0 too rarely to buy a rate. That is a grid that was too
           # easy, not an instrument that is broken — the repair is a harder population, and a red job would teach

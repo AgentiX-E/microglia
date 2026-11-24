@@ -667,6 +667,52 @@ def verdict_text(simulation, ceiling: int = VERDICT_CHARS) -> str:
     return "\n".join(kept)[:ceiling]
 
 
+#: How much of the verdict is served verbatim when the verdict *is* the material. The same ceiling the
+#: summariser was shown, because the point of R213 is that the two arms receive the same evaluator text and
+#: differ only in whether a model was asked to rewrite it.
+VERDICT_NOTE_CHARS = 600
+
+
+def note_from_verdict(explained: str, ceiling: int = VERDICT_NOTE_CHARS) -> str:
+    """The evaluator's verdict as the note itself: the material without the summariser.
+
+    R213's arm. Every note this lane has written so far was a model's paraphrase of a failure, and the paraphrase
+    was the step where the sentence stopped being about the requirement that failed — `memory_debit` measures the
+    material naming 48.8% of the unmet requirements of the attempt it came from. The verdict already names 100%
+    of them, in the evaluator's words, at 447 characters: the length the paraphrase spent 96 tokens approaching.
+
+    The `REWARD` line is dropped because a scalar is not an instruction; the met lines are kept because the
+    material's measured harm is a *break* — a requirement the attempt had met and the next attempt missed — and a
+    note that lists what already passed is the only part of it that could prevent one.
+    """
+    if not isinstance(explained, str):
+        return ""
+    kept = []
+    for line in explained.splitlines():
+        if line.strip() == "" or line.startswith("REWARD "):
+            continue
+        if kept and len("\n".join(kept + [line])) > ceiling:
+            break
+        kept.append(line)
+    return "\n".join(kept)[:ceiling]
+
+
+def verdict_writer():
+    """The note *is* the verdict: no model call, no prompt, no tokens.
+
+    R208 showed the verdict to a summariser and the sentence improved; R212 showed the sentence still named under
+    half of the requirements that failed. This arm removes the step in between. `state` is `"sentence"` when a
+    verdict existed and `"refused"` when the evaluator explained nothing, which is the same vocabulary the model
+    arm uses so a round's counters mean the same thing in either.
+    """
+
+    def write(trajectory: str, verdict: str = ""):
+        note = note_from_verdict(verdict)
+        return (note, "sentence", None, 0) if note else ("", "refused", None, 0)
+
+    return write
+
+
 def note_prompt(trajectory: str, verdict: str = "") -> str:
     """The user turn: the attempt, quoted as data, and — when one is offered — the verdict, quoted too.
 
@@ -1308,6 +1354,27 @@ def _self_test() -> int:
         verdict_text({"reward_info": {"reward": 0.0, "db_check": {"db_match": False}}})
         == verdict_text(type("_S", (), {"reward_info": _Check(reward=0.0, db_check=_Check(db_match=False))})()),
     )
+    # R213. The verdict as the note: the material with no model in it.
+    graded_note = verdict_text({"reward_info": {"reward": 0.0, "db_check": {"db_match": True},
+                                                "nl_assertions": [{"nl_assertion": "Exchange both kettles", "met": False}]}})
+    from_verdict = note_from_verdict(graded_note)
+    check("the note drops the reward line", "REWARD" not in from_verdict, from_verdict)
+    check("and keeps the unmet requirement", "Exchange both kettles" in from_verdict, from_verdict)
+    check("and keeps what was met", "DB CHECK met" in from_verdict, from_verdict)
+    check("an absent verdict is no note", note_from_verdict("") == "")
+    check("a verdict that is not a string is no note", note_from_verdict(None) == "")
+    check("a verdict of only a reward is no note", note_from_verdict("REWARD 0") == "")
+    check("blank lines are dropped", note_from_verdict("A\n\nB") == "A\nB")
+    check("the ceiling cuts on a line, never mid-line",
+          note_from_verdict("one\ntwo\nthree", ceiling=7) == "one\ntwo", note_from_verdict("one\ntwo\nthree", ceiling=7))
+    check("a single line over the ceiling is the line", note_from_verdict("x" * 50, ceiling=10) == "x" * 10)
+    written, state, detail, prompt_chars = verdict_writer()("a trajectory", graded_note)
+    check("the verdict writer returns the verdict", "Exchange both kettles" in written, written)
+    check("and calls it a sentence", state == "sentence", state)
+    check("and spends no prompt", prompt_chars == 0 and detail is None, str((prompt_chars, detail)))
+    empty_note, empty_state, _, _ = verdict_writer()("a trajectory", "")
+    check("a failure with no verdict is a refusal, not a silent sentence", empty_note == "" and empty_state == "refused",
+          str((empty_note, empty_state)))
     check("no reward info is no verdict", verdict_text(object()) == "")
     check("an empty reward info is no verdict", verdict_text({"reward_info": {}}) == "")
     check(

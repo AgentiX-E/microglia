@@ -56,6 +56,7 @@ from notes import (  # noqa: E402
     scope_of,
     set_scope,
     specificity,
+    verdict_writer,
     trajectories_path,
 )
 
@@ -768,6 +769,10 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     # one failure, and adding the second is a change to the material that has to be a dispatch argument rather
     # than a change every later run inherits silently.
     parser.add_argument("--note-verdict", action="store_true")
+    # R213. What the note *is*: a model's paraphrase of the failure (`model`, every arm before this one) or the
+    # evaluator's verdict served as written (`verdict`, which needs no model, no tokens and no summariser call).
+    # A dispatch argument rather than a default, because the two materials are the experiment.
+    parser.add_argument("--note-source", choices=("model", "verdict"), default="model")
     # A full-quality run is six hours and four arms; at double price that is a doubled bill for a
     # number that does not improve. The guard is off by default because a smoke run is cheap enough
     # to be worth running whenever the operator is awake, and on for every dispatch that is not.
@@ -1291,7 +1296,14 @@ def main(argv: list[str]) -> int:
     round_paths = []
     note_rounds = []
     trajectories: dict = {}
-    summarize = note_writer() if args.notes else None
+    # The material, chosen by dispatch: a paraphrase costs one call per failure and can drift from the
+    # requirement; the verdict costs nothing and cannot. `--note-source verdict` implies `--note-verdict`,
+    # because the verdict arm reads the verdict even when the flag was not repeated.
+    if args.notes:
+        summarize = verdict_writer() if args.note_source == "verdict" else note_writer()
+    else:
+        summarize = None
+    show_verdict = bool(args.note_verdict or args.note_source == "verdict")
     for index in range(rounds):
         out_path = args.out if rounds == 1 else f"{args.out}.round{index}"
         if os.path.exists(out_path):
@@ -1326,7 +1338,7 @@ def main(argv: list[str]) -> int:
             # started. The counters travel into the artefact rather than a log line: a round that distilled
             # nothing is the arm's own gate, and a round whose provider failed is the run being broken.
             counted = note_round(
-                round_simulations, args.notes, index + 1, summarize, trajectories, verdict=args.note_verdict
+                round_simulations, args.notes, index + 1, summarize, trajectories, verdict=show_verdict
             )
             note_rounds.append(counted)
             print(
@@ -1378,7 +1390,8 @@ def main(argv: list[str]) -> int:
                             # R208: which material the sentences were written from. A reading is only comparable
                             # to another when both say this, and a phase that silently gained the verdict would be
                             # a better number nobody could attribute.
-                            "verdict": bool(args.note_verdict),
+                            "verdict": show_verdict,
+                            "source": args.note_source,
                             "verdicts": sum(entry["verdicts"] for entry in note_rounds),
                             "verdictChars": sum(entry["verdictChars"] for entry in note_rounds),
                             # The attempts, and how many of them were kept: the builder recomputes specificity
