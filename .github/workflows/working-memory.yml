@@ -1,27 +1,22 @@
 name: working-memory
 
-# R214 — the state channel, which this lane has never built.
+# R215 — the contract, and a board that moves only when a receipt moves it.
 #
-# Three dispatches served a sentence about a failure and measured a wash: R212 rescue +1.8 pp with exact p = 1.0,
-# R213 named 100% of the unmet requirements and repaired fewer of them than a sentence that named half. The
-# published ablation of the system that holds the SOTA on this benchmark prices that channel at **+2.0 points with
-# an interval that includes zero**, and prices *verified working state* at **+23.9** (Recuris, arXiv 2608.24876).
-# So this round changes the unit of memory. Not a sentence about a failure: a **goal board** — the asks the request
-# states, ticked only when a tool receipt names them, recomputed on every turn from the messages the episode
-# already carries (AUDIT 34.215).
+# R214 built the state channel and measured two defects at once: the board grew to 10.6 asks an episode against the
+# 1.58 a request states (it read every user turn, and a simulated user's clarifications name objects and follow
+# verbs), and because its text changed on nearly every turn the provider's prefix cache fell from 90.4% to 75.1% —
+# 77% more money for a 200-character block. A list that moves every turn is not cheap because it is small; it is
+# expensive because it moves (PROGRESS 244.3).
 #
-# Two things make this affordable where the earlier rounds were not:
+# So this round changes the unit again. Not a transcript reader: a **contract**. The asks are the ones the request
+# states, fixed before the first call, and the block can therefore move only when a successful state-changing call
+# moves it — a handful of times an episode, not twenty-five. A receipt that settles nothing is now reported as one
+# of two different facts: a call of a family the request never asked for (work nobody asked for, which is the
+# failure τ² charges for) or a call whose object the board could not name (the parser's own limit).
 #
-#   * the board is a **parser**, not a model call. It costs no tokens and no summariser, so the arm's material is
-#     free and the only bill is the episodes.
-#   * the grid is **one attempt over 114 tasks**, not four rounds over 24. R213 measured the 24-task grid's noise
-#     floor at ~20 points — larger than every effect it had been measuring — because at attempt 0 the arms differ in
-#     nothing but the provider's sampling. A 114-task one-attempt grid has a floor near 9 points, and it costs
-#     *less*: 228 episodes at the bank's $0.0044 is ≈ **$1.0 (¥7.2)**, against $1.53 for the 288-episode three-arm.
-#
-# Endpoint: pass^1, paired by task, bar **+10 pp with the interval excluding zero**. Both arms run the same 114
-# tasks in the same seed world, dispatched minutes apart, which is the common-random-numbers property R211's drift
-# check demanded and R212 paid for.
+# Two endpoints, and the mechanism is checked before the rate: the arm's cache hit rate must stay within **three
+# points** of the control's and its block must change on at most **a third** of its turns, or no accuracy reading
+# from this dispatch may be quoted as a reading about the treatment.
 
 on:
   workflow_dispatch:
@@ -89,20 +84,30 @@ jobs:
           python3 eval/tools/goal_board.py --self-test
 
       - name: The agent that serves the board still behaves
-        # R214. `selfcheck_agent.py` is 223 assertions about the agent every paid dispatch loads, and until this
-        # step existed **no workflow ran it**: the tau2 drivers were outside `ci.yml`'s coverage source and no job
-        # named them. A suite nobody runs is a suite that protects nothing, so the gate for the arm that changed the
-        # agent is the gate that runs the agent's own suite.
+        # R214. `selfcheck_agent.py` is the only suite about the agent every paid dispatch loads, and until R214
+        # **no workflow ran it**: the tau2 drivers were outside `ci.yml`'s coverage source and no job named them. A
+        # suite nobody runs is a suite that protects nothing, so the gate for the arm that changed the agent is the
+        # gate that runs the agent's own suite — and measures how much of the agent it reaches.
         run: |
           set -euo pipefail
           python3 eval/drivers/tau2/selfcheck_agent.py --self-test
           python3 eval/drivers/tau2/selfcheck_usage.py --self-test
+          python3 -m pip install --disable-pip-version-check --quiet coverage
+          INCLUDE="*/eval/drivers/tau2/microglia_agent.py"
+          rm -f .coverage
+          python3 -m coverage run --branch --include="$INCLUDE" \
+            eval/drivers/tau2/selfcheck_agent.py --self-test
+          python3 -m coverage json -o "${RUNNER_TEMP}/coverage-agent.json" --include="$INCLUDE"
+          # 98 rather than 95: the suite reaches 99% of the module's lines, and a rung two points under the
+          # measurement is a rung a two-point regression climbs over.
+          python3 scripts/check-python-coverage.py "${RUNNER_TEMP}/coverage-agent.json" --min 98 --expect-files 1
 
       - name: The census, and the numbers it was quoted at
-        # The extractor's licence is a measurement, so the measurement is a gate. These five numbers are R214's
-        # §2 exactly: 180 of 226 required objects found, 152 of 180 required families mentioned, 255 asks no
-        # required object accounts for, and 86 of 114 tasks fully covered. A parser change that moves any of them
-        # by more than the margin below is a change to the material and has to be registered as one.
+        # The extractor's licence is a measurement, so the measurement is a gate. These are the numbers this round
+        # registered: 176 of 226 required objects found, 150 of 180 required families mentioned, 235 asks no
+        # required object accounts for, and 84 of 114 tasks fully covered. The bounds are tight on purpose — a
+        # parser change that moves the material has to be registered as one, and R215's own negation repair moved
+        # recall by nothing and noise by three, which is the size of change this gate is meant to notice.
         run: |
           set -euo pipefail
           python3 eval/tools/goal_board.py --census --json | tee "${RUNNER_TEMP}/census.json"
@@ -112,9 +117,9 @@ jobs:
           reading = json.load(open(sys.argv[1]))
           assert reading["tasks"] == 114, reading["tasks"]
           assert reading["required"] == 226, reading["required"]
-          assert reading["found"] >= 170, reading["found"]
+          assert reading["found"] >= 174, reading["found"]
           assert reading["familyRecall"] >= 0.82, reading["familyRecall"]
-          assert reading["spurious"] <= 280, reading["spurious"]
+          assert reading["spurious"] <= 240, reading["spurious"]
           assert reading["tasksCovered"] >= 82, reading["tasksCovered"]
           print(f"ok  {reading['found']}/{reading['required']} objects, {reading['familyRecall']:.1%} of families, "
                 f"{reading['spurious']} spurious, {reading['tasksCovered']}/{reading['tasks']} tasks covered")
@@ -296,9 +301,11 @@ jobs:
             *)     run_arm control ;;
           esac
 
-      - name: What the board cost and whether it was served
-        # The arm's own counters before the rate. A board that rendered on no turn is a null about the wiring, and a
-        # board that rendered but settled nothing is the parser's own limit: the two must not be read as one null.
+      - name: The mechanism, before the rate
+        # R215. A cadence and a cache first, because R214's accuracy reading was a reading about a block that moved
+        # on every turn: an arm whose material changes the prompt twenty-five times an episode is not the arm the
+        # registration describes, and no accuracy number may be quoted from it as a number about the treatment.
+        # These three assertions are the whole reason this step exists before the paired reading.
         run: |
           set -euo pipefail
           python3 - "${BOARD_DIR}" <<'PY'
@@ -306,27 +313,46 @@ jobs:
           from pathlib import Path
 
           root = Path(sys.argv[1])
+          summary = {}
+          for path in sorted(root.glob("*.log")):
+              for line in path.read_text(errors="replace").splitlines():
+                  if line.startswith('{"phase"'):
+                      summary[path.stem] = json.loads(line)
           episodes = usd = 0.0
           for path in sorted(root.glob("*.json")):
               document = json.loads(path.read_text())
-              arm_episodes = arm_usd = 0.0
-              for simulation in document.get("simulations") or []:
-                  arm_episodes += 1
-                  arm_usd += (simulation.get("agent_cost") or 0) + (simulation.get("user_cost") or 0)
-              episodes += arm_episodes
+              arm_usd = sum((s.get("agent_cost") or 0) + (s.get("user_cost") or 0)
+                            for s in document.get("simulations") or [])
+              count = len(document.get("simulations") or [])
+              episodes += count
               usd += arm_usd
-              print(f"{path.stem}: {int(arm_episodes)} episode(s), ${arm_usd:.4f}")
-          for path in sorted(root.glob("*.log")):
-              for line in path.read_text(errors="replace").splitlines():
-                  if not line.startswith('{"phase"'):
-                      continue
-                  summary = json.loads(line)
-                  memory = (summary.get("diagnostics") or {}).get("memory") or {}
-                  board = memory.get("board") or {}
-                  print(f"{path.stem}: {summary.get('simulations')} simulation(s), "
-                        f"board renders {board.get('renders')}, asks {board.get('items')}, "
-                        f"settled {board.get('settled')}, chars {board.get('charsTotal')}")
+              print(f"{path.stem}: {count} episode(s), ${arm_usd:.4f}")
           print(f"total {int(episodes)} episode(s), ${usd:.4f} ≈ ¥{usd * 7.2:.1f}")
+
+          board = (summary.get("board") or {}).get("diagnostics", {}).get("memory", {}).get("board") or {}
+          assert board, "the board arm wrote no counters: the mechanism did not run"
+          renders = board.get("renders") or 0
+          assert renders > 0, "the board was served on no turn"
+          share = (board.get("changes") or 0) / renders
+          mean_chars = board.get("charsMean") or 0
+          mean_open = (board.get("open") or 0) / renders
+          print(f"board: {renders} render(s), {board.get('changes')} change(s) ({share:.0%} of turns), "
+                f"{board.get('stable')} stable, {mean_chars:.0f} chars a turn, {mean_open:.1f} open ask(s)")
+          # The three mechanism readings. A board that changes on more than a third of its turns is R214's board
+          # with a different parser; one that lists more than three open asks is a transcript again.
+          assert share <= 1 / 3, f"the block changed on {share:.0%} of turns: the prefix cannot survive that"
+          assert mean_chars <= 500, f"the block is {mean_chars:.0f} characters a turn"
+          assert mean_open <= 3.0, f"{mean_open:.1f} open asks a turn: this is a list of everything, not a contract"
+
+          control = (summary.get("control") or {}).get("usage") or {}
+          treated = (summary.get("board") or {}).get("usage") or {}
+          if control and treated:
+              left, right = control.get("cache_hit_rate"), treated.get("cache_hit_rate")
+              assert isinstance(left, (int, float)) and isinstance(right, (int, float)), (left, right)
+              print(f"cache hit rate: control {left:.1%}, board {right:.1%}, {100 * (right - left):+.1f} pp")
+              assert abs(right - left) <= 0.03, (
+                  f"the arm's cache hit rate is {100 * (right - left):+.1f} points against the control's; "
+                  "the registered bar is 3")
           PY
 
       - name: The paired reading

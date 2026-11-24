@@ -13,21 +13,39 @@ parser: the request is in front of the agent on the first turn, the receipts are
 neither has to be paraphrased to be useful. A board of four asks that costs zero tokens cannot lose the cost
 argument that a sentence of ninety-six tokens has to win.
 
-## The three readings, and the one thing this module refuses to do
+## The contract, and the three readings
 
-    items        the asks, extracted from the user's own messages: a family (exchange, return, cancel, modify,
-                 address, payment, transfer) and the content words that name the object
+R214 built this as a transcript reader and measured two defects at once: the board grew to **10.6 asks** an episode
+against the **1.58** a request states, and because its text changed on nearly every turn the provider's prefix cache
+fell from 90.4% to 75.1% and the bill rose 77% for a 200-character block. A list that moves every turn is not
+cheap because it is small; it is expensive because it moves (PROGRESS 244.3).
+
+So the unit is a **contract** rather than a transcript:
+
+    items        the asks the *request* states — the first thing the user says — a family (exchange, return,
+                 cancel, modify, address, payment, transfer) and the content words that name the object. Later
+                 turns are clarifications: they refine a clause this parser cannot identify, and a parser that
+                 cannot tell which clause a "yes" refines must not add one
     receipts     the state-changing calls that succeeded, with the names of the items they touched, read from the
                  tool results the episode already carries
     settled      an item and a receipt of the same family whose touched item *name* is contained in the item's own
                  words
 
+The contract is what makes this a checker rather than a renderer: the text the board is checked against is fixed
+before the first call, so the board's content can only move when a receipt moves it — a handful of times an
+episode, not twenty-five. `scope="conversation"` still reads every user turn, and R214's numbers are reproduced by
+it; it is kept so the two readings can be subtracted rather than argued about.
+
 The refusal is the design: **an item is never marked done because something of the same kind happened.** Two
 exchanges in one order, one performed, is the shape this benchmark fails on, and a board that reports "exchange:
 done" after the first is a board that removes the agent's reason to look — the harm channel R213 measured at 8.5%
 of met requirements. So a receipt settles an item only when the product it names is named by the ask, and a receipt
-whose product cannot be named (an address change carries no item id; a read was never made) is reported in its own
-line as *unattributed* rather than credited to the nearest open ask.
+that settles nothing is reported as one of two different things:
+
+    unrequested  the request never stated an ask of this family — the agent did work nobody asked for, which is
+                 the failure τ² charges for, and the line the board exists to make visible
+    unattributed the family was asked for, and this board could not name what the receipt touched — the parser's
+                 own limit, not the agent's mistake
 
 Nothing here imports a provider, a harness or a file. `--self-test` runs offline; `--census` measures the extractor
 against the evaluator's own list of required calls, which the board never sees.
@@ -45,8 +63,15 @@ import re
 import sys
 from pathlib import Path
 
-#: The schema travels into the artefact so a reading names the shape it was taken from.
-SCHEMA = "microglia.goal-board/1"
+#: The schema travels into the artefact so a reading names the shape it was taken from. `/2` is the contract: R214's
+#: `/1` read every user turn and moved on each of them.
+SCHEMA = "microglia.goal-board/2"
+
+#: Where the asks come from. `REQUEST` is the product's reading and the one R215 registers: the first user message,
+#: fixed before the first call, so the block a turn carries can only change when a receipt changes it. `CONVERSATION`
+#: is R214's reading, kept because a subtraction between the two is how this round prices its own fix.
+REQUEST = "request"
+CONVERSATION = "conversation"
 
 #: The tag the block is injected under. Distinct from the knowledge tag because a reader that could not tell the
 #: two apart could not say which channel a movement belonged to, and because `is_pack_message` has to remove the
@@ -208,14 +233,31 @@ def _first_word(clause: str) -> str:
     return found[0] if found else ""
 
 
+#: A refusal in front of the verb it refuses. Three words of room, because this corpus writes "I don't **want to**
+#: return" more often than "don't return", and a detector that only saw the contracted form let every one of them
+#: through as a live ask — a board telling the agent to do what the user ruled out.
+NEGATION = re.compile(r"(\bnot\b|n't|\bnever\b)(?P<between>(?:\s+\w+){0,3})\s*$")
+
+#: Determiners that turn the cue from a verb into a noun: "if the agent doesn't allow **the** exchange" is a
+#: conditional about an exchange, not a refusal of one, and reading it as a refusal cost a required ask on task 107.
+NOMINAL = frozenset("the a an my your his her its this that these those".split())
+
+
 def _negated(clause: str, family: str) -> bool:
     """Whether the family's own cue is negated: "do not exchange", "don't return", "never cancel"."""
     pattern = pattern_for(family)
     match = re.search(pattern, clause.lower()) if pattern else None
     if match is None:
         return False
-    before = clause.lower()[max(0, match.start() - 14) : match.start()]
-    return bool(re.search(r"(\bnot\b|n't|\bnever\b)\s*\w*\s*$", before))
+    before = clause.lower()[max(0, match.start() - 32) : match.start()]
+    found = NEGATION.search(before)
+    if found is None:
+        return False
+    between = found.group("between").split()
+    # "not only return it, but exchange it" refuses nothing: the correlative is a list of two asks, and reading it
+    # as a refusal would drop both. A determiner between the negation and the cue makes the cue a noun
+    # ("doesn't allow the exchange"), which is a condition about the ask rather than a refusal of it.
+    return "only" not in between and not (NOMINAL & set(between))
 
 
 def _folded(items: list) -> list:
@@ -448,23 +490,47 @@ def settles(item: dict, receipt: dict, table: dict) -> bool:
     return bool(words) and words <= free
 
 
-def board_of(messages) -> dict:
-    """The board: the asks seen so far, each with the receipt that settled it or `None`.
+def request_of(messages) -> str:
+    """The request: the first thing the user said, and the only text the asks are read from.
 
-    Items come from the user's messages and receipts from the agent's, and both are recomputed from the message
-    list on every turn. That is what makes this working memory rather than a note: the board the agent reads at
-    turn nine is the board turn nine's receipts support, not the board the first turn wrote.
+    In τ² the first user turn is the request and every later turn is the simulator answering a question the agent
+    asked — "yes, the blue one", "no, only the lamp", "I'd rather have a refund". Those sentences name objects and
+    follow verbs, so a parser that read them listed **10.6** asks an episode where the request states **1.58**
+    (PROGRESS 244.2), and a board of eleven lines with one tick is not a working memory.
+
+    `""` when no user has spoken yet, which is a real turn: the agent's first call happens before the user's first
+    message in a τ² episode that starts with a greeting, and a board that guessed a request would be inventing one.
     """
-    items: list[dict] = []
     for message in messages:
         if role_of(message) in ("user", "human"):
             content = _field(message, "content")
-            if isinstance(content, str):
-                items.extend(items_of(content))
+            if isinstance(content, str) and content.strip():
+                return content
+    return ""
+
+
+def board_of(messages, scope: str = REQUEST) -> dict:
+    """The board: the asks the contract states, each with the receipt that settled it or `None`.
+
+    Items come from the request and receipts from the agent's calls, and both are recomputed from the message list
+    on every turn. That is what makes this working memory rather than a note: the board the agent reads at turn nine
+    is the board turn nine's receipts support, not the board the first turn wrote. What it may *not* do is learn new
+    asks from turns after the first — see `request_of` and PROGRESS 244.2 for the measurement that rule comes from.
+    """
+    items: list[dict] = []
+    if scope == CONVERSATION:
+        for message in messages:
+            if role_of(message) in ("user", "human"):
+                content = _field(message, "content")
+                if isinstance(content, str):
+                    items.extend(items_of(content))
+    else:
+        items.extend(items_of(request_of(messages)))
     unique = _folded(items)
     table = name_table(messages)
     receipts = receipts_of(messages)
     settled: dict = {}
+    unrequested: list[dict] = []
     unattributed: list[dict] = []
     for receipt in receipts:
         hit = False
@@ -485,16 +551,24 @@ def board_of(messages) -> dict:
                     settled[index] = receipt
                     hit = True
                     break
-        if not hit:
-            # A receipt that settles nothing is either a change nobody asked for or a change this board could not
-            # attribute. Both are worth a line: the first is the agent inventing work, the second is the board's
-            # own limit, and a reader who cannot tell them apart would read a limit as a result.
-            unattributed.append(receipt)
+        if hit:
+            continue
+        # A receipt that settles nothing is one of two different facts, and a reader who could not tell them apart
+        # would read the parser's limit as the agent's mistake. A call the request never asked for is the failure
+        # this benchmark charges for and the line worth showing; a call whose object this board could not name (an
+        # address change carries no item id) is the same board's blind spot. A call that *failed* changed nothing
+        # and is neither: reporting it would put an attempt on a list of state.
+        if not receipt.get("ok"):
+            continue
+        family_asked = any(item["family"] == receipt["family"] for item in unique)
+        (unattributed if family_asked else unrequested).append(receipt)
     return {
+        "scope": REQUEST if scope != CONVERSATION else CONVERSATION,
         "items": [
             {**item, "settled_by": (settled.get(index) or {}).get("name")} for index, item in enumerate(unique)
         ],
         "unattributed": [{"name": receipt["name"]} for receipt in unattributed],
+        "unrequested": [{"name": receipt["name"]} for receipt in unrequested],
         "receipts": len(receipts),
         "names": len(table),
     }
@@ -506,17 +580,26 @@ def render(board: dict) -> str:
     Written as a status list rather than as advice, because the thing being measured is whether *state* helps. An
     instruction ("remember to finish everything") would be the lesson channel wearing a list, and R212/R213 have
     already priced that.
+
+    Three lines and two of them are refusals. `Not asked for by the request` is the checker's most useful output: a
+    state-changing call the contract never asked for is the failure this benchmark charges for, and it is the one
+    thing a transcript cannot make visible without a fixed contract to compare against.
     """
     items = board.get("items") or []
-    if not items:
+    if not items and not (board.get("unrequested") or board.get("unattributed")):
         return ""
-    lines = ["Open asks from the request — a line is ticked only when a tool receipt names it:"]
+    where = "from the request" if board.get("scope", REQUEST) == REQUEST else "from the conversation"
+    lines = [f"Open asks {where} — a line is ticked only when a tool receipt names it:"]
     for item in items[:MAX_ITEMS]:
         mark = "x" if item.get("settled_by") else " "
         lines.append(f"[{mark}] {item['family']}: {' '.join(item['words'][:8])}")
     hidden = len(items) - MAX_ITEMS
     if hidden > 0:
         lines.append(f"… and {hidden} more ask(s) not shown")
+    unrequested = board.get("unrequested") or []
+    if unrequested:
+        names = sorted({entry["name"] for entry in unrequested})
+        lines.append(f"Not asked for by the request: {len(unrequested)} call(s) — {', '.join(names[:3])}")
     unattributed = board.get("unattributed") or []
     if unattributed:
         names = sorted({entry["name"] for entry in unattributed})
@@ -527,9 +610,9 @@ def render(board: dict) -> str:
     return body
 
 
-def board_body(messages) -> str:
-    """The rendered board for a message list, or `""` when the request has stated no ask yet."""
-    return render(board_of(messages))
+def board_body(messages, scope: str = REQUEST) -> str:
+    """The rendered board for a message list, or `""` when there is nothing to say about it yet."""
+    return render(board_of(messages, scope))
 
 
 def census(document: dict, wanted=None) -> dict:
@@ -541,9 +624,12 @@ def census(document: dict, wanted=None) -> dict:
     the same family, counted one-for-one. `spurious` is the asks no required object of that family can account for —
     the price of the parser, and the number that decides how much of the block is noise.
 
-    This is an **upper bound** and is documented as one: it runs over `reason_for_call`, the text the user simulator
-    was given, while the board at run time reads the simulator's paraphrase. The paid run is what measures the real
-    thing, and the artefact carries the counters it is measured by.
+    This is **the same kind of text the board reads**, and R215 is the round that made that true: the census has
+    always parsed `reason_for_call`, one paragraph, while the R214 board parsed every user turn of the episode and
+    listed 10.6 asks against the census's 3.8. The board now reads the request and the census reads the request, so
+    the two numbers are the same quantity measured on the two texts a simulator moves between. What is still an
+    upper bound is the fidelity of that move: the simulator paraphrases, shortens and occasionally drops a clause,
+    and the paid run is what measures the result.
     """
     wanted = set(wanted) if wanted else None
     found = required = 0
@@ -718,6 +804,19 @@ def render_comparison(reading: dict) -> str:
 FAILED: list = []
 
 
+def _report(failed: list) -> int:
+    """Print the failures and the count, and answer with the exit code the workflow reads.
+
+    A function rather than four lines at the end of `self_test`, because those four lines are the only part of this
+    file that runs once and only on a red build — the one branch a green suite can never reach. Called with a list
+    whose answer is known, it is covered on every run.
+    """
+    for name in failed:
+        print(f"FAIL {name}")
+    print(f"{len(failed)} failure(s)")
+    return 1 if failed else 0
+
+
 def self_test() -> int:
     """Assertions over text a reader can check by eye, and over the shapes tau2 hands over."""
     FAILED.clear()
@@ -772,6 +871,19 @@ def self_test() -> int:
     check("the same ask twice is one ask", len(items_of("return the lamp and return the lamp")) == 1)
     check("an empty message has no asks", items_of("") == [])
     check("a non-string has no asks", items_of(None) == [])
+    # The refusal to list a forbidden action. A board that listed "do not exchange anything" as pending would send
+    # the agent to do the one thing the user ruled out, which is the harm channel in its purest form.
+    check("a negated ask is not an ask", items_of("Please do not exchange the keyboard.") == [])
+    check("and a contracted negation is not either", items_of("I don't want to return the lamp.") == [])
+    check("but a correlative that refuses nothing is still an ask", [item["family"] for item in items_of(
+        "I not only want to return the lamp but also exchange the keyboard.")] == ["return", "exchange"])
+    check("and a condition about the ask is not a refusal of it", [item["family"] for item in items_of(
+        "If the agent doesn't allow the exchange, get a refund.")] == ["exchange", "return"])
+    check("a sentence with no cue before the ask is skipped", [item["words"] for item in items_of(
+        "Thanks! I want to return the lamp.")] == [["lamp"]])
+    check("a family with no cue has no negation", _negated("anything", "nope") is False)
+    check("a clause that only modifies the ask before it is not an ask", [item["words"] for item in items_of(
+        "I want to exchange the keyboard, with clicky switches.")] == [["keyboard"]])
 
     # The name table, at depth, from a result that carries ids and names.
     order = {"order_id": "#W2378156", "items": [{"item_id": "1151293680", "name": "Mechanical Keyboard", "price": 1.0}]}
@@ -818,11 +930,34 @@ def self_test() -> int:
     board_messages = messages + [
         {"role": "user", "content": "Also exchange the thermostat."},
     ]
-    board = board_of(board_messages)
-    check("the board holds both asks", len(board["items"]) == 2)
+    # Two scopes, one transcript: the request states one ask and the conversation states two. R215's whole claim is
+    # this difference, so it is asserted as a difference rather than as a comment on one of the two readings.
+    board = board_of(board_messages, CONVERSATION)
+    check("the conversation holds both asks", len(board["items"]) == 2)
     check("the named ask is settled", board["items"][0]["settled_by"] == "exchange_delivered_order_items")
     check("the unnamed ask is not", board["items"][1]["settled_by"] is None)
     check("the board counts the receipts", board["receipts"] == 1)
+    contract = board_of(board_messages)
+    check("the request holds the ask it stated", len(contract["items"]) == 1)
+    check("and not the one a later turn added", contract["items"][0]["words"] == ["keyboard"])
+    check("the request scope is named in the reading", contract["scope"] == REQUEST)
+    check("the conversation scope is named in its own", board["scope"] == CONVERSATION)
+    check("and the two render differently", "from conversation" in render(board) or "from the conversation" in render(board))
+    check("the request render says so", "from the request" in render(contract))
+    later_only = board_of(
+        [
+            {"role": "user", "content": "hello"},
+            {"role": "user", "content": "I want to return the lamp."},
+        ]
+    )
+    check("a request that names no ask is not repaired by a later turn", later_only["items"] == [])
+    check("no user message is no request", request_of([{"role": "assistant", "content": "hi"}]) == "")
+    check("an empty first message is skipped", request_of([{"role": "user", "content": "  "},
+                                                         {"role": "user", "content": "return it"}]) == "return it")
+    check("a request of a tuple transcript", request_of([("user", "return the lamp")]) == "return the lamp")
+    check("a non-string turn in conversation scope adds no ask", board_of(
+        [{"role": "user", "content": None}, {"role": "user", "content": "return the lamp"}], CONVERSATION
+    )["items"][0]["words"] == ["lamp"])
     one_exchange = board_of(
         [
             {"role": "user", "content": "exchange the keyboard and the thermostat"},
@@ -903,6 +1038,46 @@ def self_test() -> int:
     )
     check("a free-text receipt settles nothing it does not spell", mismatch["items"][0]["settled_by"] is None)
 
+    # The checker's two refusals, which are different facts and are charged differently. A call of a family the
+    # request never named is work nobody asked for; a call of an asked family that this board cannot name is the
+    # board's own blind spot. R214 reported both as `unattributed` and a reader could not tell which was which.
+    invented = board_of(
+        [
+            {"role": "user", "content": "I want to exchange the mechanical keyboard."},
+            {"role": "assistant", "tool_calls": [{"name": "cancel_pending_order", "arguments": {"order_id": "#W1"}}]},
+            {"role": "tool", "content": "ok"},
+        ]
+    )
+    check("a call of a family nobody asked for is unrequested", invented["unrequested"] == [{"name": "cancel_pending_order"}])
+    check("and it is not called unattributed", invented["unattributed"] == [])
+    check("and the ask it did not touch stays open", invented["items"][0]["settled_by"] is None)
+    check("the render names the invented call", "Not asked for by the request" in render(invented))
+    check("a board with no ask but an invented call still renders", render(invented).startswith("Open asks"))
+    blind = board_of(
+        [
+            {"role": "user", "content": "I want to exchange the mechanical keyboard."},
+            {"role": "assistant", "tool_calls": [{"name": "exchange_delivered_order_items",
+                                                  "arguments": {"item_ids": ["999"]}}]},
+            {"role": "tool", "content": "ok"},
+        ]
+    )
+    check("a call of an asked family with no name is unattributed", blind["unattributed"] == [
+        {"name": "exchange_delivered_order_items"}])
+    check("and not unrequested", blind["unrequested"] == [])
+    rejected = board_of(
+        [
+            {"role": "user", "content": "cancel the order"},
+            {"role": "assistant", "tool_calls": [{"name": "cancel_pending_order", "arguments": {"order_id": "#W1"}}]},
+            {"role": "tool", "content": "Error: delivered", "error": True},
+        ]
+    )
+    check("a failed call is on neither list, because it changed no state",
+          rejected["unattributed"] == [] and rejected["unrequested"] == [])
+    check("and its ask stays open", rejected["items"][0]["settled_by"] is None)
+    orphan = render({"items": [], "unrequested": [{"name": "cancel_pending_order"}]})
+    check("a board with no asks and one refusal is not empty", "Not asked for" in orphan)
+    check("and it does not claim an open line it has none of", "[ ]" not in orphan)
+
     # Rendering: bounded, marked, and empty when there is nothing to say.
     rendered = render(board)
     check("the board names itself", rendered.splitlines()[0].startswith("Open asks"))
@@ -944,6 +1119,11 @@ def self_test() -> int:
     check("a call with no result is a receipt that did not happen",
           receipts_of([{"role": "assistant", "tool_calls": [{"name": "cancel_pending_order",
           "arguments": {"order_id": "#W2378156"}}]}])[0]["ok"] is False)
+    # An argument that is neither a string nor a container — a null, a count, a boolean. τ²'s tool schemas allow
+    # them and the walkers must not raise on them, which is the only reason the two `elif` chains end nowhere.
+    flat = receipts_of([{"role": "assistant", "tool_calls": [{"name": "cancel_pending_order",
+          "arguments": {"order_id": None, "count": 3, "force": True}}]}])[0]
+    check("a non-string argument is neither an id nor free text", flat["ids"] == [] and flat["free"] == [])
     check("a tool result that says error is a receipt that did not happen",
           receipts_of([{"role": "assistant", "tool_calls": [{"name": "cancel_pending_order", "arguments": {}}]},
                        {"role": "tool", "content": "Error: nope"}])[0]["ok"] is False)
@@ -1070,11 +1250,18 @@ def self_test() -> int:
     # exercised on every green run rather than on the first red one.
     check("negative control (must fail)", False)
     check("the harness counted the control", FAILED.count("negative control (must fail)") == 1)
+    # The reporter itself is exercised on a list whose answer is known. A suite whose only unreachable line is the
+    # one that prints a failure is a suite that has never printed one, and `FAILED` is emptied on green before the
+    # loop — so the branch is covered by calling it, not by hoping.
+    reported = io.StringIO()
+    with contextlib.redirect_stdout(reported):
+        code = _report(["negative control (must fail)"])
+    check("the reporter prints a failure", reported.getvalue().startswith("FAIL negative control (must fail)"))
+    check("and exits non-zero", code == 1)
+    with contextlib.redirect_stdout(io.StringIO()):
+        check("the reporter on an empty list exits zero", _report([]) == 0)
     FAILED.remove("negative control (must fail)")
-    for name in FAILED:
-        print(f"FAIL {name}")
-    print(f"{len(FAILED)} failure(s)")
-    return 1 if FAILED else 0
+    return _report(FAILED)
 
 
 def main(argv: list) -> int:

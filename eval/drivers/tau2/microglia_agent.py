@@ -236,11 +236,21 @@ NOTES_ENV = "MICROGLIA_NOTES"
 # was served on, how many asks it listed, and how many of those a receipt had settled by then. An arm whose board
 # never rendered is a null about the wiring; an arm whose board rendered and settled nothing is the parser's own
 # limit, and the two must not be read as the same null.
+#
+# R215 adds the cadence, because R214's bill was a cadence and not a length. `changes` is the turns whose block
+# differed from the previous turn's — the only turns that can invalidate the provider's prefix — and `stable` is the
+# turns that re-served a byte-identical block. A board that changes six times in twenty-five turns leaves the prefix
+# alone nineteen times; the arm that changed it every turn paid 77% more for a 200-character list (PROGRESS 244.3).
 BOARD_ENV = "MICROGLIA_BOARD"
 _board_renders = 0
 _board_items = 0
 _board_settled = 0
 _board_chars = 0
+_board_changes = 0
+_board_stable = 0
+_board_open = 0
+_board_unrequested = 0
+_board_unattributed = 0
 _note_lookups = 0
 _note_hits = 0
 _note_chars = 0
@@ -638,17 +648,23 @@ class MicrogliaAgent(LLMAgent):
     _turn: int = -1
 
     def board_for(self, state: LLMAgentState, text: str, role: str = "") -> str:
-        """The goal board this turn should carry: the asks so far, ticked by the receipts so far.
+        """The goal board this turn should carry: the asks the request states, ticked by the receipts so far.
 
         Recomputed rather than held, and that is the whole difference between this channel and the note. A note is
         written once after a failure and read at the next attempt; a board is a function of the messages the episode
         already holds, so the board at turn nine knows what turn nine's tool receipts proved and the note at turn
         one could not. Nothing is memoised, because memoising it would make it the note again with a list inside.
 
+        What **is** held is the last block, and only so the cadence can be counted: a turn whose block is
+        byte-identical to the previous turn's is a turn the provider's prefix cache survives, and R214's arm changed
+        the block on nearly every turn of every episode. The board's text is read from the request (R215), so the
+        block can move only when a receipt moves it.
+
         The incoming message is read as a user turn only when it is one: τ² hands the tool results back through the
         same method, and a board that parsed `get_order_details` output as a request would list the catalogue.
         """
         global _board_renders, _board_items, _board_settled, _board_chars
+        global _board_changes, _board_stable, _board_open, _board_unrequested, _board_unattributed
         if self.__dict__.get("_turn") is None:
             _open_episode()
             _boundary_tasks.append((text or "")[:MAX_QUERY_CHARS])
@@ -664,7 +680,15 @@ class MicrogliaAgent(LLMAgent):
         _board_renders += 1
         _board_items += len(items)
         _board_settled += sum(1 for item in items if item.get("settled_by"))
+        _board_open += sum(1 for item in items if not item.get("settled_by"))
         _board_chars += len(body)
+        _board_unrequested += len(board.get("unrequested") or ())
+        _board_unattributed += len(board.get("unattributed") or ())
+        if self.__dict__.get("_body", None) == body:
+            _board_stable += 1
+        else:
+            _board_changes += 1
+        self._body = body
         return body
 
     def pack_for(self, state: LLMAgentState, text: str, role: str = "") -> str:
@@ -765,6 +789,14 @@ def memory_stats() -> dict:
                     "renders": _board_renders,
                     "items": _board_items,
                     "settled": _board_settled,
+                    "open": _board_open,
+                    # The cadence, per turn. `changes / renders` is the share of turns that re-billed the prefix,
+                    # which is the number R214 could only read from the provider's bill after the fact.
+                    "changes": _board_changes,
+                    "stable": _board_stable,
+                    # The checker's two refusals, apart: work nobody asked for, and the board's own blind spot.
+                    "unrequested": _board_unrequested,
+                    "unattributed": _board_unattributed,
                     "charsTotal": _board_chars,
                     "charsMean": round(_board_chars / _board_renders, 1) if _board_renders else None,
                 }

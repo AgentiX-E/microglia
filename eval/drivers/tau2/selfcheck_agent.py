@@ -1686,6 +1686,114 @@ def the_board_is_recomputed_and_never_accumulates(checks):
 
 
 @case
+def the_contract_does_not_grow_from_the_conversation(checks):
+    """R215. The asks come from the request, and the block moves only when a receipt moves it.
+
+    R214 read every user turn, so a simulated user's clarifications ("also the desk lamp") became asks, the block
+    changed on nearly every turn, and the provider's prefix cache fell 15 points — 77% more money for a list that
+    had grown to eleven lines and closed one of them. Two properties are asserted here, and they are one mechanism:
+    a request fixed before the first call, and a block whose text is a function of the receipts since.
+    """
+    saved = os.environ.get(subject.BOARD_ENV)
+    os.environ[subject.BOARD_ENV] = "1"
+    before = subject.memory_stats().get("board") or {}
+    try:
+        agent, calls, original = fresh(pack="")
+        try:
+            state = LLMAgentState()
+            state = episode_step(agent, state, "I want to exchange the mechanical keyboard.")
+            first = state.system_messages[0].content
+            state = episode_step(agent, state, "also the desk lamp and the thermostat")
+            second = state.system_messages[0].content
+            order = {"order_id": "#W2378156", "items": [{"item_id": "1151293680", "name": "Mechanical Keyboard"}]}
+            state.messages.append({"role": "assistant", "content": "", "tool_calls": [
+                {"name": "get_order_details", "arguments": {"order_id": "#W2378156"}},
+                {"name": "exchange_delivered_order_items", "arguments": {"item_ids": ["1151293680"]}},
+            ]})
+            state.messages.append({"role": "tool", "content": json.dumps(order)})
+            state.messages.append({"role": "tool", "content": json.dumps({"ok": True})})
+            state = episode_step(agent, state, "thanks")
+            third = state.system_messages[0].content
+            state = episode_step(agent, state, "and the desk lamp?")
+            fourth = state.system_messages[0].content
+            after = subject.memory_stats().get("board") or {}
+        finally:
+            subject.recall = original
+    finally:
+        if saved is None:
+            os.environ.pop(subject.BOARD_ENV, None)
+        else:
+            os.environ[subject.BOARD_ENV] = saved
+    checks.equal(len(calls), 0, "the board arm does not consult the store")
+    checks.substring(first, "[ ] exchange: mechanical keyboard", "the request's ask is open on the first turn")
+    checks.equal("lamp" in second, False, "a clarification does not add an ask to the contract")
+    checks.equal(second, first, "so the block is byte-identical and the prefix survives")
+    checks.substring(third, "[x] exchange: mechanical keyboard", "a receipt ticks the ask it names")
+    checks.equal(fourth, third, "and a turn after the change is stable again")
+    # The cadence, as the arm counts it: two changes (the contract, then the tick) over four served turns.
+    checks.equal(after["changes"] - before["changes"], 2, "the block changed twice in four turns")
+    checks.equal(after["stable"] - before["stable"], 2, "and was re-served unchanged twice")
+    checks.equal(after["renders"] - before["renders"], 4, "every turn carried a block")
+
+
+@case
+def a_board_with_nothing_to_say_says_nothing(checks):
+    """R215. Silence is an answer, and it is the one a board owes a turn that states no ask.
+
+    The other half of the cadence: a request the parser cannot read ("hi") must produce an empty block rather than
+    an empty list, because a block that says "no asks" is a block the provider bills for on every turn of an
+    episode that has nothing to track.
+    """
+    saved = os.environ.get(subject.BOARD_ENV)
+    os.environ[subject.BOARD_ENV] = "1"
+    try:
+        agent, _, original = fresh(pack="")
+        try:
+            state = LLMAgentState()
+            empty = agent.board_for(state, "hi there", "user")
+            # A tool result is not a user turn: τ² routes it through the same method, and a board that read the
+            # catalogue as a request would list products the user never mentioned.
+            tool = agent.board_for(LLMAgentState(), "", "tool")
+        finally:
+            subject.recall = original
+    finally:
+        if saved is None:
+            os.environ.pop(subject.BOARD_ENV, None)
+        else:
+            os.environ[subject.BOARD_ENV] = saved
+    checks.equal(empty, "", "a request with no ask renders no block")
+    checks.equal(tool, "", "and a tool turn carries no request to read")
+    checks.equal(subject.is_pack_message(type("M", (), {"content": None})()), False,
+                 "a message with no content is not one of this module's blocks")
+
+
+@case
+def an_arm_with_no_sidecar_reads_no_file(checks):
+    """R215. The three early returns that make "no sidecar" a state rather than a fault.
+
+    A process that was never pointed at a file must not stat one, must not report a problem, and must not count a
+    lookup: the null this arm reports is then about the arm, and a phase that meant to serve notes and did not is
+    told apart from a phase that never meant to. The fourth assertion is the cache's identity — the same stamp
+    answers with the same document, which is what keeps a round from re-reading a file it already holds.
+    """
+    saved = os.environ.pop(subject.NOTES_ENV, None)
+    try:
+        document = subject._notes_document()  # noqa: SLF001 - the branch is unreachable through the public path
+        note = subject.note_for("anything")
+        lookups = subject.memory_stats()["notes"] if subject.notes_path() else None
+    finally:
+        if saved is not None:
+            os.environ[subject.NOTES_ENV] = saved
+    checks.equal(document, {}, "no path is no document")
+    checks.equal(note, "", "and no note")
+    checks.equal(lookups, None, "and no notes block to report a lookup over")
+    with notes_arm({"I want a refund": "A note."}):
+        first = subject._notes_document()  # noqa: SLF001
+        second = subject._notes_document()  # noqa: SLF001
+    checks.equal(second, first, "a file that has not changed is not read twice")
+
+
+@case
 def a_pack_from_the_facade_wins_over_a_note(checks):
     """One material per arm. An arm carrying both would be a third treatment nobody registered."""
     with notes_arm({"I want a refund": "A note."}):
