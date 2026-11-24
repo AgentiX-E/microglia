@@ -6185,3 +6185,99 @@ anything but `rendered`, expect the ledger gate to say so and pass the body you 
 headlineOf(folds, 'guidance')   // the transient material's own share
 headlineOf(folds)               // refused when the corpus mixes — by design
 ```
+
+### 32.55 Dispatching the note pilot, and reading what it wrote
+
+The pilot is its own workflow because the arm is its own shape: no store, no facade, no retrieval, one sentence
+carried from a failed attempt into the next attempt at the same task. Two commands are worth knowing — one to buy a
+pilot, one to read it.
+
+**Buy one.** The workflow is dispatch-only; a push runs only its free half.
+
+```bash
+gh workflow run note-pilot --repo AgentiX-E/microglia --ref master \
+  -f domain=retail -f tasks='5,9,12,17,18,26' -f rounds=4 -f max_steps=100 -f concurrency=1
+```
+
+`tasks` is a comma-separated list of τ² task ids, and the six above are the first six of v1.0.1's *official* test
+split — the half the forty-task fold scores on — which is what makes the pilot's coverage an estimate about the
+population the fold will buy. Passing the domain's first six ids instead would run the same experiment on the half
+the store learns from.
+
+**Read one.** The job's page carries the reading in its step summary; the artefact is the same document:
+
+```bash
+gh run download <run-id> --repo AgentiX-E/microglia -n note-pilot -D /tmp/r206
+python3 eval/verifiers/r206_readback.py --dir /tmp/r206
+```
+
+The last line is the state, and it is the only line you have to read:
+
+| state | what to do |
+|---|---|
+| `GRADED` | the handoff happened and the material is quotable — the fold is worth its ¥7 |
+| `ABANDONED` | a refutation fired; the fired line names which, and the fold is not worth buying |
+| `NO_MEASUREMENT` | the document cannot answer — a headline that disagrees with its rows, or a census that does not close |
+| `DISCARDED` | the artefact is another arm's |
+
+`ABANDONED` and `GRADED` both exit zero: they are answers, and a red job would teach an operator to re-dispatch
+rather than to read. Only the two states that mean *the instrument is wrong* fail.
+
+**What the numbers mean when you read them by hand.**
+
+* `arms.control.passK` and `arms.treatment.passK` are shares of *tasks*, and a task counts only when all four of
+  its trials passed. With six tasks, one task is 16.7 pp: the pilot's interval is ±30 pp and its artefact says
+  `claim: "none"` for that reason. Do not quote the delta.
+* `arms.*.rate` is the episode rate over the same grid — six times the denominator, and the level at which a
+  difference of one or two episodes is visible at all.
+* `notes.coverage` is `written / failed` over the rounds after the first, and it is the number the fold's price
+  depends on: a summariser that writes a sentence for 15% of failures is R204's cross-task arm; the prediction is
+  that this one clears 60%.
+* `notes.specificity.share` is the check that the sentence is *about this task*: the share of notes naming a token
+  that appears in their own task's failure and in no other task's. Below half, the summariser copied the request.
+* `notes.collisions` must be zero. A collision is two task ids reduced to one key, which means the material crossed
+  tasks — the one thing this arm exists to not be.
+* `bill.materialTokens` is the summariser's input, counted in characters by the runner and converted at four
+  characters per token, because both kinds of call share one litellm callback and the phase's bill cannot separate
+  them on its own.
+
+**What the pilot does not do.** It does not run 320 simulations, and it does not produce a `pass^4` that can be
+compared with a leaderboard. Its own gates decide whether the fold is bought; the fold's `pass^4` is the number
+that gets ranked, and it is 40 tasks rather than six.
+
+### 32.56 Before you bind anything to an episode, measure whether the episode can be identified
+
+If an arm keys a material to "this task" or "this episode", the first question is whether the harness gives you
+anything stable to key on. τ² does not: its user simulator writes the opening message afresh on every attempt.
+Measure it before you spend:
+
+```bash
+python3 eval/verifiers/opening_stability.py --dir eval/results/note-pilot
+```
+
+```
+opening stability: NOT_SEPARABLE — 6 task(s), 48 opening(s)
+  exact key reuse: 0.006 of 168 same-task pair(s)
+  within-task similarity: min 0.132, mean 0.444
+  cross-task similarity:  max 0.562, mean 0.099
+  best threshold: θ=0.30 — 31 same-task pair(s) below it, 29 cross-task pair(s) above it
+```
+
+Four numbers, four different facts:
+
+* **exact key reuse** is what the shipped mechanism does — a `note_key` of the opening text. `0.006` means one pair
+  in 168 matched, so the binding would fire almost never.
+* **within-task similarity** is how alike two attempts at one task are; **cross-task** is how alike two different
+  tasks are. A threshold can only work if the two distributions are separated, and here the minimum of the first is
+  *below* the maximum of the second: some paraphrase of task 5 is more like task 9's opening than like its own
+  sibling's, because 5 and 9 share a scenario.
+* **the best threshold** is what a fuzzy matcher would pick if you insisted, with the two error counts beside it —
+  31 misses and 29 wrong-task servings. That is what "the identity is unavailable" looks like as an arithmetic
+  fact rather than as an opinion.
+
+`SEPARABLE` is reported when no cross-task pair is as close as the *least* similar same-task pair. `NO_MEASUREMENT`
+(fewer than two attempts at any task, or one task) exits 2 and says so, which is a statement about the grid rather
+than about the corpus.
+
+The alternative — and what R207 does — is not to match text at all: run one task per process invocation with its own
+sidecar, so the file the runner hands the agent *is* the identity, and nothing has to be recognised.

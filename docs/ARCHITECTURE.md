@@ -3757,3 +3757,112 @@ while looking like a fold that was added.
 The refusal is the point. A corpus that mixes materials does not have one share, and a function that returned one
 anyway would be the most misleading number this module could produce — which is the same reason it refuses an empty
 corpus instead of printing `0% inert`.
+
+### 8.73 The pilot has a path, and half of it is free
+
+R206's mechanism was built before its dispatch existed: `run_split.py` took `--rounds` and `--notes`, the
+self-checks covered both, and neither the lane's workflow nor its driver built those argv. A mechanism with no path
+is not a measurement, and the honest thing to write down was that boundary. This section is the path.
+
+**Why a second workflow instead of a flag on the first.** The pack lane's driver builds a store, splits a corpus,
+pins a query and pairs two arms through a sidecar service; R206 has no facade, no store and no retrieval, and its
+argv is four words long. Teaching a 1,900-line driver a second shape would mean its own two arms could disagree
+about what "the same scaffold" means — which is the exact thing `N0` exists to check. `.github/workflows/note-pilot.yml`
+runs the phases itself, and its control check is readable in four lines of YAML.
+
+**The free half.** The workflow has two jobs, and the split is the cost model:
+
+| job | when | what it costs | what it proves |
+|---|---|---|---|
+| `contract` | every push touching the material | nothing | the four commands the paid job runs, over a generated fixture pair, come back `GRADED` |
+| `pilot` | dispatch only | ≈ ¥1.5, 48 simulations | the handoff, the summariser's coverage on real retail failures, the bill per arm |
+
+The contract job is not a smoke test of the code the self-checks already cover: it runs `note_pilot.py --fixtures`,
+then the builder's CLI over those four files, then `r206_readback.py` over the result, and requires the last line to
+be `GRADED`. What that catches is the seam — a renamed flag, a task list that no longer parses, a schema the two
+files disagree about — and it catches it on a push rather than on a dispatch that has already bought forty-eight
+episodes.
+
+**Two processes, not two phases in one.** The agent's note counters are module-level (`_note_lookups`, `_note_hits`),
+so two arms in one process would report one arm's lookups against the other's hits, and the arm's first gate is
+precisely whether the control saw a note at all. The workflow runs `run_split.py` twice, control first: if the
+control fails, nothing has been spent on a treatment whose comparison would have no other side.
+
+**The same four seeds, said out loud.** Both arms run `--rounds 4 --seed 300`, and `run_split.py` derives round *i*'s
+seed as `base + i`, so the two arms are the same grid — the common-random-numbers property a paired reading needs
+and that `--trials` on two arms cannot give. The seeds travel into the artefact (`configuration.seeds`) so a reader
+can re-run the fold without guessing what "four rounds" meant.
+
+**The reading is arithmetic in a file that needs no provider.** `eval/drivers/tau2/note_pilot.py` assembles the
+document from two logs, two `results.json` files and the sidecar; `eval/verifiers/r206_readback.py` grades it. Both
+are standard-library only, which is why the contract job can exist at all and why neither can hide behind a
+dependency. The builder refuses three states and leaves every *outcome* to the verifier: two agents, a control
+carrying a notes block, no shared task.
+
+### 8.74 A `pass^k` over six tasks is not a `pass^k` claim
+
+The pilot's artefact carries `claim: "none"` in a field, not in a paragraph. With six tasks the paired interval is
+about ±30 pp, so a difference of any size the pilot can observe is inside its own noise; what the pilot decides is
+whether the material is worth 320 simulations, and that decision is made by the gates rather than by the delta.
+
+The four states are the ones every verifier in this repository uses, and the two that fail are the two that mean the
+document cannot answer:
+
+| state | meaning | what a reader does |
+|---|---|---|
+| `GRADED` | the mechanism was observed and the material is quotable | read the coverage, then buy the fold |
+| `ABANDONED` | a refutation fired: no hit, a leak, a provider failure, an unreadable sidecar, coverage below 0.6, specificity below 0.5, or a key collision | do not buy the fold, and the reason is in the fired line |
+| `NO_MEASUREMENT` | the document cannot answer, or a headline disagrees with its own rows, or the census does not close | fix the instrument |
+| `DISCARDED` | another arm: a stock agent, a facade, a material that is not the note | the numbers are about something else |
+
+Two checks inside `NO_MEASUREMENT` are worth naming, because both are transcriptions this record has already paid
+for once:
+
+* **the headline reproduces from its own rows.** R119's `pass^1` grid was labelled `k: 4`, and a gate that trusted
+  the label would have certified it. The verifier recomputes `pass^k` and the episode rate from `perTask` and
+  refuses a document that states a number its rows cannot produce.
+* **the census closes.** `written + refused + providerFailures + unreadable == failed` over the rounds after the
+  first. One failed attempt is in exactly one of those four states; a census missing a term makes every share below
+  it a share of a denominator nobody can reconstruct, which is the same identity the pack gate needed one round
+  earlier.
+
+### 8.75 The pilot ran, and it found that the material's binding does not exist
+
+R206a bought 48 simulations for ¥0.64 and came back `ABANDONED`. Two readings, and the second is the one that
+changes the roadmap.
+
+**The material was starved.** Of 24 treatment episodes, **two** failed; the summariser answered `NONE` on both. The
+control passed 20 of 24 and the treatment 22 of 24, so four rounds on six held-out tasks produce about one failure
+per arm — and one is not a population. Reading the failing attempt explains the refusal: the user simulator could
+not authenticate and the agent escalated to a human, which is what the policy asks for. **A failure whose cause is
+outside the agent's control contains no actionable note**, so this arm's coverage is a function of how many
+failures are the agent's, a quantity this corpus had never been asked for.
+
+**The binding does not exist.** The registration said a task's opening request is "stable within a task and
+different across tasks". Measured on the pilot's own 48 episodes:
+
+| reading | value |
+|---|---|
+| exact key reuse, over 168 same-task pairs | **0.006** — one accidental match |
+| within-task similarity, min / mean | 0.132 / 0.444 |
+| cross-task similarity, max / mean | **0.562** / 0.099 |
+| separable (`within-min > across-max`) | **no** |
+| best fuzzy threshold | θ = 0.30, with 31 same-task pairs missed and 29 cross-task pairs wrong |
+
+τ²'s user simulator re-samples the opening on every attempt, so one task opens with four different sentences; and
+two retail tasks can share a *scenario* (5 and 9 are both "exchange a water bottle and a desk lamp" for different
+users), so a paraphrase of one is closer to the other's opening than to its own sibling's. **No threshold on text
+can bind this material to a task**, and the shipped mechanism would have served nothing even if every note had been
+written.
+
+**The zero was two defects wearing one number.** `hits: 0` had two sufficient causes — no note existed, and the key
+could not have matched one — and a report that named either would have been wrong. That is why the measurement is a
+file (`eval/verifiers/opening_stability.py`) rather than a paragraph: it takes a `results.json` and answers, with
+numbers, whether the corpus's openings identify their tasks, so the next arm that binds anything to an episode can
+be told before it spends.
+
+**What follows, and what does not.** The forty-task fold is **not** bought: 320 simulations at the measured ¥4.3
+would be spent on an arm whose binding cannot fire, and its zero would be published as "the material is inert".
+The identity moves from the message to the file — one task per invocation, one sidecar per task, and the runner
+choosing which file the agent reads (`prereg/R207-transient-identity.md`). The material itself is untouched,
+because changing the summariser's prompt at the same time would make the result attributable to neither.

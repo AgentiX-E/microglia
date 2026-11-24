@@ -193,6 +193,52 @@ def score_arm(document: dict, k: int) -> dict:
     }
 
 
+def is_peak(moment, card: dict) -> bool:
+    """Whether the provider's peak band covers `moment`, read from the rate card rather than restated here.
+
+    The card is the one place the windows are written (`eval/manifests/model-rates.json`), and this function exists
+    because the workflow has to ask *before* it spends: the same tokens cost exactly twice inside a peak band, and
+    a pilot that starts two minutes before one opens pays double for most of its model time.
+    """
+    windows = card.get("peakWindows") if isinstance(card, dict) else None
+    if not isinstance(windows, list) or not windows:
+        raise SystemExit("tau2-note-pilot-no-windows")
+    if card.get("peakWeekdaysOnly", True) and moment.weekday() >= 5:
+        return False
+    return any(int(window["fromHourUtc"]) <= moment.hour < int(window["toHourUtc"]) for window in windows)
+
+
+def fits_window(now, minutes: float, card: dict, step: float = 1.0) -> tuple[bool, str]:
+    """Whether a run starting at `now` and lasting `minutes` stays out of every peak band.
+
+    Minute-stepped rather than compared at the endpoints, because the answer is about *the whole run*: R58's
+    evaluation crossed 06:00 UTC and priced ninety-three minutes at the closing band, and a guard that only checked
+    the start would have called that run cheap. The step is a parameter so the self-test can drive a coarse clock;
+    the workflow uses the default.
+    """
+    from datetime import timedelta
+
+    def refusal(moment) -> tuple[bool, str]:
+        return (
+            False,
+            f"tau2-pilot-peak-window: the run would be inside {moment.strftime('%a %H:%M')} UTC, where the "
+            "same tokens cost exactly twice the off-peak rate",
+        )
+
+    # The start is checked on its own, because a run of zero minutes is still a run whose first call is billed at
+    # the band its start falls in. The end is *exclusive*: a run that finishes exactly as a band opens made every
+    # one of its calls before it, and refusing that would be refusing a run that is cheap.
+    if is_peak(now, card):
+        return refusal(now)
+    end = now + timedelta(minutes=minutes)
+    moment = now + timedelta(minutes=step)
+    while moment < end:
+        if is_peak(moment, card):
+            return refusal(moment)
+        moment += timedelta(minutes=step)
+    return (True, "")
+
+
 def material_of(summary: dict) -> dict | None:
     """The treatment's material, or `None` when the phase has no notes block at all.
 
@@ -372,11 +418,37 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--claim-reason", default="a pilot resolves nothing: the fold's own sample is the claim")
     parser.add_argument("--out", default="")
     parser.add_argument("--fixtures", help="write a synthetic pair of phases into this directory and stop")
+    parser.add_argument("--window-minutes", type=float, default=None,
+                        help="refuse unless this many minutes of model time fit in the off-peak window")
+    parser.add_argument("--rate-card", default="")
     parser.add_argument("--self-test", action="store_true")
     arguments = parser.parse_args(argv)
 
     if arguments.self_test:
         return self_test()
+    if arguments.window_minutes is not None:
+        # Before the first call, and in the same process that would have made it: a guard that runs after the
+        # installation is a guard that reports on eight minutes already spent, which is still cheap but is the
+        # wrong order.
+        from datetime import datetime, timezone
+        from pathlib import Path
+
+        card_path = arguments.rate_card or str(
+            Path(__file__).resolve().parents[2] / "manifests" / "model-rates.json"
+        )
+        with open(card_path, encoding="utf-8") as stream:
+            card = json.load(stream)
+        now = datetime.now(timezone.utc)
+        fits, reason = fits_window(now, arguments.window_minutes, card)
+        print(
+            f"[note-pilot] {arguments.window_minutes:.0f} min from {now.strftime('%a %H:%M')} UTC: "
+            f"{'fits' if fits else 'refused'}",
+            file=sys.stderr,
+        )
+        if not fits:
+            print(reason, file=sys.stderr)
+            return 3
+        return 0
     if arguments.fixtures:
         # Printed rather than assumed: the workflow's free half reads these four paths from here, so a rename
         # is a failure in one place instead of a shell script that silently ran the builder on nothing.
@@ -775,6 +847,26 @@ def self_test() -> int:
             # into the exception: the code is the only thing a caller can assert on.
             refused = error.code
         check("a pilot with no output path is refused", refused == 2, str(refused))
+
+    # --- the window -----------------------------------------------------------------------------------
+    # The guard's clock is a parameter because a function that read the wall clock would make this suite pass or
+    # fail depending on the hour it ran, which is a check that cannot say no on a Tuesday afternoon (the lesson
+    # `_cost(now=…)` was given in the driver).
+    from datetime import datetime, timezone
+
+    card = {"peakWindows": [{"fromHourUtc": 1, "toHourUtc": 4}, {"fromHourUtc": 6, "toHourUtc": 10}],
+            "peakWeekdaysOnly": True}
+    monday = datetime(2026, 11, 23, tzinfo=timezone.utc)
+    check("a run that ends before the band fits", fits_window(monday.replace(hour=0, minute=30), 20, card)[0])
+    check("a run that would end inside the band does not fit",
+          not fits_window(monday.replace(hour=0, minute=30), 40, card)[0])
+    check("a run that starts inside the band does not fit", not fits_window(monday.replace(hour=2, minute=0), 10, card)[0])
+    check("the refusal names the window", "twice" in fits_window(monday.replace(hour=2), 10, card)[1])
+    check("a run ending exactly at the boundary fits", fits_window(monday.replace(hour=0, minute=40), 20, card)[0])
+    saturday = datetime(2026, 11, 28, 2, 0, tzinfo=timezone.utc)
+    check("the weekend has no band", fits_window(saturday, 30, card)[0])
+    check("a zero-minute run at a boundary is judged on its start",
+          not fits_window(monday.replace(hour=1, minute=0), 0, card)[0])
 
     print(f"\n{checks} checks, {failures} failure(s)")
     return 0 if failures == 0 else 1

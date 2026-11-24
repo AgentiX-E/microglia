@@ -90,6 +90,7 @@ jobs:
           python3 eval/drivers/tau2/notes.py --self-test
           python3 eval/drivers/tau2/note_pilot.py --self-test
           python3 eval/verifiers/r206_readback.py --self-test
+          python3 eval/verifiers/opening_stability.py --self-test
 
       - name: The chain the paid job runs, end to end
         run: |
@@ -147,6 +148,24 @@ jobs:
             echo "::error::DEEPSEEK_API_KEY is not configured for this repository"
             exit 1
           fi
+
+      - name: Does the whole job fit in the off-peak window?
+        # Before the installation, not after it: the guard's question is about the *job*, and eight minutes of `uv
+        # sync` between the question and the first call is exactly the gap in which a run starting at 00:50 crosses
+        # into the 01:00 band with its bill already doubled. R58's evaluation crossed 06:00 UTC and priced
+        # ninety-three minutes at the closing band; this step exists so that crossing is a refusal rather than a
+        # line in an artefact.
+        run: |
+          set -euo pipefail
+          MINUTES="$(python3 -c "
+          tasks = len('${PILOT_TASKS}'.split(','))
+          rounds = int('${PILOT_ROUNDS}')
+          # 26 s a simulation, measured in R206's pilot (48 in 21 minutes), plus eight for the install and one for
+          # the reading. Rounded up: a guard that under-estimates is a guard that refuses nothing.
+          print(int((tasks * rounds * 2 * 26) / 60) + 9 + 1)
+          ")"
+          echo "estimated ${MINUTES} min for this pilot" >> "$GITHUB_STEP_SUMMARY"
+          python3 eval/drivers/tau2/note_pilot.py --window-minutes "${MINUTES}"
 
       - name: Cache the tau2 environment
         uses: actions/cache@v4
@@ -250,6 +269,27 @@ jobs:
           print(f"| bill | ${document['bill']['controlUsd']} + ${document['bill']['treatmentUsd']} |")
           print(f"| material tokens | {document['bill']['materialTokens']} |")
           PY
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Did the openings identify their tasks?
+        # R206's pilot answered this with a number for the first time, and the answer was no: 0.006 exact reuse and
+        # two tasks whose paraphrases are closer to each other than to their own siblings. Every future pilot of this
+        # material carries the measurement, because a zero hit rate has two explanations and only one of them is
+        # about the material.
+        if: always()
+        run: |
+          set -euo pipefail
+          {
+            echo "### Can an opening message identify its task?"
+            echo
+            echo '```'
+            # Exit 2 is `NO_MEASUREMENT` — fewer than two attempts at any task, so there is nothing to compare and
+            # nothing to say. It is echoed rather than propagated: a pilot that ran one round is a wiring run, and
+            # a red job would report the grid as broken.
+            if ! python3 eval/verifiers/opening_stability.py --dir "${PILOT_DIR}"; then
+              echo "opening stability: not measurable on this grid"
+            fi
+            echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload the pilot

@@ -2358,3 +2358,32 @@ in no other task's. The check that separates a note about the failure from a res
 store served), `guidance` (one sentence a summariser wrote from that block, R204), or a note (R206). It is the field
 the corpus headline is scoped by, because `renders` counts served packs on two of those and the summariser's
 *inputs* on the third.
+
+**Pilot (R206a)** — six tasks × four rounds × two arms, 48 simulations, ≈ ¥1.5. Not a fold and not a claim: it
+observes that the note handoff happens, measures the summariser's coverage and specificity on real retail failures,
+and prices the two arms, so that the 320-simulation fold is bought on evidence rather than on a hope. Its artefact
+carries `claim: "none"` and its interval (±30 pp at six tasks) is the reason.
+
+**Contract job** — the free half of `note-pilot.yml`. On every push that touches the note material it runs the same
+four commands the paid job runs, over a generated fixture pair, and requires the reading to come back `GRADED`. It
+exists because a mechanism whose dispatch path is first exercised by a dispatch is a mechanism whose typos cost
+money.
+
+**Census closure (notes)** — `written + refused + providerFailures + unreadable == failed`, over the rounds after the
+first. One failed attempt ends in exactly one of those four states; a census that misses a term makes every share
+derived from it a share of a denominator nobody can reconstruct, which is why a document that fails this identity is
+`NO_MEASUREMENT` rather than a reading.
+
+**Opening stability** — whether a task's first user message can serve as that task's identity. Measured over a
+run's own episodes by `eval/verifiers/opening_stability.py`: exact key reuse, within- vs cross-task similarity, and
+the error counts of the best threshold a fuzzy matcher could use. It is a property of the corpus and the user
+simulator, not of the material, and it is the first thing to measure before binding anything to an episode.
+
+**Exact reuse** — the share of same-task pairs whose opening keys are identical after whitespace collapsing. τ²
+retail measures **0.006**: the user simulator re-samples the opening every attempt, so a mechanism that keys on the
+text binds almost never.
+
+**Not separable** — the state a corpus is in when its most dissimilar pair of attempts at one task is *less* alike
+than its most similar pair of attempts at two different tasks. No threshold can then tell a task from its
+neighbour; on τ² retail two tasks can share a scenario (a water bottle and a desk lamp, for different users), which
+is what makes paraphrases of one closer to the other's opening.

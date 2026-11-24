@@ -197,3 +197,49 @@ print.
 artefact says so in a field rather than in a paragraph: with six tasks the paired interval is ±30 pp, and the
 decision the pilot actually makes is whether the material is worth 320 simulations — `N2` coverage ≥ 0.6, `N3`
 specificity ≥ 0.5, `N1` a handoff observed, and zero collisions.
+
+## Amendment 4 (2026-11-24) — the pilot ran, and the identity it binds by does not exist
+
+**The pilot.** Run `45299603895`, 6 held-out retail tasks (`5,9,12,17,18,26`), 4 rounds, both arms, ¥0.64
+($0.0897). The state is `ABANDONED`, and the two reasons it gives are the two defects this amendment records.
+
+**The material was starved.** Of 24 treatment episodes, **2 failed**, and the summariser answered `NONE` on both:
+`written 0`, coverage `0.000`, specificity ungraded. The control's own grid passed 20 of 24 (83.3%), treatment 22
+of 24 (91.7%) — so at this difficulty four rounds on six tasks produce about one failure per arm, and one failure
+is not a population. Reading the failing attempt (task 5, trial 0) shows why a refusal can be correct: the user
+simulator could not authenticate and the agent escalated to a human, which is the policy's own answer. **A failure
+whose cause is outside the agent's control contains no actionable note**, so the arm's coverage is a function of how
+many failures are the agent's — a quantity nobody had measured on this corpus before this pilot.
+
+**The identity does not exist, and that is the defect that matters.** The registration said the opening request is
+"stable within a task and different across tasks". Measured on the pilot's own 48 episodes
+(`eval/verifiers/opening_stability.py`):
+
+| reading | value |
+|---|---|
+| exact key reuse over 168 same-task pairs | **0.006** (one accidental match) |
+| within-task similarity, min / mean | 0.132 / 0.444 |
+| cross-task similarity, max / mean | **0.562** / 0.099 |
+| separable (within-min > across-max) | **no** |
+| best threshold for a fuzzy matcher | θ=0.30 — 31 same-task pairs missed, 29 cross-task pairs wrong |
+
+τ²'s user simulator samples the opening afresh on every attempt, so the same task opens with four different
+sentences; and two retail tasks can share a *scenario* (5 and 9 are both "exchange a water bottle and a desk
+lamp"), so a paraphrase of one task's opening is closer to the other task's than to its own sibling's. **No
+threshold on text can bind this material to a task**, and the shipped mechanism would have served nothing even if
+the summariser had written every note.
+
+**Consequences, stated as consequences rather than as plans.**
+
+1. **R206's fold is not bought.** 320 simulations at the measured ¥4.3 would spend that on an arm whose binding
+   cannot fire, and a zero delta would be reported as "the material is inert" — the collapse this file exists to
+   prevent, one layer below where it usually happens.
+2. **The identity must be structural.** `R207-transient-identity` is registered for it: one task per invocation and
+   one sidecar per task, so the file the runner chose *is* the task, and the sidecar declares `scope: task` so that
+   a mis-scoped file is refused rather than silently served.
+3. **The pilot's grid is worth keeping.** The same six tasks, four rounds and two arms cost ¥0.64 and took 26
+   minutes, which makes a wiring run affordable whenever the mechanism changes — and the next one reuses this
+   grid so the two are comparable.
+4. **The price in the header was wrong in the safe direction.** 48 simulations cost $0.0897, i.e. $0.0019 each, so
+   320 are ≈ ¥4.3 rather than the ≈ ¥5–7 registered. A retail episode is short (379 calls over 24 episodes), and
+   the material itself is 990 prompt tokens for the whole arm.
