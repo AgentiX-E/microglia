@@ -540,12 +540,56 @@ def trajectory_text(simulation, ceiling: int = TRAJECTORY_CHARS) -> str:
     return f"{body[:half]}\n…\n{body[-half:]}"
 
 
-def _check_line(kind: str, entry) -> str:
-    """One check as `<kind> met` / `<kind> not met: <description>`, or `""` when it carries no verdict.
+def _arguments_text(arguments, ceiling: int = 80) -> str:
+    """An action's arguments as `key=value, …`, bounded — the part of a failure a note can actually use.
+
+    `cancel_pending_order(order_id=W2378156)` is the difference between a note that says "cancel the right order"
+    and one that says "the right action was not taken"; the arguments are also the only place a retail failure's
+    entity appears in the evaluator's own words.
+    """
+    if not isinstance(arguments, dict) or not arguments:
+        return ""
+    parts = []
+    for key in list(arguments)[:4]:
+        value = arguments[key]
+        text = value if isinstance(value, str) else str(value)
+        text = " ".join(text.split())
+        if len(text) > 40:
+            text = text[:37] + "..."
+        parts.append(f"{key}={text}")
+    return ", ".join(parts)[:ceiling]
+
+
+def _action_text(entry) -> str:
+    """An action check's action as `name(arguments)`, from either wire shape.
+
+    τ² hands this process an `Action` object and an artefact holds `{"name": …, "arguments": {…}}`. The first
+    version of this reader wanted a string and therefore rendered `ACTION not met` for every failure in the bank —
+    85 failures sharing one line, which is a material with a cost and no content.
+    """
+    action = _field(entry, "action")
+    if isinstance(action, str) and action.strip():
+        return " ".join(action.split())
+    if isinstance(action, dict):
+        name = _field(action, "name")
+        if isinstance(name, str) and name.strip():
+            arguments = _arguments_text(_field(action, "arguments"))
+            name = " ".join(name.split())
+            return f"{name}({arguments})" if arguments else name
+    return ""
+
+
+def _check_line(kind: str, entry):
+    """One check as `(line, met)`, or `("", None)` when it carries no verdict.
 
     Both spellings of the outcome are read — τ²'s `RewardInfo` says `met` on three of the four check families and
     `db_match` on the fourth — and a check with no outcome is dropped rather than guessed at, because a line that
     invented `met` would tell the summariser the opposite of what the evaluator said.
+
+    The detail is the action when there is one, else the first check text τ² has for the family, and the
+    evaluator's `justification` is appended when it says something the detail does not. That field is the richest
+    sentence in the artefact — "the agent told the user there are 12 options, not 10" — and dropping it left the
+    summariser with `ASSERTION not met` and nothing to act on.
     """
     met = None
     for key in CHECK_STATE_KEYS:
@@ -554,14 +598,20 @@ def _check_line(kind: str, entry) -> str:
             met = value
             break
     if not isinstance(met, bool):
-        return ""
-    detail = ""
-    for key in CHECK_TEXT_KEYS:
-        value = _field(entry, key)
-        if isinstance(value, str) and value.strip():
-            detail = " ".join(value.split())[:200]
-            break
-    return f"{kind} {'met' if met else 'not met'}" + (f": {detail}" if detail else "")
+        return "", None
+    detail = _action_text(entry)
+    if detail == "":
+        for key in CHECK_TEXT_KEYS:
+            value = _field(entry, key)
+            if isinstance(value, str) and value.strip():
+                detail = " ".join(value.split())[:200]
+                break
+    justification = _field(entry, "justification")
+    if isinstance(justification, str) and justification.strip():
+        text = " ".join(justification.split())[:200]
+        if text and text not in detail:
+            detail = f"{detail} \u2014 {text}" if detail else text
+    return f"{kind} {'met' if met else 'not met'}" + (f": {detail}" if detail else ""), met
 
 
 def verdict_text(simulation, ceiling: int = VERDICT_CHARS) -> str:
@@ -589,6 +639,10 @@ def verdict_text(simulation, ceiling: int = VERDICT_CHARS) -> str:
         match = _field(db, "db_match")
         if isinstance(match, bool):
             lines.append(f"DB CHECK {'met' if match else 'not met'}")
+    # Head first, then the checks that failed, then the ones that passed: a block cut off at the ceiling that shows
+    # twelve `ACTION met` lines and loses the one `not met` tells the summariser the attempt was fine.
+    failing: list = []
+    passing: list = []
     for kind, key in (
         ("ENV", "env_assertions"),
         ("ACTION", "action_checks"),
@@ -599,13 +653,18 @@ def verdict_text(simulation, ceiling: int = VERDICT_CHARS) -> str:
         if not isinstance(entries, list):
             continue
         for entry in entries:
-            line = _check_line(kind, entry)
+            line, met = _check_line(kind, entry)
             if line:
-                lines.append(line)
-    if not lines:
+                (passing if met else failing).append(line)
+    kept: list = []
+    for line in lines + failing + passing:
+        candidate = "\n".join(kept + [line])
+        if len(candidate) > ceiling and kept:
+            break
+        kept.append(line)
+    if not kept:
         return ""
-    body = "\n".join(lines)
-    return body if len(body) <= ceiling else body[:ceiling]
+    return "\n".join(kept)[:ceiling]
 
 
 def note_prompt(trajectory: str, verdict: str = "") -> str:
@@ -1263,6 +1322,47 @@ def _self_test() -> int:
         verdict_text({"reward_info": {"action_checks": [{"action": "cancel_pending_order", "action_match": False}]}}),
     )
     check("a non-numeric reward is not cited", verdict_text({"reward_info": {"reward": True}}) == "")
+
+    # R210. The verdict's *content*, which the first version lost in three ways at once. τ²'s action check carries
+    # its action as an object — `{"name": …, "arguments": {…}}` — so a reader that wanted a string rendered
+    # `ACTION not met` for every failure in the bank, and 77 of the 85 then had an empty exclusive vocabulary: the
+    # material was informationally degenerate and the ablation measured its cost without its content.
+    action = {"action": {"action_id": "0_0", "name": "cancel_pending_order",
+                         "arguments": {"order_id": "W2378156", "reason": "no longer needed"}},
+              "action_match": False}
+    rendered = verdict_text({"reward_info": {"reward": 0.0, "action_checks": [action]}})
+    check("an action object is rendered by its name", "cancel_pending_order" in rendered, rendered)
+    check("an action object is rendered by its arguments", "W2378156" in rendered, rendered)
+    check("a passing action is still named", "cancel_pending_order" in verdict_text(
+        {"reward_info": {"action_checks": [{**action, "action_match": True}]}}))
+    check("an empty argument is not rendered as a hole", "()" not in verdict_text(
+        {"reward_info": {"action_checks": [{"action": {"name": "sync"}, "action_match": False}]}}),
+        verdict_text({"reward_info": {"action_checks": [{"action": {"name": "sync"}, "action_match": False}]}}))
+    # The evaluator's own explanation, which is the richest sentence in the artefact and was dropped entirely.
+    explained = {"nl_assertions": [{"nl_assertion": "Agent should tell the user there are 10 t-shirt options.",
+                                    "met": False,
+                                    "justification": "The agent told the user there are 12 options, not 10."}]}
+    check("the evaluator's justification is quoted",
+          "12 options" in verdict_text({"reward_info": explained}), verdict_text({"reward_info": explained}))
+    check("a communicate check's explanation is quoted", "not communicated" in verdict_text(
+        {"reward_info": {"communicate_checks": [{"info": "10", "met": False,
+                                                 "justification": "Information '10' not communicated."}]}}))
+    check("the justification is not quoted twice",
+          verdict_text({"reward_info": {"nl_assertions": [{"nl_assertion": "same text", "met": False,
+                                                           "justification": "same text"}]}}).count("same text") == 1)
+
+    # Ordering: the head is the reward and the database verdict, and after them the **failures** come before the
+    # passes. A block truncated at 600 characters that shows twelve `ACTION met` lines and cuts the one `not met`
+    # is worse than no block, because it tells the summariser the attempt was fine.
+    mixed = {"reward_info": {"reward": 0.0, "db_check": {"db_match": True},
+                             "action_checks": [{"action": {"name": f"step_{index}"}, "action_match": True}
+                                               for index in range(12)]
+                             + [{"action": {"name": "the_one_that_failed"}, "action_match": False}]}}
+    truncated = verdict_text(mixed, ceiling=200)
+    check("a failure is kept ahead of a pass", "the_one_that_failed" in truncated, truncated)
+    check("the failure comes first", truncated.index("the_one_that_failed") < truncated.index("step_0"), truncated)
+    check("the reward stays at the head", truncated.startswith("REWARD 0"), truncated)
+
     check(
         "the verdict ceiling is honoured",
         len(verdict_text({"reward_info": {"reward": 0.0, "nl_assertions": [{"met": False, "nl_assertion": "z" * 900}]}}, ceiling=80)) <= 80,
