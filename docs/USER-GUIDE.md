@@ -6621,3 +6621,30 @@ Three habits this teaches:
   twenty-four; a bar carried across populations measures the population.
 
 `DRIFT` is exit 3 and stays red in CI: no reading exists, so nothing may be quoted from the run.
+
+### 32.67 What a `NO_LIFT` obliges you to do
+
+`NO_LIFT` is not "the material is useless". It is three statements, and the third is the one that decides the next
+dispatch:
+
+1. **the point estimate is small** — R212 read +1.8 pp for a note against no note (12/30 versus 13/34), with a
+   sensitivity of +7.5 pp on the wider population;
+2. **the registered scale is excluded** — the arm's 95% upper limit sits below baseline + 25 pp, so a large effect
+   did not happen, whatever the mechanism's counters say;
+3. **the price of a smaller answer is known, and it is the reason to stop.** Detecting a 7.5-point difference at 80%
+   power against a 38% baseline needs ~674 opportunities per arm. At 0.37 opportunities an episode that is ~1,800
+   episodes, about ¥58 — more than any dispatch this lane has declined.
+
+So the obligation is not to tune the sentence. It is to change the mechanism or stop spending:
+
+```bash
+# what a NO_LIFT hands to the next registration
+python3 eval/tools/rescue_rate.py --dir eval/results/note-rescue/treatment \
+    --baseline-dir eval/results/note-rescue/control --pooled --json /tmp/r212.json
+
+# and the offline question that costs ¥0.5 instead of ¥58: does the note pass the verdict before it is served?
+```
+
+Two things to check before believing a null of this shape: the **population** line (19 tasks give +1.8 pp, 24 give
++7.5 pp — same run) and the **counters** (35 notes, 99 lookups, 54 hits: a null with zero lookups would have been a
+statement about the plumbing).

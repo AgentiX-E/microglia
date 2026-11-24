@@ -2504,3 +2504,12 @@ holds the world fixed, and the reason one run can be its own counterfactual.
 **Pooled transition (`--pooled`)** — every consecutive pair of attempts summed rather than the first pair only. On a
 four-round arm that is three transitions per task, all of them the event a note acts on; the reading prints
 `pooled` so the claim stays legible.
+
+**Power ceiling (of a rescue rate)** — the price at which an effect of a given size becomes detectable, and the
+number that ends a lane. R212's observed +7.5 pp at a 38% baseline needs ~674 opportunities per arm at 80% power;
+an episode yields 0.37 opportunities, so the read costs ~1,800 episodes (≈ ¥58). A lane whose remaining question is
+below its power ceiling has no behavioural work left that it would fund.
+
+**Population (of a reading)** — the tasks a share is taken over, printed in every reading because it moves the
+number: R212's two arms give +1.8 pp on the nineteen tasks the control failed and +7.5 pp on all twenty-four. The
+default is the tasks the baseline failed — the ones with a counterfactual — and any other choice must be named.

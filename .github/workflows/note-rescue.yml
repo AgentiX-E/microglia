@@ -114,7 +114,7 @@ jobs:
             --baseline eval/manifests/note-bank-baseline.json \
             | tee "${RUNNER_TEMP}/baseline.txt"
           grep -q '15 (65.2%)' "${RUNNER_TEMP}/baseline.txt"
-          grep -q '27/50 vs bank 27/50' "${RUNNER_TEMP}/baseline.txt"
+          grep -q '27/50 vs baseline 27/50' "${RUNNER_TEMP}/baseline.txt"
           grep -q 'NO_LIFT' "${RUNNER_TEMP}/baseline.txt"
 
       - name: The four readings, over fixtures
@@ -363,7 +363,7 @@ jobs:
 
           root = Path(sys.argv[1])
           phases = lookups = hits = written = refused = verdicts = task_hits = 0
-          for path in sorted(root.glob("treatment-*.log")):
+          for path in sorted(root.glob("*-*.log")):
               for line in path.read_text(errors="replace").splitlines():
                   if not line.startswith('{"phase"'):
                       continue
@@ -382,12 +382,22 @@ jobs:
           episodes = 0
           usd = 0.0
           seconds = 0.0
-          for path in sorted((root / "treatment").glob("*.json")):
-              document = json.loads(path.read_text())
-              for simulation in document.get("simulations") or []:
-                  episodes += 1
-                  usd += (simulation.get("agent_cost") or 0) + (simulation.get("user_cost") or 0)
-                  seconds += simulation.get("duration") or 0
+          per_arm = {}
+          for arm in ("control", "treatment"):
+              arm_documents = sorted((root / arm).glob("*.json")) if (root / arm).is_dir() else []
+              if not arm_documents:
+                  continue
+              arm_episodes = arm_usd = arm_seconds = 0.0
+              for path in arm_documents:
+                  document = json.loads(path.read_text())
+                  for simulation in document.get("simulations") or []:
+                      arm_episodes += 1
+                      arm_usd += (simulation.get("agent_cost") or 0) + (simulation.get("user_cost") or 0)
+                      arm_seconds += simulation.get("duration") or 0
+              per_arm[arm] = (int(arm_episodes), arm_usd, arm_seconds)
+              episodes += arm_episodes
+              usd += arm_usd
+              seconds += arm_seconds
 
           print("### R211 — the arm's own counters")
           print()
@@ -398,7 +408,10 @@ jobs:
           print(f"| notes written / refused | {written} / {refused} |")
           print(f"| verdicts shown | {verdicts} |")
           print(f"| sidecar lookups / key hits / task hits | {lookups} / {hits} / {task_hits} |")
-          print(f"| bill | ${usd:.4f} |")
+          for arm, (arm_episodes, arm_usd, arm_seconds) in per_arm.items():
+              print(f"| {arm} | {arm_episodes} episode(s), ${arm_usd:.4f}, "
+                    f"{(arm_seconds / arm_episodes if arm_episodes else 0):.1f} s an episode |")
+          print(f"| bill, both arms | ${usd:.4f} |")
           print(f"| mean episode | {(seconds / episodes if episodes else 0):.1f} s |")
           PY
 

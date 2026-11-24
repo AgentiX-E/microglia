@@ -233,6 +233,7 @@ def render(arm: dict, baseline: dict | None, drift: dict | None, state: str, sen
         "| reading | value |",
         "|---|---|",
         f"| transition | {arm['transition']} |",
+        f"| population | {arm['tasks']} task(s), those the baseline failed |",
         f"| opportunities | {arm['fail']} |",
         f"| rescued | {arm['rescue']} ({rate(arm)}) |",
     ]
@@ -244,7 +245,7 @@ def render(arm: dict, baseline: dict | None, drift: dict | None, state: str, sen
             lines.append(f"| exact p | {p:.4f} |")
     if drift is not None:
         lines.append(
-            f"| drift check: attempt 0 | {drift['armPassed']}/{drift['tasks']} vs bank "
+            f"| drift check: attempt 0 | {drift['armPassed']}/{drift['tasks']} vs baseline "
             f"{drift['baselinePassed']}/{drift['tasks']} (tolerance {drift['tolerance']}) |"
         )
     lines.append(f"| verdict | **{state}** — {sentence} |")

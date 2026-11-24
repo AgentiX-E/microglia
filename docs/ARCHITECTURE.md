@@ -4242,3 +4242,44 @@ Two design consequences follow, and both are cheaper than the alternative:
 
 The instrument now reads either a document or a directory on each side (`--baseline-dir`), which is what lets one
 dispatch be its own counterfactual. 63 self-check cases, 99% line and branch coverage.
+
+### 8.85 What the paired arm found: a live mechanism and an effect below the registered scale
+
+R212 ran both arms in one dispatch, at the same seeds, over the twenty-four tasks the bank failed at least twice:
+192 episodes, **$1.0054 (¥7.2)**, 27–28 seconds an episode.
+
+| arm | episodes | rescue (pooled) | attempt 0 | pass^4 |
+|---|---|---|---|---|
+| control | 96 | 13 / 34 (38.2%) | 8 / 19 | 5 / 24 |
+| treatment | 96 | 12 / 30 (40.0%) | 9 / 19 | 2 / 24 |
+
+- **the world was held.** Attempt 0 agreed to within one task (9 vs 8 of the nineteen the control failed), which is
+  what the same-seed design is for; R211's cross-run gap of eleven tasks did not recur.
+- **the mechanism was live.** 35 notes written, 35 verdicts shown, 99 sidecar lookups, 54 task hits — the note was
+  served and found on every attempt that had one.
+- **the note did not rescue.** +1.8 pp, exact p = 1.0, and the arm's upper limit (59.4%) sits below the registered
+  bar (38.2% + 25 = 63.2%), so `NO_LIFT` at the registered scale.
+
+The sensitivity is worth stating because it is not the reading: over all twenty-four tasks — including five the
+control never failed and for which it therefore supplies no counterfactual — the arm is 16/35 (45.7%) against
+13/34, **+7.5 pp with an upper limit of 63.4%**, which sits one fifth of a point above the bar and would grade
+`INCONCLUSIVE`. So the honest summary is not "the note does nothing" but **"the note's effect is between +2 and +8
+points, and 25 points is excluded on the registered population"**.
+
+That is where the lane's price ceiling arrives, and it is an arithmetic fact rather than a judgement: detecting a
+7.5-point difference at 80% power against a 38% baseline needs about **674 opportunities per arm**. An attempt
+yields 0.37 opportunities (35 from 96 episodes), so the arm would cost ~1,800 episodes — **about ¥58, four and a
+half times the fold that was cancelled for being expensive**. The behavioural question is therefore answered as far
+as it can be bought: the sentence changes behaviour by less than the registered scale, and refining it further
+cannot be measured at any price this lane would pay.
+
+Three consequences:
+
+- `serveBody: guidance` stays a registered experiment and stops being tuned. R212's refutation lands and its next
+  step is EDV's verify-then-admit — a note validated against the verdict **before** it is served — which is
+  measurable offline on the 85 stored failures for about ¥0.5;
+- the population a share is taken over is now printed in every reading (`population`), because the same two arms
+  give +1.8 pp on nineteen tasks and +7.5 pp on twenty-four, and a number without its population is a number with a
+  choice hidden inside it;
+- the drift line says `vs baseline` rather than `vs bank`: with both arms in one dispatch the baseline is the
+  control, and a label that says otherwise invites the reader to compare across runs again.
