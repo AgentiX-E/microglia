@@ -627,6 +627,62 @@ def note_prompt(trajectory: str, verdict: str = "") -> str:
 # --------------------------------------------------------------------------- the reply
 
 
+#: The provider's own reasoning switch, and the reason it is not optional. `deepseek-flash` answers in thinking
+#: mode by default and bills the reasoning against `max_tokens`; the note budget is 96 tokens for one sentence, so a
+#: call that leaves thinking on spends the whole budget before writing anything and returns an empty message.
+#:
+#: R208's ablation measured **96.0 completion tokens per call** across 85 failures — every call at the ceiling — and
+#: `sentence_of` read the empty answer as the model declining. R206a, R207 and R208 all reported "the summariser
+#: refused" on that evidence. It was a truncation, and the note lane's low yield was never a judgement about the
+#: material. The driver already knew: its agent and simulator calls pass this body, and the note call was the one
+#: copy that did not.
+NOTE_EXTRA_BODY = {"thinking": {"type": "disabled"}}
+
+
+def call_note_model(prompt: str, model: str = ""):
+    """One summariser call: `(sentence, state, counts)` with state in {sentence, refused, truncated, failed}.
+
+    One function rather than one per caller, because the defect this replaces was two copies of the same call and
+    the second copy had lost a keyword. `counts` carries the provider's own counters and its `finish_reason`, so a
+    caller can tell a decision from a cut-off: `sentence_of` answers `""` to both, and three rounds of measurement
+    were built on that ambiguity.
+    """
+    try:
+        import litellm  # noqa: PLC0415 - τ²'s dependency, absent in the self-check
+
+        reply = litellm.completion(
+            model=model or note_model(),
+            messages=[
+                {"role": "system", "content": NOTE_SYSTEM},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0,
+            max_tokens=NOTE_MAX_TOKENS,
+            timeout=NOTE_TIMEOUT_S,
+            extra_body=NOTE_EXTRA_BODY,
+        )
+    except Exception as error:  # noqa: BLE001 - any failure means "no note"
+        return "", "failed", {"error": f"{type(error).__name__}: {error}"}
+    usage = getattr(reply, "usage", None)
+    counts = {
+        "prompt": getattr(usage, "prompt_tokens", 0) or 0,
+        "completion": getattr(usage, "completion_tokens", 0) or 0,
+    }
+    choices = getattr(reply, "choices", None)
+    finish = ""
+    if isinstance(choices, list) and choices:
+        finish = str(getattr(choices[0], "finish_reason", "") or "")
+    counts["finish"] = finish
+    sentence = sentence_of(reply)
+    if sentence:
+        return sentence, "sentence", counts
+    # A cut-off call is not a refusal: the model was still thinking when the budget ran out and never got to
+    # answer. Counting it as `NONE` is how a truncation becomes a decision.
+    if finish == "length":
+        return "", "truncated", counts
+    return "", "refused", counts
+
+
 def sentence_of(reply) -> str:
     """The sentence in a provider reply, or `""` when the model declined.
 
@@ -778,6 +834,7 @@ def note_round(simulations, path: str, attempt: int, summarize, trajectories, ve
         "failed": 0,
         "written": 0,
         "refused": 0,
+        "truncated": 0,
         "providerFailures": 0,
         "unscored": 0,
         "unreadable": 0,
@@ -817,6 +874,11 @@ def note_round(simulations, path: str, attempt: int, summarize, trajectories, ve
             counters["providerFailures"] += 1
             if counters["firstProviderFailure"] is None:
                 counters["firstProviderFailure"] = detail
+            continue
+        if state == "truncated":
+            # Measured apart from a refusal: a call cut off at the ceiling never reached an answer, so it is a
+            # budget fact rather than a judgement about the attempt. R208's 96.0 tokens per call were all this.
+            counters["truncated"] += 1
             continue
         if state == "refused":
             counters["refused"] += 1
@@ -1083,6 +1145,60 @@ def _self_test() -> int:
     check("no reward info is None", reward_of(object()) is None)
     check("a boolean reward is not a reward", reward_of(type("_S", (), {"reward_info": _Info(True)})()) is None)
     check("a missing reward is None", reward_of(type("_S", (), {"reward_info": _Info(None)})()) is None)
+
+    # R209. The call itself. Every other check in this file reads what the summariser *said*; these read what it was
+    # *asked*, because R208's ablation measured 96.0 completion tokens per call — the whole budget — and read the
+    # empty answer as a refusal. `deepseek-flash` thinks by default, the note budget is one sentence, and a call
+    # that leaves thinking on spends the budget before writing anything. The three rounds that counted that as the
+    # model declining were counting a truncation.
+    import types as _types
+
+    def _reply(content, finish="stop", prompt_tokens=400, completion_tokens=20):
+        return _types.SimpleNamespace(
+            choices=[_types.SimpleNamespace(message=_types.SimpleNamespace(content=content),
+                                            finish_reason=finish)],
+            usage=_types.SimpleNamespace(prompt_tokens=prompt_tokens, completion_tokens=completion_tokens),
+        )
+
+    seen: list = []
+    module = _types.ModuleType("litellm")
+
+    def _completion(**kwargs):
+        seen.append(kwargs)
+        if "RAISE" in kwargs["messages"][1]["content"]:
+            raise RuntimeError("provider down")
+        return _reply("", "length") if "CUT" in kwargs["messages"][1]["content"] else _reply("Ask for the id first.")
+
+    module.completion = _completion
+    sys.modules["litellm"] = module
+    try:
+        sentence, state, counts = call_note_model("ATTEMPT\n<<<\nplease\n>>>\n")
+        check("a written sentence is a sentence", (sentence != "", state) == (True, "sentence"), state)
+        check("the counters come back", counts.get("completion") == 20, str(counts))
+        check("thinking is switched off on every call",
+              seen[-1].get("extra_body") == {"thinking": {"type": "disabled"}}, str(seen[-1].get("extra_body")))
+        check("the budget is one sentence", seen[-1].get("max_tokens") == NOTE_MAX_TOKENS, str(seen[-1].get("max_tokens")))
+        check("the call is deterministic", seen[-1].get("temperature") == 0)
+        check("the system turn is the note's own", seen[-1]["messages"][0]["content"] == NOTE_SYSTEM)
+        check("a call cut off at the ceiling is a truncation, not a refusal",
+              call_note_model("CUT")[1] == "truncated", call_note_model("CUT 2")[1])
+        check("a truncation says so in its counters", call_note_model("CUT")[2].get("finish") == "length")
+        check("a provider exception is a failure", call_note_model("RAISE")[1] == "failed")
+        check("a failure carries its error", "provider down" in str(call_note_model("RAISE")[2].get("error")))
+        no_key = os.environ.pop("MICROGLIA_NOTE_MODEL", None)
+        try:
+            os.environ["TAU_MODEL"] = "deepseek/deepseek-flash"
+            call_note_model("ATTEMPT\n<<<\nplease\n>>>\n")
+            check("the arm's model is the default", seen[-1].get("model") == "deepseek/deepseek-flash",
+                  str(seen[-1].get("model")))
+            call_note_model("ATTEMPT\n<<<\nplease\n>>>\n", "deepseek/deepseek-v4-pro")
+            check("a named model wins", seen[-1].get("model") == "deepseek/deepseek-v4-pro")
+        finally:
+            os.environ.pop("TAU_MODEL", None)
+            if no_key is not None:
+                os.environ["MICROGLIA_NOTE_MODEL"] = no_key
+    finally:
+        del sys.modules["litellm"]
 
     # R208. The verdict: what the evaluator said was wrong with the attempt, which the trajectory cannot say.
     # The four check families τ² reports, a passing check, and the shapes an artefact carries them in.

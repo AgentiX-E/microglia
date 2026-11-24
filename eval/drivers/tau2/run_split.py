@@ -44,9 +44,7 @@ from turns import turn_census  # noqa: E402
 # R206's material, in its own module for `turns`' reason: `notes.py` imports nothing third-party, so its
 # identity rule, its sidecar and its specificity check are exercised by a self-check that needs no provider.
 from notes import (  # noqa: E402
-    NOTE_MAX_TOKENS,
-    NOTE_SYSTEM,
-    NOTE_TIMEOUT_S,
+    call_note_model,
     first_user_text,
     load as load_notes,
     merge_rounds,
@@ -56,7 +54,6 @@ from notes import (  # noqa: E402
     save as save_notes,
     save_trajectories,
     scope_of,
-    sentence_of,
     set_scope,
     specificity,
     trajectories_path,
@@ -1170,26 +1167,12 @@ def note_writer():
     """
 
     def write(trajectory: str, verdict: str = ""):
+        # One call, in `notes`, because this was the copy of it that had lost `extra_body` — and a summariser whose
+        # 96-token budget is spent on reasoning returns an empty message that reads exactly like a refusal.
         prompt = note_prompt(trajectory, verdict)
-        try:
-            import litellm  # noqa: PLC0415 - τ²'s dependency, absent in the self-check
-
-            reply = litellm.completion(
-                model=note_model(os.environ.get("TAU_MODEL", "")),
-                messages=[
-                    {"role": "system", "content": NOTE_SYSTEM},
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=0,
-                max_tokens=NOTE_MAX_TOKENS,
-                timeout=NOTE_TIMEOUT_S,
-            )
-        except Exception as error:  # noqa: BLE001 - any failure means "no note"
-            return "", "failed", f"{type(error).__name__}: {error}", len(prompt)
-        sentence = sentence_of(reply)
-        if sentence == "":
-            return "", "refused", None, len(prompt)
-        return sentence, "sentence", None, len(prompt)
+        sentence, state, counts = call_note_model(prompt, note_model(os.environ.get("TAU_MODEL", "")))
+        detail = counts.get("error") if state == "failed" else None
+        return sentence, state, detail, len(prompt)
 
     return write
 

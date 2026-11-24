@@ -380,6 +380,7 @@ jobs:
           print(f"| delta (withheld) | {document['comparison']['passK']['deltaPp']} pp "
                 f"over {document['comparison']['passK']['paired']} task(s) |")
           print(f"| note coverage | {share(notes['coverage'])} of {notes['failed']} failure(s) |")
+          print(f"| refusals / truncated | {notes['refused']} / {notes.get('truncated', 0)} |")
           print(f"| specificity | {share((notes.get('specificity') or {}).get('share'))} |")
           print(f"| hits: file / text | {notes['taskHits']} / {notes['keyHits']} of {notes['lookups']} lookup(s) |")
           print(f"| material | attempt{' + verdict' if notes.get('verdict') else ' only'} "

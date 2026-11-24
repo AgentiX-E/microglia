@@ -330,6 +330,10 @@ def material_of(summary: dict) -> dict | None:
         "failed": failed,
         "coverage": (written / failed) if failed else None,
         "refused": sum(int(number(entry.get("refused")) or 0) for entry in later),
+        # R209. A call cut off at the token ceiling never reached an answer, so it is counted apart from a refusal:
+        # the census closes as written + refused + truncated == failed, and a fold whose phases were cut off is a
+        # fold that measured a budget rather than a material.
+        "truncated": sum(int(number(entry.get("truncated")) or 0) for entry in later),
         "providerFailures": sum(int(number(entry.get("providerFailures")) or 0) for entry in later),
         "unreadable": sum(int(number(entry.get("unreadable")) or 0) for entry in later),
         "unscored": sum(int(number(entry.get("unscored")) or 0) for entry in later),
@@ -1286,8 +1290,9 @@ def self_test() -> int:
         check("the fold's bill is the sum of its phases", abs(document["bill"]["controlUsd"] - 1.0) < 1e-6,
               str(document["bill"]))
         check("the fold's census closes over every phase",
-              document["notes"]["written"] + document["notes"]["refused"] == document["notes"]["failed"],
-              str({key: document["notes"][key] for key in ("written", "refused", "failed")}))
+              (document["notes"]["written"] + document["notes"]["refused"]
+               + document["notes"].get("truncated", 0)) == document["notes"]["failed"],
+              str({key: document["notes"][key] for key in ("written", "refused", "truncated", "failed")}))
         check("the fold's coverage is complete", document["notes"]["coverage"] == 1.0, str(document["notes"]["coverage"]))
         check("every task's scope arrived", document["notes"]["scopeTasks"] == ["1", "2", "3"],
               str(document["notes"]["scopeTasks"]))

@@ -216,6 +216,7 @@ def measure(rows, band: str = "off_peak") -> dict:
             "written": sum(1 for entry in seen if entry.get("state") == "sentence"),
             "refused": sum(1 for entry in seen if entry.get("state") == "refused"),
             "failed": sum(1 for entry in seen if entry.get("state") == "failed"),
+            "truncated": sum(1 for entry in seen if entry.get("state") == "truncated"),
             "dry": sum(1 for entry in seen if entry.get("state") == "dry"),
             "promptChars": sum(int(entry.get("promptChars") or 0) for entry in seen),
             "noteChars": sum(len(str(entry.get("sentence") or "")) for entry in seen),
@@ -280,7 +281,11 @@ def measure(rows, band: str = "off_peak") -> dict:
     p4 = {"mean": mean_added, "max": (max(added) if added else None), "bar": P4_BAR,
           "pass": mean_added is not None and mean_added <= P4_BAR and max(added) <= P4_BAR}
 
+    truncated = sum(materials[name]["truncated"] for name in MATERIALS)
+    p0 = {"truncated": truncated, "bar": 0, "pass": truncated == 0}
+
     bars = [
+        {"name": "P0", "pass": p0["pass"], "reading": p0},
         {"name": "P1", "pass": p1["pass"], "reading": p1},
         {"name": "P2", "pass": p2["pass"], "reading": p2},
         {"name": "P3", "pass": p3["verdict"]["pass"], "reading": p3},
@@ -290,6 +295,7 @@ def measure(rows, band: str = "off_peak") -> dict:
         "failures": len(rows),
         "materials": materials,
         "tokens": tokens,
+        "p0": p0,
         "p1": p1,
         "p2": p2,
         "p3": p3,
@@ -313,6 +319,7 @@ def render(result) -> str:
     population = result.get("failures") or 0
     materials = result.get("materials") or {}
     tokens = result.get("tokens") or {}
+    p0 = result.get("p0") or {}
     p1 = result.get("p1") or {}
     p2 = result.get("p2") or {}
     p3 = result.get("p3") or {}
@@ -335,6 +342,7 @@ def render(result) -> str:
         f"| written | {attempt.get('written', 0)} | {verdict.get('written', 0)} |",
         f"| refusals | {attempt.get('refused', 0)} | {verdict.get('refused', 0)} |",
         f"| provider failures | {attempt.get('failed', 0)} | {verdict.get('failed', 0)} |",
+        f"| truncated | {attempt.get('truncated', 0)} | {verdict.get('truncated', 0)} |",
         f"| prompt chars | {attempt.get('promptChars', 0)} | {verdict.get('promptChars', 0)} |",
         f"| note chars | {attempt.get('noteChars', 0)} | {verdict.get('noteChars', 0)} |",
         f"| tokens (in / out) | {(tokens.get('attempt') or {}).get('prompt', 0)} / "
@@ -344,6 +352,7 @@ def render(result) -> str:
         "",
         "| prediction | reading | bar | result |",
         "|---|---|---|---|",
+        f"| P0 no call was cut off | {p0.get('truncated', 0)} truncated | 0 | {_pass(p0.get('pass'))} |",
         f"| P1 the evaluator explained | {p1.get('explained', 0)} of {population} ({_percent(p1.get('share'))}) "
         f"| >= {P1_BAR * 100:.0f}% | {_pass(p1.get('pass'))} |",
         f"| P2 the verdict rescues what the attempt declined | {p2.get('rescued', 0)} of {p2.get('declined', 0)} "
@@ -379,38 +388,6 @@ def _report(checks: int, failures) -> int:
         print(f"FAIL  {name}")
     print(f"{checks} case(s), {len(failures or [])} failure(s)")
     return 0 if not failures else 1
-
-
-def summarise(model: str):
-    """The provider call, in the shape `run_split.py` uses, so the two cannot drift.
-
-    `temperature=0` and the same ceiling as the arm: the ablation is about the material, and every other degree of
-    freedom is held fixed by construction rather than by argument.
-    """
-    def write(prompt: str):
-        try:
-            import litellm  # noqa: PLC0415 - τ²'s dependency, absent in the self-check
-
-            reply = litellm.completion(
-                model=model,
-                messages=[
-                    {"role": "system", "content": notes.NOTE_SYSTEM},
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=0,
-                max_tokens=notes.NOTE_MAX_TOKENS,
-                timeout=notes.NOTE_TIMEOUT_S,
-            )
-        except Exception as error:  # noqa: BLE001 - any failure means "no note"
-            return "", "failed", 0
-        usage = getattr(reply, "usage", None)
-        prompt_tokens = getattr(usage, "prompt_tokens", 0) if usage is not None else 0
-        completion_tokens = getattr(usage, "completion_tokens", 0) if usage is not None else 0
-        sentence = notes.sentence_of(reply)
-        state = "sentence" if sentence else "refused"
-        return sentence, state, {"prompt": prompt_tokens, "completion": completion_tokens}
-
-    return write
 
 
 def main(argv: list[str]) -> int:
@@ -455,7 +432,10 @@ def main(argv: list[str]) -> int:
     if plan["usd"] is not None and plan["usd"] > args.max_usd:
         print(f"tau2-ablation-over-budget:{plan['usd']:.4f}>{args.max_usd:.2f}", file=sys.stderr)
         return 2
-    write = summarise(model)
+    # The call is `notes.call_note_model`: one place, with thinking switched off, and the counters and
+    # `finish_reason` it returns are what let this reading tell a refusal from a truncation.
+    def write(prompt: str):
+        return notes.call_note_model(prompt, model)
     rows = []
     for index, failure in enumerate(failures, start=1):
         simulation = failure["simulation"]
@@ -481,6 +461,12 @@ def main(argv: list[str]) -> int:
         Path(args.json).write_text(json.dumps(result, indent=1) + "\n", encoding="utf-8")
     if args.dry_run:
         return 0
+    # A truncated call measures nothing: the model never reached an answer, so neither arm was compared and the
+    # reading is a fact about the budget rather than about the material. That is exit 2 — cannot measure — and it
+    # is the state R206a, R207 and R208 spent three rounds in without a name for it.
+    if not result["p0"]["pass"]:
+        print("tau2-ablation-truncated:" + str(result["p0"]["truncated"]), file=sys.stderr)
+        return 2
     return 0 if all(bar["pass"] for bar in result["bars"]) else 1
 
 
@@ -583,7 +569,8 @@ def self_test() -> int:
     check("P4 is measured against the attempt's ceiling", reading["p4"]["bar"] == P4_BAR, str(reading["p4"]["bar"]))
     check("the block is cheap at 210 characters", reading["p4"]["pass"], str(reading["p4"]))
     check("McNemar sees both rescues", reading["mcnemar"]["rescued"] == 2, str(reading["mcnemar"]))
-    check("every bar is reported with its own name", [bar["name"] for bar in reading["bars"]] == ["P1", "P2", "P3", "P4"],
+    check("every bar is reported with its own name",
+          [bar["name"] for bar in reading["bars"]] == ["P0", "P1", "P2", "P3", "P4"],
           str([bar["name"] for bar in reading["bars"]]))
     check("the bill is summed from the provider's own counters",
           reading["tokens"]["verdict"]["prompt"] == 1_680, str(reading["tokens"]["verdict"]))
@@ -671,9 +658,9 @@ def self_test() -> int:
 
     # --- the provider path, driven with a stand-in module: the plumbing between `notes.sentence_of` and the reply
     # shape is exactly what a rewrite breaks, and a real call cannot be made in a self-check.
-    def reply(content: str, prompt_tokens: int = 500, completion_tokens: int = 20):
+    def reply(content: str, prompt_tokens: int = 500, completion_tokens: int = 20, finish: str = "stop"):
         return _types.SimpleNamespace(
-            choices=[_types.SimpleNamespace(message=_types.SimpleNamespace(content=content))],
+            choices=[_types.SimpleNamespace(message=_types.SimpleNamespace(content=content), finish_reason=finish)],
             usage=_types.SimpleNamespace(prompt_tokens=prompt_tokens, completion_tokens=completion_tokens),
         )
 
@@ -682,7 +669,7 @@ def self_test() -> int:
 
     def completion(**kwargs):
         prompt = kwargs["messages"][1]["content"]
-        seen.append(prompt)
+        seen.append(kwargs)
         if "RAISE" in prompt:
             raise RuntimeError("provider down")
         if "VERDICT" in prompt:
@@ -695,15 +682,15 @@ def self_test() -> int:
     fake.completion = completion
     sys.modules["litellm"] = fake
     try:
-        write = summarise("deepseek-flash")
-        sentence, state, usage = write(
-            "ATTEMPT\n<<<\nplease help\n>>>\nVERDICT\n<<<\nCOMMUNICATE not met: confirm ref_50000 items\n>>>\n"
-        )
-        check("a written sentence is a sentence", (sentence != "", state) == (True, "sentence"), state)
-        check("the usage counters are read", usage == {"prompt": 500, "completion": 20}, str(usage))
-        check("a refusal is not a failure", write("ATTEMPT\n<<<\nplease\n>>>\n")[1] == "refused")
-        check("a provider exception is a failure", write("RAISE")[1] == "failed")
-        check("the system turn is the arm's own", "note" in seen[0].lower() or True)
+        # The tool does not own the call — `notes.call_note_model` does — so what is checked here is that the call
+        # the tool *makes* is the one the arm makes: thinking off, one sentence, deterministic. R208's 96.0
+        # tokens per call were a call without that body, and the check that would have caught it belongs beside the
+        # request rather than beside this tool.
+        notes.call_note_model("ATTEMPT\n<<<\nplease help\n>>>\nVERDICT\n<<<\nCOMMUNICATE not met: ref_5\n>>>\n")
+        check("the ablation's call switches thinking off",
+              seen[-1].get("extra_body") == {"thinking": {"type": "disabled"}}, str(seen[-1].get("extra_body")))
+        check("the ablation's call is deterministic", seen[-1].get("temperature") == 0)
+        check("the ablation's call is one sentence", seen[-1].get("max_tokens") == notes.NOTE_MAX_TOKENS)
 
         # The command line over a bank that fails twelve times: the progress print, the per-failure loop, and both
         # exit codes, with the provider answered by the stand-in rather than by a network.
@@ -714,6 +701,19 @@ def self_test() -> int:
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             graded = main(["--bank", str(noisy_path), "--max-usd", "1"])
         check("a material that rescues every refusal is graded", graded == 0, str(graded))
+
+        # A budget that runs out before the answer is a P0 failure and exit 2: the model never wrote, so nothing
+        # about the material was measured. This is the state R208's 85 failures were actually in.
+        truncated = _types.ModuleType("litellm")
+        truncated.completion = lambda **kwargs: reply("", finish="length", completion_tokens=96)
+        sys.modules["litellm"] = truncated
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            cut = main(["--bank", str(noisy_path), "--limit", "2", "--max-usd", "1"])
+        check("a truncated reading cannot measure", cut == 2, str(cut))
+        check("a truncation is not a refusal",
+              measure([{"task": "5", "trial": 0, "reward": 0.0, "verdictText": "REWARD 0",
+                        "materials": {name: {"sentence": "", "state": "truncated", "promptChars": 100,
+                                             "usage": {}} for name in MATERIALS}}])["p2"]["declined"] == 0)
 
         always_refused = _types.ModuleType("litellm")
         always_refused.completion = lambda **kwargs: reply("NONE")
