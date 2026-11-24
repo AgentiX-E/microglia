@@ -35,6 +35,7 @@ Nothing here calls a model. Every field is in the artefacts a paid run already w
 
 import argparse
 import json
+import math
 import os
 import re
 import sys
@@ -316,22 +317,55 @@ def bar_of(turnover) -> dict:
     return {"bar": bar, "base": base, "headroom": base - bar}
 
 
+def wilson(passed: int, total: int, z: float = 1.96) -> "tuple[float, float] | None":
+    """The Wilson score interval for one proportion, which is the input Newcombe's method needs."""
+    if total <= 0:
+        return None
+    proportion = passed / total
+    denominator = 1 + z * z / total
+    centre = (proportion + z * z / (2 * total)) / denominator
+    half = z * math.sqrt(proportion * (1 - proportion) / total + z * z / (4 * total * total)) / denominator
+    return max(0.0, centre - half), min(1.0, centre + half)
+
+
+def newcombe(passed: int, total: int, other_passed: int, other_total: int, z: float = 1.96):
+    """The Newcombe hybrid-score interval for the difference of two independent proportions.
+
+    An interval rather than a p-value alone, because the two movements are small and a reader is entitled to
+    the range the difference occupies: 3.5 points with an interval spanning zero is a different claim from 3.5
+    points with one that does not, and only the second may be quoted as a movement.
+    """
+    if total <= 0 or other_total <= 0:
+        return None
+    first, second = passed / total, other_passed / other_total
+    left = wilson(passed, total, z)
+    right = wilson(other_passed, other_total, z)
+    if left is None or right is None:
+        return None
+    low = (first - second) - math.sqrt((first - left[0]) ** 2 + (right[1] - second) ** 2)
+    high = (first - second) + math.sqrt((left[1] - first) ** 2 + (second - right[0]) ** 2)
+    return low, high
+
+
 def compare_of(arm, reference) -> dict:
     """The two movements, each with the exact test its own denominator allows."""
     moved = {
-        "repairDelta": None, "repairP": None, "breakDelta": None, "breakP": None,
-        "rescueDelta": None, "rescueP": None,
+        "repairDelta": None, "repairP": None, "repairCi": None,
+        "breakDelta": None, "breakP": None, "breakCi": None,
+        "rescueDelta": None, "rescueP": None, "rescueCi": None,
     }
     if arm["turnover"]["unmetBefore"] and reference["turnover"]["unmetBefore"]:
         a, b = arm["turnover"]["repaired"], arm["turnover"]["persisted"]
         c, d = reference["turnover"]["repaired"], reference["turnover"]["persisted"]
         moved["repairDelta"] = (arm["turnover"]["repairRate"] or 0.0) - (reference["turnover"]["repairRate"] or 0.0)
         moved["repairP"] = fisher_two_sided(a, b, c, d)
+        moved["repairCi"] = newcombe(a, a + b, c, c + d)
     if arm["turnover"]["metBefore"] and reference["turnover"]["metBefore"]:
         a, b = arm["turnover"]["broken"], arm["turnover"]["held"]
         c, d = reference["turnover"]["broken"], reference["turnover"]["held"]
         moved["breakDelta"] = (arm["turnover"]["breakRate"] or 0.0) - (reference["turnover"]["breakRate"] or 0.0)
         moved["breakP"] = fisher_two_sided(a, b, c, d)
+        moved["breakCi"] = newcombe(a, a + b, c, c + d)
     if arm["rescue"]["opportunities"] and reference["rescue"]["opportunities"]:
         a = arm["rescue"]["rescued"]
         b = arm["rescue"]["opportunities"] - a
@@ -339,6 +373,7 @@ def compare_of(arm, reference) -> dict:
         d = reference["rescue"]["opportunities"] - c
         moved["rescueDelta"] = (arm["rescue"]["rate"] or 0.0) - (reference["rescue"]["rate"] or 0.0)
         moved["rescueP"] = fisher_two_sided(a, b, c, d)
+        moved["rescueCi"] = newcombe(a, a + b, c, c + d)
     return moved
 
 
@@ -389,11 +424,11 @@ def render(arms, references, notes) -> str:
         state, sentence = state_of(arm, moved)
         lines.append(f"**{name} against control.** `{state}` — {sentence}.")
         lines.append("")
-        lines.append("| movement | arm − control | exact p |")
-        lines.append("|---|---|---|")
-        lines.append(f"| repair rate | {_pp(moved['repairDelta'])} | {_p(moved['repairP'])} |")
-        lines.append(f"| break rate | {_pp(moved['breakDelta'])} | {_p(moved['breakP'])} |")
-        lines.append(f"| rescue rate | {_pp(moved['rescueDelta'])} | {_p(moved['rescueP'])} |")
+        lines.append("| movement | arm − control | 95% interval | exact p |")
+        lines.append("|---|---|---|---|")
+        lines.append(f"| repair rate | {_pp(moved['repairDelta'])} | {_ci(moved['repairCi'])} | {_p(moved['repairP'])} |")
+        lines.append(f"| break rate | {_pp(moved['breakDelta'])} | {_ci(moved['breakCi'])} | {_p(moved['breakP'])} |")
+        lines.append(f"| rescue rate | {_pp(moved['rescueDelta'])} | {_ci(moved['rescueCi'])} | {_p(moved['rescueP'])} |")
         lines.append(f"| admission bar `breaks/(repairs+breaks)` | {_pct(bar['bar'])} vs base {_pct(bar['base'])} | "
                      f"headroom (base − bar) {_pp(bar['headroom'])} |")
         if bar["headroom"] is not None and bar["headroom"] < 0:
@@ -427,6 +462,10 @@ def _pct(value) -> str:
 
 def _pp(value) -> str:
     return "n/a" if value is None else f"{100 * value:+.1f} pp"
+
+
+def _ci(interval) -> str:
+    return "n/a" if interval is None else f"[{100 * interval[0]:+.1f}, {100 * interval[1]:+.1f}] pp"
 
 
 def _p(value) -> str:
@@ -787,6 +826,20 @@ def self_test() -> int:
         check("the json is written", out.is_file())
         written = json.loads(out.read_text())
         check("and holds every arm", set(written["arms"]) == {"control", "material"}, str(set(written["arms"])))
+
+    # The interval: Newcombe's hybrid score, which brackets its own point and refuses an empty denominator.
+    interval = newcombe(40, 83, 38, 85)
+    check("the interval brackets the difference",
+          interval is not None and interval[0] < 40 / 83 - 38 / 85 < interval[1], str(interval))
+    check("the interval is not degenerate",
+          interval is not None and interval[1] - interval[0] < 1.0, str(interval))
+    check("an empty denominator has no interval", newcombe(1, 0, 1, 2) is None)
+    check("an empty other denominator has no interval", newcombe(1, 2, 1, 0) is None)
+    check("a zero proportion still has an interval", wilson(0, 10) is not None)
+    check("no observations is no interval", wilson(0, 0) is None)
+    check("an identical pair straddles zero", (lambda ci: ci[0] <= 0 <= ci[1])(newcombe(5, 10, 5, 10)))
+    check("the interval prints with its units", _ci((-0.05, 0.02)) == "[-5.0, +2.0] pp")
+    check("a missing interval prints n/a", _ci(None) == "n/a")
 
     # The percent and p formatters, which the table's cells depend on.
     check("a none rate prints n/a", _pct(None) == "n/a")
