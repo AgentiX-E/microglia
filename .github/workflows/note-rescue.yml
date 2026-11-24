@@ -40,9 +40,17 @@ on:
         # bank is re-read. `rescue_rate.py` computes the same list from the same field.
         default: ''
       rounds:
-        description: 'Attempts per task. Two is the mechanism; more adds notes to a story already told.'
+        description: 'Attempts per task. Two is the mechanism; four buys three transitions instead of one.'
         required: false
-        default: '2'
+        default: '4'
+      arms:
+        description: 'both or treatment. Both, unless a baseline has already been run in this world.'
+        required: false
+        default: 'both'
+      population:
+        description: 'hard (failed twice of four in the bank) or failing (failed at all)'
+        required: false
+        default: 'hard'
       max_steps:
         description: 'Steps per episode'
         required: false
@@ -206,7 +214,9 @@ jobs:
       TAU2_DATA_DIR: ${{ github.workspace }}/.tau2-bench/data
       RESCUE_DOMAIN: ${{ github.event.inputs.domain || 'retail' }}
       RESCUE_TASKS: ${{ github.event.inputs.tasks }}
-      RESCUE_ROUNDS: ${{ github.event.inputs.rounds || '2' }}
+      RESCUE_ROUNDS: ${{ github.event.inputs.rounds || '4' }}
+      RESCUE_ARMS: ${{ github.event.inputs.arms || 'both' }}
+      RESCUE_POPULATION: ${{ github.event.inputs.population || 'hard' }}
       RESCUE_MAX_STEPS: ${{ github.event.inputs.max_steps || '100' }}
       RESCUE_CONCURRENCY: ${{ github.event.inputs.concurrency || '3' }}
       RESCUE_NOTE_VERDICT: ${{ github.event.inputs.note_verdict || 'true' }}
@@ -233,9 +243,13 @@ jobs:
           set -euo pipefail
           TASKS="${RESCUE_TASKS}"
           if [ -z "${TASKS}" ]; then
-            TASKS="$(python3 -c "
-          import json
-          print(','.join(json.load(open('eval/manifests/note-bank-baseline.json'))['provenance']['failingTasks']))
+            # Two populations, both named by the baseline rather than here: the fifty that failed at all, and the
+            # twenty-four that failed twice of four. R212 runs the second, because two rounds over the first give
+            # twenty-three opportunities and four rounds over the second give forty-four at the same price.
+            TASKS="$(POPULATION="${RESCUE_POPULATION}" python3 -c "
+          import json, os
+          field = 'hardTasks' if os.environ['POPULATION'] == 'hard' else 'failingTasks'
+          print(','.join(json.load(open('eval/manifests/note-bank-baseline.json'))['provenance'][field]))
           ")"
           fi
           COUNT="$(python3 -c "print(len([t for t in '${TASKS}'.split(',') if t]))")"
@@ -250,10 +264,11 @@ jobs:
           MINUTES="$(python3 -c "
           tasks = len([entry for entry in '${RESCUE_TASK_LIST}'.split(',') if entry])
           rounds = int('${RESCUE_ROUNDS}')
+          arms = 2 if '${RESCUE_ARMS}' == 'both' else 1
           # 26 s a simulation (R206's pilot, 48 in 21 minutes) plus 10 s of τ² import per invocation, one
           # invocation per task, plus eight for the install and one for the reading. Rounded up.
           concurrency = max(1, int('${RESCUE_CONCURRENCY}'))
-          print(int((tasks * rounds * 26 + tasks * 10) / concurrency / 60) + 9 + 1)
+          print(int((arms * (tasks * rounds * 26 + tasks * 10)) / concurrency / 60) + 9 + 1)
           ")"
           echo "estimated ${MINUTES} min for this rescue" >> "$GITHUB_STEP_SUMMARY"
           python3 eval/drivers/tau2/note_pilot.py --window-minutes "${MINUTES}"
@@ -298,25 +313,42 @@ jobs:
 
           cat > "${RUNNER_TEMP}/run_task.sh" <<'SCRIPT'
           #!/usr/bin/env bash
-          # One invocation: one task, two rounds, the note carried across the boundary between them.
+          # One invocation: one task, one arm, the note carried across the boundary between the rounds.
           set -uo pipefail
-          task="$1"
-          extra=(--notes "${RESCUE_DIR}/notes-${task}.json")
-          if [ "${RESCUE_NOTE_VERDICT}" = "true" ]; then
-            extra+=(--note-verdict)
+          arm="$1"; task="$2"
+          extra=()
+          if [ "$arm" = "treatment" ]; then
+            extra=(--notes "${RESCUE_DIR}/notes-${task}.json")
+            if [ "${RESCUE_NOTE_VERDICT}" = "true" ]; then
+              extra+=(--note-verdict)
+            fi
           fi
           "${PYTHON}" eval/drivers/tau2/run_split.py \
             --phase eval --agent microglia_agent \
             --domain "${RESCUE_DOMAIN}" --tasks "${task}" --rounds "${RESCUE_ROUNDS}" \
             --max-steps "${RESCUE_MAX_STEPS}" --seed "${RESCUE_SEED}" --require-off-peak \
-            --out "${RESCUE_DIR}/treatment/results-${task}.json" "${extra[@]}" \
-            > "${RESCUE_DIR}/treatment-${task}.log" 2>&1
+            --out "${RESCUE_DIR}/${arm}/results-${task}.json" "${extra[@]}" \
+            > "${RESCUE_DIR}/${arm}-${task}.log" 2>&1
           SCRIPT
           chmod +x "${RUNNER_TEMP}/run_task.sh"
           export RESCUE_DIR RESCUE_DOMAIN RESCUE_ROUNDS RESCUE_MAX_STEPS RESCUE_SEED RESCUE_NOTE_VERDICT PYTHON
 
-          echo "${RESCUE_TASK_LIST}" | tr ',' '\n' \
-            | xargs -P "${TAU_CONCURRENCY}" -n 1 "${RUNNER_TEMP}/run_task.sh"
+          run_arm () {
+            local arm="$1"
+            echo "${RESCUE_TASK_LIST}" | tr ',' '\n' \
+              | xargs -P "${TAU_CONCURRENCY}" -n 1 "${RUNNER_TEMP}/run_task.sh" "$arm"
+          }
+
+          # Control first, and in the same dispatch: R211 compared an arm with the bank's baseline and the drift
+          # check refused it (38/50 against 27/50 on the same fifty tasks). One seed is shared by every task of an
+          # attempt, so two arms at different seeds are two draws of a process whose per-attempt rate moves by far
+          # more than a binomial standard error. The world is a variable, so it has to be held.
+          if [ "${RESCUE_ARMS}" = "both" ]; then
+            mkdir -p "${RESCUE_DIR}/control"
+            run_arm control
+          fi
+          mkdir -p "${RESCUE_DIR}/treatment"
+          run_arm treatment
 
       - name: What the notes cost and whether they were served
         # The arm's own counters, before the rate. A rescue rate with zero lookups is a rate over attempts that
@@ -370,14 +402,36 @@ jobs:
           print(f"| mean episode | {(seconds / episodes if episodes else 0):.1f} s |")
           PY
 
+      - name: Keep both arms
+        # The documents, not just the summary. R211's treatment arm was read from its log and the per-task rows were
+        # lost with the runner, which is why its reading could not be recomputed and why the next run has to buy
+        # both arms again. An arm that cannot be re-read is a number with a screenshot.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: note-rescue
+          path: eval/results/note-rescue/
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: The rate, against the transition nobody wrote
         run: |
           set -euo pipefail
+          # One run, two arms: the control is the baseline, and the drift check then compares two arms that share
+          # a seed rather than an arm with a document written at another time. `--pooled` on a four-round arm sums
+          # every transition instead of the first, which is the same event measured three times.
           set +e
-          python3 eval/tools/rescue_rate.py \
-            --dir "${RESCUE_DIR}/treatment" \
-            --baseline eval/manifests/note-bank-baseline.json \
-            --json "${RESCUE_DIR}/rescue.json" | tee "${RESCUE_DIR}/reading.txt"
+          extra=()
+          if [ "${RESCUE_ROUNDS}" -ge 3 ]; then extra+=(--pooled); fi
+          if [ -d "${RESCUE_DIR}/control" ]; then
+            python3 eval/tools/rescue_rate.py \
+              --dir "${RESCUE_DIR}/treatment" --baseline-dir "${RESCUE_DIR}/control" "${extra[@]}" \
+              --json "${RESCUE_DIR}/rescue.json" | tee "${RESCUE_DIR}/reading.txt"
+          else
+            python3 eval/tools/rescue_rate.py \
+              --dir "${RESCUE_DIR}/treatment" --baseline eval/manifests/note-bank-baseline.json "${extra[@]}" \
+              --json "${RESCUE_DIR}/rescue.json" | tee "${RESCUE_DIR}/reading.txt"
+          fi
           STATUS=${PIPESTATUS[0]}
           set -e
           {

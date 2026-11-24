@@ -67,12 +67,18 @@ def trials_of(document) -> dict[str, dict[int, float]]:
     return by_task
 
 
-def rescue_of(document, transition: tuple[int, int] = (0, 1), tasks=None) -> dict:
+def rescue_of(document, transition: tuple[int, int] = (0, 1), tasks=None, pooled: bool = False) -> dict:
     """How often the attempt after a failed one passed, with the denominator that makes it a rate.
 
     `fail` is the number of opportunities (a scored attempt at `from` that failed and has a scored `to`), and it
     is also the size of the population: a rate over eight opportunities and a rate over three are both numbers
     and only one of them is evidence.
+
+    `pooled` sums every consecutive pair instead of one transition. On a four-round arm that is the difference
+    between eleven opportunities and forty-four, and the transitions are the same event — an attempt that
+    follows a failure — with a note that by round two is longer than the one round one carried. Pooling is
+    therefore a statement about the material *as it accumulates*, and `render` prints the transition so a reader
+    knows which claim is being made.
     """
     wanted = set(tasks) if tasks else None
     by_task = trials_of(document)
@@ -82,14 +88,19 @@ def rescue_of(document, transition: tuple[int, int] = (0, 1), tasks=None) -> dic
     failed = 0
     rescued = 0
     for trials in by_task.values():
-        if first not in trials or second not in trials:
-            continue
-        if trials[first] >= 1.0:
-            continue
-        failed += 1
-        rescued += 1 if trials[second] >= 1.0 else 0
+        pairs = []
+        if pooled:
+            trial_numbers = sorted(trials)
+            pairs = list(zip(trial_numbers, trial_numbers[1:]))
+        elif first in trials and second in trials:
+            pairs = [(first, second)]
+        for left, right in pairs:
+            if trials[left] >= 1.0:
+                continue
+            failed += 1
+            rescued += 1 if trials[right] >= 1.0 else 0
     return {
-        "transition": f"{first}->{second}",
+        "transition": "pooled" if pooled else f"{first}->{second}",
         "tasks": len(by_task),
         "fail": failed,
         "rescue": rescued,
@@ -280,6 +291,8 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--dir", default="")
     parser.add_argument("--bank", default="")
     parser.add_argument("--baseline", default="")
+    parser.add_argument("--baseline-dir", default="")
+    parser.add_argument("--pooled", action="store_true")
     parser.add_argument("--tasks", default="")
     parser.add_argument("--first", type=int, default=0)
     parser.add_argument("--second", type=int, default=1)
@@ -314,7 +327,44 @@ def main(argv: list[str]) -> int:
     baseline = None
     drift = None
     base_document = None
-    if arguments.baseline:
+    if arguments.baseline and arguments.baseline_dir:
+        print("--baseline and --baseline-dir name the same side twice", file=sys.stderr)
+        return 4
+    if arguments.baseline or arguments.baseline_dir:
+        if arguments.baseline_dir:
+            # Both sides from one run. The comparison this enables is the only one that controls the world: one
+            # seed is shared by every task of an attempt, so two arms run at different seeds are two draws of a
+            # process whose per-attempt rate moves by more than a binomial standard error (R211 measured 38/50
+            # against the bank's 27/50 on the same fifty tasks).
+            base_directory = Path(arguments.baseline_dir)
+            if not base_directory.is_dir():
+                print(f"no directory at {base_directory}", file=sys.stderr)
+                return 4
+            base_documents = documents_of(base_directory)
+            if not base_documents:
+                print(f"no document under {base_directory}", file=sys.stderr)
+                return 4
+            base_document = merge(base_documents)
+            if tasks is None:
+                tasks = failing_tasks_of(base_document)
+            arm = rescue_of(arm_document, transition, tasks, arguments.pooled)
+            baseline = rescue_of(base_document, transition, tasks, arguments.pooled)
+            drift = drift_of(arm_document, base_document, tasks)
+            state, sentence, p = verdict_of(arm, baseline) if drift["matched"] else (
+                "DRIFT",
+                f"the arm's first attempt passed {drift['armPassed']}/{drift['tasks']} against the baseline's "
+                f"{drift['baselinePassed']}; the two arms did not run the same world",
+                None,
+            )
+            print(render(arm, baseline, drift, state, sentence, p))
+            if arguments.json:
+                Path(arguments.json).write_text(
+                    json.dumps({"arm": arm, "baseline": baseline, "drift": drift, "state": state, "p": p}, indent=1)
+                    + "\n"
+                )
+            return {"RESCUED": 0, "NO_LIFT": 0, "UNPAIRED": 0, "INCONCLUSIVE": 0}.get(
+                state, 2 if state == "NO_MEASUREMENT" else 3
+            )
         base_path = Path(arguments.baseline)
         if not base_path.is_file():
             print(f"no baseline at {base_path}", file=sys.stderr)
@@ -325,9 +375,9 @@ def main(argv: list[str]) -> int:
             # instead would put the same fifty ids in two places, and the day they disagree the reading is a
             # comparison of two populations wearing one label.
             tasks = failing_tasks_of(base_document)
-        baseline = rescue_of(base_document, transition, tasks)
+        baseline = rescue_of(base_document, transition, tasks, arguments.pooled)
         drift = drift_of(arm_document, base_document, tasks)
-    arm = rescue_of(arm_document, transition, tasks)
+    arm = rescue_of(arm_document, transition, tasks, arguments.pooled)
 
     if drift is not None and not drift["matched"]:
         state, sentence, p = (
@@ -412,6 +462,15 @@ def self_test() -> int:
     check("a task with no id is skipped", rescue_of({"simulations": [{"trial": 0}]})["tasks"] == 0)
     check("a task list narrows the population", rescue_of(arm, tasks=["2"])["fail"] == 1,
           str(rescue_of(arm, tasks=["2"])))
+
+    # Pooling: a four-round arm has three transitions per task, and they are the same event.
+    four = _document({"1": [0.0, 1.0, 0.0, 1.0], "2": [0.0, 0.0, 0.0, 0.0]})
+    pooled = rescue_of(four, pooled=True)
+    check("pooling counts every consecutive pair", pooled["fail"] == 5, str(pooled))
+    check("and sums their rescues", pooled["rescue"] == 2, str(pooled))
+    check("the pooled reading says so", pooled["transition"] == "pooled", str(pooled))
+    check("one transition is still available", rescue_of(four)["fail"] == 2, str(rescue_of(four)))
+    check("a pooled rate is over pairs, not tasks", abs(pooled["rate"] - 0.4) < 1e-9, str(pooled["rate"]))
 
     # The baseline's own scale, from the bank's numbers: 15 of 23 is 65.2%, and that is the number to beat.
     baseline = {"fail": 23, "rescue": 15, "rate": 15 / 23, "transition": "0->1", "tasks": 50}
@@ -506,6 +565,28 @@ def self_test() -> int:
             wide = root / "wide.json"
             wide.write_text(json.dumps(_document({str(i): [1.0, 1.0] for i in range(20)})))
             check("drift refuses the comparison", main(["--bank", str(drifted), "--baseline", str(wide)]) == 3)
+            # Both sides from one run: the only comparison that controls the world, since one seed is shared by
+            # every task of an attempt.
+            arm_dir = root / "arm"
+            base_dir = root / "base"
+            arm_dir.mkdir()
+            base_dir.mkdir()
+            (arm_dir / "a.json").write_text(json.dumps(_document({"1": [0.0, 1.0], "2": [0.0, 0.0]})))
+            (base_dir / "a.json").write_text(json.dumps(_document({"1": [0.0, 0.0], "2": [0.0, 0.0]})))
+            both = root / "both.json"
+            check("two directories are one comparison",
+                  main(["--dir", str(arm_dir), "--baseline-dir", str(base_dir), "--json", str(both)]) == 0)
+            check("and the reading is written", both.is_file())
+            check("two names for one side is refused",
+                  main(["--dir", str(arm_dir), "--baseline", str(wide), "--baseline-dir", str(base_dir)]) == 4)
+            check("a missing baseline directory is unreadable",
+                  main(["--dir", str(arm_dir), "--baseline-dir", str(root / "nope")]) == 4)
+            empty_dir = root / "empty"
+            empty_dir.mkdir()
+            check("an empty baseline directory is unreadable",
+                  main(["--dir", str(arm_dir), "--baseline-dir", str(empty_dir)]) == 4)
+            check("a pooled reading is available from the command line",
+                  main(["--dir", str(arm_dir), "--baseline-dir", str(base_dir), "--pooled"]) == 0)
 
     # The harness's own failure path: a case that records `False` must reach the exit code, or a suite that lost a
     # case would report success with a smaller denominator. Tallying the deliberately broken list is the only way

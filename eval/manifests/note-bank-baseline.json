@@ -64,7 +64,34 @@
    "111",
    "112"
   ],
-  "failingTaskCount": 50
+  "failingTaskCount": 50,
+  "hardTasks": [
+   "1",
+   "2",
+   "3",
+   "4",
+   "20",
+   "27",
+   "31",
+   "34",
+   "38",
+   "39",
+   "41",
+   "59",
+   "66",
+   "71",
+   "80",
+   "95",
+   "98",
+   "104",
+   "105",
+   "106",
+   "107",
+   "109",
+   "110",
+   "111"
+  ],
+  "hardRule": "tasks the bank failed at least twice of four: the population R212 runs, because the fifty that fail at all are twenty-three opportunities at two rounds and the hard twenty-four are forty-four at four. Bank pooled rescue on them: 20 of 44 (45.5%)."
  },
  "simulations": [
   {
