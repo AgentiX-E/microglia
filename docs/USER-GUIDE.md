@@ -6553,3 +6553,35 @@ share bar by writing a long sentence about nothing.
 The reader this replaces — a token only the note's own failure held — is still reported as `exclusive`, and on a
 bank where most failures share an action its ceiling is low enough to be useless: measure the ceiling before
 trusting the share.
+
+### 32.65 Reading a rescue rate, and why `pass^k` was the wrong dial
+
+If you are about to dispatch a fold to find out whether the notes help, read this first.
+
+`pass^4` cannot answer it. A note needs a failure to be written from, so the task that reads one has already lost
+the all-four-attempts race; the tasks that could still win it never have a note. Dispatch four hundred episodes and
+the headline comes back at zero whether the material is gold or garbage.
+
+What to read instead:
+
+```bash
+python3 eval/tools/rescue_rate.py --dir eval/results/note-rescue/treatment \
+    --baseline eval/manifests/note-bank-baseline.json
+```
+
+| reading | what it means |
+|---|---|
+| `opportunities` | attempts that followed a failed attempt. Below 12 the run has nothing to say and exits 2. |
+| `rescued` | of those, the ones that passed. The bank's baseline on the same fifty tasks is 15 of 23 (65.2%). |
+| `drift check` | the arm's own first attempts against the bank's, 27 of 50 expected. A gap over four tasks exits 3. |
+| `RESCUED` | `+25 pp` and `p < 0.05`. The note is doing something at this scale. |
+| `NO_LIFT` | the arm's upper limit is below baseline + 25, so a 25-point lift is excluded at this n. |
+| `INCONCLUSIVE` | neither, which is a fact about 23 opportunities rather than about the note. |
+
+Two habits this encodes. **The counterfactual is a number, not a zero**: an attempt after a failure passes 65% of
+the time with nothing carried, so "the note rescued seven tasks" means nothing until five of them are subtracted.
+**A small run cannot refute**: `NO_LIFT` is printed only when the interval excludes the registered effect, and the
+exit code says which of the two nulls you are holding.
+
+The cost is a hundred episodes — about ¥3.1 and thirteen minutes at concurrency 3 — because one arm is enough once
+round 0 is recognised as its own control.

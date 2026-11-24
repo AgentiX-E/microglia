@@ -2471,3 +2471,24 @@ apart. Counted apart everywhere the census closes, and graded as `P0` by the abl
 
 **Kept notes (`--keep-notes`)** — a reading that carries the sentences, their paired sentence and the evaluator's
 verdict, so a change of measure can be recomputed with `--from-reading` instead of re-billed.
+
+**Opportunity (in a rescue rate)** — an attempt that followed a failed attempt, and therefore the only place a note
+can act. A task that passed its first attempt is not an opportunity, and a rate computed over all attempts is a rate
+over attempts that were never offered the material.
+
+**Rescue rate** — `P(pass at attempt j+1 | fail at attempt j)`, per arm. The lane's real endpoint: `pass^k` cannot
+move under a note, because reading one requires the failure that already forfeits it. Baseline on the fifty failing
+tasks: 15 of 23, 65.2%.
+
+**Blind endpoint** — a measure that cannot register the intervention by construction. `pass^4` for a note is the
+worked example: the treatment's `pass^4` equals the control's for a perfect summariser and a useless one alike, so
+the null it returns is about the endpoint rather than about the material.
+
+**Drift check** — the treatment arm's first attempts compared with the bank's on the same tasks (27 of 50). No note
+exists before attempt 0, so that count samples the same process the bank sampled; a gap of more than four tasks
+means the committed baseline does not describe this run, and the comparison is refused (`DRIFT`) rather than
+widened.
+
+**Baseline document** — `eval/manifests/note-bank-baseline.json`: R208's bank reduced to `task_id`, `trial`, `seed`
+and `reward`, with the commit, the grid and the bill beside them. A counterfactual that lives in a paid run is
+committed in the shape its reader reads.

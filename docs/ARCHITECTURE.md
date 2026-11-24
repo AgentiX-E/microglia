@@ -4175,3 +4175,37 @@ The verdict is the only place the requirement appears, so its content is the mat
 
 Measured on the bank with no model call: mean 439 characters, max 598 against the 600 ceiling, and 55 of 85
 failures now carry at least one token no other failure's verdict carries.
+
+### 8.83 The endpoint that could not move, and the rate that can
+
+`pass^k` is "every one of the k attempts passed". A note is written only after a **failed** attempt and only
+between rounds. Those two facts compose into a blind spot nobody had noticed when the next dispatch was costed:
+
+> a task that ever receives a note has already failed attempt 0, so its `pass^k` is zero whatever the note says;
+> a task that passes attempt 0 never has a note, so it evolves exactly as its control does.
+
+The treatment's `pass^k` therefore equals the control's in expectation, for a perfect summariser and a useless one
+alike. Four hundred episodes at ¥12.5 would have bought a null that is a property of the endpoint.
+
+The mechanism lives one transition down, and the counterfactual was already paid for. R208's bank — 456 episodes,
+no sidecar — restricted to the fifty tasks it failed, says: **of the 23 attempts that followed a failed attempt,
+15 passed (65.2%) with nothing carried at all.** That is the number a note has to beat; every claim in the lane is
+now stated against it rather than against zero.
+
+Three consequences, and they are the shape of `eval/tools/rescue_rate.py`:
+
+- **the estimand is conditional** — `P(pass at j+1 | fail at j)`, over pairs, so a task that never failed is not in
+  the denominator and a rate is never computed over attempts that were not opportunities;
+- **the baseline is a committed document** — `eval/manifests/note-bank-baseline.json` is the bank stripped to
+  `task_id`, `trial`, `seed`, `reward`: 40 KB of the 32 MB, because a counterfactual that lives in a paid run
+  should not have to be re-derived from a log nobody kept;
+- **round 0 is the arm's own control** — no note exists before it, so its pass count samples the same process the
+  bank sampled. That free check is what makes one arm defensible instead of two: the assumption is measured inside
+  the run (27 of 50 either side) rather than asserted across two runs, and a disagreement of more than four tasks
+  is `DRIFT` — a void comparison, not a wider interval.
+
+The registered scale is 25 points: `RESCUED` needs `+25 pp` *and* an exact p below 0.05; `NO_LIFT` is only awarded
+when the arm's Clopper-Pearson upper limit sits below baseline + 25, so an underpowered run cannot be reported as a
+refutation; everything between is `INCONCLUSIVE`, which is a statement about 23 opportunities. The arm is fifty
+tasks, two rounds, one arm — 100 episodes, **$0.44 ≈ ¥3.1** — a quarter of the folded price and able to exclude the
+effect it registers.

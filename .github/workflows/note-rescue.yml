@@ -1,0 +1,401 @@
+name: note-rescue
+
+# R211 — the rate a note has to beat, and the arm that buys it for ¥3.1 instead of ¥12.5.
+#
+# R210 planned a fold: fifty failing tasks, two arms, four rounds, four hundred episodes. It would have measured
+# `pass^k` lift, and `pass^k` cannot move here. The endpoint is "every attempt passed"; a note is written only
+# after a failed attempt and only between rounds (`run_split.py:1290`), so a task that ever receives one has
+# already failed attempt 0 — its `pass^k` is zero whatever the note says — and a task that passes attempt 0 never
+# has a note at all. The treatment's `pass^k` equals the control's in expectation for a perfect summariser and a
+# useless one alike. Four hundred episodes would have bought an artefact about the endpoint rather than about the
+# material.
+#
+# This workflow measures the transition instead: of the attempts that failed, how many of the next ones passed,
+# with a note served, against the same transition with nothing served. That baseline is not a second arm — it is
+# R208's bank, already paid, committed as `eval/manifests/note-bank-baseline.json` because it is 40 KB of rewards
+# inside a 32 MB document. On the fifty failing tasks it is **15 of 23 (65.2%)**.
+#
+# Two jobs, and the split is the cost model:
+#
+#   contract  free, on every push that touches the instrument. Runs the reader's self-test, then the same two
+#             commands the paid job runs over documents whose rate is known by construction: the baseline against
+#             itself (0.0 pp, p = 1), a fixture that rescues everything (RESCUED), one that matches the baseline
+#             (NO_LIFT), one too small to say anything (INCONCLUSIVE) and one whose first attempts disagree with
+#             the bank (DRIFT, refused). Then the coverage floor on the reader.
+#   rescue    dispatch only. Fifty tasks, two rounds, one arm: 100 episodes at the lane's measured 23.3 s and
+#             $0.0044 each, about 13 minutes of model time at concurrency 3, ~9 minutes of install, **$0.44 ≈ ¥3.1**.
+
+on:
+  workflow_dispatch:
+    inputs:
+      domain:
+        description: 'tau2 domain'
+        required: false
+        default: retail
+      tasks:
+        description: 'Comma-separated task ids. Empty means the fifty the baseline failed.'
+        required: false
+        # Empty on purpose. The population is a property of the baseline document — the tasks whose transition the
+        # bank observed — and a second copy of fifty ids in this file is the copy that goes stale on the day the
+        # bank is re-read. `rescue_rate.py` computes the same list from the same field.
+        default: ''
+      rounds:
+        description: 'Attempts per task. Two is the mechanism; more adds notes to a story already told.'
+        required: false
+        default: '2'
+      max_steps:
+        description: 'Steps per episode'
+        required: false
+        default: '100'
+      concurrency:
+        description: 'Tasks at a time. The provider limits requests, and one episode holds three.'
+        required: false
+        default: '3'
+      note_verdict:
+        description: 'Show the summariser the evaluator verdict as well as the attempt (R208)'
+        required: false
+        # On, unlike the pilot: R210 measured the verdict material at 44.7% specificity against 28.9% for the
+        # attempt alone, and a rescue rate is a claim about the material the product would ship.
+        default: 'true'
+  push:
+    branches: [master]
+    paths:
+      - 'eval/tools/rescue_rate.py'
+      - 'eval/manifests/note-bank-baseline.json'
+      - 'eval/drivers/tau2/notes.py'
+      - 'eval/drivers/tau2/run_split.py'
+      - 'eval/drivers/tau2/note_pilot.py'
+      - 'scripts/check-python-coverage.py'
+      - '.github/workflows/note-rescue.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  # One rescue at a time: two dispatches sharing a sidecar directory would have the second reading the first's
+  # notes, which is a treatment nobody registered.
+  group: note-rescue
+  cancel-in-progress: false
+
+jobs:
+  contract:
+    name: the reader, over documents whose rate is known (no model calls)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: The reader agrees with itself
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import sys
+          assert sys.version_info >= (3, 11), sys.version
+          PY
+          python3 eval/tools/rescue_rate.py --self-test
+
+      - name: The baseline is the baseline
+        # The committed document is the counterfactual every reading is quoted against, so its own numbers are a
+        # gate: 23 opportunities, 15 rescued, 27 of 50 first attempts passing. A bank re-read into a different
+        # shape would move these, and a reading quoted against a baseline nobody re-checked is a reading with an
+        # assumption in place of a number.
+        run: |
+          set -euo pipefail
+          python3 eval/tools/rescue_rate.py \
+            --bank eval/manifests/note-bank-baseline.json \
+            --baseline eval/manifests/note-bank-baseline.json \
+            | tee "${RUNNER_TEMP}/baseline.txt"
+          grep -q '15 (65.2%)' "${RUNNER_TEMP}/baseline.txt"
+          grep -q '27/50 vs bank 27/50' "${RUNNER_TEMP}/baseline.txt"
+          grep -q 'NO_LIFT' "${RUNNER_TEMP}/baseline.txt"
+
+      - name: The four readings, over fixtures
+        # Each fixture is a document whose rate and whose state are true by construction, so a reader that names
+        # the wrong verdict fails here rather than on a dispatch that has already bought a hundred simulations.
+        # `opp` tasks fail attempt 0 (the opportunities) and `rescued` of them pass attempt 1: 23 and 23 is a
+        # rescue, 23 and 15 is the bank's own rate and must come back `NO_LIFT`, 23 and 20 is +21.7 pp with an
+        # interval that still contains the registered 25 and must come back `INCONCLUSIVE`.
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, subprocess, tempfile
+          from pathlib import Path
+
+          TOOL = "eval/tools/rescue_rate.py"
+          BASE = "eval/manifests/note-bank-baseline.json"
+          failing = json.loads(Path(BASE).read_text())["provenance"]["failingTasks"]
+
+          def document(opportunities, rescued, first_attempt_passes=False):
+              # Fifty tasks in the arm's own shape: the first `opportunities` fail attempt 0, the rest pass it.
+              simulations = []
+              for index, task in enumerate(failing):
+                  at_zero = 1.0 if first_attempt_passes or index >= opportunities else 0.0
+                  simulations.append({"task_id": task, "trial": 0, "reward_info": {"reward": at_zero}})
+                  simulations.append({"task_id": task, "trial": 1,
+                                      "reward_info": {"reward": 1.0 if index < rescued else 0.0}})
+              return {"simulations": simulations}
+
+          def read(document):
+              with tempfile.TemporaryDirectory() as temporary:
+                  (Path(temporary) / "a.json").write_text(json.dumps(document))
+                  done = subprocess.run(["python3", TOOL, "--dir", temporary, "--baseline", BASE],
+                                        capture_output=True, text=True)
+              return done.returncode, done.stdout + done.stderr
+
+          cases = [
+              ("a note that rescued every attempt is a rescue", document(23, 23), 0, "RESCUED"),
+              ("a note that added nothing is a null the interval carries", document(23, 15), 0, "NO_LIFT"),
+              ("twenty of twenty-three cannot exclude the registered scale", document(23, 20), 0, "INCONCLUSIVE"),
+          ]
+          for name, fixture, code, state in cases:
+              returned, output = read(fixture)
+              assert returned == code, f"{name}: exit {returned}, wanted {code}\n{output}"
+              assert state in output, f"{name}: {state} not in\n{output}"
+              print(f"ok  {name}")
+
+          # Drift: the arm's first attempts disagree with the bank's, so the baseline does not describe the run and
+          # the comparison is refused (exit 3) rather than widened.
+          returned, output = read(document(23, 15, first_attempt_passes=True))
+          assert returned == 3, f"drift: exit {returned}\n{output}"
+          assert "DRIFT" in output, output
+          print("ok  an arm that drifted from the bank is refused")
+
+          # Fifty phases in one directory are one grid. A reader that took one file would report a rate over one
+          # task under a name that says fifty, which is why this fixture is fifty files and not one.
+          with tempfile.TemporaryDirectory() as temporary:
+              directory = Path(temporary)
+              for index, task in enumerate(failing):
+                  # The bank's own shape: twenty-three of the fifty fail attempt 0, so the drift check is silent
+                  # and the reading is about the rate rather than about a population that moved.
+                  at_zero = 0.0 if index < 23 else 1.0
+                  (directory / f"{index:02d}.json").write_text(json.dumps({"simulations": [
+                      {"task_id": task, "trial": 0, "reward_info": {"reward": at_zero}},
+                      {"task_id": task, "trial": 1, "reward_info": {"reward": 1.0 if index % 2 == 0 else 0.0}},
+                  ]}))
+              # No baseline here on purpose: fifty tasks that all fail attempt 0 cannot pass the drift check
+              # (they disagree with the bank's 27 of 50), and what this case is about is the merge — one document
+              # per phase, one population out.
+              done = subprocess.run(["python3", TOOL, "--dir", temporary], capture_output=True, text=True)
+          assert done.returncode == 0, done.stdout + done.stderr
+          assert "opportunities | 50" in done.stdout, done.stdout
+          assert "rescued | 25" in done.stdout, done.stdout
+          assert "UNPAIRED" in done.stdout, done.stdout
+          print("ok  fifty phases are one population")
+          PY
+
+      - name: The reader, measured
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check --quiet coverage
+          INCLUDE="*/eval/tools/rescue_rate.py"
+          rm -f .coverage
+          python3 -m coverage run --branch --include="$INCLUDE" eval/tools/rescue_rate.py --self-test
+          python3 -m coverage json -o "${RUNNER_TEMP}/coverage-rescue.json" --include="$INCLUDE"
+          # One file, and the count is asserted: a run that measured nothing reports 100% of nothing.
+          python3 scripts/check-python-coverage.py "${RUNNER_TEMP}/coverage-rescue.json" --min 95 --expect-files 1
+
+  rescue:
+    name: rescue — one arm, two rounds, the note served at the attempt after a failure
+    needs: contract
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    # Install (8 min) plus a hundred episodes divided by the concurrency plus one τ² import per invocation plus
+    # the reading. Generous rather than tight: a step killed mid-phase writes no artefact and the money is spent.
+    timeout-minutes: 90
+    env:
+      DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+      TAU_VERSION: ${{ vars.TAU_VERSION }}
+      TAU_MODEL: ${{ vars.TAU_MODEL || 'deepseek/deepseek-flash' }}
+      TAU2_DATA_DIR: ${{ github.workspace }}/.tau2-bench/data
+      RESCUE_DOMAIN: ${{ github.event.inputs.domain || 'retail' }}
+      RESCUE_TASKS: ${{ github.event.inputs.tasks }}
+      RESCUE_ROUNDS: ${{ github.event.inputs.rounds || '2' }}
+      RESCUE_MAX_STEPS: ${{ github.event.inputs.max_steps || '100' }}
+      RESCUE_CONCURRENCY: ${{ github.event.inputs.concurrency || '3' }}
+      RESCUE_NOTE_VERDICT: ${{ github.event.inputs.note_verdict || 'true' }}
+      RESCUE_SEED: '300'
+      RESCUE_DIR: eval/results/note-rescue
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require the provider key before the first call
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DEEPSEEK_API_KEY}" ]; then
+            echo "::error::DEEPSEEK_API_KEY is not configured for this repository"
+            exit 1
+          fi
+
+      - name: The population this dispatch will run
+        # The fifty ids come from the baseline, which is where the transition they were selected by is recorded.
+        # An input that names them is honoured and must agree: a run over a different fifty would be a rate over a
+        # population the baseline never saw, and `DRIFT` would be the only trace of it.
+        run: |
+          set -euo pipefail
+          TASKS="${RESCUE_TASKS}"
+          if [ -z "${TASKS}" ]; then
+            TASKS="$(python3 -c "
+          import json
+          print(','.join(json.load(open('eval/manifests/note-bank-baseline.json'))['provenance']['failingTasks']))
+          ")"
+          fi
+          COUNT="$(python3 -c "print(len([t for t in '${TASKS}'.split(',') if t]))")"
+          echo "RESCUE_TASK_LIST=${TASKS}" >> "$GITHUB_ENV"
+          echo "${COUNT} task(s) in this population" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Does the whole job fit in the off-peak window?
+        # Before the installation, not after it: a cycle of `uv sync` between the question and the first call is
+        # exactly the gap in which a run crosses into the 01:00 band with its bill already doubled.
+        run: |
+          set -euo pipefail
+          MINUTES="$(python3 -c "
+          tasks = len([entry for entry in '${RESCUE_TASK_LIST}'.split(',') if entry])
+          rounds = int('${RESCUE_ROUNDS}')
+          # 26 s a simulation (R206's pilot, 48 in 21 minutes) plus 10 s of τ² import per invocation, one
+          # invocation per task, plus eight for the install and one for the reading. Rounded up.
+          concurrency = max(1, int('${RESCUE_CONCURRENCY}'))
+          print(int((tasks * rounds * 26 + tasks * 10) / concurrency / 60) + 9 + 1)
+          ")"
+          echo "estimated ${MINUTES} min for this rescue" >> "$GITHUB_STEP_SUMMARY"
+          python3 eval/drivers/tau2/note_pilot.py --window-minutes "${MINUTES}"
+
+      - name: Cache the tau2 environment
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            .tau2-bench
+          key: tau2-${{ vars.TAU_VERSION }}-${{ runner.os }}
+
+      - name: Install tau2-bench at the pinned ref
+        run: |
+          set -euo pipefail
+          REF="${TAU_VERSION:-v1.0.1}"
+          if [ ! -d .tau2-bench/.git ]; then
+            git clone --depth 1 --branch "$REF" https://github.com/sierra-research/tau2-bench .tau2-bench \
+              || { echo "tau2-clone-failed:$REF"; exit 21; }
+          fi
+          cd .tau2-bench
+          python -m pip install --upgrade pip uv
+          uv sync || { echo "tau2-sync-failed:$REF"; exit 22; }
+          uv pip install mcp || { echo "tau2-mcp-missing:$REF"; exit 24; }
+          uv run tau2 check-data || { echo "tau2-data-missing:$REF"; exit 23; }
+
+      - name: One arm, one task per process, the seeds written down
+        # The sidecar's identity is the task, so an invocation holds one task and the grid is fifty phases. The
+        # control arm does not run: its side of the transition is R208's bank, and running it twice would buy the
+        # same number twice while the treatment waited.
+        env:
+          TAU_CONCURRENCY: ${{ github.event.inputs.concurrency || '3' }}
+          TAU_RETRIES: '4'
+        run: |
+          set -euo pipefail
+          PYTHON="${GITHUB_WORKSPACE}/.tau2-bench/.venv/bin/python"
+          test -x "$PYTHON" || { echo "tau2-venv-missing"; exit 25; }
+          mkdir -p "${RESCUE_DIR}/treatment"
+          SEEDS="$(python3 -c "print(','.join(str(int('${RESCUE_SEED}') + index) for index in range(int('${RESCUE_ROUNDS}'))))")"
+          echo "seeds ${SEEDS}" >> "$GITHUB_STEP_SUMMARY"
+          echo "RESCUE_SEEDS=${SEEDS}" >> "$GITHUB_ENV"
+
+          cat > "${RUNNER_TEMP}/run_task.sh" <<'SCRIPT'
+          #!/usr/bin/env bash
+          # One invocation: one task, two rounds, the note carried across the boundary between them.
+          set -uo pipefail
+          task="$1"
+          extra=(--notes "${RESCUE_DIR}/notes-${task}.json")
+          if [ "${RESCUE_NOTE_VERDICT}" = "true" ]; then
+            extra+=(--note-verdict)
+          fi
+          "${PYTHON}" eval/drivers/tau2/run_split.py \
+            --phase eval --agent microglia_agent \
+            --domain "${RESCUE_DOMAIN}" --tasks "${task}" --rounds "${RESCUE_ROUNDS}" \
+            --max-steps "${RESCUE_MAX_STEPS}" --seed "${RESCUE_SEED}" --require-off-peak \
+            --out "${RESCUE_DIR}/treatment/results-${task}.json" "${extra[@]}" \
+            > "${RESCUE_DIR}/treatment-${task}.log" 2>&1
+          SCRIPT
+          chmod +x "${RUNNER_TEMP}/run_task.sh"
+          export RESCUE_DIR RESCUE_DOMAIN RESCUE_ROUNDS RESCUE_MAX_STEPS RESCUE_SEED RESCUE_NOTE_VERDICT PYTHON
+
+          echo "${RESCUE_TASK_LIST}" | tr ',' '\n' \
+            | xargs -P "${TAU_CONCURRENCY}" -n 1 "${RUNNER_TEMP}/run_task.sh"
+
+      - name: What the notes cost and whether they were served
+        # The arm's own counters, before the rate. A rescue rate with zero lookups is a rate over attempts that
+        # never saw the material — a null about the plumbing wearing a null about the note's name — so the counts
+        # are printed beside the rate rather than trusted. Each phase prints its summary as one JSON line at the
+        # end of its log; a log without one is not counted, which is why `phases` is printed next to `episodes`.
+        run: |
+          set -euo pipefail
+          python3 - "${RESCUE_DIR}" <<'PY'
+          import json, sys
+          from pathlib import Path
+
+          root = Path(sys.argv[1])
+          phases = lookups = hits = written = refused = verdicts = task_hits = 0
+          for path in sorted(root.glob("treatment-*.log")):
+              for line in path.read_text(errors="replace").splitlines():
+                  if not line.startswith('{"phase"'):
+                      continue
+                  summary = json.loads(line)
+                  phases += 1
+                  counter = (summary.get("diagnostics") or {}).get("memory") or {}
+                  notes = counter.get("notes") or {}
+                  lookups += notes.get("lookups") or 0
+                  hits += notes.get("hits") or 0
+                  task_hits += notes.get("taskHits") or 0
+                  for entry in (summary.get("notes") or {}).get("rounds") or []:
+                      written += entry.get("written") or 0
+                      refused += entry.get("refused") or 0
+                      verdicts += entry.get("verdicts") or 0
+
+          episodes = 0
+          usd = 0.0
+          seconds = 0.0
+          for path in sorted((root / "treatment").glob("*.json")):
+              document = json.loads(path.read_text())
+              for simulation in document.get("simulations") or []:
+                  episodes += 1
+                  usd += (simulation.get("agent_cost") or 0) + (simulation.get("user_cost") or 0)
+                  seconds += simulation.get("duration") or 0
+
+          print("### R211 — the arm's own counters")
+          print()
+          print("| reading | value |")
+          print("|---|---|")
+          print(f"| phases with a summary | {phases} |")
+          print(f"| episodes | {episodes} |")
+          print(f"| notes written / refused | {written} / {refused} |")
+          print(f"| verdicts shown | {verdicts} |")
+          print(f"| sidecar lookups / key hits / task hits | {lookups} / {hits} / {task_hits} |")
+          print(f"| bill | ${usd:.4f} |")
+          print(f"| mean episode | {(seconds / episodes if episodes else 0):.1f} s |")
+          PY
+
+      - name: The rate, against the transition nobody wrote
+        run: |
+          set -euo pipefail
+          set +e
+          python3 eval/tools/rescue_rate.py \
+            --dir "${RESCUE_DIR}/treatment" \
+            --baseline eval/manifests/note-bank-baseline.json \
+            --json "${RESCUE_DIR}/rescue.json" | tee "${RESCUE_DIR}/reading.txt"
+          STATUS=${PIPESTATUS[0]}
+          set -e
+          {
+            echo "### R211 — the rescue rate"
+            echo
+            echo '```'
+            cat "${RESCUE_DIR}/reading.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          # 2 is `NO_MEASUREMENT`: the grid failed attempt 0 too rarely to buy a rate. That is a grid that was too
+          # easy, not an instrument that is broken — the repair is a harder population, and a red job would teach
+          # an operator to re-dispatch rather than to read. 3 is `DRIFT` and stays red: the baseline does not
+          # describe this run, so the comparison has no counterfactual and no reading can be quoted from it.
+          if [ "$STATUS" -eq 2 ]; then
+            echo "::warning::fewer than twelve opportunities — the grid was too easy for this arm"
+            STATUS=0
+          fi
+          exit "$STATUS"

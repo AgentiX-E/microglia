@@ -1,0 +1,3719 @@
+{
+ "_note": "R208's bank, stripped to the four fields a conditional rate needs. The bank itself is 32 MB of transcripts and its rewards are 40 KB of the same document; a counterfactual that lives in a paid run should be committed in the shape the reader reads rather than re-derived from a log nobody kept. Provenance is the commit the episodes ran at, the grid, and the bill the census states.",
+ "provenance": {
+  "round": "R208",
+  "lane": "note-bank",
+  "gitCommit": "b3d5db0c5fba116adfd2eb29871e8f4ee2397577",
+  "release": "v1.0.1",
+  "domain": "retail",
+  "tasks": 114,
+  "trials": 4,
+  "maxSteps": 100,
+  "episodes": 456,
+  "billUsd": 2.0103,
+  "arms": "control (no sidecar)",
+  "failingTasks": [
+   "1",
+   "2",
+   "3",
+   "4",
+   "9",
+   "12",
+   "19",
+   "20",
+   "27",
+   "30",
+   "31",
+   "32",
+   "34",
+   "35",
+   "36",
+   "38",
+   "39",
+   "41",
+   "46",
+   "52",
+   "56",
+   "59",
+   "62",
+   "63",
+   "66",
+   "67",
+   "70",
+   "71",
+   "74",
+   "76",
+   "79",
+   "80",
+   "81",
+   "82",
+   "84",
+   "91",
+   "92",
+   "94",
+   "95",
+   "98",
+   "99",
+   "104",
+   "105",
+   "106",
+   "107",
+   "108",
+   "109",
+   "110",
+   "111",
+   "112"
+  ],
+  "failingTaskCount": 50
+ },
+ "simulations": [
+  {
+   "task_id": "0",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "1",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "2",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "3",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "4",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "5",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "6",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "7",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "8",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "9",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "10",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "11",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "12",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "13",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "15",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "14",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "17",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "16",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "18",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "19",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "20",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "21",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "22",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "23",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "24",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "25",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "26",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "27",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "28",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "29",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "31",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "30",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "32",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "33",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "35",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "34",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "36",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "37",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "38",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "39",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "40",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "41",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "42",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "43",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "44",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "45",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "46",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "48",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "47",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "49",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "50",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "51",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "52",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "53",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "54",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "56",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "55",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "57",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "58",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "59",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "60",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "61",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "62",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "63",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "64",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "66",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "65",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "67",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "69",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "68",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "70",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "71",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "72",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "73",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "74",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "75",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "77",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "76",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "78",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "79",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "81",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "80",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "82",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "83",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "84",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "85",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "86",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "87",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "88",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "90",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "89",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "91",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "92",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "93",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "94",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "96",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "95",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "97",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "98",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "99",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "100",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "101",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "102",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "103",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "104",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "105",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "107",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "106",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "108",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "109",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "110",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "111",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "113",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "112",
+   "trial": 0,
+   "seed": 626729,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "1",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "0",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "3",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "2",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "5",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "4",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "6",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "7",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "8",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "9",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "10",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "11",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "12",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "14",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "13",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "15",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "16",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "17",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "18",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "19",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "20",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "22",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "21",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "23",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "24",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "25",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "26",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "27",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "28",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "29",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "30",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "31",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "33",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "32",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "34",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "35",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "36",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "37",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "38",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "39",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "40",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "41",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "42",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "44",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "43",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "45",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "46",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "48",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "47",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "50",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "49",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "51",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "52",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "53",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "54",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "55",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "56",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "57",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "58",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "59",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "60",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "61",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "62",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "63",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "64",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "65",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "66",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "68",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "67",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "69",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "70",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "71",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "72",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "73",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "74",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "75",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "77",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "76",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "78",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "79",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "81",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "80",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "83",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "82",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "84",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "85",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "87",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "86",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "88",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "89",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "90",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "91",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "92",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "93",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "94",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "95",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "96",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "97",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "98",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "99",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "100",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "101",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "102",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "104",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "103",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "105",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "107",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "106",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "108",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "109",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "110",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "111",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "112",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "113",
+   "trial": 1,
+   "seed": 373753,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "0",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "1",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "2",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "3",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "4",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "5",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "6",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "8",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "7",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "9",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "10",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "11",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "12",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "13",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "14",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "15",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "17",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "18",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "19",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "16",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "20",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "21",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "22",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "24",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "23",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "25",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "26",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "27",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "28",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "29",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "30",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "31",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "32",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "33",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "35",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "34",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "36",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "37",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "39",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "38",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "40",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "41",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "42",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "43",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "44",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "45",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "46",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "47",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "48",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "49",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "50",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "51",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "52",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "53",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "54",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "56",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "55",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "57",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "58",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "59",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "60",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "61",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "62",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "63",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "64",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "65",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "66",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "68",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "67",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "69",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "70",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "71",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "72",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "73",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "74",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "75",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "76",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "77",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "78",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "79",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "80",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "81",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "82",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "83",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "84",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "85",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "87",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "86",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "88",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "89",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "90",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "92",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "91",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "93",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "94",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "95",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "96",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "97",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "98",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "99",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "101",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "100",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "102",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "103",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "104",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "106",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "105",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "108",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "107",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "110",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "109",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "112",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "111",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "113",
+   "trial": 2,
+   "seed": 361454,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "0",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "1",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "2",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "4",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "3",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "5",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "6",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "7",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "8",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "9",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "10",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "11",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "12",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "13",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "14",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "15",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "16",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "17",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "18",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "19",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "20",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "21",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "22",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "23",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "24",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "25",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "26",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "27",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "28",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "29",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "31",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "30",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "33",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "32",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "34",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "35",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "36",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "37",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "38",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "39",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "40",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "42",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "41",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "44",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "43",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "45",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "46",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "47",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "48",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "50",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "49",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "51",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "52",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "53",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "54",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "56",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "55",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "57",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "58",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "59",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "60",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "61",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "62",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "63",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "64",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "65",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "66",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "67",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "68",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "69",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "70",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "71",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "72",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "73",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "74",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "75",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "77",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "76",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "78",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "79",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "80",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "81",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "82",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "83",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "84",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "85",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "87",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "86",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "88",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "89",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "90",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "91",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "92",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "93",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "94",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "95",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "96",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "97",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "98",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "99",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "100",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "101",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "102",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "103",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "104",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "105",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "106",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "107",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "108",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "109",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "111",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "110",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 0.0
+   }
+  },
+  {
+   "task_id": "113",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  },
+  {
+   "task_id": "112",
+   "trial": 3,
+   "seed": 1567,
+   "reward_info": {
+    "reward": 1.0
+   }
+  }
+ ]
+}
