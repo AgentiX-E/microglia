@@ -189,29 +189,33 @@ def lookup(notes, text) -> "tuple[str, str]":
     one. Entries are compared by `attempt` rather than by insertion order, because a dictionary's order is a
     property of the writer and the attempt number is a property of the run.
     """
-    key = note_key(text)
     entries = notes.get("notes") if isinstance(notes, dict) else None
     if not isinstance(entries, dict):
         return "", "none"
+    scope = scope_of(notes)
+    task = scope["task"] if scope["kind"] == "task" else ""
+    if task != "":
+        # A file that declares this task and holds an entry for another one is checked before the key, not after:
+        # either the runner wrote two tasks into one sidecar or the file was pointed at the wrong task, and in
+        # both cases the *whole file* has lost its identity — including the entry whose key happens to match,
+        # which may be the other task's attempt at the same opening. That is the cross-task mechanism R41 and
+        # R204 measured, and answering nothing is the only answer that cannot be wrong.
+        for entry in entries.values():
+            held = entry.get("task") if isinstance(entry, dict) else None
+            if isinstance(held, str) and held.strip() != "" and held.strip() != task:
+                return "", "none"
+    key = note_key(text)
     if key != "":
         found = _note_in(entries.get(key))
         if found:
             return found, "key"
-    scope = scope_of(notes)
-    if scope["kind"] != "task":
+    if task == "":
         return "", "none"
-    task = scope["task"]
     best: "tuple[int, str] | None" = None
     for entry in entries.values():
         note = _note_in(entry)
         if note == "":
             continue
-        held = entry.get("task")
-        if isinstance(held, str) and held != "" and held != task:
-            # An entry about another task inside a file that declares this one. Either the runner wrote two
-            # tasks into one sidecar or the file was pointed at the wrong task; serving this sentence is the
-            # cross-task mechanism R41 and R204 measured, and it is the one thing this arm must not be.
-            return "", "none"
         attempt = _attempt_in(entry)
         if best is None or attempt >= best[0]:
             best = (attempt, note)
@@ -1131,6 +1135,10 @@ def _self_test() -> int:
     record(crossed, "task five", "Five's sentence.", attempt=1, reward=0.0, task="5")
     record(crossed, "task nine", "Nine's sentence.", attempt=2, reward=0.0, task="9")
     check("an entry for another task is not served", lookup(crossed, "neither opening") == ("", "none"))
+    # And not even the entry whose key matches: the contradiction is about the *file*, and the matching entry may
+    # be the other task's attempt at the same opening — which is exactly the pair R206a measured as unseparatable.
+    check("a key hit in a file that contradicts itself is refused",
+          lookup(crossed, "task five") == ("", "none"))
     check("a merged file serves nothing on a miss", lookup({"schema": SCHEMA, "notes": {"k": {"note": "x", "task": "5"}},
                                                             "scope": {"kind": "many", "tasks": ["5"]}}, "other") == ("", "none"))
     check("an untyped entry is not evidence of another task",

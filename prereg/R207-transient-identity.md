@@ -139,7 +139,7 @@ material, and turning it into an abandonment would throw away a paid fold over a
 self-checks and no coverage gate; measured before this round's cases, they stood at 89.4% together
 (`r206_readback.py` 86.6%, `opening_stability.py` 80.0%). The contract job now runs them under `coverage --branch`
 and fails below 95% per file, and the four stand at 96.9 / 95.7 / 98.1 / 96.6 — which is why this arm's regression
-suite is 137 + 132 + 44 + 35 cases rather than the 82 + 76 + 27 + 21 it was.
+suite is 138 + 132 + 44 + 35 cases rather than the 82 + 76 + 27 + 21 it was.
 
 **What is still unmeasured, stated before the run.** Whether the file binding actually fires (`taskHits > 0`), and
 whether coverage clears 0.6 once failures are the agent's. The pilot answers the first with 24 looked-up episodes and

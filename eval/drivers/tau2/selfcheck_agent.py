@@ -89,6 +89,9 @@ _install_stub()
 sys.path.insert(0, HERE)
 
 import microglia_agent as subject  # noqa: E402 - after the stub, by construction
+# The sidecar's own format, imported rather than restated: a fixture that hardcoded the schema string would go on
+# passing the day the schema moved — and moving it is exactly what R207 did (`microglia.notes/1` -> `/2`).
+import notes as notes_module  # noqa: E402 - beside the agent it belongs to
 
 
 # ----------------------------------------------------------------------- fixtures
@@ -1435,9 +1438,13 @@ class notes_arm:
     between tasks.
     """
 
-    def __init__(self, notes: dict | None = None, *, corrupt: bool = False):
+    def __init__(self, notes: dict | None = None, *, corrupt: bool = False, scope: dict | None = None):
         self.notes = dict(notes or {})
         self.corrupt = corrupt
+        # R207. Every sidecar declares the task it describes — that declaration *is* the identity now — and the
+        # default here is one task, because one invocation writes one. `scope` overrides it for the one case whose
+        # subject is a file that cannot name a task (a merge of several), where the fallback must not fire.
+        self.scope = scope if scope is not None else {"kind": "task", "task": "1"}
 
     def __enter__(self):
         import tempfile
@@ -1466,7 +1473,8 @@ class notes_arm:
         import json as _json
 
         document = {
-            "schema": "microglia.notes/1",
+            "schema": notes_module.SCHEMA,
+            "scope": self.scope,
             "notes": {
                 key: {"note": value, "attempt": 1, "reward": 0.0, "task": "1", "chars": len(value)}
                 for key, value in notes.items()
@@ -1474,6 +1482,11 @@ class notes_arm:
         }
         with open(self.path, "w", encoding="utf-8") as stream:
             _json.dump(document, stream)
+
+    def write_text(self, text: str) -> None:
+        """Write a document verbatim, for the states the entry-map constructor cannot express."""
+        with open(self.path, "w", encoding="utf-8") as stream:
+            stream.write(text)
 
     def __exit__(self, *exc_info):
         if self.saved is None:
@@ -1514,9 +1527,67 @@ def arm_hits(arm):
 
 
 @case
+def a_note_is_served_by_the_file_rather_than_by_the_text(checks):
+    """R207's mechanism in one assertion: the opening is paraphrased, and the note arrives anyway.
+
+    R206 keyed the note on the opening message, and R206a measured that key at 0.006 exact reuse over 168
+    same-task pairs — so on this corpus the text binding almost never fires. Here the request differs from the
+    one the note was written under, the file declares the task, and the sentence is served: `taskHits` moves and
+    `keyHits` does not.
+    """
+    with notes_arm({"I want a refund for order 42": "Ask for the order id before quoting a refund."}) as arm:
+        agent, _, original = fresh(pack="")
+        try:
+            state = LLMAgentState()
+            state = episode_step(agent, state, "Hello, could you refund my order 42 please?")
+        finally:
+            subject.recall = original
+        stats = subject.memory_stats()
+    checks.equal(len(state.system_messages), 1, "the file's task served the note on a key miss")
+    checks.substring(state.system_messages[0].content, "Ask for the order id before quoting a refund.",
+                     "which is the note")
+    checks.equal(stats["notes"]["hits"] - arm.hits, 1, "one hit")
+    checks.equal(stats["notes"]["taskHits"] - 0 >= 1, True, "and it is counted as a task hit")
+    checks.equal(stats["notes"]["scope"], {"kind": "task", "task": "1"},
+                 "the artefact says which task the file named")
+
+
+@case
+def a_file_carrying_another_tasks_note_serves_nothing(checks):
+    """The one state R207 could reintroduce R206's cross-task defect in, refused at the reader.
+
+    A sidecar that declares task 1 while holding an entry for task 9 is either a writer that crossed two tasks or
+    a runner that pointed one task at another's file. Serving that sentence is the mechanism R41 and R204
+    measured; returning nothing is the only answer that cannot be wrong.
+    """
+    with notes_arm({}) as arm:
+        arm.write_text(
+            '{"schema": "microglia.notes/2", "scope": {"kind": "task", "task": "1"},'
+            ' "notes": {"I want a refund": {"note": "Nine\'s sentence.", "attempt": 1, "reward": 0.0,'
+            ' "task": "9", "chars": 16}}}'
+        )
+        agent, _, original = fresh(pack="")
+        try:
+            state = LLMAgentState()
+            state = episode_step(agent, state, "I want a refund")
+        finally:
+            subject.recall = original
+        stats = subject.memory_stats()
+    checks.equal(len(state.system_messages), 0, "nothing is served")
+    checks.equal(stats["notes"]["hits"] - arm.hits, 0, "and no hit is claimed")
+
+
+@case
 def a_task_without_a_note_serves_nothing_and_says_so(checks):
-    """The first round: no sidecar entry exists yet, and that is a lookup with no hit rather than an error."""
-    with notes_arm({"another task": "Ask for the order id."}) as arm:
+    """The first round: no sidecar entry exists yet, and that is a lookup with no hit rather than an error.
+
+    The sidecar here declares `many` — a file merged from several tasks — which is the state in which R207's
+    single-task fallback must *not* fire: with more than one task in the file the identity is unknown again, and
+    serving "the" entry would be serving a neighbour's sentence. A file declaring one task answers differently,
+    and `a_note_is_served_by_the_file_rather_than_by_the_text` is that case.
+    """
+    with notes_arm({"another task": "Ask for the order id."},
+                   scope={"kind": "many", "tasks": ["1", "9"]}) as arm:
         agent, _, original = fresh(pack="")
         try:
             state = LLMAgentState()
