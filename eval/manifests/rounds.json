@@ -1,0 +1,50 @@
+{
+  "schema": "microglia.rounds/1",
+  "note": "The rounds this project owes, as data. A date in a roadmap table is a date nobody can assert on; this file is read by eval/tools/round_clock.py on every push, so a registered round that passes its date turns CI red instead of being discovered the next time somebody reads the plan. `status` moves registered -> dispatched -> read, or to `cancelled`, which is a decision rather than a debt. Nothing here fires on a clock: two dispatches in this lane were armed on a `schedule:` trigger and neither fired (AUDIT 34.232, 34.241), so a funded action is a `workflow_dispatch` and the cron is left to the free contract job.",
+  "rounds": [
+    {
+      "id": "R216b",
+      "title": "the placement's price — front against tail, one dispatch",
+      "status": "dispatched",
+      "dispatchedAt": "2026-11-25T13:45:00Z",
+      "dispatchBy": "2026-11-25T12:00:00Z",
+      "run": 45626715004,
+      "arms": ["front", "board"],
+      "episodes": 228,
+      "estimateUsd": 1.2,
+      "artefacts": [
+        "eval/results/working-memory/front.json",
+        "eval/results/working-memory/board.json"
+      ]
+    },
+    {
+      "id": "R218b",
+      "title": "the reliability column — four attempts, control against front",
+      "status": "registered",
+      "dispatchBy": "2026-11-27T12:00:00Z",
+      "prereg": "prereg/R218b-pass4.md",
+      "arms": ["control", "front"],
+      "trials": 4,
+      "episodes": 912,
+      "estimateUsd": 4.75,
+      "dependsOn": ["R216b"]
+    },
+    {
+      "id": "R219",
+      "title": "the invocation policy — serve the state when a write needs it, not when it is renderable",
+      "status": "registered",
+      "dispatchBy": "2026-11-30T12:00:00Z",
+      "arms": ["front", "policy"],
+      "episodes": 228,
+      "estimateUsd": 1.2,
+      "dependsOn": ["R216b"]
+    },
+    {
+      "id": "R220",
+      "title": "one manifest, two readers — the configuration the eval measured is the one the product ships",
+      "status": "registered",
+      "dispatchBy": "2026-11-29T12:00:00Z",
+      "estimateUsd": 0.0
+    }
+  ]
+}

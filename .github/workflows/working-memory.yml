@@ -288,19 +288,28 @@ jobs:
           uv pip install mcp || { echo "tau2-mcp-missing:$REF"; exit 24; }
           uv run tau2 check-data || { echo "tau2-data-missing:$REF"; exit 23; }
 
-      - name: The provider accepts a block behind the conversation, in a conversation that has tool calls in it
+      - name: The provider accepts a block behind the conversation, on a history it produced itself
         # R216. The tail placement is the first change in this lane that puts a message of *its own* into
         # `state.messages` rather than the system block, and a provider that refuses it would fail every episode of
         # the grid — 114 chances to learn something one call can say.
         #
-        # **This step was wrong and it cost a dispatch.** R216-1's tail arm died on 94 of 114 episodes with a
-        # `BadRequestError`, and this smoke test had passed minutes earlier, because it built the conversation out of
-        # *user* turns: `system, user, system, user`. A τ² episode is almost entirely `assistant(tool_calls)` followed
-        # by `tool(result)`, a shape this test never produced. So it certified a dialogue the benchmark does not run
-        # (`AUDIT 34.239`). Two calls now, and both on the real shape: one with the block placed where `tail_index`
-        # puts it (after the last answered call), and one with it in the position the naive append used (between a
-        # call and its results), whose outcome is printed rather than asserted — a provider that tolerated it would
-        # be news, not a failure of this step.
+        # **This step has now been wrong twice, in two different ways, and both are worth more than the step.**
+        #
+        # R216-1: it built the conversation out of *user* turns — `system, user, system, user` — and passed minutes
+        # before the tail arm died on 94 of 114 episodes with `An assistant message with 'tool_calls' must be
+        # followed by tool messages`. A τ² episode is almost entirely `assistant(tool_calls)` then `tool(result)`, a
+        # shape the test never produced, so it certified the one dialogue in which the naive append is legal.
+        #
+        # R216b: rebuilt on that shape, it then failed with `The reasoning_content in the thinking mode must be
+        # passed back to the API` — because `deepseek-flash` answers in thinking mode unless told otherwise, and a
+        # hand-written assistant turn carries no `reasoning_content` to give back. Which is the deeper lesson: **a
+        # fabricated history is a history the provider has never seen.** So the first call is real. The model is
+        # asked to call a tool, and the turn it returns — with whatever fields the provider demands be echoed — is
+        # the turn the placement tests are built on.
+        #
+        # Three calls: one to produce the assistant turn, one with the block where `tail_index` puts it (asserted),
+        # one with the block between the call and its results (printed, because a provider that tolerated it would be
+        # news rather than a failure).
         run: |
           set -euo pipefail
           PYTHON="${GITHUB_WORKSPACE}/.tau2-bench/.venv/bin/python"
@@ -320,29 +329,32 @@ jobs:
                   "parameters": {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]},
               },
           }]
-          call = {
-              "role": "assistant",
-              "content": None,
-              "tool_calls": [{
-                  "id": "call_1",
-                  "type": "function",
-                  "function": {"name": "get_order", "arguments": "{\"id\": \"42\"}"},
-              }],
-          }
-          result = {"role": "tool", "tool_call_id": "call_1", "content": "{\"status\": \"shipped\"}"}
           head = [{"role": "system", "content": "You are a support agent."},
-                  {"role": "user", "content": "Where is order 42?"}]
+                  {"role": "user", "content": "Where is order 42? Call get_order."}]
 
-          # The shape the driver produces: the block lands after the call *and* its result.
-          placed = head + [call, result, {"role": "system", "content": block}]
-          reply = litellm.completion(model=model, messages=placed, tools=tools, max_tokens=8, temperature=0)
+          first = litellm.completion(
+              model=model, messages=head, tools=tools,
+              tool_choice={"type": "function", "function": {"name": "get_order"}},
+              max_tokens=64, temperature=0,
+          )
+          assert first.choices, first
+          turn = first.choices[0].message
+          assert getattr(turn, "tool_calls", None), (
+              "the provider answered without calling the tool, so this step cannot build the shape it tests")
+          # Keep every field the provider returned: `reasoning_content` is one of them, and dropping it is exactly
+          # the failure this step spent a dispatch discovering.
+          assistant = {k: v for k, v in turn.model_dump().items() if v is not None}
+          call_id = assistant["tool_calls"][0]["id"]
+          result = {"role": "tool", "tool_call_id": call_id, "content": "{\"status\": \"shipped\"}"}
+
+          placed = head + [assistant, result, {"role": "system", "content": block}]
+          reply = litellm.completion(model=model, messages=placed, tools=tools, max_tokens=32, temperature=0)
           assert reply.choices, reply
           print(f"ok  {model} accepted the block after a tool result: {reply.choices[0].message.content!r}")
 
-          # The shape the naive append produced, and the one that killed R216-1's arm.
-          split = head + [call, {"role": "system", "content": block}, result]
+          split = head + [assistant, {"role": "system", "content": block}, result]
           try:
-              litellm.completion(model=model, messages=split, tools=tools, max_tokens=8, temperature=0)
+              litellm.completion(model=model, messages=split, tools=tools, max_tokens=32, temperature=0)
               print("note  the provider tolerated a system turn between a call and its result; tail_index is then "
                     "belt and braces rather than load-bearing")
           except Exception as error:
