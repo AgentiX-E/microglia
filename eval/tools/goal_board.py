@@ -1019,6 +1019,24 @@ def false_accusations(document: dict, whole_episode: bool = False) -> dict:
     }
 
 
+def _siblings() -> str:
+    """Put this file's own directory on `sys.path`, and answer it.
+
+    The two imports below are lazy — `compare_of` needs Newcombe's interval, `main --compare` needs the merge — and
+    both live beside this file rather than in it. `python3 eval/tools/goal_board.py` puts that directory on the path
+    by itself; `python3 -m coverage run eval/tools/goal_board.py` does **not**, and CI measures this module through
+    `-m` precisely because a suite that only runs one way is a suite that protects one way. The first push carrying
+    R219's instrument failed CI for this and nothing else: `ModuleNotFoundError: No module named 'memory_debit'`, on a
+    line the local interpreter had been reaching for eleven rounds.
+
+    Idempotent, and the branch is measured: the second call is the one a module imported twice takes.
+    """
+    here = os.path.dirname(os.path.abspath(__file__))
+    if here not in sys.path:
+        sys.path.insert(0, here)
+    return here
+
+
 def _task_key(task: str):
     """Tasks sort numerically when they are numbers, which every τ² id is, and lexically when they are not."""
     return (0, int(task)) if str(task).isdigit() else (1, str(task))
@@ -1046,6 +1064,7 @@ def compare_of(control: dict, treatment: dict, k: int = 1, names: tuple[str, str
     The interval is Newcombe's for two independent proportions and is quoted as **conservative**: ignoring the
     pairing widens it, so an interval that excludes zero here would exclude it under the paired calculation too.
     """
+    _siblings()
     from memory_debit import newcombe  # lazy: the arm imports this module every episode and needs no statistics
 
     left = _attempts_of(control, k)
@@ -1754,6 +1773,18 @@ def self_test() -> int:
           false_accusations(blank)["episodesFalseShare"] is None)
     check("an episode with no messages is skipped rather than judged",
           false_accusations({"tasks": accused["tasks"], "simulations": [{"task_id": "7"}]})["episodes"] == 0)
+    here = _siblings()
+    check("the module finds its own directory", here == os.path.dirname(os.path.abspath(__file__)))
+    # Idempotent asserted as "the second call changes nothing", not as "the directory appears once": script mode has
+    # already put it on the path under the spelling it was typed (`eval/tools`) and this function adds the absolute
+    # one, so a count would be measuring two spellings of one directory rather than a duplicate import root.
+    untouched = list(sys.path)
+    check("and does it once", _siblings() == here and sys.path == untouched)
+    # The other branch, forced: the directory taken off the path and asked for again. This is the state the runner
+    # was in — `-m` in front of the interpreter leaves the working directory first and the script's directory
+    # nowhere — and it is the branch that failed a build when it was unexercised.
+    sys.path[:] = [p for p in sys.path if os.path.abspath(p or ".") != here]
+    check("and puts it back when it is missing", _siblings() == here and here in sys.path)
     check("a task that is not a dict has no requirements", _required_families(None) == set())
     check("a criteria block that is not a dict has none", _required_families({"evaluation_criteria": "x"}) == set())
     check("an action that names no write tool is not a requirement", _required_families(
@@ -1904,6 +1935,7 @@ def main(argv: list) -> int:
                 print(f"  {bucket:13s} {counts['false']}/{counts['entries']} false")
         return 0
     if arguments.compare:
+        _siblings()
         from rescue_rate import documents_of, merge  # lazy, for the same reason as `compare_of`'s import
 
         documents = []
