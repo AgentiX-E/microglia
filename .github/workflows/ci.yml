@@ -122,9 +122,14 @@ jobs:
           # command-line argument, so nothing type-checks it. This binds it to eval/manifests/serving-defaults.json,
           # whose TypeScript half core/memory/__tests__/serving.test.ts binds on the product side.
           python3 -m coverage run --append --branch eval/tools/serving_defaults.py --self-test
+          # R218c. The interleaved placebo's driver: it decides the order two arms run in and whether the pair is
+          # readable at all, so a defect here would be a reading about the *instrument* printed as a reading about
+          # the memory. Its self-test drives a real subprocess with a fake runner, so the round's whole path is
+          # measured without a provider.
+          python3 -m coverage run --append --branch eval/drivers/tau2/interleave.py --self-test
           python3 -m coverage json -o coverage-python.json
           python3 scripts/check-python-coverage.py --self-test
-          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 14
+          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 15
 
       - name: The rounds this project owes, and the date each one was registered for
         # The failure this prevents is not a wrong number, it is a round that quietly stops being planned: R216b's

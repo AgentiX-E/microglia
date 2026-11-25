@@ -13,9 +13,36 @@ recallFloor: 0
 
 # R218c — the placebo, interleaved: two identical arms, and a registered delta of zero
 
-Registered 25 November 2026, after R218b. The dispatch is not yet built: `run_split.py` runs one arm at a time, so
-"interleaved" is a code change (an arm-pair flag that runs task *i* on both arms before task *i+1*), not a flag. The
-round is registered before the build because the prediction is what decides whether the build is worth doing.
+Registered 25 November 2026, after R218b. The dispatch was not built at registration: `run_split.py` runs one arm at
+a time, so "interleaved" was a code change, not a flag. The round is registered before the build because the
+prediction is what decides whether the build is worth doing.
+
+## As built, before the first paid call
+
+`eval/drivers/tau2/interleave.py` — a driver rather than a flag on `run_split.py`, and the difference is the
+measurement rather than the tidy-up:
+
+- **one process per (block, arm)**, not one process for both arms. Two arms in one interpreter share the provider
+  client and the `litellm` callback that counts this lane's tokens, so their bills and their latencies would be one
+  object's — and the refutation below names exactly that state (`SHARED_PROCESS`) as the one that proves nothing was
+  measured. The cost is thirty τ² imports; the gain is a bill, a wall clock and a resumable round per part.
+- **eight tasks a block**, so the two readings of a task sit a couple of minutes apart rather than R218b's
+  thirty-five. The gap is *measured* per block and reported, because a block size that buys a gap nobody looked at
+  is the confound again with a smaller constant.
+- **the verdict is six states, not a bar**: `UNPAIRED`, `SHARED_PROCESS`, `GRID_ORDERED`, `ORDER_ASYMMETRIC`,
+  `BILL_DRIFT`, `PLACEBO_HELD`. The order is the argument — a grid whose arms never disagree is an instrument that
+  measured an import, and that has to be said before any delta is quoted.
+- **the `p > 0.05` bar has no branch of its own, and the arithmetic is why**: with `moved` and `broke` within two
+  tasks of each other the exact McNemar p is at least 0.5 (the tightest such split, 2 against 0, is p = 0.5), so the
+  symmetry bar *implies* the significance bar. The p is still reported beside it.
+- **a refuted prediction does not fail the build.** The workflow gates on the instrument's invariants (every task
+  twice, both arms over a hundred episodes, at least ten measured blocks, at least one disagreement) and prints the
+  prediction as a finding. A red job for a refuted prediction teaches an operator to rerun until the grid is green,
+  which is the opposite of what a placebo is for (AUDIT 34.231).
+
+The reading is `python3 eval/drivers/tau2/interleave.py --read --dir eval/results/working-memory`, and it needs no
+`--compare`: the two arms are compared by the same `compare_of` `goal_board.py` has taken eleven rounds of readings
+with, on the two documents the merge writes.
 
 ## What is measured
 
@@ -25,7 +52,7 @@ by task** rather than arm by arm:
 | arm | material | what it prices |
 |---|---|---|
 | `control-a` | none | the world, measured once |
-| `control-b` | none | the same world, measured again, 40 seconds later rather than 35 minutes |
+| `control-b` | none | the same world, measured again one block later rather than 35 minutes later |
 
 Grid: **114 tasks × 2 arms × 1 attempt = 228 episodes**, ≈ **$1.3**. Every task appears twice; the only thing that
 differs between the two readings of it is when it ran.
@@ -58,16 +85,21 @@ differs between the two readings of it is when it ran.
 |---|---|
 | 228 episodes at $0.0044 | **$1.00 ≈ ¥7.2** |
 | plus the front arm's re-read if the first pass is clean | $1.30 total ceiling |
-| wall clock at concurrency 6 | ~30 min |
+| wall clock, concurrency 3 | ~65 min by the driver's own estimate (thirty τ² imports included); R218b's grid ran 14 s an episode, which puts the floor near 35 min |
 | window | one opening, off-peak; the guard refuses a start inside a peak band |
 
 ## The reading
 
-The endpoint is the paired reader the other rounds use, with the arm names swapped:
+The endpoint is the driver's own read, which merges the thirty parts and takes the pair with `goal_board.py`'s
+`compare_of` — one implementation of the pairing, not a second:
 
 ```bash
-python3 eval/tools/goal_board.py --compare control-a.json control-b.json --k 1
+python3 eval/drivers/tau2/interleave.py --read --dir eval/results/working-memory
 ```
 
-and it must print `NO_LIFT` with a delta inside ±5 pp. A `LIFT` on two identical arms is the round's failure, and it
-is a failure about the instrument rather than about the treatment.
+It must print `PLACEBO_HELD` with a delta inside ±5 pp, moved and broke within two tasks of each other, and a bill
+ratio inside 10%. Any of `GRID_ORDERED`, `ORDER_ASYMMETRIC`, `BILL_DRIFT` is the round's failure, and it is a
+failure about the **instrument** rather than about the treatment: it says that a contrast measured inside one
+dispatch of this grid is contaminated by the order the arms ran in, which is precisely what R216-1's +7.9 pp and
+R218b's −6.1 pp could be. `SHARED_PROCESS` (no disagreement anywhere) is a failure too, and the opposite one: the
+test would have measured an import rather than a run.

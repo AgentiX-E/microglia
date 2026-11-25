@@ -28,7 +28,7 @@ on:
   workflow_dispatch:
     inputs:
       arms:
-        description: "three (control, front, tail — R216), placement (front, tail — R216b), pair (control, front — R218b), both (control, tail), board, control"
+        description: "three (control, front, tail — R216), placement (front, tail — R216b), pair (control, front — R218b), interleave (control-a, control-b — R218c), both (control, tail), board, control"
         required: false
         default: 'placement'
       tasks:
@@ -141,6 +141,22 @@ jobs:
           print(f"ok  {reading['found']}/{reading['required']} objects, {reading['familyRecall']:.1%} of families, "
                 f"{reading['spurious']} spurious, {reading['tasksCovered']}/{reading['tasks']} tasks covered")
           PY
+
+      - name: The interleaved placebo's driver, measured
+        # R218c. This is the module that decides which arm runs first, which tasks share a block, and whether the
+        # pair is readable at all — so its defect would be a reading about the instrument published as a reading
+        # about the memory. It needs no provider (a fake runner writes the documents), which is why this gate can
+        # sit in the cheap job rather than in the one that spends.
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check --quiet coverage
+          INCLUDE="*/eval/drivers/tau2/interleave.py"
+          rm -f .coverage
+          python3 -m coverage run --branch --include="$INCLUDE" eval/drivers/tau2/interleave.py --self-test
+          python3 -m coverage json -o "${RUNNER_TEMP}/coverage-interleave.json" --include="$INCLUDE"
+          # 95 rather than the measured 99.8: the same rung the rest of the tree uses, so a two-point regression
+          # is caught and a refactor that moves a line is not a build failure.
+          python3 scripts/check-python-coverage.py "${RUNNER_TEMP}/coverage-interleave.json" --min 95 --expect-files 1
 
       - name: The parser, measured
         run: |
@@ -259,7 +275,9 @@ jobs:
           MINUTES="$(python3 -c "
           tasks = len([entry for entry in '${BOARD_TASK_LIST}'.split(',') if entry])
           trials = int('${BOARD_TRIALS}')
-          arms = {'three': 3, 'both': 2, 'pair': 2}.get('${BOARD_ARMS}', 1)
+          # `interleave` is two arms as well, and its own driver is what divides the grid: an estimate that read it
+          # as one arm would arm the window guard with half the run it is guarding.
+          arms = {'three': 3, 'both': 2, 'pair': 2, 'interleave': 2}.get('${BOARD_ARMS}', 1)
           concurrency = max(1, int('${BOARD_CONCURRENCY}'))
           print(int((arms * tasks * trials * 26) / concurrency / 60) + 9 + 1)
           ")"
@@ -402,6 +420,22 @@ jobs:
           }
 
           case "${BOARD_ARMS}" in
+            interleave)
+              # R218c. Two arms that are the same code, run **block by block**: block 0 on `control-a`, then block 0
+              # on `control-b`, then block 1. Thirty invocations of eight tasks, each its own process — a shared
+              # process would make the two arms share one token counter and one client, and the preregistration
+              # names "a delta of exactly zero on every task" as the state that would prove it.
+              #
+              # `--resume` is on because a transient provider failure at block 11 must not re-buy blocks 0 to 10:
+              # an invocation writes its document at the end, so a part on disk is a part that completed.
+              "${PYTHON}" eval/drivers/tau2/interleave.py --run \
+                --tasks "${BOARD_TASK_LIST}" --chunk 8 \
+                --dir "${BOARD_DIR}" \
+                --python "${PYTHON}" \
+                --seed "${BOARD_SEED}" --trials "${BOARD_TRIALS}" --max-steps "${BOARD_MAX_STEPS}" \
+                --concurrency "${BOARD_CONCURRENCY}" \
+                --require-off-peak --resume
+              ;;
             three)
               # R216. Three arms, in this order and for this reason: the control is the world nobody has touched,
               # `front` is the **parser** under R215's placement, and `tail` adds the placement. The two contrasts
@@ -444,6 +478,9 @@ jobs:
           esac
 
       - name: The mechanism, before the rate
+        # R218c's grid is two arms of the same code: it has no board, no parser arm and no contrast to take, and
+        # the placebo's own step reads it. Gated on the dispatch rather than on a filename that would not exist.
+        if: env.BOARD_ARMS != 'interleave'
         # R216. Four readings, in the order that decides whether an accuracy number is about the treatment at all:
         # the cadence (how often the block is re-written), the placement (how often the prompt is written at all), the
         # price (the bill per episode), and the attribution (does a tick ever happen). R215's 3-point cache bar was a
@@ -544,6 +581,9 @@ jobs:
           PY
 
       - name: The attribution, which is the mechanism and not the accuracy
+        # R218c's grid is two arms of the same code: it has no board, no parser arm and no contrast to take, and
+        # the placebo's own step reads it. Gated on the dispatch rather than on a filename that would not exist.
+        if: env.BOARD_ARMS != 'interleave'
         # R216. A board that lists asks and ticks none is a static list, and R215 shipped exactly that: **32.7%** of
         # its writing episodes ended with a tick against a 60% bar. The parser's replay over R215's own document says
         # the three repairs in this round take it to **69.2%** — measured before the dispatch, for free, which is what
@@ -576,6 +616,9 @@ jobs:
           PY
 
       - name: The paired reading
+        # R218c's grid is two arms of the same code: it has no board, no parser arm and no contrast to take, and
+        # the placebo's own step reads it. Gated on the dispatch rather than on a filename that would not exist.
+        if: env.BOARD_ARMS != 'interleave'
         # Three contrasts, one change each. `tail − control` is the round's registered endpoint; `front − control` is
         # what the three parser repairs are worth under R215's placement; `tail − front` is what the placement buys.
         # A two-arm grid could only have reported the sum, and the sum is the number that cannot be acted on.
@@ -620,6 +663,46 @@ jobs:
           print(f"ok  paired over {reading['tasks']} task(s)")
           PY
 
+      - name: The placebo reading
+        # R218c. Four endpoints, in the order the preregistration lists them: the delta inside five points, the
+        # moved and broke counts within two tasks of each other, the bill per episode inside ten percent, and — the
+        # one that is a failure of the *instrument* rather than of the treatment — at least one task where the two
+        # arms disagree, because two processes on one grid always do.
+        #
+        # The **invariants** are gates and the **prediction** is printed. That split is deliberate and it is the
+        # lesson of R216's one-sided cost bar (AUDIT 34.231): a red job for a refuted prediction teaches an operator
+        # to rerun until the grid is green, which is the opposite of what a placebo is for. So an unpaired arm, a
+        # short grid or a grid whose arms never disagree fails the build; "GRID_ORDERED" is a finding.
+        if: env.BOARD_ARMS == 'interleave'
+        run: |
+          set -euo pipefail
+          python3 eval/drivers/tau2/interleave.py --read --dir "${BOARD_DIR}" | tee "${RUNNER_TEMP}/reading.txt"
+          python3 eval/drivers/tau2/interleave.py --read --dir "${BOARD_DIR}" --json \
+            > "${RUNNER_TEMP}/placebo.json"
+          python3 - "${RUNNER_TEMP}/placebo.json" <<'PY'
+          import json, sys
+
+          reading = json.load(open(sys.argv[1]))
+          # Every task twice. A grid of 106 that reads like a grid of 114 is the failure every reader downstream is
+          # built to trust: `unpaired == 0` says the arms agree, not that the plan was met.
+          assert reading["tasks"] >= 100, reading["tasks"]
+          assert reading["unpaired"] == 0, reading["unpaired"]
+          for arm in ("control-a", "control-b"):
+              assert reading["episodes"][arm] >= 100, reading["episodes"]
+          # The gap is what the round buys, so a run that did not measure one did not do the round.
+          assert reading["gapSeconds"]["blocks"] >= 10, reading["gapSeconds"]
+          assert reading["moved"] + reading["broke"] > 0, "the arms disagree on no task at all"
+          print(f"ok  {reading['tasks']} task(s) twice, {reading['moved']} moved and {reading['broke']} broke, "
+                f"median gap {reading['gapSeconds']['median']}s")
+          print(f"::notice title=R218c placebo::{reading['state']}, delta {reading['deltaPp']:+.2f} pp, "
+                f"bills {reading['billLeft']:.5f} against {reading['billRight']:.5f} an episode")
+          if reading["state"] != "PLACEBO_HELD":
+              # A finding, and the loudest one this lane can produce: every contrast measured on this grid is then
+              # a contrast about the order rather than about the material.
+              print(f"::warning title=R218c::the two identical arms read {reading['state']} — no contrast measured "
+                    "inside one dispatch of this grid is publishable until the interleave is the default")
+          PY
+
       - name: Upload the documents
         if: always()
         uses: actions/upload-artifact@v4
@@ -628,6 +711,8 @@ jobs:
           path: |
             eval/results/working-memory/*.json
             eval/results/working-memory/*.log
+            eval/results/working-memory/parts/*.json
+            eval/results/working-memory/parts/*.log
           if-no-files-found: warn
 
       # R218b lost its reading twice at the transport: the artifact is served only through a redirect to a blob host
