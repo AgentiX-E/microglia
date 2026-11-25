@@ -25,3 +25,14 @@ export {
 
 export { LexicalIndex } from './lexical-index.js';
 export { EmbeddedMemory, rehydrateKnowledge } from './store.js';
+
+export {
+  ASK_SOURCES,
+  SERVING_DEFAULTS,
+  SERVING_PLACEMENTS,
+  SETTLEMENT_GRADES,
+  type AskSource,
+  type ServingDefaults,
+  type ServingPlacement,
+  type SettlementGrade,
+} from './serving.js';

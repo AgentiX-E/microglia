@@ -118,16 +118,22 @@ jobs:
           # date fails the build on the next commit. Measured under the same floor for the same reason - a clock
           # that silently returns zero is a clock that certifies nothing is owed.
           python3 -m coverage run --append --branch eval/tools/round_clock.py --self-test
+          # R220. The driver's half of one manifest, two readers: the placement the workflow hands an arm is a
+          # command-line argument, so nothing type-checks it. This binds it to eval/manifests/serving-defaults.json,
+          # whose TypeScript half core/memory/__tests__/serving.test.ts binds on the product side.
+          python3 -m coverage run --append --branch eval/tools/serving_defaults.py --self-test
           python3 -m coverage json -o coverage-python.json
           python3 scripts/check-python-coverage.py --self-test
-          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 13
+          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 14
 
       - name: The rounds this project owes, and the date each one was registered for
         # The failure this prevents is not a wrong number, it is a round that quietly stops being planned: R216b's
         # 10:02 UTC cron produced no run at all and nothing said so for four hours. A registry read on every push
         # makes the debt visible at the next commit. It is a separate step from the coverage floor because its
         # subject is the plan rather than the code.
-        run: python3 eval/tools/round_clock.py
+        run: |
+          python3 eval/tools/round_clock.py
+          python3 eval/tools/serving_defaults.py
 
       - name: Repository audit (source rules, manifests, published dependencies)
         run: pnpm audit:repo

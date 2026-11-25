@@ -594,9 +594,17 @@ jobs:
             --compare "${BASE}" "${TREATED}" --k "${BOARD_K}" --json \
             > "${RUNNER_TEMP}/reading.json"
           if [ -f "${BOARD_DIR}/front.json" ] && [ -f "${BOARD_DIR}/board.json" ]; then
-            echo "--- the parser, under R215's placement ---"
-            python3 eval/tools/goal_board.py --compare "${BOARD_DIR}/control.json" "${BOARD_DIR}/front.json" \
-              --k "${BOARD_K}"
+            # The parser's own price needs a control, and a `placement` grid does not run one. R216b found this the
+            # expensive way: the guard above fell back to `front` and the reading worked, then this block opened
+            # `control.json` **by name** and the step died after $1.3007 had been spent — the third place in this
+            # file where an arm was named rather than looked for.
+            if [ -f "${BOARD_DIR}/control.json" ]; then
+              echo "--- the parser, under R215's placement ---"
+              python3 eval/tools/goal_board.py --compare "${BOARD_DIR}/control.json" "${BOARD_DIR}/front.json" \
+                --k "${BOARD_K}"
+            else
+              echo "--- no control arm in this dispatch: the parser's price is R216-1's reading, not this one's ---"
+            fi
             echo "--- the placement, with the parser held ---"
             python3 eval/tools/goal_board.py --compare "${BOARD_DIR}/front.json" "${BOARD_DIR}/board.json" \
               --k "${BOARD_K}"
