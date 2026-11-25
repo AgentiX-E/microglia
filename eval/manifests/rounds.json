@@ -97,7 +97,7 @@
   {
    "id": "R218c",
    "title": "the placebo, interleaved \u2014 two identical arms, task by task, registered delta of zero",
-   "status": "registered",
+   "status": "read",
    "dispatchBy": "2026-11-26T18:00:00Z",
    "prereg": "prereg/R218c-interleave.md",
    "arms": [
@@ -110,7 +110,43 @@
    "dependsOn": [
     "R218b"
    ],
-   "why": "R218b found the same treatment arm reading 86.84, 81.60 and 78.07 in one afternoon, and the arms in its grid ran 35 minutes apart. Two identical arms interleaved task by task must read zero; if they do not, no contrast on this grid is measurable and the repair is the grid."
+   "why": "R218b found the same treatment arm reading 86.84, 81.60 and 78.07 in one afternoon, and the arms in its grid ran 35 minutes apart. Two identical arms interleaved task by task must read zero; if they do not, no contrast on this grid is measurable and the repair is the grid.",
+   "dispatchedAt": "2026-11-25T17:33:52Z",
+   "run": 45666085846,
+   "readAt": "2026-11-25T18:20:00Z",
+   "actualUsd": 1.0295,
+   "outcome": "the grid is usable and the asymmetry bar was mis-specified: 4 of 5 endpoints hold, the fifth by one task",
+   "reading": {
+    "controlA": "92/114 (80.70%), $0.004575 an episode",
+    "controlB": "95/114 (83.33%), $0.004455 an episode",
+    "deltaPp": 2.63,
+    "moved": 16,
+    "broke": 13,
+    "held": 79,
+    "neither": 6,
+    "unpaired": 0,
+    "p": 0.7111,
+    "billRatio": 0.9736,
+    "gapSeconds": {
+     "separationMedian": 70.9,
+     "separationMax": 100.3,
+     "handoverMedian": 0.0,
+     "blocks": 15
+    },
+    "turnover": {
+     "tasks": 29,
+     "rate": 0.254,
+     "r218bCrossDispatch": 0.22
+    },
+    "resolution": {
+     "detectablePp": 13.2,
+     "tasksFor5pp": 799,
+     "tasksFor10pp": 200,
+     "tasksInTau2": 300
+    },
+    "verdict": "ORDER_ASYMMETRIC: 16 against 13 is three tasks past a two-task window on 29 discordant pairs, which is p = 0.71",
+    "finding": "turnover does not shrink when the gap shrinks 30x: 25.4% at 71 s against R218b's 22% at 35 min, so the drift is sampling noise rather than a time confound, and no schedule repairs it"
+   }
   },
   {
    "id": "R218d",

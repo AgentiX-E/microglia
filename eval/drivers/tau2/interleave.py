@@ -61,6 +61,7 @@ from __future__ import annotations
 import argparse
 import io
 import json
+import math
 import statistics
 import subprocess
 import sys
@@ -254,7 +255,31 @@ def bill_per_episode(document: dict) -> "float | None":
     return total / len(simulations)
 
 
-def _sum_usage(documents: "list[dict]") -> dict:
+def _phase_summary(log_path: Path) -> dict:
+    """The driver's own end-of-phase line, from the log it writes beside the part.
+
+    `run_tasks` writes τ²'s results document, and that document has **no** `usage` key: the bill is printed by
+    `run_split.py` as one JSON line when the invocation ends. The log beside the part is that line's only home, which
+    is why the manifest records the log's name — the first version of this file summed `document["usage"]`, got
+    nothing, and reported the arm's bill as **$0.0000**. That is the absence-as-zero defect this lane has now paid
+    for four times, and here it arrived through a key that exists on the summary line and not on the document.
+    """
+    try:
+        text = log_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return {}
+    for line in reversed(text.splitlines()):
+        if line.startswith('{"phase"'):
+            try:
+                # A line that starts with `{"phase"` parses to an object or raises; there is no third case, so there
+                # is no type guard here — a guard that cannot be false is a branch nobody can test.
+                return json.loads(line)
+            except json.JSONDecodeError:
+                return {}
+    return {}
+
+
+def _sum_usage(usages: "list") -> dict:
     """The parts' token counters, summed, with the ratios recomputed rather than added.
 
     `merge_documents` keeps the first part's `usage` block, which is right for a round where the parts are trials of
@@ -263,7 +288,7 @@ def _sum_usage(documents: "list[dict]") -> dict:
     over parts of unequal size is a different number from the mean.
     """
     totals = {
-        "parts": len(documents),
+        "parts": len(usages),
         "measuredParts": 0,
         "calls": 0,
         "prompt_tokens": 0,
@@ -273,8 +298,7 @@ def _sum_usage(documents: "list[dict]") -> dict:
         "usd": 0.0,
         "bands": [],
     }
-    for document in documents:
-        usage = document.get("usage") if isinstance(document, dict) else None
+    for usage in usages:
         if not isinstance(usage, dict):
             continue
         totals["measuredParts"] += 1
@@ -299,11 +323,20 @@ def _sum_usage(documents: "list[dict]") -> dict:
 
 
 def gaps(entries: "list[dict]", arms: "tuple[str, ...]" = ARMS) -> dict:
-    """How far apart the two readings of a block actually ran, in seconds.
+    """How far apart the two readings of a block ran, in two quantities that are not the same one.
 
-    This is the number the round exists to shrink, so it is measured rather than claimed. A part whose timestamps are
-    missing (an interrupted run) contributes no gap rather than a zero: a zero would read as "the two arms ran
-    simultaneously", which is the `SHARED_PROCESS` state the verdict refuses.
+    **separation** is `start(B) − start(A)`: how far apart the two readings of the same task *began*, which is what
+    the round is about and is approximately the duration of one block. **handover** is `start(B) − end(A)`: the time
+    between one invocation finishing and the next starting, which is near zero by construction because the driver
+    starts the next part immediately.
+
+    The first version of this function reported only the handover, and the round's own reading came back with a
+    median of **0.0 s over 15 blocks** — a metric that says an interleave is instantaneous, and therefore one that
+    cannot tell an eight-task block from a one-task block. The separation is the number that can, so both are
+    reported and the sentence quotes the separation.
+
+    A part whose timestamps are missing (an interrupted run) contributes no gap rather than a zero: a zero would
+    read as "the two arms ran simultaneously", which is the `SHARED_PROCESS` state the verdict refuses.
     """
     by_block: "dict[int, dict]" = {}
     for entry in entries:
@@ -314,22 +347,64 @@ def gaps(entries: "list[dict]", arms: "tuple[str, ...]" = ARMS) -> dict:
         if not isinstance(block, int) or arm not in arms:
             continue
         by_block.setdefault(block, {})[arm] = entry
-    measured = []
-    for block in sorted(by_block):
-        seat = by_block[block]
-        try:
-            first = datetime.fromisoformat(seat[arms[0]]["endedAt"])
-            second = datetime.fromisoformat(seat[arms[1]]["startedAt"])
-        except (KeyError, TypeError, ValueError):
-            continue
-        measured.append(round((second - first).total_seconds(), 1))
-    if not measured:
-        return {"blocks": 0, "median": None, "max": None, "perBlock": []}
+
+    def measure(pairs: "list[tuple[str, str]]") -> "dict[str, object]":
+        measured = []
+        for block in sorted(by_block):
+            seat = by_block[block]
+            try:
+                first = seat[arms[0]]
+                second = seat[arms[1]]
+                left = datetime.fromisoformat(first[pairs[0][0]])
+                right = datetime.fromisoformat(second[pairs[0][1]])
+            except (KeyError, TypeError, ValueError):
+                continue
+            measured.append(round((right - left).total_seconds(), 1))
+        if not measured:
+            return {"median": None, "max": None, "perBlock": []}
+        return {"median": statistics.median(measured), "max": max(measured), "perBlock": measured}
+
+    separation = measure([("startedAt", "startedAt")])
+    handover = measure([("endedAt", "startedAt")])
     return {
-        "blocks": len(measured),
-        "median": statistics.median(measured),
-        "max": max(measured),
-        "perBlock": measured,
+        "blocks": len(separation["perBlock"]),
+        # Reported flat as well as nested: every reader before this one asked for `gapSeconds["median"]`, and a
+        # number that silently becomes a dict is the kind of change that reads as an absence.
+        "median": separation["median"],
+        "max": separation["max"],
+        "perBlock": separation["perBlock"],
+        "separation": separation,
+        "handover": handover,
+    }
+
+
+#: The two-tailed 5% and one-sided 20% normal quantiles, summed. The number a power calculation multiplies by.
+POWER_FACTOR = 1.959964 + 0.841621
+
+
+def resolution(moved: int, broke: int, tasks: int) -> dict:
+    """What a grid of this size can resolve, computed from the grid's own discordance.
+
+    The quantity that decides whether any of this lane's contrasts were ever detectable. For a paired binary reading
+    the variance of the difference is `(discordance − δ²) / n`, so the smallest delta detectable at 80% power is
+    `2.80 × sqrt(discordance / n)` — and because the discordance rate is a property of the **task**, not of the
+    scheduler, an interleave does not move it. That is the finding this block makes checkable rather than arguable:
+    R218c's two identical arms disagreed on 29 of 114 tasks while running 71 s apart, which is 25.4% — the same
+    order as R218b's 22% across arms 35 minutes apart.
+
+    `tasksFor` is the same arithmetic inverted, and it is the number a plan needs: at a 25% discordance rate, five
+    points needs ~790 tasks and ten points needs ~200. τ²'s four domains hold about 300.
+    """
+    total = moved + broke
+    if not tasks or not total:
+        return {"discordanceRate": None, "detectablePp": None, "tasksFor5pp": None, "tasksFor10pp": None}
+    rate = total / tasks
+    detectable = POWER_FACTOR * math.sqrt(rate / tasks)
+    return {
+        "discordanceRate": round(rate, 4),
+        "detectablePp": round(100 * detectable, 2),
+        "tasksFor5pp": math.ceil(POWER_FACTOR**2 * rate / 0.05**2),
+        "tasksFor10pp": math.ceil(POWER_FACTOR**2 * rate / 0.10**2),
     }
 
 
@@ -372,6 +447,9 @@ def verdict(
         "billPerEpisode": [left_bill, right_bill],
         "billRatio": ratio,
         "gapSeconds": gap,
+        # What this grid could have resolved, beside what it measured. A delta quoted without it invites a reader to
+        # treat a nine-point swing as an effect when the grid cannot see thirteen.
+        "resolution": resolution(moved, broke, total),
         "bars": {"deltaPp": delta_bar, "symmetry": symmetry, "bill": bill_bar},
     }
     if total == 0 or block["unpaired"] > 0:
@@ -395,13 +473,22 @@ def render_verdict(block: dict) -> str:
     left, right = ARMS
     gap = block["gapSeconds"]
     where = (
-        f", the two readings of a task {gap['median']}s apart (median over {gap['blocks']} block(s), worst "
-        f"{gap['max']}s)" if gap.get("median") is not None else ", with no measured gap"
+        f", the two readings of a task starting {gap['median']}s apart (median over {gap['blocks']} block(s), worst "
+        f"{gap['max']}s, handover {gap['handover']['median']}s)"
+        if gap.get("median") is not None
+        else ", with no measured gap"
+    )
+    seen = block.get("resolution") or {}
+    what = (
+        f"; {seen['discordanceRate']:.1%} of tasks turned over, so this grid resolves {seen['detectablePp']:.1f} pp "
+        f"at 80% power and would need {seen['tasksFor5pp']} tasks to resolve five"
+        if seen.get("discordanceRate") is not None
+        else ""
     )
     body = (
         f"{block['leftRate']:.1%} against {block['rightRate']:.1%} on {block['tasks']} task(s), delta "
         f"{block['deltaPp']:+.2f} pp, moved {block['moved']}, broke {block['broke']}, held {block['held']}, "
-        f"neither {block['neither']}, McNemar p = {block['p']}{where}"
+        f"neither {block['neither']}, McNemar p = {block['p']}{where}{what}"
     ) if block["tasks"] else f"no shared task over {block['tasks']} task(s)"
     return {
         "UNPAIRED": f"UNPAIRED: {body} — the arms do not cover the same tasks, so nothing is paired",
@@ -456,7 +543,12 @@ def merge_arm(arm: str, entries: "list[dict]", root) -> dict:
     documents = [_read_json(path) for path in paths]
     merged = merge_documents(documents)
     merged["arm"] = arm
-    merged["usage"] = _sum_usage(documents)
+    # Per part, the bill is on the log rather than in the document (see `_phase_summary`). Read from the document
+    # first anyway: a future τ² that carries usage in the result would be read without a change here, and the log is
+    # the fallback that describes today's.
+    merged["usage"] = _sum_usage(
+        [document.get("usage") or _phase_summary(path.with_suffix(".log")).get("usage") for document, path in zip(documents, paths)]
+    )
     # `diagnostics` is a per-invocation census — means over that invocation's calls, and a `cache` block whose
     # first-call ratio belongs to one process. Summing it would invent a number no process measured, and keeping the
     # first part's would report one thirtieth of the run as the run. Naming the parts is the honest option.
@@ -720,11 +812,11 @@ def self_test() -> int:
     # --- the counters, summed -------------------------------------------------------------------------
     summed = _sum_usage(
         [
-            {"usage": {"calls": 3, "prompt_tokens": 100, "cached_tokens": 60, "completion_tokens": 10,
-                       "uncached_tokens": 40, "cost": {"usd": 0.1, "band": "off_peak"}}},
-            {"usage": {"calls": 2, "prompt_tokens": 300, "cached_tokens": 240, "completion_tokens": 20,
-                       "uncached_tokens": 60, "cost": {"usd": 0.2, "band": "off_peak"}}},
-            {"no": "usage"},
+            {"calls": 3, "prompt_tokens": 100, "cached_tokens": 60, "completion_tokens": 10,
+             "uncached_tokens": 40, "cost": {"usd": 0.1, "band": "off_peak"}},
+            {"calls": 2, "prompt_tokens": 300, "cached_tokens": 240, "completion_tokens": 20,
+             "uncached_tokens": 60, "cost": {"usd": 0.2, "band": "off_peak"}},
+            "no usage at all",
         ]
     )
     check("the calls are summed", summed["calls"] == 5)
@@ -733,9 +825,9 @@ def self_test() -> int:
     check("the bill is summed in USD and converted once", summed["usd"] == 0.3 and summed["cny"] == 2.16)
     check("one band is not mixed", summed["mixedBands"] is False)
     check("the parts that reported are counted", summed["measuredParts"] == 2 and summed["parts"] == 3)
-    mixed = _sum_usage([{"usage": {"cost": {"usd": 1, "band": "peak"}}}, {"usage": {"cost": {"usd": 1, "band": "off_peak"}}}])
+    mixed = _sum_usage([{"cost": {"usd": 1, "band": "peak"}}, {"cost": {"usd": 1, "band": "off_peak"}}])
     check("two bands are mixed", mixed["mixedBands"] is True)
-    empty = _sum_usage([{"usage": {}}])
+    empty = _sum_usage([{}])
     check("no tokens is no rate", empty["cache_hit_rate"] is None and empty["usd"] == 0.0)
 
     # --- the gap -------------------------------------------------------------------------------------
@@ -754,8 +846,12 @@ def self_test() -> int:
              "endedAt": "2026-11-26T04:08:00+00:00", "tasks": ["1"]},
         ]
         measured = gaps(entries)
-        check("both blocks are measured", measured["blocks"] == 2 and measured["perBlock"] == [30.0, 20.0])
-        check("the median is the middle", measured["median"] == 25.0 and measured["max"] == 30.0)
+        # Separation is start-to-start: block 0's two readings began 150 s apart, block 1's 80 s apart.
+        check("both blocks are measured", measured["blocks"] == 2 and measured["perBlock"] == [150.0, 80.0], measured)
+        check("the median separation is the middle", measured["median"] == 115.0 and measured["max"] == 150.0)
+        # Handover is end-to-start, and it is near zero by construction: the driver starts the next part at once.
+        check("the handover is measured beside it", measured["handover"]["perBlock"] == [30.0, 20.0], measured["handover"])
+        check("the two are not the same number", measured["median"] != measured["handover"]["median"])
         check("a missing timestamp is no gap, not a zero", gaps([{"block": 0, "arm": "control-a"}])["median"] is None)
         check("an unparseable timestamp is no gap", gaps(
             [{"block": 0, "arm": "control-a", "endedAt": "never", "startedAt": "never"},
@@ -775,6 +871,18 @@ def self_test() -> int:
                 "controlRate": 0.9,
                 "boardRate": 0.9,
             }
+
+        # The resolution, which is the number a plan needs: at a 25% discordance rate the grid resolves about
+        # thirteen points and would need ~800 tasks to resolve five.
+        quarter = resolution(16, 13, 114)
+        check("a quarter-discordant grid resolves about thirteen points", 12.9 <= quarter["detectablePp"] <= 13.5, quarter)
+        check("and needs about eight hundred tasks for five", 780 <= quarter["tasksFor5pp"] <= 820, quarter)
+        check("and about two hundred for ten", 195 <= quarter["tasksFor10pp"] <= 205, quarter)
+        check("the rate is the discordance over the tasks", quarter["discordanceRate"] == round(29 / 114, 4))
+        nothing_to_see = resolution(0, 0, 114)
+        check("a grid with no discordance has no resolution", nothing_to_see["detectablePp"] is None)
+        check("and no task count", nothing_to_see["tasksFor5pp"] is None)
+        check("an empty grid has no resolution", resolution(0, 0, 0)["discordanceRate"] is None)
 
         held = verdict(reading(114, 3, 2, both=80, neither=29), 0.005, 0.0051, measured)
         check("a three-two split over a hundred and fourteen holds", held["state"] == "PLACEBO_HELD", held["state"])
@@ -804,7 +912,14 @@ def self_test() -> int:
         ):
             sentence = render_verdict(_stamp(block))
             check(f"the {state} sentence names its state", sentence.startswith(state + ":"), sentence)
-        check("the sentence carries the gap", "30.0s" in render_verdict(_stamp(held)))
+        check("the sentence carries the separation", "115.0s apart" in render_verdict(_stamp(held)), render_verdict(_stamp(held)))
+        check("and the grid's resolution", "at 80% power" in render_verdict(_stamp(held)), render_verdict(_stamp(held)))
+        check(
+            "a reading with no discordance claims no resolution",
+            "resolves" not in render_verdict(_stamp(shared)),
+            render_verdict(_stamp(shared)),
+        )
+        check("and the handover beside it", "handover 25.0s" in render_verdict(_stamp(held)))
         check(
             "a reading with no gap says so",
             "no measured gap" in render_verdict(_stamp(verdict(reading(114, 3, 2), 0.005, 0.005, gaps([])))),
@@ -833,7 +948,12 @@ def self_test() -> int:
             "document = {'domain': 'retail', 'tasks': [{'id': task} for task in tasks], 'simulations': simulations,\n"
             "            'usage': {'calls': 1, 'prompt_tokens': 10, 'cached_tokens': 5, 'completion_tokens': 1,\n"
             "                      'uncached_tokens': 5, 'cost': {'usd': 0.01, 'band': 'off_peak'}}}\n"
-            "json.dump(document, open(out, 'w'))\n",
+            "json.dump(document, open(out, 'w'))\n"
+            "# The bill travels on the log, not in the document: this is the line `run_split.py` prints, and the\n"
+            "# merge reads it from here. A fake runner that skipped it would leave the log path untested.\n"
+            "print(json.dumps({'phase': 'eval', 'usage': {'calls': 1, 'prompt_tokens': 10, 'cached_tokens': 5,\n"
+            "                                              'completion_tokens': 1, 'uncached_tokens': 5,\n"
+            "                                              'cost': {'usd': 0.01, 'band': 'off_peak'}}}))\n",
             encoding="utf-8",
         )
         round_root = root / "round"
@@ -899,6 +1019,16 @@ def self_test() -> int:
             resume=True,
         )
         check("a part from another grid is re-run", stale["parts"][0].get("skipped") is None)
+
+        # --- the bill's home, which is the log ------------------------------------------------------
+        summary = root / "round" / "parts" / "control-a.part00.log"
+        check("the summary is read off the log", _phase_summary(summary).get("usage", {}).get("calls") == 1,
+              _phase_summary(summary))
+        check("a log with no summary line answers nothing", _phase_summary(root / "elsewhere.log") == {})
+        (root / "bad.log").write_text('hello\n{"phase": broken json\n', encoding="utf-8")
+        check("a malformed summary line answers nothing", _phase_summary(root / "bad.log") == {})
+        (root / "empty.log").write_text("", encoding="utf-8")
+        check("an empty log answers nothing", _phase_summary(root / "empty.log") == {})
 
         # --- the command line ------------------------------------------------------------------------
         # The command line, driven for real: `--run` launches the fake runner as a child process, `--read` re-derives
@@ -1009,7 +1139,7 @@ def self_test() -> int:
                                                           if entry["arm"] == "control-a"]}),
         )
         # A counter block that is not a block, a document that is not a document: the summing reports what it read.
-        check("a part with no usage is counted as unmeasured", _sum_usage([{"usage": "no"}, "neither"])["measuredParts"] == 0)
+        check("a part with no usage is counted as unmeasured", _sum_usage(["no", "neither"])["measuredParts"] == 0)
         check(
             "an episode that is not an object is skipped by the bill",
             # 0.25, not 0.5: the denominator is the document's own episode count and a junk entry still occupies

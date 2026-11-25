@@ -689,13 +689,23 @@ jobs:
           assert reading["unpaired"] == 0, reading["unpaired"]
           for arm in ("control-a", "control-b"):
               assert reading["episodes"][arm] >= 100, reading["episodes"]
-          # The gap is what the round buys, so a run that did not measure one did not do the round.
+          # The gap is what the round buys, so a run that did not measure one did not do the round. It is the
+          # **separation** — how far apart the two readings of a task began — and not the handover between one
+          # invocation and the next, which is zero by construction: the first version of this gate read the handover
+          # and reported 0.0 s over 15 blocks (AUDIT 34.256).
           assert reading["gapSeconds"]["blocks"] >= 10, reading["gapSeconds"]
+          separation = reading["gapSeconds"]["separation"]["median"]
+          assert separation is not None and separation >= 30, (
+              f"the two readings of a task began {separation} s apart: a block that ran in under thirty seconds "
+              "means the population was not the one the plan named"
+          )
           assert reading["moved"] + reading["broke"] > 0, "the arms disagree on no task at all"
           print(f"ok  {reading['tasks']} task(s) twice, {reading['moved']} moved and {reading['broke']} broke, "
                 f"median gap {reading['gapSeconds']['median']}s")
+          seen = reading.get("resolution") or {}
           print(f"::notice title=R218c placebo::{reading['state']}, delta {reading['deltaPp']:+.2f} pp, "
-                f"bills {reading['billLeft']:.5f} against {reading['billRight']:.5f} an episode")
+                f"bills {reading['billLeft']:.5f} against {reading['billRight']:.5f} an episode, "
+                f"{seen.get('discordanceRate', 0):.1%} turnover, resolves {seen.get('detectablePp')} pp at 80% power")
           if reading["state"] != "PLACEBO_HELD":
               # A finding, and the loudest one this lane can produce: every contrast measured on this grid is then
               # a contrast about the order rather than about the material.
