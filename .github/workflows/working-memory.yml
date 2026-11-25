@@ -28,9 +28,9 @@ on:
   workflow_dispatch:
     inputs:
       arms:
-        description: 'three (control, front, tail — the registered grid), both (control then tail), board, control'
+        description: "three (control, front, tail — R216), placement (front, tail — R216b), pair (control, front — R218b), both (control, tail), board, control"
         required: false
-        default: 'three'
+        default: 'placement'
       tasks:
         description: 'Comma-separated task ids. Empty means every task the bank holds.'
         required: false
@@ -45,6 +45,10 @@ on:
         description: 'The seed world both arms share'
         required: false
         default: '400'
+      k:
+        description: 'Attempts a task must survive to count as passed. 1 for pass^1; 4 for the reliability reading'
+        required: false
+        default: '1'
       max_steps:
         description: 'Steps per episode'
         required: false
@@ -211,9 +215,10 @@ jobs:
       TAU_VERSION: ${{ vars.TAU_VERSION }}
       TAU_MODEL: ${{ vars.TAU_MODEL || 'deepseek/deepseek-flash' }}
       TAU2_DATA_DIR: ${{ github.workspace }}/.tau2-bench/data
-      BOARD_ARMS: ${{ github.event.inputs.arms || 'three' }}
+      BOARD_ARMS: ${{ github.event.inputs.arms || 'placement' }}
       BOARD_TASKS: ${{ github.event.inputs.tasks }}
       BOARD_TRIALS: ${{ github.event.inputs.trials || '1' }}
+      BOARD_K: ${{ github.event.inputs.k || '1' }}
       BOARD_SEED: ${{ github.event.inputs.seed || '400' }}
       BOARD_MAX_STEPS: ${{ github.event.inputs.max_steps || '100' }}
       BOARD_CONCURRENCY: ${{ github.event.inputs.concurrency || '3' }}
@@ -254,7 +259,7 @@ jobs:
           MINUTES="$(python3 -c "
           tasks = len([entry for entry in '${BOARD_TASK_LIST}'.split(',') if entry])
           trials = int('${BOARD_TRIALS}')
-          arms = {'three': 3, 'both': 2}.get('${BOARD_ARMS}', 1)
+          arms = {'three': 3, 'both': 2, 'pair': 2}.get('${BOARD_ARMS}', 1)
           concurrency = max(1, int('${BOARD_CONCURRENCY}'))
           print(int((arms * tasks * trials * 26) / concurrency / 60) + 9 + 1)
           ")"
@@ -346,6 +351,27 @@ jobs:
               run_arm front --note-source board-front
               run_arm board --note-source board
               ;;
+            placement)
+              # R216b. **The contrast that is new, and only it.** `front` is R216's parser under R215's placement;
+              # `board` moves the block behind the conversation. `tail - front` is the price of the move, which is
+              # the one number R216's first dispatch could not read because the tail arm died at the provider.
+              #
+              # No control arm, and the reason is arithmetic rather than taste: `control -> front` is the price of
+              # the three parser repairs, it was measured inside R216's first dispatch (+7.9 pp), and a second
+              # measurement of it is 114 episodes bought to confirm a number this round does not read. Cross-
+              # dispatch comparison is not available either - R216 found the same arm turning over 22% of its tasks
+              # between two dispatches, so the confirmation would not be one.
+              run_arm front --note-source board-front
+              run_arm board --note-source board
+              ;;
+            pair)
+              # R218b. The two arms the reliability question needs, at whatever `trials` the dispatch asks for: the
+              # control is the world nobody touched, `front` is the repaired parser under R215's placement. No tail —
+              # the placement has its own price from R216, and paying for it again would be paying for a number this
+              # round does not read.
+              run_arm control
+              run_arm front --note-source board-front
+              ;;
             both)
               # Control first. The two arms are one measurement, and a control written after the board would be a
               # control run in a world the board had already spent forty minutes in.
@@ -396,28 +422,32 @@ jobs:
 
           board = (summary.get("board") or {}).get("diagnostics", {}).get("memory", {}).get("board") or {}
           front = (summary.get("front") or {}).get("diagnostics", {}).get("memory", {}).get("board") or {}
-          assert board, "the board arm wrote no counters: the mechanism did not run"
-          renders = board.get("renders") or 0
-          assert renders > 0, "the board was served on no turn"
-          share = (board.get("changes") or 0) / renders
-          mean_chars = board.get("charsMean") or 0
-          mean_open = (board.get("open") or 0) / renders
-          appends, held = board.get("tailAppends") or 0, board.get("tailHeld") or 0
-          print(f"board: {renders} render(s), {board.get('changes')} change(s) ({share:.0%}), "
-                f"{appends} append(s), {held} held, {mean_chars:.0f} chars a turn, {mean_open:.1f} open ask(s)")
-          assert board.get("placement") == "tail", f"the arm ran the {board.get('placement')!r} placement"
-          assert mean_chars <= 500, f"the block is {mean_chars:.0f} characters a turn"
-          assert mean_open <= 3.0, f"{mean_open:.1f} open asks a turn: this is a list of everything, not a contract"
-          # The cadence bar belongs to the **front** arm and only to it: a block in the system message that moves
-          # re-buys the prompt, so a change rate above a third is a prefix that cannot survive. Behind the
-          # conversation a change costs the messages after the old position, so applying that bar here would fail a
-          # mechanism working as specified — R215's 3-point cache bar, one round later (AUDIT 34.226).
-          # The placement's own reading: a write per change at most, and at least one turn that found the block
-          # already in place. An arm with `held == 0` re-wrote the block on every turn — R215's bill with a smaller
-          # constant — and an arm with no appends served nothing at all.
-          assert appends > 0, "the block was never written into the prompt"
-          assert appends <= (board.get("changes") or 0), (appends, board.get("changes"))
-          assert held > 0, "no turn found the block already in place: it is being re-written every turn"
+          # R218b dispatches `pair`, which has no tail arm: the assertions below belong to the arm that was run, so
+          # they are gated on its presence rather than on the dispatch's name. A grid that contains both arms runs
+          # both blocks exactly as before.
+          assert board or front, "no arm wrote counters: the mechanism did not run"
+          if board:
+            renders = board.get("renders") or 0
+            assert renders > 0, "the board was served on no turn"
+            share = (board.get("changes") or 0) / renders
+            mean_chars = board.get("charsMean") or 0
+            mean_open = (board.get("open") or 0) / renders
+            appends, held = board.get("tailAppends") or 0, board.get("tailHeld") or 0
+            print(f"board: {renders} render(s), {board.get('changes')} change(s) ({share:.0%}), "
+                  f"{appends} append(s), {held} held, {mean_chars:.0f} chars a turn, {mean_open:.1f} open ask(s)")
+            assert board.get("placement") == "tail", f"the arm ran the {board.get('placement')!r} placement"
+            assert mean_chars <= 500, f"the block is {mean_chars:.0f} characters a turn"
+            assert mean_open <= 3.0, f"{mean_open:.1f} open asks a turn: this is a list of everything, not a contract"
+            # The cadence bar belongs to the **front** arm and only to it: a block in the system message that moves
+            # re-buys the prompt, so a change rate above a third is a prefix that cannot survive. Behind the
+            # conversation a change costs the messages after the old position, so applying that bar here would fail a
+            # mechanism working as specified — R215's 3-point cache bar, one round later (AUDIT 34.226).
+            # The placement's own reading: a write per change at most, and at least one turn that found the block
+            # already in place. An arm with `held == 0` re-wrote the block on every turn — R215's bill with a smaller
+            # constant — and an arm with no appends served nothing at all.
+            assert appends > 0, "the block was never written into the prompt"
+            assert appends <= (board.get("changes") or 0), (appends, board.get("changes"))
+            assert held > 0, "no turn found the block already in place: it is being re-written every turn"
 
           if front:
               # The parser arm's own counters, which must show the other placement: a run where both arms report
@@ -435,15 +465,20 @@ jobs:
               assert front_share <= 1 / 3, (
                   f"the parser arm's block changed on {front_share:.0%} of turns: at the front of the prompt that "
                   "re-bills every token after it")
-          control, treated = per_episode.get("control"), per_episode.get("board")
-          if control and treated:
-              ratio = treated / control
-              print(f"bill per episode: control ${control:.5f}, board ${treated:.5f} ({100 * (ratio - 1):+.0f}%)")
+          # The baseline is the control when one was run and the parser arm when it was not. R216b dispatches
+          # `placement`, whose baseline is `front`: the question there is what moving the block costs **the parser
+          # arm**, and comparing it to a control that was never run would have been an assertion that silently did
+          # not execute - a cost bar that passes by not looking.
+          baseline_name = "control" if per_episode.get("control") else "front"
+          baseline, treated = per_episode.get(baseline_name), per_episode.get("board")
+          if baseline and treated and baseline_name != "board":
+              ratio = treated / baseline
+              print(f"bill per episode: {baseline_name} ${baseline:.5f}, board ${treated:.5f} ({100 * (ratio - 1):+.0f}%)")
               # A **band**, not a ceiling. R216's first dispatch passed a one-sided bar at 0.16 of the control's
               # bill, which is not a cheap arm but an arm that stopped early (AUDIT 34.231). A cost bar has to be
               # two-sided or it rewards the failure it was written to price.
               assert 0.80 <= ratio <= 1.20, (
-                  f"the arm's bill is {100 * (ratio - 1):+.0f}% of the control's; the registered band is -20% to "
+                  f"the arm's bill is {100 * (ratio - 1):+.0f}% of the {baseline_name}'s; the registered band is -20% to "
                   "+20%, and a large negative is a run that did not happen")
           PY
 
@@ -455,8 +490,12 @@ jobs:
         # gate because a ratio quoted from a document is a number nobody re-ran.
         run: |
           set -euo pipefail
-          python3 eval/tools/goal_board.py --replay "${BOARD_DIR}/board.json"
-          python3 eval/tools/goal_board.py --replay "${BOARD_DIR}/board.json" --json \
+          # R218b dispatches `pair`, whose parser arm is `front`; R216's grid has both. The replay runs on the arm
+          # that exists rather than on a filename the dispatch name implies.
+          TARGET="${BOARD_DIR}/board.json"
+          [ -f "${TARGET}" ] || TARGET="${BOARD_DIR}/front.json"
+          python3 eval/tools/goal_board.py --replay "${TARGET}"
+          python3 eval/tools/goal_board.py --replay "${TARGET}" --json \
             > "${RUNNER_TEMP}/replay.json"
           python3 - "${RUNNER_TEMP}/replay.json" <<'PY'
           import json, sys
@@ -481,16 +520,25 @@ jobs:
         # A two-arm grid could only have reported the sum, and the sum is the number that cannot be acted on.
         run: |
           set -euo pipefail
+          TREATED="${BOARD_DIR}/board.json"
+          [ -f "${TREATED}" ] || TREATED="${BOARD_DIR}/front.json"
+          # The left arm is the control when the dispatch has one. R216b's `placement` grid starts at the parser
+          # arm, because its question is `tail - front`; naming a control file that was never written would have
+          # made `set -e` kill the reading after the money was spent.
+          BASE="${BOARD_DIR}/control.json"
+          [ -f "${BASE}" ] || BASE="${BOARD_DIR}/front.json"
           python3 eval/tools/goal_board.py \
-            --compare "${BOARD_DIR}/control.json" "${BOARD_DIR}/board.json" | tee "${RUNNER_TEMP}/reading.txt"
+            --compare "${BASE}" "${TREATED}" --k "${BOARD_K}" | tee "${RUNNER_TEMP}/reading.txt"
           python3 eval/tools/goal_board.py \
-            --compare "${BOARD_DIR}/control.json" "${BOARD_DIR}/board.json" --json \
+            --compare "${BASE}" "${TREATED}" --k "${BOARD_K}" --json \
             > "${RUNNER_TEMP}/reading.json"
-          if [ -f "${BOARD_DIR}/front.json" ]; then
+          if [ -f "${BOARD_DIR}/front.json" ] && [ -f "${BOARD_DIR}/board.json" ]; then
             echo "--- the parser, under R215's placement ---"
-            python3 eval/tools/goal_board.py --compare "${BOARD_DIR}/control.json" "${BOARD_DIR}/front.json"
+            python3 eval/tools/goal_board.py --compare "${BOARD_DIR}/control.json" "${BOARD_DIR}/front.json" \
+              --k "${BOARD_K}"
             echo "--- the placement, with the parser held ---"
-            python3 eval/tools/goal_board.py --compare "${BOARD_DIR}/front.json" "${BOARD_DIR}/board.json"
+            python3 eval/tools/goal_board.py --compare "${BOARD_DIR}/front.json" "${BOARD_DIR}/board.json" \
+              --k "${BOARD_K}"
           fi
           python3 - "${RUNNER_TEMP}/reading.json" <<'PY'
           import json, sys

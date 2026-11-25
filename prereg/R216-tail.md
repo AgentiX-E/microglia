@@ -202,3 +202,37 @@ placement with nothing to say writes nothing — for 264 assertions.
 The workflow's paid job gains a **replay gate on attribution** before the paired reading, and its mechanism gate
 replaces R215's cache bar with the two readings that bar was a proxy for: the writes per turn and the bill per
 episode.
+
+## Amendment 2 — the second dispatch buys two arms, not three
+
+The first dispatch could not price the placement: the tail arm died at the provider (94 of 114 episodes with no
+messages) and the round's own endpoint, `tail − front`, was left unmeasured. The re-dispatch was armed as the same
+three-arm grid, and asking what it costs made the answer obvious — **it was buying something the round does not read.**
+
+| arm | episodes | measured bill (R216-1) | what it answers | is it this round's question |
+|---|---|---|---|---|
+| control | 114 | $0.5039 | what no memory does | **no** — priced in dispatch 1 as `front − control` = +7.9 pp |
+| front | 114 | $0.6889 | R216's parser under R215's placement | yes, as the left side of the contrast |
+| board (tail) | 114 | **$0.0812** in dispatch 1 (20 of 114 alive); ~$0.60 predicted alive | the placement | **yes** — this is the endpoint |
+
+Three arms at 342 episodes is ~**$1.79**; the two arms that answer the registered question are 228 episodes at
+~**$1.29**. The $0.50 difference buys a second measurement of `front − control`, and it does not buy a *comparable*
+one: §246.8 measured the same arm turning over 22% of its tasks between two dispatches (15 pass→fail, 10 fail→pass,
+p ≈ 0.42), so the second measurement would be a new number rather than a confirmation. **Cross-dispatch pairing is
+the one thing this lane has established it cannot do**, so a control re-run is not insurance — it is a third
+statistic nobody reads.
+
+So the dispatch is `arms=placement`: `front` then `board`, one contrast, `tail − front`.
+
+**What that changes in the gate, stated because a gate that skips silently is worse than no gate.** Two readings had
+`control` as their left arm by name: the bill band (`board / control` within −20%…+20%) and the paired reading. With
+no control arm both would have taken a branch that does not execute — `if control and treated:` is false, and
+`--compare control.json ...` would have killed the step under `set -e` *after* the money was spent. Both now fall
+back to `front` as the baseline, and the reading carries the names of the files it compared, so a sentence can no
+longer call its left arm "control" when the file was `front.json`. The band's meaning changes with the baseline and
+is restated: **the placement may cost the parser arm −20% to +20%**, which is the design's own derivation (~15%
+cheaper in the bill, because the prefix survives) with the same two-sidedness that caught R216-1's dead arm.
+
+**The cost line for this round, after the change:** 228 episodes ≈ **$1.29 (¥9.3)**, against $1.79 (¥12.9) as armed.
+The registered prediction is unchanged — the placement's bill within ±20% of the parser arm's, attribution ≥60%,
+`tail − front` reported as the price of the move — because none of those numbers is about the control.

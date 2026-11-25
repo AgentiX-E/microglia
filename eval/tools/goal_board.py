@@ -923,12 +923,20 @@ def _task_key(task: str):
     return (0, int(task)) if str(task).isdigit() else (1, str(task))
 
 
-def compare_of(control: dict, treatment: dict) -> dict:
-    """The paired reading: of the tasks one attempt each, how many the board turned over.
+def compare_of(control: dict, treatment: dict, k: int = 1, names: tuple[str, str] = ("control", "board")) -> dict:
+    """The paired reading: of the tasks both arms ran, how many the board turned over, at pass^k.
 
     Paired by task and by nothing else, because both arms ran the same task in the same world at the same seed —
     the two documents are the two answers to one question, and a difference of two independent rates would throw
     away the pairing that makes a 114-task grid able to resolve nine points.
+
+    `k` is the number of attempts a task must survive to count as passed, and it defaults to one because every arm
+    before R218b was a one-attempt arm, where "the best attempt" and "the attempt" are the same number. A four-
+    attempt arm needs `k = 4` to ask the reliability question, and passing the wrong `k` is not a small error: at
+    `k = 1` a four-attempt arm reads its **first** attempt, which is the honest per-attempt estimate, while
+    `max(attempts)` — the rule this function used before R218b — would read *best of four*, the opposite end of the
+    ladder from `pass^4` and the most flattering of the four readings available. The reading reports the `k` it used
+    so a quoted number cannot be re-read as the other one.
 
     Three numbers, and the third is why this is a reading rather than a score. `moved` is the discordant count that
     favours the board; `broke` is the discordant count against it; a board that flips five tasks each way has a
@@ -939,8 +947,8 @@ def compare_of(control: dict, treatment: dict) -> dict:
     """
     from memory_debit import newcombe  # lazy: the arm imports this module every episode and needs no statistics
 
-    left = _attempts_of(control)
-    right = _attempts_of(treatment)
+    left = _attempts_of(control, k)
+    right = _attempts_of(treatment, k)
     shared = sorted(set(left) & set(right), key=_task_key)
     both = moved = broke = neither = 0
     for task in shared:
@@ -959,6 +967,11 @@ def compare_of(control: dict, treatment: dict) -> dict:
     board_rate = (both + moved) / total if total else None
     return {
         "tasks": total,
+        "k": k,
+        # The two arm names as files, because `R216b` pairs `front` against `board` and a reading that called its
+        # left arm "control" would be a sentence about a document that was never written.
+        "left": names[0],
+        "right": names[1],
         "controlPassed": both + broke,
         "boardPassed": both + moved,
         "controlRate": control_rate,
@@ -974,12 +987,24 @@ def compare_of(control: dict, treatment: dict) -> dict:
     }
 
 
-def _attempts_of(document: dict) -> dict:
-    """The best attempt per task, which on a one-attempt arm is the attempt."""
+def _attempts_of(document: dict, k: int = 1) -> dict:
+    """The `pass^k` outcome per task: one when its first `k` attempts all passed, zero otherwise.
+
+    A task with fewer than `k` attempts **leaves the map** rather than counting as a failure — the same rule
+    `note_pilot.py` applies to a `pass^k` denominator and `packages/eval/src/l4.ts` applies on the TypeScript side.
+    Filling it with a zero would report "reliably fails" about a task nobody tried twice, which is the defect this
+    lane has caught once already in a different coat.
+    """
     from rescue_rate import trials_of  # lazy, for the same reason as `compare_of`'s import
 
     by_task = trials_of(document)
-    return {task: max(trials.values()) for task, trials in by_task.items() if trials}
+    outcome = {}
+    for task, trials in by_task.items():
+        if not trials or len(trials) < k:
+            continue
+        kept = [trials[index] for index in sorted(trials)[:k]]
+        outcome[task] = 1.0 if all(value is not None and value >= 1.0 for value in kept) else 0.0
+    return outcome
 
 
 def mcnemar_exact(moved: int, broke: int) -> float | None:
@@ -1021,8 +1046,12 @@ def render_comparison(reading: dict) -> str:
     else:
         state = "NO_LIFT"
         sentence = "no movement larger than the grid's noise"
+    k = reading.get("k", 1)
+    ladder = "" if k == 1 else f" at pass^{k}"
+    left = reading.get("left", "control")
+    right = reading.get("right", "board")
     return (
-        f"{state}: control {reading['controlPassed']}/{total} ({reading['controlRate']:.1%}) against board "
+        f"{state}{ladder}: {left} {reading['controlPassed']}/{total} ({reading['controlRate']:.1%}) against {right} "
         f"{reading['boardPassed']}/{total} ({reading['boardRate']:.1%}), delta {100 * delta:+.1f} pp "
         f"[{100 * interval[0]:+.1f}, {100 * interval[1]:+.1f}] pp, McNemar exact p = "
         f"{p if p is None else format(p, '.4f')}; moved {moved}, broke {broke}, held {reading['both']}, "
@@ -1060,6 +1089,16 @@ def self_test() -> int:
         return {
             "simulations": [
                 {"task_id": task, "trial": 0, "reward_info": {"reward": value}} for task, value in rewards.items()
+            ]
+        }
+
+    def multi_arm(attempts: dict) -> dict:
+        """One document whose tasks each carry a list of attempt rewards, in attempt order."""
+        return {
+            "simulations": [
+                {"task_id": task, "trial": index, "reward_info": {"reward": value}}
+                for task, values in attempts.items()
+                for index, value in enumerate(values)
             ]
         }
 
@@ -1510,6 +1549,21 @@ def self_test() -> int:
     check("no shared task is unpaired", render_comparison(compare_of(arm({"0": 1}), arm({"1": 1}))).startswith("UNPAIRED"))
     check("the unpaired count is reported", compare_of(arm({"0": 1}), arm({"1": 1}))["unpaired"] == 2)
     check("a missing best attempt is not a pass", _attempts_of(arm({"0": 0})) == {"0": 0})
+    four = multi_arm({"0": [1, 1, 1, 1], "1": [1, 1, 1, 0], "2": [1, 0, 1, 1], "3": [0, 1, 1, 1]})
+    check("pass^1 at four attempts is its first attempt, not its best",
+          _attempts_of(four) == {"0": 1.0, "1": 1.0, "2": 1.0, "3": 0.0})
+    check("pass^4 at four attempts is all four", _attempts_of(four, 4) == {"0": 1.0, "1": 0.0, "2": 0.0, "3": 0.0})
+    two = multi_arm({"0": [1, 1], "1": [1, 0]})
+    check("a task with two attempts leaves a pass^4 reading", _attempts_of(two, 4) == {})
+    check("but enters a pass^2 reading", _attempts_of(two, 2) == {"0": 1.0, "1": 0.0})
+    check("the reading reports the k it used", compare_of(four, four, 4)["k"] == 4)
+    check("and the rendered sentence carries it", " at pass^2" in render_comparison(compare_of(four, two, 2)))
+    check("a one-attempt reading is not labelled with a ladder", "pass^" not in render_comparison(
+        compare_of(arm({"0": 1}), arm({"0": 0}))))
+    named = render_comparison(compare_of(arm({"0": 1}), arm({"0": 0}), names=("front", "board")))
+    check("the reading names the arms it was given", " front 1/1 " in named and " against board " in named)
+    check("and defaults to the names the grid has always used",
+          " control 1/1 " in render_comparison(compare_of(arm({"0": 1}), arm({"0": 0}))))
 
     # Handlers the arm never calls but the operator does: the census, the board on a document, and the paired
     # reading from two paths. Exercised through `main` because that is the surface a dispatch uses, and a CLI that
@@ -1610,7 +1664,9 @@ def main(argv: list) -> int:
     parser.add_argument("--goals", default="", help="the census manifest (eval/manifests/retail-goals.json)")
     parser.add_argument("--census", action="store_true")
     parser.add_argument("--compare", nargs=2, default=None, metavar=("CONTROL", "BOARD"),
-                        help="two result documents or directories: the paired one-attempt reading")
+                        help="two result documents or directories: the paired reading")
+    parser.add_argument("--k", type=int, default=1,
+                        help="attempts a task must survive to count as passed (default 1; a four-attempt arm wants 4)")
     parser.add_argument("--replay", default="", help="a result document the arm already produced")
     parser.add_argument("--json", action="store_true")
     arguments = parser.parse_args(argv)
@@ -1664,7 +1720,10 @@ def main(argv: list) -> int:
             else:
                 with open(path, "r", encoding="utf-8") as handle:
                     documents.append(json.load(handle))
-        reading = compare_of(documents[0], documents[1])
+        reading = compare_of(
+            documents[0], documents[1], k=max(1, arguments.k),
+            names=(Path(arguments.compare[0]).stem, Path(arguments.compare[1]).stem),
+        )
         if arguments.json:
             print(json.dumps(reading, indent=1, sort_keys=True))
         else:
