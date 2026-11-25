@@ -4852,6 +4852,17 @@ episode fail. A within-task sign test on it would have reported "more material, 
 a finding about episode length. The repair is a recording rather than an analysis: the arm writes one line an
 episode, where the dose is known, and the next arm can be read per episode instead of per arm.
 
+**What it measured, and the number that changed the plan.** Two identical arms over 114 retail tasks, 71 seconds
+apart: **80.70%** against **83.33%**, δ = +2.63 pp, McNemar p = 0.711, bills within 3%. The delta is inside the bar and
+the direction is not significant — and **29 of the 114 tasks still flipped**. R218b's arms were 35 minutes apart with
+22% turnover; this one is 71 seconds apart with 25.4%. Thirty times less time, the same noise, so the 8.8-point
+afternoon was never a time confound: it is the model and the user simulator sampling differently from one seed world.
+
+That converts into the quantity every reading now prints: at a 25.4% discordance rate, **114 tasks resolve 13.2 pp at
+80% power** and would need **799 tasks** for five points. τ²'s four domains hold about 300, which resolves ~8 pp. The
+consequence is a rule rather than a preference — **an effect below ten points is not measurable on this benchmark**,
+and a contrast must be quoted with the smallest effect its grid could have seen.
+
 **Why this is architecture.** A project that reports deltas has three layers of possible defect — the treatment, the
 grid, and the reading — and only the first is usually checked. An interleave that must read zero is the cheapest
 possible test of the second, and a dose reader that must answer `NO_DOSE` on an arm it cannot see is the cheapest
