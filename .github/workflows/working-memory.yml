@@ -399,9 +399,12 @@ jobs:
           print(f"board: {renders} render(s), {board.get('changes')} change(s) ({share:.0%}), "
                 f"{appends} append(s), {held} held, {mean_chars:.0f} chars a turn, {mean_open:.1f} open ask(s)")
           assert board.get("placement") == "tail", f"the arm ran the {board.get('placement')!r} placement"
-          assert share <= 1 / 3, f"the block changed on {share:.0%} of turns: the prefix cannot survive that"
           assert mean_chars <= 500, f"the block is {mean_chars:.0f} characters a turn"
           assert mean_open <= 3.0, f"{mean_open:.1f} open asks a turn: this is a list of everything, not a contract"
+          # The cadence bar belongs to the **front** arm and only to it: a block in the system message that moves
+          # re-buys the prompt, so a change rate above a third is a prefix that cannot survive. Behind the
+          # conversation a change costs the messages after the old position, so applying that bar here would fail a
+          # mechanism working as specified — R215's 3-point cache bar, one round later (AUDIT 34.226).
           # The placement's own reading: a write per change at most, and at least one turn that found the block
           # already in place. An arm with `held == 0` re-wrote the block on every turn — R215's bill with a smaller
           # constant — and an arm with no appends served nothing at all.
@@ -413,10 +416,18 @@ jobs:
               # The parser arm's own counters, which must show the other placement: a run where both arms report
               # the same placement is a dispatch that passed the same flag twice.
               assert front.get("placement") == "front", front.get("placement")
+              front_renders = front.get("renders") or 0
+              assert front_renders > 0, "the parser arm served no turn"
+              front_share = (front.get("changes") or 0) / front_renders
               front_chars = front.get("charsMean") or 0
-              print(f"front: {front.get('renders')} render(s), {front.get('changes')} change(s), "
+              print(f"front: {front_renders} render(s), {front.get('changes')} change(s) ({front_share:.0%}), "
                     f"{front_chars:.0f} chars a turn")
               assert front_chars <= 500, front_chars
+              # Here, and only here, the cadence is the price: this arm writes into the system message, so every
+              # change re-buys the prompt behind it.
+              assert front_share <= 1 / 3, (
+                  f"the parser arm's block changed on {front_share:.0%} of turns: at the front of the prompt that "
+                  "re-bills every token after it")
           control, treated = per_episode.get("control"), per_episode.get("board")
           if control and treated:
               ratio = treated / control

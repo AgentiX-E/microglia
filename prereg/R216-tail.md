@@ -111,9 +111,12 @@ than paid for at twice the rate.
 
 - **P1 — the wiring.** The board renders on at least **95%** of turns after the contract exists and lists at least
   one ask on at least **80%** of episodes.
-- **P2 — the placement, before the rate.** `placement == "tail"` in the artefact; the block is **written on at most
-  half the turns** (`tailAppends ≤ 0.5 × renders`); at least one turn **found it already in place** (`tailHeld > 0`);
-  and the arm's **bill per episode is within 20% of the control's**. The derivation: 1,034 turns × ~40 tokens of
+- **P2 — the placement, before the rate.** `placement == "tail"` in the artefact; the block is **written no more
+  often than it changes** (`tailAppends ≤ changes`, i.e. one write per change and no re-write on a stable turn); at
+  least one turn **found it already in place** (`tailHeld > 0`); and the arm's **bill per episode is within 20% of
+  the control's**. The cadence bar of R215 (≤ a third of turns) is applied to the **front** arm and only to it: a
+  change at the front re-buys the prompt, a change at the tail does not, and a bar whose price has been removed is a
+  bar that would fail a mechanism working as specified. The derivation: 1,034 turns × ~40 tokens of
   block ≈ 41 k, plus 247 changes × ~350 tokens behind the old position ≈ 86 k, against a control that buys 860 k
   uncached — ≈ +15%; the bar is 20%, R215's front placement was +37%.
 - **P3 — attribution, which is the mechanism and not the accuracy.** At least **60%** of writing episodes end with a
