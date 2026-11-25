@@ -28,9 +28,9 @@ on:
   workflow_dispatch:
     inputs:
       arms:
-        description: 'both (control then board), board alone, or control alone'
+        description: 'three (control, front, tail — the registered grid), both (control then tail), board, control'
         required: false
-        default: 'both'
+        default: 'three'
       tasks:
         description: 'Comma-separated task ids. Empty means every task the bank holds.'
         required: false
@@ -53,6 +53,13 @@ on:
         description: 'Episodes at a time, inside one invocation'
         required: false
         default: '3'
+  schedule:
+    # R216. One opening of the provider's off-peak window, and the dispatch is armed rather than paid for twice:
+    # the rate card's peak bands are 01-04 and 06-10 UTC on weekdays, the grid is ~40 minutes, so 04:05 UTC is the
+    # first minute of the first off-peak hour after this round's registration. The cron names one date on purpose —
+    # `5 4 25 11 *` is 25 November and not "every night" — and the job's own `if:` compares the schedule string, so a
+    # stale entry cannot spend money on a day nobody registered.
+    - cron: '5 4 25 11 *'
   push:
     branches: [master]
     paths:
@@ -190,7 +197,11 @@ jobs:
   board:
     name: board — one attempt over the whole population, two arms, the same seed world
     needs: contract
-    if: github.event_name == 'workflow_dispatch'
+    # A dispatch, or the one scheduled opening this round armed. Anything else — a push, a cron from another date —
+    # runs the contract job and stops there, which is the cheap half.
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      || (github.event_name == 'schedule' && github.event.schedule == '5 4 25 11 *')
     runs-on: ubuntu-latest
     # Install (8 min) plus 228 episodes divided by the concurrency plus two imports plus the reading. Generous
     # rather than tight: a step killed mid-grid writes no document and the money is spent.
@@ -200,7 +211,7 @@ jobs:
       TAU_VERSION: ${{ vars.TAU_VERSION }}
       TAU_MODEL: ${{ vars.TAU_MODEL || 'deepseek/deepseek-flash' }}
       TAU2_DATA_DIR: ${{ github.workspace }}/.tau2-bench/data
-      BOARD_ARMS: ${{ github.event.inputs.arms || 'both' }}
+      BOARD_ARMS: ${{ github.event.inputs.arms || 'three' }}
       BOARD_TASKS: ${{ github.event.inputs.tasks }}
       BOARD_TRIALS: ${{ github.event.inputs.trials || '1' }}
       BOARD_SEED: ${{ github.event.inputs.seed || '400' }}
@@ -243,7 +254,7 @@ jobs:
           MINUTES="$(python3 -c "
           tasks = len([entry for entry in '${BOARD_TASK_LIST}'.split(',') if entry])
           trials = int('${BOARD_TRIALS}')
-          arms = 2 if '${BOARD_ARMS}' == 'both' else 1
+          arms = {'three': 3, 'both': 2}.get('${BOARD_ARMS}', 1)
           concurrency = max(1, int('${BOARD_CONCURRENCY}'))
           print(int((arms * tasks * trials * 26) / concurrency / 60) + 9 + 1)
           ")"
@@ -272,6 +283,34 @@ jobs:
           uv pip install mcp || { echo "tau2-mcp-missing:$REF"; exit 24; }
           uv run tau2 check-data || { echo "tau2-data-missing:$REF"; exit 23; }
 
+      - name: The provider accepts a block behind the conversation
+        # R216. The tail placement is the first change in this lane that puts a message of *its own* into
+        # `state.messages` rather than the system block, and a provider that refuses a system message after the
+        # user's would fail every episode of the grid — 114 chances to learn something one call can say. Two calls
+        # in total, one with the block and one without, because the question is not "does this model answer" (the
+        # control answers it) but "does an extra system turn in the middle change what it accepts".
+        run: |
+          set -euo pipefail
+          PYTHON="${GITHUB_WORKSPACE}/.tau2-bench/.venv/bin/python"
+          MODEL="${TAU_MODEL}"
+          "${PYTHON}" - "$MODEL" <<'PY'
+          import sys
+
+          import litellm
+
+          model = sys.argv[1]
+          block = "<microglia-board>\nOpen asks from the request:\n[ ] return: desk lamp\n</microglia-board>"
+          messages = [
+              {"role": "system", "content": "You are a support agent."},
+              {"role": "user", "content": "I want to return the desk lamp."},
+              {"role": "system", "content": block},
+              {"role": "user", "content": "ok?"},
+          ]
+          reply = litellm.completion(model=model, messages=messages, max_tokens=8, temperature=0)
+          assert reply.choices, reply
+          print(f"ok  {model} accepted a system turn after the user's: {reply.choices[0].message.content!r}")
+          PY
+
       - name: One invocation per arm, the whole population, the same seeds
         # The sidecar's identity was why earlier rounds ran one task per process. This arm has no sidecar: the board
         # is computed from the episode, so the population runs inside one `run_tasks` call and the 114 imports
@@ -297,6 +336,16 @@ jobs:
           }
 
           case "${BOARD_ARMS}" in
+            three)
+              # R216. Three arms, in this order and for this reason: the control is the world nobody has touched,
+              # `front` is the **parser** under R215's placement, and `tail` adds the placement. The two contrasts
+              # are then one change each — front − control is what the three parser repairs are worth, tail − front
+              # is what moving the block buys — which is the decomposition this round exists to make. A two-arm
+              # grid would have reported their sum and nothing about which half it came from.
+              run_arm control
+              run_arm front --note-source board-front
+              run_arm board --note-source board
+              ;;
             both)
               # Control first. The two arms are one measurement, and a control written after the board would be a
               # control run in a world the board had already spent forty minutes in.
@@ -339,6 +388,7 @@ jobs:
           print(f"total {int(episodes)} episode(s), ${usd:.4f} ≈ ¥{usd * 7.2:.1f}")
 
           board = (summary.get("board") or {}).get("diagnostics", {}).get("memory", {}).get("board") or {}
+          front = (summary.get("front") or {}).get("diagnostics", {}).get("memory", {}).get("board") or {}
           assert board, "the board arm wrote no counters: the mechanism did not run"
           renders = board.get("renders") or 0
           assert renders > 0, "the board was served on no turn"
@@ -359,6 +409,14 @@ jobs:
           assert appends <= (board.get("changes") or 0), (appends, board.get("changes"))
           assert held > 0, "no turn found the block already in place: it is being re-written every turn"
 
+          if front:
+              # The parser arm's own counters, which must show the other placement: a run where both arms report
+              # the same placement is a dispatch that passed the same flag twice.
+              assert front.get("placement") == "front", front.get("placement")
+              front_chars = front.get("charsMean") or 0
+              print(f"front: {front.get('renders')} render(s), {front.get('changes')} change(s), "
+                    f"{front_chars:.0f} chars a turn")
+              assert front_chars <= 500, front_chars
           control, treated = per_episode.get("control"), per_episode.get("board")
           if control and treated:
               ratio = treated / control
@@ -395,6 +453,9 @@ jobs:
           PY
 
       - name: The paired reading
+        # Three contrasts, one change each. `tail − control` is the round's registered endpoint; `front − control` is
+        # what the three parser repairs are worth under R215's placement; `tail − front` is what the placement buys.
+        # A two-arm grid could only have reported the sum, and the sum is the number that cannot be acted on.
         run: |
           set -euo pipefail
           python3 eval/tools/goal_board.py \
@@ -402,6 +463,12 @@ jobs:
           python3 eval/tools/goal_board.py \
             --compare "${BOARD_DIR}/control.json" "${BOARD_DIR}/board.json" --json \
             > "${RUNNER_TEMP}/reading.json"
+          if [ -f "${BOARD_DIR}/front.json" ]; then
+            echo "--- the parser, under R215's placement ---"
+            python3 eval/tools/goal_board.py --compare "${BOARD_DIR}/control.json" "${BOARD_DIR}/front.json"
+            echo "--- the placement, with the parser held ---"
+            python3 eval/tools/goal_board.py --compare "${BOARD_DIR}/front.json" "${BOARD_DIR}/board.json"
+          fi
           python3 - "${RUNNER_TEMP}/reading.json" <<'PY'
           import json, sys
 
@@ -411,6 +478,7 @@ jobs:
           assert reading["tasks"] >= 100, reading["tasks"]
           assert reading["unpaired"] == 0, reading["unpaired"]
           print(f"ok  paired over {reading['tasks']} task(s)")
+          PY
 
       - name: Upload the documents
         if: always()

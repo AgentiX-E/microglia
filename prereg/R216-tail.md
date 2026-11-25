@@ -6,7 +6,7 @@ opened: 2026-11-25
 # before spending anything says the round's registered diagnosis — "a set ask cannot be settled" — was worth two
 # settlements in a hundred and seven episodes. The bulk is three other defects, and the bill is an address rather
 # than a cadence. This round repairs those four and moves the block behind the conversation.
-arms: control, board
+arms: control, front, board
 sample: 114
 gates: V0
 recallFloor: 0
@@ -92,12 +92,20 @@ minutes apart, and R215 measured the control moving 98 → 95 across two dispatc
 | arm | material | episodes | estimate |
 |---|---|---|---|
 | `control` | none | 114 | ≈ $0.51 |
+| `front` | the same parser, R215's placement — the block in the system message | 114 | ≈ $0.69 |
 | `board` | the contract at the tail, written only when a receipt moves it | 114 | ≈ $0.55 |
 
-**≈ $1.06 (¥7.6)**, ~30 minutes at concurrency 3, and a 2-task pilot is dispatched first (≈ $0.02) because the
-tail placement is the first time this lane puts a message of its own into `state.messages` rather than the system
-block: a provider that refuses a mid-conversation system message would fail every episode, and that is worth 2 tasks
-rather than 114.
+**≈ $1.75 (¥12.6)**, ~55 minutes at concurrency 3. Three arms rather than two, and the reason is the ablation this
+round cannot do later: `front − control` is what the three parser repairs are worth under the placement R215
+measured, and `board − front` is what moving the block buys. A two-arm grid reports their sum, which is the one
+number nobody can act on — and this lane has already paid for that lesson once (R214 changed the supply rule and the
+cadence together and could not say which was the harm).
+
+Two pre-flight checks before the grid, because the placement is the first change here that puts a message of its own
+into `state.messages` rather than the system block: a **one-call smoke test** that the provider accepts a system turn
+after the user's (≈ $0.0002, and it fails the job rather than the grid), and the dispatch is **armed for the first
+minute of the off-peak window** (04:05 UTC, the rate card's peak bands being 01-04 and 06-10 on weekdays) rather
+than paid for at twice the rate.
 
 ## Prediction
 
@@ -114,6 +122,10 @@ rather than 114.
 - **P4 — the harm stays gone.** Paired pass^1 against the control is **not worse by more than 3 points**.
 - **P5 — the lift.** Paired pass^1 **+10 pp**, McNemar exact p < 0.05, interval excludes zero (`BOARD_UP`), paired
   over **≥ 100 tasks** with zero unpaired.
+- **P6 — the decomposition.** `board − front` reports the placement's own contribution separately from
+  `front − control`, both printed with their intervals. Neither is required to clear the bar on its own; what is
+  required is that the sum is reported as a sum **and** that the two halves are visible. A round where the parser
+  arm is materially worse and the tail arm is better is a finding about placement, not about state.
 
 ## Refutation
 
