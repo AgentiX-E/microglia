@@ -288,12 +288,19 @@ jobs:
           uv pip install mcp || { echo "tau2-mcp-missing:$REF"; exit 24; }
           uv run tau2 check-data || { echo "tau2-data-missing:$REF"; exit 23; }
 
-      - name: The provider accepts a block behind the conversation
+      - name: The provider accepts a block behind the conversation, in a conversation that has tool calls in it
         # R216. The tail placement is the first change in this lane that puts a message of *its own* into
-        # `state.messages` rather than the system block, and a provider that refuses a system message after the
-        # user's would fail every episode of the grid — 114 chances to learn something one call can say. Two calls
-        # in total, one with the block and one without, because the question is not "does this model answer" (the
-        # control answers it) but "does an extra system turn in the middle change what it accepts".
+        # `state.messages` rather than the system block, and a provider that refuses it would fail every episode of
+        # the grid — 114 chances to learn something one call can say.
+        #
+        # **This step was wrong and it cost a dispatch.** R216-1's tail arm died on 94 of 114 episodes with a
+        # `BadRequestError`, and this smoke test had passed minutes earlier, because it built the conversation out of
+        # *user* turns: `system, user, system, user`. A τ² episode is almost entirely `assistant(tool_calls)` followed
+        # by `tool(result)`, a shape this test never produced. So it certified a dialogue the benchmark does not run
+        # (`AUDIT 34.239`). Two calls now, and both on the real shape: one with the block placed where `tail_index`
+        # puts it (after the last answered call), and one with it in the position the naive append used (between a
+        # call and its results), whose outcome is printed rather than asserted — a provider that tolerated it would
+        # be news, not a failure of this step.
         run: |
           set -euo pipefail
           PYTHON="${GITHUB_WORKSPACE}/.tau2-bench/.venv/bin/python"
@@ -305,15 +312,41 @@ jobs:
 
           model = sys.argv[1]
           block = "<microglia-board>\nOpen asks from the request:\n[ ] return: desk lamp\n</microglia-board>"
-          messages = [
-              {"role": "system", "content": "You are a support agent."},
-              {"role": "user", "content": "I want to return the desk lamp."},
-              {"role": "system", "content": block},
-              {"role": "user", "content": "ok?"},
-          ]
-          reply = litellm.completion(model=model, messages=messages, max_tokens=8, temperature=0)
+          tools = [{
+              "type": "function",
+              "function": {
+                  "name": "get_order",
+                  "description": "Look one order up by id.",
+                  "parameters": {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]},
+              },
+          }]
+          call = {
+              "role": "assistant",
+              "content": None,
+              "tool_calls": [{
+                  "id": "call_1",
+                  "type": "function",
+                  "function": {"name": "get_order", "arguments": "{\"id\": \"42\"}"},
+              }],
+          }
+          result = {"role": "tool", "tool_call_id": "call_1", "content": "{\"status\": \"shipped\"}"}
+          head = [{"role": "system", "content": "You are a support agent."},
+                  {"role": "user", "content": "Where is order 42?"}]
+
+          # The shape the driver produces: the block lands after the call *and* its result.
+          placed = head + [call, result, {"role": "system", "content": block}]
+          reply = litellm.completion(model=model, messages=placed, tools=tools, max_tokens=8, temperature=0)
           assert reply.choices, reply
-          print(f"ok  {model} accepted a system turn after the user's: {reply.choices[0].message.content!r}")
+          print(f"ok  {model} accepted the block after a tool result: {reply.choices[0].message.content!r}")
+
+          # The shape the naive append produced, and the one that killed R216-1's arm.
+          split = head + [call, {"role": "system", "content": block}, result]
+          try:
+              litellm.completion(model=model, messages=split, tools=tools, max_tokens=8, temperature=0)
+              print("note  the provider tolerated a system turn between a call and its result; tail_index is then "
+                    "belt and braces rather than load-bearing")
+          except Exception as error:
+              print(f"note  as expected, the block between a call and its result is refused: {type(error).__name__}")
           PY
 
       - name: One invocation per arm, the whole population, the same seeds
