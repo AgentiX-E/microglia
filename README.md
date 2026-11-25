@@ -1253,22 +1253,31 @@ measured no effect larger than the grid's own variance, and the published ablati
 SOTA on τ²-retail prices the same channel at **+2.0 points with an interval that includes zero** — against
 **+23.9** for verified working state.
 
-`eval/tools/goal_board.py` is that second channel, and it costs nothing to serve: it reads the asks out of the
-user's messages (a family — exchange, return, cancel, modify, address, payment, transfer — and the words that
-name the object) and the receipts out of the agent's own tool calls (state-changing calls that succeeded, with
-the product names their results proved), then recomputes the board on every turn. A line is ticked only when a
-receipt of the same family **names the product the ask names**; a receipt that names nothing is reported as
-*unattributed* rather than credited to the nearest open ask.
+`eval/tools/goal_board.py` is that second channel, and it costs nothing to build: it reads the asks out of the
+**request** (a family — exchange, return, cancel, modify, address, payment, transfer — and the words that name the
+object) and the receipts out of the agent's own tool calls (state-changing calls that succeeded, with the product
+names their results proved), then recomputes the board on every turn. A line is ticked only when a receipt of the
+same family **names the product the ask names**; a receipt that settles nothing is reported as *unrequested* (work
+nobody asked for) or *unattributed* (the board's own blind spot) rather than credited to the nearest open ask.
 
 Measured against the evaluator's own list of required changes, over all 114 retail requests, the parser finds
-**180 of 226 required objects (79.6%)**, mentions **152 of 180 required families (84.4%)**, and reports 255
-asks that no required object accounts for — 3.8 lines a task, at 41.4% precision. What it cannot do is stated
-rather than hidden: it reads what the user *said*, so a scripted user who changes their mind mid-call gets a
-board that lists both asks.
+**176 of 226 required objects (77.9%)**, mentions **150 of 180 required families (83.3%)**, and reports 235
+asks that no required object accounts for — 3.6 lines a task, at 42.8% precision. What it cannot do is stated
+rather than hidden: it reads what the request *says*, so a set phrase ("return everything from my two most recent
+orders") names no product and no receipt can settle it by name. That is the defect R215 found and R216 repairs.
 
 The grid is one attempt over 114 tasks with both arms in one seed world, which is the cheapest powered
 behavioural design in this lane: a floor near 9 points, against 20 for the 24-task grid every earlier reading
 was taken through.
+
+**Result (R215, 228 episodes, $1.1996).** Control **95/114 (83.3%)**, contract **100/114 (87.7%)**: **+4.4 pp**
+[−4.9, +13.6], McNemar p = 0.40, fourteen tasks turned over against nine that broke. Two rules changed between
+the rounds and both are visible in the counters: the asks come from the request, so the list fell from 10.6 a turn
+to **1.96**; and the block can only move when a receipt moves it, so it changed on **23.9%** of turns instead of
+essentially all of them, and the bill premium fell from +77% to **+37%**. The registered ten-point bar was not met,
+a three-point cache bar was registered and missed by 6.5 (no per-turn block can clear it: 114 of the round's 247
+changes are first turns), and only **32.7%** of writing episodes ended with a ticked ask — because a set-phrased
+ask cannot be settled by containment. The harm is gone; the lift is not there; the next change is the set rule.
 
 **Result (R214, 228 episodes, $1.4261).** Control **98/114 (86.0%)**, board **92/114 (80.7%)**: −5.3 pp
 [−15.0, +4.5], McNemar p = 0.26, thirteen tasks broken against seven moved. The board was served on every turn

@@ -4481,3 +4481,104 @@ only in its per-turn form.
 For the product this is a decision rather than an experiment: **no per-turn context block ships.** The serve
 profile's five fields are unchanged, and the sixth — the state channel — is now a measured `off` rather than an
 unexamined absence.
+
+### 8.90 The contract: a block that can only move when a receipt moves it
+
+R214's board was a **renderer**: it read the transcript every turn and printed what it found, so its text changed
+whenever the *conversation* changed — which is every turn. R215 makes it a **checker**: the asks are the ones the
+*request* states, read from the first user turn and fixed before the first call, and the block can therefore change
+only when a successful state-changing call changes it.
+
+That single rule is both halves of R214's failure. The list stops growing (10.6 asks against 1.58), and because it
+stops growing the block stops moving, so the prefix the provider already cached survives the turn.
+
+**Where the contract comes from.** `request_of(messages)` is the first non-empty user message.
+`board_of(messages, scope='request')` parses it once, on every turn, from the same messages the episode carries —
+nothing is memoised, because memoising a contract would make it a note again. `scope='conversation'` keeps R214's
+reading so the difference between the two is a subtraction over one transcript rather than an argument about one.
+
+**Why the later turns are not read.** In τ² the first user turn is the request and every later turn is the simulator
+answering a question the agent asked — "yes, the blue one", "no, only the lamp", "I'd rather have a refund". Those
+sentences name objects and follow verbs, so a parser that read them listed **10.6** asks an episode against the
+**1.58** the request states. A board of eleven lines with one tick is not a working memory; it is the transcript
+with square brackets.
+
+The rule has a cost and it is stated rather than hidden: a user who says "actually, also return the desk lamp" on
+turn four is not on the board. That is the conservative side of the trade the measurement forces — R214's harm was
+*over*-listing, and a board that under-lists leaves the conversation in front of the agent, which is where the ask
+still is.
+
+**Two refusals, not one.** A receipt that settles nothing is now classified:
+
+| line | what it means | whose fault |
+|---|---|---|
+| `Not asked for by the request` | a successful call of a family the contract never stated | the agent's — this is the failure τ² charges for |
+| `Not attributed to any ask` | a successful call of an asked family whose object the board could not name | the board's — an address change carries no item id |
+
+R214 printed both under one line, and a reader who could not tell a limit from a mistake would read one as the
+other. A **failed** call now appears on neither: it changed no state, and a list of state is not a list of attempts.
+
+**The cadence is counted.** The agent holds the last block it served and counts the turns whose block differed from
+it (`changes`) and the turns that re-served a byte-identical block (`stable`). `changes / renders` is the share of
+turns that can re-bill the prefix, which is the number R214 could only read from the provider's bill after the
+fact — and it is the number the workflow now refuses to spend money without.
+
+**One repair inside the parser.** The negation rule read "don't return" and let "I don't want to return" through as
+a live ask. It now allows three words between the negation and the cue, and refuses the correlative ("not only
+return it, but exchange it") and the nominal ("if the agent doesn't allow **the** exchange"), neither of which
+refuses anything. On the census the repair moves recall by nothing (176 of 226 objects either way) and noise by
+three (238 → 235); on task 107 it is the difference between listing a required exchange and dropping it.
+
+### 8.91 What the contract measured: the harm is gone, the lift is not there, and attribution is the wall
+
+Run `45511205369`, 114 tasks, one attempt, two arms in one seed world, 228 episodes, $1.1996.
+
+| arm | pass^1 | bill / episode | cache hit rate |
+|---|---|---|---|
+| control | **95/114 (83.3%)** | $0.00444 | 90.4% |
+| contract | **100/114 (87.7%)** | $0.00608 | 84.0% |
+
+Paired by task: **+4.4 pp** [−4.9, +13.6], McNemar p = 0.4049, 14 tasks turned over against 9 that broke. R214's
+−5.3 is gone and the ten-point bar is not met. The control itself moved 98 → 95 across two dispatches on the same
+grid and the same seed: three tasks, which is the drift the lane's own check predicted, and the reason both rounds
+re-run the control rather than reusing the previous one.
+
+**The mechanism held on three of four bars.**
+
+| reading | bar | value |
+|---|---|---|
+| turns whose block changed | ≤ 33% | **23.9%** (247 of 1,034) |
+| mean block | ≤ 500 chars | **150.5** |
+| mean open asks a turn | ≤ 3.0 | **2.05** |
+| cache hit rate against the control | ≤ 3 points | **−6.5 points** |
+
+Changing the supply rule took the list from 10.6 asks a turn to **1.96** and the change rate from essentially every
+turn to a quarter of them; the bill premium fell from +77% to **+37%**. The 3-point cache bar was missed, and the
+arithmetic says the bar was wrong rather than the arm: 247 changes × 4,756 tokens = 1.17 M tokens of re-bought
+prefix, **114 of those changes are first turns**, and on a nine-turn episode the cold start alone costs about six
+points. *No block that shows state can be cache-neutral at the front of the prompt.* The remaining lever is
+placement, not cadence.
+
+**Attribution collapsed, and that is the round's finding.**
+
+| reading | R214 | R215 |
+|---|---|---|
+| asks at the last turn, mean | 10.6 | **1.96** |
+| ticked, mean | 1.58 | **0.45** |
+| episodes ending with a tick | 79.2% | **32.7%** |
+| writes credited to an ask | 125 of 187 | **52 of 191** |
+
+A contract built from the simulator's first message looks like `return everything two`, `return everything related`,
+`return ['cancel', 'bunch', 'recent', 'basically', 'anything', 'related']` — **set phrases**, while the receipt that
+answers them is `return_delivered_order_items` on four named products. `settles()` requires containment between the
+ask's words and a product name, so a set ask is **unsettable by construction**. R214's board ticked such receipts
+only because a ten-line list eventually contained a product name from a later clarification: the transcript reader
+did not attribute better, it had more chances to.
+
+**What survives, and what changes.** The tick rule, the refusal to over-credit, and the two-refusal split are
+unchanged. What the round adds to the design is that **a set ask needs the family rule that a wordless ask already
+has**, and that **the block belongs at the tail**: appended when it changes instead of rewritten in the system
+message, so its cost is its own length rather than the prefix it sits on. Both are the next round's registration.
+
+For the product this is still an `off`: +4.4 points with an interval that includes zero is not a default, and the
+arm costs 37% more. The serve profile's five fields are unchanged.

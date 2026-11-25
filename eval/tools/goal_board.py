@@ -589,7 +589,9 @@ def render(board: dict) -> str:
     if not items and not (board.get("unrequested") or board.get("unattributed")):
         return ""
     where = "from the request" if board.get("scope", REQUEST) == REQUEST else "from the conversation"
-    lines = [f"Open asks {where} — a line is ticked only when a tool receipt names it:"]
+    # The header promises lines, so it is only printed when there are some: a block that opens "Open asks" and then
+    # says nothing about asks is a block a reader has to decode.
+    lines = [f"Open asks {where} — a line is ticked only when a tool receipt names it:"] if items else []
     for item in items[:MAX_ITEMS]:
         mark = "x" if item.get("settled_by") else " "
         lines.append(f"[{mark}] {item['family']}: {' '.join(item['words'][:8])}")

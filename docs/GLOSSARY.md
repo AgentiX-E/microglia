@@ -2563,9 +2563,14 @@ ask names, by containment in either direction ("the keyboard" settles a Mechanic
 names no product is reported as **unattributed**, never credited to the nearest open ask. Attribution is what
 separates state from a hint.
 
-**Unattributed** — a successful change the board could not tie to an ask, either because the episode never read
-the product's name or because nobody asked for it. It has its own line in the board and its own count in the
-artefact, because a reader who could not tell a limit from a result would read one as the other.
+**Unattributed** — a successful change of a family the request did ask for whose object this board could not name:
+the episode never read the product, or the call carried no item id (an address change). It has its own line and its
+own count, apart from **unrequested**, because a reader who could not tell a limit from a mistake would read one as
+the other. R214 reported both under one line; R215 splits them.
+
+**Unrequested** — a successful change of a family the request never asked for. This is work nobody asked for — the
+failure τ² charges for — and it is the one thing a transcript cannot make visible without a contract to compare
+against. A *failed* call is neither: it changed no state.
 
 **Working memory** — memory that is a function of the episode in progress rather than of a failure that ended it.
 The board is the instance here; the term is the literature's (Recuris prices it at +23.9 on τ²-retail, against
@@ -2600,3 +2605,13 @@ the write path rather than re-rendering it per turn.
 **Checker** — the component that decides whether a state change happened, from a tool receipt rather than from a
 transcript. The literature's word for the half of a memory system that made state worth +23.9; the half this lane
 built as a renderer first, and measured at −5.3 points.
+
+**Contract** — the asks a request states, read from the first user turn and fixed before the first call. It is what
+turns a board from a renderer into a checker: the text a receipt is checked against cannot change while the
+episode runs, so the block can only move when a receipt moves it. A clarification refines a clause; it does not add
+one, because a parser that cannot tell which clause a "yes" refines would add a line for every sentence the
+simulator says (R214: 10.6 asks an episode against the 1.58 a request states).
+
+**Scope** — where the parser reads asks from: `request` (the first user turn, the product's reading) or
+`conversation` (every user turn, R214's reading). Kept as an argument rather than a rewrite, so the difference
+between the two is a subtraction over one transcript rather than an argument about one.

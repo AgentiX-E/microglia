@@ -6742,10 +6742,16 @@ On a dispatch, `.github/workflows/working-memory.yml` runs the pair: `control`, 
 - **Compare like with like.** `--compare` pairs by task, so both arms must have run the same tasks in the same
   seed world. Two arms at different seed bases are two worlds, which is what R211's drift check refused.
 
-The census is the parser's licence and it is gated: 180 of 226 required objects, 152 of 180 required families,
-255 asks no required object accounts for, 86 of 114 tasks fully covered. If you change the parser, the gate in
+The census is the parser's licence and it is gated: 176 of 226 required objects, 150 of 180 required families,
+235 asks no required object accounts for, 84 of 114 tasks fully covered. If you change the parser, the gate in
 `working-memory.yml` will tell you which of those numbers you moved — and a moved number is a change to the
 material, to be registered rather than merged quietly.
+
+> **A number to distrust, and how it was found.** This paragraph used to quote 180 of 226, 152 of 180, 255 and
+> 86 — the census as it stood when R214 was *registered*, before two parser filters and one reverted fold landed.
+> The code never produced those numbers again and the gate's bounds were wide enough to accept both, so for one
+> round the documentation and the artefact disagreed and nothing failed. R215 pins the gate to the measured values
+> (AUDIT 34.223) and this is the sentence that was wrong. If you quote a census, re-run it.
 
 One habit, unchanged from §32.69 and now cheaper to keep: **read the floor before the delta.** A 114-task grid
 resolves about nine points; the registration's bar is ten. An effect of five points on this grid is not a small
@@ -6783,3 +6789,43 @@ a renderer on the read path.
 
 Habit for the next design: **cost a memory arm in three terms, not two** — the episode, the material's own calls,
 and the prefix the material invalidates. The third is the one that surprises.
+
+### 32.72 The contract arm, and the four numbers that decide whether it was a memory
+
+R215's arm is the same dispatch argument as R214's — `--note-source board` — with three differences in what it
+serves: the asks come from the **first user message only**, a receipt that settles nothing is reported as
+`unrequested` (work nobody asked for) or `unattributed` (the board's blind spot), and the agent counts how often
+the block it serves actually changes.
+
+```bash
+python3 eval/tools/goal_board.py --self-test
+python3 eval/tools/goal_board.py --census --json
+python3 eval/tools/goal_board.py --compare control.json board.json    # paired, by task
+```
+
+Read four numbers before the accuracy, in this order:
+
+1. **`board.changes / board.renders`.** The share of turns whose block differed from the previous turn's, which is
+   the share of turns that can re-bill the provider's prefix. R214's board changed on essentially every turn and
+   cost +77%; R215's changed on **23.9%** and cost +37%. The gate in `working-memory.yml` fails the run above a
+   third.
+2. **`usage.cache_hit_rate` against the control's.** Not a diagnostic — a price. At this lane's card a cache miss
+   is fifty times a hit. Compare the *gap*, and compare it against the floor: one change an episode is a cold
+   start, and on a nine-turn grid that is about six points by itself.
+3. **`board.settled` against `board.items`.** A board that lists two asks and ticks none is a static list. R215's
+   last turns averaged 1.96 asks with **0.45** ticked, because the contract's asks are set phrases ("return
+   everything from my two most recent orders") and a set phrase names no product, so containment can never settle
+   it. If you see this ratio, the bug is in the settlement rule and not in the material.
+4. **`board.unrequested`.** Calls of a family the request never asked for. This is the line a transcript cannot
+   produce and the one worth showing the agent: it is the failure τ² charges for. R215 reported 77 of them, and a
+   run where this number is large is a run whose *contract* is wrong — the request said something the parser did
+   not read.
+
+Two habits that R215 bought:
+
+- **A 3-point cache bar is not implementable, and a 3-point cache bar is what this round registered.** The gate
+  failed the run for a mechanism that worked as specified. When you write a bar that depends on a grid, derive it
+  from the grid: `changes × prompt` is the bill, and `changes` has a floor of one an episode.
+- **Re-run the control in the same dispatch.** The control read 98/114 in R214 and 95/114 in R215 on the same
+  tasks at the same seed. Three tasks of drift is larger than most effects this lane has measured, and the drift
+  check exists because of it.
