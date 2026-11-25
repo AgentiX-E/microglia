@@ -4,7 +4,7 @@
   "rounds": [
     {
       "id": "R216b",
-      "title": "the placement's price \u2014 front against tail, one dispatch",
+      "title": "the placement's price — front against tail, one dispatch",
       "status": "read",
       "dispatchedAt": "2026-11-25T13:45:00Z",
       "dispatchBy": "2026-11-25T12:00:00Z",
@@ -41,8 +41,8 @@
     },
     {
       "id": "R218b",
-      "title": "the reliability column \u2014 four attempts, control against front",
-      "status": "registered",
+      "title": "the reliability column — four attempts, control against front",
+      "status": "read",
       "dispatchBy": "2026-11-27T12:00:00Z",
       "prereg": "prereg/R218b-pass4.md",
       "arms": [
@@ -54,11 +54,67 @@
       "estimateUsd": 4.75,
       "dependsOn": [
         "R216b"
-      ]
+      ],
+      "dispatchedAt": "2026-11-25T15:32:00Z",
+      "run": 45646309827,
+      "readAt": "2026-11-25T16:45:00Z",
+      "actualUsd": 4.677,
+      "outcome": "refuted on two of five bars",
+      "reading": {
+        "control": "pass^1 96/114 (84.2%), pass^4 66/114 (57.9%), $0.00442 an episode",
+        "front": "pass^1 89/114 (78.1%), pass^4 61/114 (53.5%), $0.00584 an episode",
+        "deltaPass1": "-6.1 pp [-16.2, +4.1], McNemar p = 0.2295",
+        "deltaPass4": "-4.4 pp [-17.0, +8.4], McNemar p = 0.4869",
+        "attribution": "71.7% of 417 writing episodes",
+        "dependence": {
+          "icc": {
+            "control": 0.773,
+            "front": 0.745
+          },
+          "ratio": {
+            "control": 0.6875,
+            "front": 0.6854
+          },
+          "independentAttempts": 1.2
+        },
+        "drift": {
+          "front": [
+            86.84,
+            81.6,
+            78.07
+          ],
+          "control": [
+            78.95,
+            84.21
+          ]
+        },
+        "placement": {
+          "1x": "7th of 17",
+          "2xTextVerbatim": "2nd of 9"
+        }
+      }
+    },
+    {
+      "id": "R218c",
+      "title": "the placebo, interleaved — two identical arms, task by task, registered delta of zero",
+      "status": "registered",
+      "dispatchBy": "2026-11-26T18:00:00Z",
+      "prereg": "prereg/R218c-interleave.md",
+      "arms": [
+        "control",
+        "control"
+      ],
+      "trials": 1,
+      "episodes": 228,
+      "estimateUsd": 1.3,
+      "dependsOn": [
+        "R218b"
+      ],
+      "why": "R218b found the same treatment arm reading 86.84, 81.60 and 78.07 in one afternoon, and the arms in its grid ran 35 minutes apart. Two identical arms interleaved task by task must read zero; if they do not, no contrast on this grid is measurable and the repair is the grid."
     },
     {
       "id": "R219",
-      "title": "the invocation policy \u2014 serve the state when a write needs it, not when it is renderable",
+      "title": "the invocation policy — serve the state when a write needs it, not when it is renderable",
       "status": "registered",
       "dispatchBy": "2026-11-30T12:00:00Z",
       "arms": [
@@ -73,10 +129,13 @@
     },
     {
       "id": "R220",
-      "title": "one manifest, two readers \u2014 the configuration the eval measured is the one the product ships",
-      "status": "registered",
+      "title": "one manifest, two readers — the configuration the eval measured is the one the product ships",
+      "status": "read",
       "dispatchBy": "2026-11-29T12:00:00Z",
-      "estimateUsd": 0.0
+      "estimateUsd": 0.0,
+      "readAt": "2026-11-25T16:20:00Z",
+      "actualUsd": 0.0,
+      "outcome": "built; the probe now prices the shipped placement and --board names the population"
     }
   ]
 }

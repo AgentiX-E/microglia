@@ -629,3 +629,35 @@ jobs:
             eval/results/working-memory/*.json
             eval/results/working-memory/*.log
           if-no-files-found: warn
+
+      # R218b lost its reading twice at the transport: the artifact is served only through a redirect to a blob host
+      # that rejects a forwarded `Authorization` (401), and the job-log endpoint answers 403 for this token. A $4.68
+      # result that can only be read by someone who knows to strip a header is a result one person can read.
+      #
+      # So the round's numbers are also published as **annotations**, which `api.github.com` serves directly
+      # (`GET /repos/{owner}/{repo}/check-runs/{id}/annotations`) with no redirect and no extra permission. The
+      # upload above stays: it carries the documents, this carries the sentence.
+      - name: Publish the reading where the API can read it
+        if: always()
+        run: |
+          set -euo pipefail
+          READING="${RUNNER_TEMP}/reading.txt"
+          if [ -f "${READING}" ]; then
+            # One annotation, 60 lines at most: a notice is a summary, and the document is the evidence.
+            head -c 20000 "${READING}" | while IFS= read -r line; do
+              [ -n "${line}" ] && echo "::notice title=working-memory reading::${line}"
+            done
+          else
+            echo "::warning title=working-memory reading::no reading was written; the documents are the artifact"
+          fi
+          python3 - "${BOARD_DIR}" <<'PY'
+          import json, sys
+          from pathlib import Path
+
+          root = Path(sys.argv[1])
+          for path in sorted(root.glob("*.json")):
+              document = json.loads(path.read_text())
+              simulations = document.get("simulations") or []
+              usd = sum((s.get("agent_cost") or 0) + (s.get("user_cost") or 0) for s in simulations)
+              print(f"::notice title={path.stem} bill::{len(simulations)} episode(s), ${usd:.4f}")
+          PY
