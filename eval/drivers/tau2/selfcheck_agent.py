@@ -1838,6 +1838,68 @@ def the_block_sits_behind_the_conversation_and_moves_only_on_change(checks):
 
 
 @case
+def the_block_never_splits_a_call_from_its_results(checks):
+    """R216's first dispatch lost a whole arm to this, so it is asserted before the second one.
+
+    The provider's rule is exact: an assistant message carrying `tool_calls` must be followed immediately by one tool
+    message per call. `serve_tail` appended the block at the end of the conversation on every turn, and on the turn a
+    call is made that put a system message between the call and the results about to arrive — every episode failed
+    with `An assistant message with 'tool_calls' must be followed by tool messages`, 94 of 114 of them leaving no
+    messages at all (PROGRESS 246.6).
+
+    Four shapes, one per branch of `tail_index`, plus the invariant the provider actually enforces checked over the
+    result rather than over the index: a fixture that asserted only where the block *goes* would pass on a
+    conversation that is still illegal for another reason.
+    """
+    call = {"role": "assistant", "content": "", "tool_calls": [{"name": "get_order_details",
+                                                               "arguments": {"order_id": "#W1"}}]}
+    two_calls = {"role": "assistant", "content": "", "tool_calls": [
+        {"name": "get_order_details", "arguments": {"order_id": "#W1"}},
+        {"name": "get_user_details", "arguments": {"user_id": "u1"}},
+    ]}
+    body = "<microglia-board>\n[ ] return: lamp\n</microglia-board>"
+
+    def placed(messages):
+        agent = subject.MicrogliaAgent()
+        state = agent.serve_tail(LLMAgentState(messages=list(messages)), body)
+        return [("board" if subject.is_pack_message(m) else (m.get("role") if isinstance(m, dict) else m[0]))
+                for m in state.messages]
+
+    checks.equal(subject.tail_index([("user", "hi"), ("assistant", "hello")]), 2,
+                 "a conversation with no calls takes the block at its end")
+    checks.equal(subject.tail_index([("user", "hi"), call]), 1,
+                 "an unanswered call moves the block in front of it")
+    checks.equal(subject.tail_index([("user", "hi"), two_calls, {"role": "tool", "content": "ok"}]), 1,
+                 "a half-answered pair of calls moves it in front too")
+    checks.equal(subject.tail_index([("user", "hi"), two_calls, {"role": "tool", "content": "ok"},
+                                     {"role": "tool", "content": "ok"}]), 4,
+                 "a fully answered pair takes it at the end")
+    checks.equal(placed([("user", "hi"), call]), ["user", "board", "assistant"],
+                 "and the block lands in front of the call, not between it and its results")
+    checks.equal(placed([("user", "hi")]), ["user", "board"], "a plain turn appends")
+
+    class Carrying:
+        """The driver's shape: an object with the field, not a dict."""
+
+        role = "assistant"
+        content = ""
+
+        def __init__(self) -> None:
+            self.tool_calls = [{"name": "get_order_details", "arguments": {}}]
+
+    checks.equal(subject.tail_index([("user", "hi"), Carrying()]), 1,
+                 "the accessor reads an object as well as a dict")
+
+    # The provider's invariant, over the result: between an assistant message with calls and the next non-tool
+    # message there must be exactly one tool message per call, and nothing else.
+    transcript = [("user", "return the lamp"), call, {"role": "tool", "content": "ok"},
+                  ("assistant", "done")]
+    order = placed(transcript)
+    between = order[order.index("assistant") + 1:order.index("assistant") + 3]
+    checks.equal(between, ["tool", "assistant"], "a system block never sits inside the answered run")
+
+
+@case
 def the_placement_is_read_from_the_environment(checks):
     """R216. One variable, three arms, and no arm that is two at once.
 
@@ -1890,9 +1952,15 @@ def a_placement_with_nothing_to_say_writes_nothing(checks):
         tail_written = quiet.serve_tail(LLMAgentState(), "<microglia-board>\n[ ] return: lamp\n</microglia-board>")
         os.environ[subject.BOARD_ENV] = "front"
         front_agent = subject.MicrogliaAgent()
-        subject._episode_injected.clear()  # noqa: SLF001
         front_state = episode_step(front_agent, LLMAgentState(), "return the lamp")
         front_written = len(front_state.system_messages)
+        # A resumed run: an episode already under way, so `pack_for` opens no boundary — which is the one state in
+        # which the guard's false branch is reachable, and the one a process restarted mid-episode is in.
+        resumed = subject.MicrogliaAgent()
+        resumed._turn = 0  # noqa: SLF001 - the state a resumed run is in
+        subject._episode_injected.clear()  # noqa: SLF001
+        resumed_state = episode_step(resumed, LLMAgentState(), "return the lamp")
+        resumed_written = len(resumed_state.system_messages)
     finally:
         subject._episode_injected[:] = saved_boundaries  # noqa: SLF001
         if saved_env is None:
@@ -1903,6 +1971,7 @@ def a_placement_with_nothing_to_say_writes_nothing(checks):
     checks.equal(same is given, True, "and does not even copy the state")
     checks.equal(len(tail_written.messages), 1, "a block is written when there is one")
     checks.equal(front_written, 1, "and the front placement writes its own without a boundary to raise")
+    checks.equal(resumed_written, 1, "a resumed run writes one too, with no boundary to record it against")
 
 
 @case

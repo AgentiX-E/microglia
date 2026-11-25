@@ -74,7 +74,12 @@ from notes import lookup, scope_of, sentence_of, load as load_notes
 _TOOLS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "tools")
 if _TOOLS not in sys.path:
     sys.path.insert(0, _TOOLS)
-from goal_board import BOARD_TAG, board_of as goal_board_of, render as render_goal_board  # noqa: E402
+from goal_board import (  # noqa: E402
+    BOARD_TAG,
+    board_of as goal_board_of,
+    render as render_goal_board,
+    role_of,
+)
 
 # `ValidAgentInputMessage` moved in τ² v1.0.0: it lived in `tau2.agent.base` and now lives in
 # `tau2.agent.base_agent`, beside the `HalfDuplexAgent` that `LLMAgent` extends. Both are tried
@@ -635,6 +640,46 @@ def is_pack_message(message) -> bool:
     return head.startswith(f"<{PACK_TAG}") or head.startswith(f"<{BOARD_TAG}")
 
 
+def _attr(message, name: str):
+    """One field of a message, from any of the three shapes this module is handed: object, dict, or a pair.
+
+    The three arrive for the same reason `goal_board` has its own version: the driver sees pydantic models, a self-check
+    sees dicts, and a transcript read back from a document sees whatever JSON had. A placement function that only
+    understood the first would be correct in production and untestable in the suite that exists to protect it.
+    """
+    value = getattr(message, name, None)
+    if value is not None:
+        return value
+    return message.get(name) if isinstance(message, dict) else None
+
+
+def tail_index(messages) -> int:
+    """Where a message of this module's own may be inserted without splitting a call from its results.
+
+    An assistant message that carries `tool_calls` must be followed **immediately** by one tool message per call,
+    and a provider enforces it: `An assistant message with 'tool_calls' must be followed by tool messages responding
+    to each 'tool_call_id'`. R216's first dispatch inserted the board at the end of `state.messages` on every turn,
+    which on the turn a call is made puts a system message between the call and the results it is about to receive —
+    and **every episode failed**, 94 of 114 with no messages at all and the remaining 20 scored against a broken
+    prompt (PROGRESS 246.6).
+
+    So the position is computed rather than assumed. The last assistant message that carries calls is found, the run
+    of tool messages after it is counted, and if the run does not answer every call the insertion point moves to
+    *before* that assistant message. Everything else appends at the end, which is where the cheapest position is.
+    """
+    for index in range(len(messages) - 1, -1, -1):
+        calls = _attr(messages[index], "tool_calls") or []
+        if not calls:
+            continue
+        answered = 0
+        for later in messages[index + 1 :]:
+            if role_of(later) != "tool":
+                break
+            answered += 1
+        return index if answered < len(calls) else len(messages)
+    return len(messages)
+
+
 def injected_message(pack: str, tag: str = PACK_TAG) -> SystemMessage:
     """The recalled block as one system message, given an element only if it arrives without one.
 
@@ -771,6 +816,9 @@ class MicrogliaAgent(LLMAgent):
         * **on change only** — an unchanged board is left exactly where it was written, so the turn costs nothing.
           A block re-written every turn would pay the message it sits behind on every turn, which is R215's bill
           with a smaller constant.
+        * **legal** — never between an assistant message's `tool_calls` and the tool messages that answer them. That
+          is not a preference: it is what the provider refuses, and R216's first dispatch lost a whole arm to it
+          (`tail_index`).
         """
         global _injected_chars, _board_tail_appends, _board_tail_held, _pack_copies_dropped
         carried = [message for message in state.messages if is_pack_message(message)]
@@ -788,7 +836,8 @@ class MicrogliaAgent(LLMAgent):
             _injected_lengths.append(len(injected.content))
             if _episode_injected:
                 _episode_injected[-1] = True
-            kept = kept + [injected]
+            at = tail_index(kept)
+            kept = kept[:at] + [injected] + kept[at:]
             _board_tail_appends += 1
         self._tail_body = pack or None
         fresh.messages = kept

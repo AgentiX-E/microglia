@@ -55,11 +55,11 @@ on:
         default: '3'
   schedule:
     # R216. One opening of the provider's off-peak window, and the dispatch is armed rather than paid for twice:
-    # the rate card's peak bands are 01-04 and 06-10 UTC on weekdays, the grid is ~40 minutes, so 04:05 UTC is the
-    # first minute of the first off-peak hour after this round's registration. The cron names one date on purpose —
-    # `5 4 25 11 *` is 25 November and not "every night" — and the job's own `if:` compares the schedule string, so a
+    # the rate card's peak bands are 01-04 and 06-10 UTC on weekdays, so 10:02 UTC is the first minute of the first
+    # off-peak hour after the round's first dispatch returned (06:05). The cron names one date on purpose —
+    # `2 10 25 11 *` is 25 November and not "every night" — and the job's own `if:` compares the schedule string, so a
     # stale entry cannot spend money on a day nobody registered.
-    - cron: '5 4 25 11 *'
+    - cron: '2 10 25 11 *'
   push:
     branches: [master]
     paths:
@@ -201,7 +201,7 @@ jobs:
     # runs the contract job and stops there, which is the cheap half.
     if: >-
       github.event_name == 'workflow_dispatch'
-      || (github.event_name == 'schedule' && github.event.schedule == '5 4 25 11 *')
+      || (github.event_name == 'schedule' && github.event.schedule == '2 10 25 11 *')
     runs-on: ubuntu-latest
     # Install (8 min) plus 228 episodes divided by the concurrency plus two imports plus the reading. Generous
     # rather than tight: a step killed mid-grid writes no document and the money is spent.
@@ -376,16 +376,23 @@ jobs:
                       summary[path.stem] = json.loads(line)
           per_episode = {}
           episodes = usd = 0.0
+          alive = {}
           for path in sorted(root.glob("*.json")):
               document = json.loads(path.read_text())
-              count = len(document.get("simulations") or [])
-              arm_usd = sum((s.get("agent_cost") or 0) + (s.get("user_cost") or 0)
-                            for s in document.get("simulations") or [])
+              simulations = document.get("simulations") or []
+              count = len(simulations)
+              arm_usd = sum((s.get("agent_cost") or 0) + (s.get("user_cost") or 0) for s in simulations)
               episodes += count
               usd += arm_usd
               per_episode[path.stem] = arm_usd / count if count else 0.0
-              print(f"{path.stem}: {count} episode(s), ${arm_usd:.4f}")
+              # Liveness: an episode with no messages never reached the model. R216's first dispatch reported 94 of
+              # 114 like that in one arm and the counters looked *healthy* — because a broken arm is a cheap one.
+              alive[path.stem] = sum(1 for s in simulations if s.get("messages"))
+              print(f"{path.stem}: {count} episode(s), {alive[path.stem]} with messages, ${arm_usd:.4f}")
           print(f"total {int(episodes)} episode(s), ${usd:.4f} ≈ ¥{usd * 7.2:.1f}")
+          for arm, live in alive.items():
+              assert live >= 0.95 * max(alive.values()), (
+                  f"{arm} reached the model on {live} of {max(alive.values())} episode(s): the arm did not run")
 
           board = (summary.get("board") or {}).get("diagnostics", {}).get("memory", {}).get("board") or {}
           front = (summary.get("front") or {}).get("diagnostics", {}).get("memory", {}).get("board") or {}
@@ -432,9 +439,12 @@ jobs:
           if control and treated:
               ratio = treated / control
               print(f"bill per episode: control ${control:.5f}, board ${treated:.5f} ({100 * (ratio - 1):+.0f}%)")
-              assert ratio <= 1.20, (
-                  f"the arm costs {100 * (ratio - 1):+.0f}% more an episode; the design's derivation is ~15% and the "
-                  "registered bar is 20%")
+              # A **band**, not a ceiling. R216's first dispatch passed a one-sided bar at 0.16 of the control's
+              # bill, which is not a cheap arm but an arm that stopped early (AUDIT 34.231). A cost bar has to be
+              # two-sided or it rewards the failure it was written to price.
+              assert 0.80 <= ratio <= 1.20, (
+                  f"the arm's bill is {100 * (ratio - 1):+.0f}% of the control's; the registered band is -20% to "
+                  "+20%, and a large negative is a run that did not happen")
           PY
 
       - name: The attribution, which is the mechanism and not the accuracy
@@ -453,6 +463,8 @@ jobs:
 
           reading = json.load(open(sys.argv[1]))
           assert reading["writing"] > 0, "no episode made a state-changing call: this is not a board reading"
+          assert reading["skipped"] == 0, (
+              f"{reading['skipped']} episode(s) carried no messages: the arm did not reach the model")
           share = reading["tickShare"]
           assert share is not None and share >= 0.60, (
               f"{share:.1%} of writing episodes ended with a tick; the registered bar is 60%")

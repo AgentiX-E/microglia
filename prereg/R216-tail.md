@@ -53,6 +53,35 @@ python3 eval/tools/goal_board.py --replay eval/results/working-memory/board.json
 | a contract sealed on a greeting that contained no ask | 14 | `""` against a `modify_pending_order_items` |
 | a set ask | **2** | `return everything related` |
 
+## Amendment 1 — the first dispatch's arm collapsed, and the cause was a provider rule
+
+Dispatch `45546028726` (04:19–05:42 UTC, $1.2739) returned two usable arms and one that never ran:
+
+| arm | pass^1 | bill / episode | what happened |
+|---|---|---|---|
+| control | 90/114 (78.9%) | $0.00442 | the world |
+| front | 99/114 (86.8%) | $0.00604 (+37%) | **+7.9 pp** [−2.0, +17.6], p = 0.0784, 15 moved against 6 broke |
+| tail | 10/114 (8.8%) | $0.00071 | the arm did not run: 94 of 114 episodes carried no messages |
+
+The tail arm's failure is exact and the provider said so: `An assistant message with 'tool_calls' must be followed
+by tool messages responding to each 'tool_call_id'`. `serve_tail` appended the block at the end of
+`state.messages`, and on the turn a call is made that put a system message between the call and the results about
+to arrive. Every episode raised `BadRequestError`, four attempts were made, and the run recorded an episode with no
+messages.
+
+Two repairs, both made before the second dispatch and both pinned by a test that fails on the old code:
+
+1. `tail_index(messages)` computes the insertion point instead of assuming it: the last assistant message carrying
+   calls is found, the run of tool messages after it is counted, and if the run does not answer every call the
+   insertion moves to **before** that assistant message.
+2. The mechanism gate now requires **liveness** — every arm must reach the model on at least 95% of the episodes the
+   best arm reached — and its cost bar became a **band, −20% to +20%**, because a ceiling is satisfied by an arm
+   that stopped early: the collapsed arm passed the one-sided bar at 0.16 of the control's bill (AUDIT 34.231).
+
+The round's endpoints are unchanged. The re-dispatch re-runs **all three arms**, because the control has now read
+86.0% (R214), 83.3% (R215) and 78.9% (R216) on the same 114 tasks at the same seed and the drift between dispatches
+is larger than the effect being measured.
+
 ## What this round changes
 
 1. **The contract seals at the first user turn that yields an ask.** R215 sealed it at the first user turn, which is
