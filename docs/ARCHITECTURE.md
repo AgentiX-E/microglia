@@ -4691,3 +4691,56 @@ on the same 114 tasks at seed 400, against 87.7% → 86.8% for the treated arm. 
 is sampling noise (~2 sd) or a provider change the board's material buffers, the rule it settles is the one this lane
 has applied since R211: **only a within-dispatch contrast may be quoted**, which is why the re-dispatch re-runs all
 three arms rather than reusing a control from two hours earlier.
+
+### 8.95 A claim carries three things: the metric, the domain, and the number of attempts
+
+`eval/tools/submission.py` turns a dispatch into a row a leaderboard would accept, and writing it found that the
+table this project has been quoting about its own position was wrong in three ways at once. None of them was a typo;
+each was a cell compared without the two facts that give a cell its meaning.
+
+The board is τ²-bench 1.x text, read 2026-11-25 at commit `768f3d8f` and pinned as
+`eval/manifests/tau2-board-1x-2026-11-25.json` — 46 submissions, of which **25 state a retail cell, 5 state a price,
+and 16 state a `pass^4`**. What that snapshot says:
+
+| the claim this lane made | what the board's own files say |
+|---|---|
+| "the SOTA row is 87.9% on τ²-retail" | 87.91 is the **mean over retail, airline and telecom** of Qwen3.5-397B. Its retail cell is **84.43** |
+| "Claude Opus 4.5 (alone) 85.3%" | 85.3 is **Gemini 3.0 Pro's** retail cell. Opus 4.5's is **79.61** |
+| "86.0% against 87.9%, a 1.9-point gap" | our 86.0 is `pass^1` at **one** attempt; most board rows state `pass^4` over four |
+
+The tool exists so the fourth row of that table cannot be written again. Three operations, one rule:
+
+```bash
+# a dispatch becomes a row: pass^1..pass^4 computed from the grid, the bill averaged per trajectory
+python3 eval/tools/submission.py --emit --arm results/front.json --harness replace \
+  --injects "a state block behind the conversation" --model deepseek-flash \
+  --model-organization DeepSeek --tau2-version 1.0.1 --date 2026-11-25 --out submission.json
+# the row is checked against the schema the board publishes, plus the prose rules a schema cannot express
+python3 eval/tools/submission.py --check submission.json
+# the row is placed among the board's rows, or the placement is refused
+python3 eval/tools/submission.py --position submission.json --metric pass_4 --domain retail
+```
+
+**`--position` is the part that changes behaviour.** It refuses to place a row on a metric the artefact does not
+state, and says why: `our artefact states no pass_4 for retail: the metric needs 4 attempt(s) per task and the run
+was made with fewer`. A `pass^1` at one attempt has no `pass^4`; the previous table did not refuse, it subtracted.
+
+**The scaffold is the other refusal.** The board's standard entry is a general-purpose model through the stock
+agent; adding a planner, router, custom tool or modified control flow is `custom`. This project replaces the
+scaffold outright — the block is a system message the stock agent never writes — so `--harness replace` forces
+`submission_type: "custom"`, requires notes and references, and declares `modified_prompts: true`. A row that
+claimed `standard` would be a row claiming a mechanism it did not run.
+
+What the two readings say, on the same 114 tasks and one dispatch:
+
+| reading | value | note |
+|---|---|---|
+| retail `pass^1`, board at the front | **86.84%** | rank **1 of 26** by point estimate, ahead of Claude Sonnet 4.5 (86.20) |
+| its resolution | ±3.2 pp | at n=114 one attempt, so "first" means "indistinguishable from the top three" |
+| retail `pass^4` | **not measured** | one attempt cannot be squared; 16 board rows state it, the top is 61.40 |
+| cost per conversation | **$0.006043** | the priced rows run $0.0482–$0.3870; one states $0.0000 for self-hosted weights |
+
+So the honest sentence is narrower than the one it replaces and stronger than the one before it: **on the column the
+board states most often, this project is at the top by point estimate with a resolution of three points, at a
+fifteenth of the cheapest published price — and the column that measures reliability has never been run.** That last
+clause is R218's paid half: four trials, two arms, 912 episodes, ≈ $4.2.

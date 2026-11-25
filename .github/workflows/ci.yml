@@ -109,9 +109,13 @@ jobs:
           # The scorer the round after this one will read: a module under the same floor as the drivers, because
           # "it only computes numbers" is how a number nobody re-derived ends up in a report (R190).
           python3 -m coverage run --append --branch scripts/test_score_bank.py
+          # R218. The submission builder decides what number this project may claim and against which rows, so it
+          # is the one tool in the lane whose defect would be published: a metric read off one attempt and placed
+          # in a pass^4 column is a wrong claim with a plausible shape. Measured under the same floor.
+          python3 -m coverage run --append --branch eval/tools/submission.py --self-test
           python3 -m coverage json -o coverage-python.json
           python3 scripts/check-python-coverage.py --self-test
-          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 11
+          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 12
 
       - name: Repository audit (source rules, manifests, published dependencies)
         run: pnpm audit:repo

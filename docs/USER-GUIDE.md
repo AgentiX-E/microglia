@@ -6900,3 +6900,55 @@ Two failures worth recognising by sight:
 - *every episode errors with a `tool_calls` complaint* — the block was inserted between an assistant message's calls
   and their results. `tail_index` computes the position for exactly this.
 - *one arm's bill is a fraction of the control's* — it stopped early. Check `skipped` before reading any counter.
+
+### 32.75 Putting a run on the board, and the two requests the tool refuses
+
+Every number this project quotes about its position has to come from a file the board would accept, and that is a
+mechanical question rather than an editorial one. The tool is `eval/tools/submission.py`; the data it compares
+against is a pinned snapshot of the leaderboard, not a live fetch, so a reading always names its artefact:
+
+```bash
+python3 eval/tools/submission.py --census            # what the board holds, per domain and per metric
+python3 eval/tools/submission.py --census --means    # every entry's three-domain mean beside its retail cell
+```
+
+**Emitting.** A dispatch document becomes a `submission.json`. The rates are computed from the grid, so a task with
+fewer attempts than `k` leaves the `pass^k` denominator instead of counting as a failure, and the bill is the mean
+cost of one trajectory — absent rather than cheap when an episode is missing a cost:
+
+```bash
+python3 eval/tools/submission.py --emit \
+  --arm eval/results/working-memory/front.json \
+  --harness replace --injects "a state block behind the conversation" \
+  --model deepseek-flash --model-organization DeepSeek \
+  --tau2-version 1.0.1 --date 2026-11-25 \
+  --reference https://github.com/AgentiX-E/microglia \
+  --out submission.json
+```
+
+`--harness replace` is not a style choice: it is what makes the entry `custom`, which then requires notes, references
+and a declared prompt modification. A tool that let you type `standard` here would let you claim the stock scaffold.
+
+**Checking.** `--check` mirrors the schema the board publishes — every object it closes is closed, every range and
+enum is checked, the contact is required — and adds the board's prose rules that no schema can express: a custom
+entry without notes is refused, and so is one that leaves `modified_prompts` unstated.
+
+```bash
+python3 eval/tools/submission.py --check submission.json
+```
+
+**Placing.** This is the operation that changes what you are allowed to say:
+
+```bash
+python3 eval/tools/submission.py --position submission.json --metric pass_1 --domain retail
+python3 eval/tools/submission.py --position submission.json --metric pass_4 --domain retail
+```
+
+The first prints a ranked table with our row marked and the user simulator of each competitor beside its number,
+because two rows run against different simulators are two experiments. The second prints `UNRANKED` and the reason —
+one attempt has no `pass^4`. **Read the exit code**: `0` means placed, `1` means the artefact cannot support the
+claim. A table that silently placed an unmeasured quantity in a `pass^4` column is how this lane spent eight rounds
+comparing a `pass^1` to a three-domain mean.
+
+If you only want the cheapest correct statement about a run, it is the one `--emit` prints back: the rates it
+computed, the bill per trajectory, and whether the row would be listed Verified or Unverified.

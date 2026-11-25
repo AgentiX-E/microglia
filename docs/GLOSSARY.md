@@ -2640,3 +2640,29 @@ turn, so the growth defect R214 measured is not re-opened: one message, not twen
 system message in front of it, and left untouched when a receipt does not move it. A change then costs the messages
 after the old position rather than the whole prompt, and an unchanged turn costs nothing. `--note-source board` is
 tail; `board-front` is R215's placement, kept so a reading can be reproduced.
+
+## Board and submission terms
+
+**pass^k** — the share of tasks where **all k attempts** succeeded. Not the mean of k attempts, and not a
+confidence interval: at `k = 4` a task that passed three times and failed once counts as a failure. This is why a
+`pass^1` of 86% and a `pass^4` of 51% are the same system, and why the two may never share a column without their k.
+
+**avg@4** — the mean reward over four attempts. It estimates the per-attempt success rate more precisely than a
+single attempt does, so it is comparable to `pass^1` in expectation and not to `pass^4`. A row that says `avg@4` and
+a row that says `pass^4` are measuring accuracy and reliability respectively.
+
+**Three-domain mean** — the mean of an entry's `pass^1` over retail, airline and telecom. It is the number a
+model-capability claim uses and it is **not a retail number**: Qwen3.5-397B's three-domain mean is 87.91 while its
+retail cell is 84.43. `banking_knowledge` is excluded — different task shape, its own tab, its own retrieval
+configuration — and including it turns a 84.4 entry into a 68.4 one.
+
+**Submission type** — `standard` is a general-purpose model through the benchmark's own agent scaffold; `custom`
+modifies anything on the benchmark side (prompts, tools, orchestration, user simulator, task selection, grading). A
+memory harness that injects a system message is `custom` by that definition, whether or not it calls itself one, and
+a custom entry must explain itself in `methodology.notes`, link its implementation in `references`, and declare
+`modified_prompts`.
+
+**Unranked** — the state of a row that cannot be placed on a metric in a domain because the artefact does not state
+it. Distinct from last place and from zero: a `pass^1` at one attempt is unranked on `pass^4`, and drawing it as a
+zero would report "reliably never" where the truth is "not measured". `--position` exits `1` in this state so a
+script cannot mistake it for a placement.
