@@ -1,22 +1,28 @@
 name: working-memory
 
-# R215 — the contract, and a board that moves only when a receipt moves it.
+# R216 — the set rule, and a block placed behind the conversation.
 #
-# R214 built the state channel and measured two defects at once: the board grew to 10.6 asks an episode against the
-# 1.58 a request states (it read every user turn, and a simulated user's clarifications name objects and follow
-# verbs), and because its text changed on nearly every turn the provider's prefix cache fell from 90.4% to 75.1% —
-# 77% more money for a 200-character block. A list that moves every turn is not cheap because it is small; it is
-# expensive because it moves (PROGRESS 244.3).
+# R215 changed the supply rule and the harm went away: asks from the request took the list from 10.6 a turn to 1.96,
+# the block stopped moving on every turn (23.9%), and -5.3 pp became +4.4 pp. Two things it could not fix by asking
+# for less:
 #
-# So this round changes the unit again. Not a transcript reader: a **contract**. The asks are the ones the request
-# states, fixed before the first call, and the block can therefore move only when a successful state-changing call
-# moves it — a handful of times an episode, not twenty-five. A receipt that settles nothing is now reported as one
-# of two different facts: a call of a family the request never asked for (work nobody asked for, which is the
-# failure τ² charges for) or a call whose object the board could not name (the parser's own limit).
+#   * **the board could not see its own successes.** Only 32.7% of writing episodes ended with a tick, against a 60%
+#     bar. R215's diagnosis was a set phras ("return everything from my two most recent orders"), and re-parsing the
+#     round's own episodes before spending anything says that was worth **two settlements in a hundred and seven**.
+#     The bulk is three other things: an ask one word short of the product it names (28 episodes), a contract sealed
+#     on a greeting that contained no ask (14), and the account families, whose receipts carry no item id at all
+#     (AUDIT 34.227). All four are repaired here; `--replay` is what found them.
+#   * **the address was the bill.** A block in the system message sits in front of every token the episode will send,
+#     so each of the round's 247 changes re-bought a 4,756-token prompt; 114 of them were first turns, which no
+#     per-turn block can avoid. The arm cost 37% more for a 200-character list (AUDIT 34.226).
 #
-# Two endpoints, and the mechanism is checked before the rate: the arm's cache hit rate must stay within **three
-# points** of the control's and its block must change on at most **a third** of its turns, or no accuracy reading
-# from this dispatch may be quoted as a reading about the treatment.
+# So this round moves the block **behind the conversation** — appended when a receipt changes it, left exactly where
+# it was written when nothing does — and teaches the parser the third settlement shape: a **set** ask, one ask over
+# several products, settled by its family and absorbing the calls that belong to it.
+#
+# Endpoints, checked in this order: the mechanism (a set is settled and absorbs; the block is written on at most half
+# the turns; the arm's bill per episode is within 20% of the control's — the design's derivation puts it at ~15% and
+# R215's front placement at 37%), then attribution (60% of writing episodes ticked), then the rate (+10 pp paired).
 
 on:
   workflow_dispatch:
@@ -302,10 +308,11 @@ jobs:
           esac
 
       - name: The mechanism, before the rate
-        # R215. A cadence and a cache first, because R214's accuracy reading was a reading about a block that moved
-        # on every turn: an arm whose material changes the prompt twenty-five times an episode is not the arm the
-        # registration describes, and no accuracy number may be quoted from it as a number about the treatment.
-        # These three assertions are the whole reason this step exists before the paired reading.
+        # R216. Four readings, in the order that decides whether an accuracy number is about the treatment at all:
+        # the cadence (how often the block is re-written), the placement (how often the prompt is written at all), the
+        # price (the bill per episode), and the attribution (does a tick ever happen). R215's 3-point cache bar was a
+        # bar no correct implementation could clear — 114 of its 247 changes were cold starts — so the price is
+        # asserted on the bill, which is the quantity the bar was a proxy for.
         run: |
           set -euo pipefail
           python3 - "${BOARD_DIR}" <<'PY'
@@ -318,14 +325,16 @@ jobs:
               for line in path.read_text(errors="replace").splitlines():
                   if line.startswith('{"phase"'):
                       summary[path.stem] = json.loads(line)
+          per_episode = {}
           episodes = usd = 0.0
           for path in sorted(root.glob("*.json")):
               document = json.loads(path.read_text())
+              count = len(document.get("simulations") or [])
               arm_usd = sum((s.get("agent_cost") or 0) + (s.get("user_cost") or 0)
                             for s in document.get("simulations") or [])
-              count = len(document.get("simulations") or [])
               episodes += count
               usd += arm_usd
+              per_episode[path.stem] = arm_usd / count if count else 0.0
               print(f"{path.stem}: {count} episode(s), ${arm_usd:.4f}")
           print(f"total {int(episodes)} episode(s), ${usd:.4f} ≈ ¥{usd * 7.2:.1f}")
 
@@ -336,23 +345,53 @@ jobs:
           share = (board.get("changes") or 0) / renders
           mean_chars = board.get("charsMean") or 0
           mean_open = (board.get("open") or 0) / renders
-          print(f"board: {renders} render(s), {board.get('changes')} change(s) ({share:.0%} of turns), "
-                f"{board.get('stable')} stable, {mean_chars:.0f} chars a turn, {mean_open:.1f} open ask(s)")
-          # The three mechanism readings. A board that changes on more than a third of its turns is R214's board
-          # with a different parser; one that lists more than three open asks is a transcript again.
+          appends, held = board.get("tailAppends") or 0, board.get("tailHeld") or 0
+          print(f"board: {renders} render(s), {board.get('changes')} change(s) ({share:.0%}), "
+                f"{appends} append(s), {held} held, {mean_chars:.0f} chars a turn, {mean_open:.1f} open ask(s)")
+          assert board.get("placement") == "tail", f"the arm ran the {board.get('placement')!r} placement"
           assert share <= 1 / 3, f"the block changed on {share:.0%} of turns: the prefix cannot survive that"
           assert mean_chars <= 500, f"the block is {mean_chars:.0f} characters a turn"
           assert mean_open <= 3.0, f"{mean_open:.1f} open asks a turn: this is a list of everything, not a contract"
+          # The placement's own reading: a write per change at most, and at least one turn that found the block
+          # already in place. An arm with `held == 0` re-wrote the block on every turn — R215's bill with a smaller
+          # constant — and an arm with no appends served nothing at all.
+          assert appends > 0, "the block was never written into the prompt"
+          assert appends <= (board.get("changes") or 0), (appends, board.get("changes"))
+          assert held > 0, "no turn found the block already in place: it is being re-written every turn"
 
-          control = (summary.get("control") or {}).get("usage") or {}
-          treated = (summary.get("board") or {}).get("usage") or {}
+          control, treated = per_episode.get("control"), per_episode.get("board")
           if control and treated:
-              left, right = control.get("cache_hit_rate"), treated.get("cache_hit_rate")
-              assert isinstance(left, (int, float)) and isinstance(right, (int, float)), (left, right)
-              print(f"cache hit rate: control {left:.1%}, board {right:.1%}, {100 * (right - left):+.1f} pp")
-              assert abs(right - left) <= 0.03, (
-                  f"the arm's cache hit rate is {100 * (right - left):+.1f} points against the control's; "
-                  "the registered bar is 3")
+              ratio = treated / control
+              print(f"bill per episode: control ${control:.5f}, board ${treated:.5f} ({100 * (ratio - 1):+.0f}%)")
+              assert ratio <= 1.20, (
+                  f"the arm costs {100 * (ratio - 1):+.0f}% more an episode; the design's derivation is ~15% and the "
+                  "registered bar is 20%")
+          PY
+
+      - name: The attribution, which is the mechanism and not the accuracy
+        # R216. A board that lists asks and ticks none is a static list, and R215 shipped exactly that: **32.7%** of
+        # its writing episodes ended with a tick against a 60% bar. The parser's replay over R215's own document says
+        # the three repairs in this round take it to **69.2%** — measured before the dispatch, for free, which is what
+        # `--replay` exists for (PROGRESS 245.3). This step is the same measurement on the new artefact, and it is a
+        # gate because a ratio quoted from a document is a number nobody re-ran.
+        run: |
+          set -euo pipefail
+          python3 eval/tools/goal_board.py --replay "${BOARD_DIR}/board.json"
+          python3 eval/tools/goal_board.py --replay "${BOARD_DIR}/board.json" --json \
+            > "${RUNNER_TEMP}/replay.json"
+          python3 - "${RUNNER_TEMP}/replay.json" <<'PY'
+          import json, sys
+
+          reading = json.load(open(sys.argv[1]))
+          assert reading["writing"] > 0, "no episode made a state-changing call: this is not a board reading"
+          share = reading["tickShare"]
+          assert share is not None and share >= 0.60, (
+              f"{share:.1%} of writing episodes ended with a tick; the registered bar is 60%")
+          # The grades, so the reading says which rule produced its ticks. A run whose ticks are mostly loose is a
+          # reading about a looser rule than the registered one, and it has to be visible rather than inferred.
+          print(f"ok  {reading['ticked']}/{reading['writing']} ticked ({share:.1%}), "
+                f"{reading['loose']} loose of {reading['settled']} settled, {reading['absorbed']} absorbed, "
+                f"{reading['unrequested']} unrequested, {reading['unattributed']} unattributed")
           PY
 
       - name: The paired reading

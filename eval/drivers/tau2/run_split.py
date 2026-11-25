@@ -772,7 +772,12 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     # R213. What the note *is*: a model's paraphrase of the failure (`model`, every arm before this one) or the
     # evaluator's verdict served as written (`verdict`, which needs no model, no tokens and no summariser call).
     # A dispatch argument rather than a default, because the two materials are the experiment.
-    parser.add_argument("--note-source", choices=("model", "verdict", "board"), default="model")
+    # R216: `board` is the tail placement and `board-front` is R215's, kept reachable because a rerun of a reading
+    # has to be able to reproduce the arm it came from. The two differ in one thing — where the block sits — and the
+    # dispatch that compares them is the one that prices the address.
+    parser.add_argument(
+        "--note-source", choices=("model", "verdict", "board", "board-front"), default="model"
+    )
     # A full-quality run is six hours and four arms; at double price that is a doubled bill for a
     # number that does not improve. The guard is off by default because a smoke run is cheap enough
     # to be worth running whenever the operator is awake, and on for every dispatch that is not.
@@ -1237,10 +1242,13 @@ def main(argv: list[str]) -> int:
     # round boundary and no writer. The environment is set here rather than left to the dispatch for the same reason
     # the note path is: the agent reads it once, at its first turn, and an arm that says it served a board while the
     # variable was never set is the wiring defect this lane has counted five times.
-    if args.note_source == "board":
+    if args.note_source in ("board", "board-front"):
         if args.notes:
             raise SystemExit("tau2-board-takes-no-notes")
-        os.environ["MICROGLIA_BOARD"] = "1"
+        # The value *is* the placement: `tail` writes the block behind the conversation, `front` into the system
+        # message. A single truth read by one function (`board_placement`) rather than two switches that could
+        # disagree, which is how an arm ends up being a third treatment nobody registered.
+        os.environ["MICROGLIA_BOARD"] = "tail" if args.note_source == "board" else "front"
         if "MICROGLIA_NOTES" in os.environ:
             del os.environ["MICROGLIA_NOTES"]
     elif "MICROGLIA_BOARD" in os.environ:

@@ -64,8 +64,11 @@ import sys
 from pathlib import Path
 
 #: The schema travels into the artefact so a reading names the shape it was taken from. `/2` is the contract: R214's
-#: `/1` read every user turn and moved on each of them.
-SCHEMA = "microglia.goal-board/2"
+#: `/1` read every user turn and moved on each of them. `/3` is the set ask: an ask whose words name no product in
+#: the episode's own name table is settled by family and **absorbs** the later receipts of that family, because
+#: "return everything from my two most recent orders" is one ask over four products and no containment rule can
+#: ever satisfy it (AUDIT 34.225).
+SCHEMA = "microglia.goal-board/3"
 
 #: Where the asks come from. `REQUEST` is the product's reading and the one R215 registers: the first user message,
 #: fixed before the first call, so the block a turn carries can only change when a receipt changes it. `CONVERSATION`
@@ -152,6 +155,24 @@ CONTINUATION = frozenset(
 #: The address family keeps the prepositions the other families stop at, because the value it is asked for is a
 #: place and "to"/"in"/"at" are part of how the place is named.
 ADDRESS_BOUNDARY = frozenset(BOUNDARY - {"to", "in"})
+
+#: The words that make an ask a **set**: it asks for all of something, so one call is the start of it and not the
+#: end. Read from the request's own vocabulary rather than from a list of products, because a set phrase is exactly
+#: the ask whose objects the parser cannot enumerate — "return everything from my two most recent orders" names no
+#: product at all, and R215 spent a dispatch calling those receipts unattributed (AUDIT 34.225).
+#: The weaker of the two settlement grades: a shared content word and half of the shorter side. Half is a
+#: measurement rather than a taste — every one of R215's 28 refused successes shared exactly one word, and in all of
+#: them that word was half of the product's name ("Hiking Boots" against "boots", "Smart Watch" against "watch").
+#: A quarter would tick a lamp for a lamp, and containment (1.0) is the grade that missed them.
+OVERLAP = 0.5
+
+#: The words that make an ask a **set**: it asks for all of something, so one call is the start of it and not the
+#: end. Read from the request's own vocabulary rather than from a list of products, because a set phrase is exactly
+#: the ask whose objects the parser cannot enumerate — "return everything from my two most recent orders" names no
+#: product at all, and R215 spent a dispatch calling those receipts unattributed (AUDIT 34.225).
+QUANTIFIERS = frozenset(
+    """everything anything all both each every whole entire rest remaining others some any""".split()
+)
 
 
 def words_of(text: str) -> list[str]:
@@ -460,34 +481,131 @@ def receipts_of(messages) -> list[dict]:
     return receipts
 
 
-def settles(item: dict, receipt: dict, table: dict) -> bool:
-    """Whether this receipt proves *this* ask was performed by name.
+def grade_of(name_words: set, words: set) -> str:
+    """The grade of a match between a product's name and an ask's words: `"name"`, `"overlap"`, or `""`.
 
-    Containment runs in both directions, because the two sides abbreviate differently: a user says "the keyboard"
-    about a **Mechanical Keyboard**, and a user says "the mechanical keyboard" about a product the catalogue calls
-    **Keyboard**. What is refused is the case the board exists to refuse — a receipt that names a *different*
-    product than the ask does — and containment is what makes that refusal computable without a catalogue.
+    One function for both callers, because `settles` and `names_a_product` have to agree: if the board can tick an
+    ask it does not consider to name a product, then the same ask is both settled and a set, and the two rules would
+    fight over it in the order the loop happens to run.
+    """
+    if not name_words or not words:
+        return ""
+    if name_words <= words or words <= name_words:
+        return "name"
+    if len(name_words & words) / min(len(name_words), len(words)) >= OVERLAP:
+        return "overlap"
+    return ""
 
-    An ask that names no object cannot be settled here; it is settled by family in `board_of`, one receipt per ask.
+
+def settlement(item: dict, receipt: dict, table: dict) -> str:
+    """How strongly this receipt proves this ask was performed: `"name"`, `"overlap"`, or `""` for no.
+
+    Two grades, because the corpus has two kinds of match and calling them one made R215 refuse 28 of its own
+    successes. The evidence is in its artefact (PROGRESS 245.3, re-read before R216 was dispatched):
+
+        ask `specifically boots ordered`   receipt names **Hiking Boots**      one word short of containment
+        ask `watch received`               receipt names **Smart Watch**        one word short either way
+        ask `gaming related purchased`     receipt names **Gaming Mouse**       one word short
+
+    Containment — one word set inside the other — is the **strict** grade and it is unchanged: a receipt that names a
+    product the ask names in full is a settlement, and it is what every tick in R214/R215 was. The second grade is
+    **overlap**: at least one content word in common and at least half of the shorter side. That is what these three
+    cases are, and it is deliberately weaker than containment, so the board pays for it in honesty: every settlement
+    of this grade is counted (`loose`), the count travels into the artefact, and a reading whose ticks are mostly
+    loose is a reading about a looser rule than the one that was registered.
+
+    The refusal is unchanged for the case the board exists to refuse — a receipt that names a *different* product.
+    "Desk Lamp" against "Table Lamp" is now a tick where it used to be a refusal, and that is the price of the 28;
+    it is stated here because the alternative was a board that could not see three quarters of its own successes.
     """
     if not receipt.get("ok") or receipt.get("family") != item.get("family"):
-        return False
+        return ""
     words = set(item.get("words") or ())
     if not words:
-        return False
+        return ""
     named = [table[identifier] for identifier in receipt.get("ids") or [] if identifier in table]
     if named:
+        grade = ""
         for name in named:
-            name_words = set(words_of(name))
-            if name_words and (name_words <= words or words <= name_words):
-                return True
-        return False
+            found = grade_of(set(words_of(name)), words)
+            if found == "name":
+                return "name"
+            grade = grade or found
+        return grade
     # The free-text branch runs the other way round: an ask's words have to be spelled by the receipt, because a
     # receipt that names a place or a value names it in full, and a superset is a receipt about this ask.
     free = set()
     for text in receipt.get("free") or []:
         free.update(words_of(text))
-    return bool(words) and words <= free
+    return "name" if words <= free else ""
+
+
+def settles(item: dict, receipt: dict, table: dict) -> bool:
+    """Whether this receipt proves this ask was performed by name, at either grade.
+
+    An ask that names no object cannot be settled here; it is settled by family in `board_of`, one receipt per ask.
+    """
+    return settlement(item, receipt, table) != ""
+
+
+def names_a_product(item: dict, table: dict) -> bool:
+    """Whether this ask names a product the episode has already seen.
+
+    The test is the containment rule of `settles` run against the name table instead of against one receipt, and it
+    is what separates the two kinds of ask τ² retail actually contains:
+
+        "return the mechanical keyboard"                    names a product  → settled by that product, or by nothing
+        "return everything from my two most recent orders"  names no product → settled by family, absorbs its receipts
+
+    The distinction has to be drawn against the *episode's* table rather than a catalogue, because the board never
+    has a catalogue: a name the episode has not yet read is a name it cannot match. R215 shipped without this test and
+    reported 73% of its writes as unattributed or unrequested (AUDIT 34.225) — the set phrase had no rule, because
+    the only rule asked a set phrase to contain a product name.
+    """
+    words = set(item.get("words") or ())
+    if not words:
+        return False
+    return any(grade_of(set(words_of(name)), words) for name in table.values())
+
+
+def settles_by_family(item: dict, table: dict) -> bool:
+    """Whether this ask is one no receipt can name, so its family's first successful call is its settlement.
+
+    Two conditions, and the second is the one R216 had to learn from its own artefact:
+
+    * **the ask names no product the episode has read.** An ask that names one is settled by that product or by
+      nothing — that is the refusal `settles` exists for, and it is unchanged.
+    * **an ask with words needs a catalogue to be judged nameless.** An empty table means the board has nothing to
+      search, so it cannot tell a set phrase from a mis-parsed one, and a rule that fired there would tick "cancel the
+      pending order for the lamp" on the strength of any cancel — the over-credit R215 was right to refuse. With one
+      order read, the same ask is *matched* against the lamp it names (at overlap grade) and refused for the right
+      reason. A **wordless** ask needs no catalogue: there is nothing to look for.
+
+    Under those two conditions the shapes that arrive are all of one kind: order-level ("cancel the order"), set
+    ("return everything from my two most recent orders"), and account-level ("the address is wrong", "split the
+    payment between two cards"), where the receipt carries no item id at all and a name match is meaningless. The
+    measurement that produced this rule is in PROGRESS 245.3 and was taken **before** this round's dispatch: of
+    R215's 107 writing episodes, 29 failed on a family that had asked and 29 on an object the board could not name,
+    and the account families are most of the second group.
+    """
+    words = set(item.get("words") or ())
+    if not words:
+        # "Cancel the order" names a container. There is no product to look for, so no catalogue is needed to know
+        # that the family is the only evidence available.
+        return True
+    if not table:
+        return False
+    return not names_a_product(item, table)
+
+
+def absorbs_receipts(item: dict, table: dict) -> bool:
+    """Whether later calls of this ask's family belong to it.
+
+    Only a **set** ask absorbs: it asked for all of something, so the second, third and fourth call are the same ask
+    being performed. An order-level ask does not — "cancel the order" twice is a duplicate, and a board that absorbed
+    the second would hide the only anomaly that shape can produce.
+    """
+    return settles_by_family(item, table) and bool(set(item.get("words") or ()) & QUANTIFIERS)
 
 
 def request_of(messages) -> str:
@@ -498,15 +616,32 @@ def request_of(messages) -> str:
     follow verbs, so a parser that read them listed **10.6** asks an episode where the request states **1.58**
     (PROGRESS 244.2), and a board of eleven lines with one tick is not a working memory.
 
+    **R216 seals the contract at the first user turn that yields an ask, not at the first user turn.** The two are
+    the same message in most episodes and they are not in 14 of R215's 107 writing episodes, where the request opens
+    with a greeting ("hi, I need help with a couple of orders") and the asks arrive in the second sentence the user
+    says. A contract sealed on the greeting is empty, and an empty contract calls every one of the episode's changes
+    *unrequested* — the board's most damning line, printed at an agent that was doing what it was told.
+
+    The growth defect is not re-opened by this, and the distinction is the whole of R215's finding: a rule that stops
+    at the first productive turn takes **one** message, and a rule that reads every turn takes twenty-five. What is
+    still refused is a clarification: once a turn has yielded an ask, later turns are the agent's answers, not the
+    contract.
+
     `""` when no user has spoken yet, which is a real turn: the agent's first call happens before the user's first
     message in a τ² episode that starts with a greeting, and a board that guessed a request would be inventing one.
     """
+    first = ""
     for message in messages:
-        if role_of(message) in ("user", "human"):
-            content = _field(message, "content")
-            if isinstance(content, str) and content.strip():
-                return content
-    return ""
+        if role_of(message) not in ("user", "human"):
+            continue
+        content = _field(message, "content")
+        if not isinstance(content, str) or not content.strip():
+            continue
+        if not first:
+            first = content
+        if items_of(content):
+            return content
+    return first
 
 
 def board_of(messages, scope: str = REQUEST) -> dict:
@@ -530,24 +665,34 @@ def board_of(messages, scope: str = REQUEST) -> dict:
     table = name_table(messages)
     receipts = receipts_of(messages)
     settled: dict = {}
+    absorbed: dict = {}
     unrequested: list[dict] = []
     unattributed: list[dict] = []
+    # Which asks are ones no receipt can name — order-level and set phrases — so the family rule below is the only
+    # rule that can settle them. Computed once, because it depends on the table and not on the receipts, and an ask
+    # does not stop being a set when a product with a similar word arrives later.
+    sets = {index for index, item in enumerate(unique) if settles_by_family(item, table)}
+    absorbing = {index for index, item in enumerate(unique) if absorbs_receipts(item, table)}
+    loose = 0
     for receipt in receipts:
         hit = False
         for index, item in enumerate(unique):
             if index in settled:
                 continue
-            if settles(item, receipt, table):
+            grade = settlement(item, receipt, table)
+            if grade:
                 settled[index] = receipt
+                loose += 1 if grade == "overlap" else 0
                 hit = True
         if not hit:
-            # An ask that names no object ("cancel the order") is settled by the first receipt of its family and
-            # by nothing else: there is no product to contain, and the alternative — leaving it open for ever —
-            # would have the board tell the agent to cancel an order it has already cancelled.
-            for index, item in enumerate(unique):
-                if index in settled or item["words"]:
+            # An ask that names no product ("cancel the order", "return everything from my two most recent orders")
+            # is settled by the first receipt of its family and by nothing else: there is no product to contain, and
+            # the alternative — leaving it open for ever — would have the board tell the agent to cancel an order it
+            # has already cancelled.
+            for index in sorted(sets):
+                if index in settled:
                     continue
-                if item["family"] == receipt["family"] and receipt.get("ok"):
+                if unique[index]["family"] == receipt["family"] and receipt.get("ok"):
                     settled[index] = receipt
                     hit = True
                     break
@@ -560,15 +705,42 @@ def board_of(messages, scope: str = REQUEST) -> dict:
         # and is neither: reporting it would put an attempt on a list of state.
         if not receipt.get("ok"):
             continue
+        # …and a third fact, which R215 could not express: a receipt that belongs to a **set** ask already settled.
+        # Returning four products against "return everything from my two most recent orders" is one ask performed
+        # with four calls, not three changes nobody asked for. The receipt is counted against the ask that absorbed
+        # it — the count is shown, so a set that grew after the tick is still visible — rather than reported as either
+        # failure. Absorbing it is not free: the board is saying "this ask is being worked on", and a run where the
+        # absorbed count runs away is a run whose set ask is standing in for several asks the parser never read.
+        owner = next(
+            (
+                index
+                for index in sorted(absorbing)
+                if unique[index]["family"] == receipt["family"] and index in settled
+            ),
+            None,
+        )
+        if owner is not None:
+            absorbed[owner] = absorbed.get(owner, 0) + 1
+            continue
         family_asked = any(item["family"] == receipt["family"] for item in unique)
         (unattributed if family_asked else unrequested).append(receipt)
     return {
         "scope": REQUEST if scope != CONVERSATION else CONVERSATION,
         "items": [
-            {**item, "settled_by": (settled.get(index) or {}).get("name")} for index, item in enumerate(unique)
+            {
+                **item,
+                "settled_by": (settled.get(index) or {}).get("name"),
+                "absorbed": absorbed.get(index, 0),
+            }
+            for index, item in enumerate(unique)
         ],
         "unattributed": [{"name": receipt["name"]} for receipt in unattributed],
         "unrequested": [{"name": receipt["name"]} for receipt in unrequested],
+        "absorbed": sum(absorbed.values()),
+        # How many of the ticks came from the weaker grade. A reading whose ticks are mostly loose is a reading about
+        # a looser rule than the one that was registered, and the number is here so that can be said rather than
+        # discovered (see `settlement`).
+        "loose": loose,
         "receipts": len(receipts),
         "names": len(table),
     }
@@ -594,7 +766,13 @@ def render(board: dict) -> str:
     lines = [f"Open asks {where} — a line is ticked only when a tool receipt names it:"] if items else []
     for item in items[:MAX_ITEMS]:
         mark = "x" if item.get("settled_by") else " "
-        lines.append(f"[{mark}] {item['family']}: {' '.join(item['words'][:8])}")
+        line = f"[{mark}] {item['family']}: {' '.join(item['words'][:8])}"
+        # A set ask that absorbed calls says so, because the count is the only visible difference between "the board
+        # credited this ask once" and "this ask is being performed by four calls". A tick with no count is one call;
+        # a tick with `+3` is a set, and a reader who wanted to know whether the agent stopped early can tell.
+        if item.get("absorbed"):
+            line += f" (+{item['absorbed']} call{'s' if item['absorbed'] > 1 else ''})"
+        lines.append(line)
     hidden = len(items) - MAX_ITEMS
     if hidden > 0:
         lines.append(f"… and {hidden} more ask(s) not shown")
@@ -686,6 +864,57 @@ def census(document: dict, wanted=None) -> dict:
         "familyFound": family_found,
         "familyRecall": (family_found / family_required) if family_required else None,
         "perFamily": per_family,
+    }
+
+
+def replay(document: dict) -> dict:
+    """Re-parse a document the arm already produced, and say what the board would have shown at each turn's end.
+
+    The cheapest measurement this lane has and the one it was missing: an artefact from a previous dispatch carries
+    every message the episode exchanged, so a parser change can be priced **before** a single call is paid for. R216
+    was registered on a set rule that turned out to be worth two settlements in a hundred and seven episodes; running
+    this first is what showed the round's real defect was somewhere else (PROGRESS 245.3).
+
+    The counts are episode-level, because the question a reading asks is "did the agent's writes connect to what was
+    asked", and a per-ask rate answers a different one. `writing` is the episodes that *attempted* a state change —
+    the denominator the registered bar is written over — and `ticked` those where at least one ask ended settled.
+    `loose` and `absorbed` travel with it so the reading says which rule produced the ticks, and `unrequested` is
+    the checker's own output rather than a defect count: a call of a family the contract never stated is the failure
+    this benchmark charges for, and it is the one thing a transcript cannot make visible.
+
+    An episode with no messages is skipped rather than counted as unticked: a document that was truncated mid-grid
+    would otherwise report a rate over episodes that never ran.
+    """
+    writing = ticked = asks = settled = absorbed = loose = unrequested = unattributed = skipped = 0
+    for simulation in document.get("simulations") or []:
+        messages = simulation.get("messages") or []
+        if not messages:
+            skipped += 1
+            continue
+        board = board_of(messages)
+        items = board.get("items") or []
+        asks += len(items)
+        settled += sum(1 for item in items if item.get("settled_by"))
+        absorbed += board.get("absorbed") or 0
+        loose += board.get("loose") or 0
+        unrequested += len(board.get("unrequested") or [])
+        unattributed += len(board.get("unattributed") or [])
+        if board.get("receipts"):
+            writing += 1
+            ticked += 1 if any(item.get("settled_by") for item in items) else 0
+    return {
+        "episodes": len(document.get("simulations") or []),
+        "skipped": skipped,
+        "writing": writing,
+        "ticked": ticked,
+        "tickShare": (ticked / writing) if writing else None,
+        "asks": asks,
+        "settled": settled,
+        "settledShare": (settled / asks) if asks else None,
+        "absorbed": absorbed,
+        "loose": loose,
+        "unrequested": unrequested,
+        "unattributed": unattributed,
     }
 
 
@@ -952,7 +1181,20 @@ def self_test() -> int:
             {"role": "user", "content": "I want to return the lamp."},
         ]
     )
-    check("a request that names no ask is not repaired by a later turn", later_only["items"] == [])
+    # R215 refused this and R216 accepts it, and the reversal is a measurement rather than a change of mind: the
+    # greeting-then-request shape is 14 of R215's 107 writing episodes, and a contract sealed on the greeting classified
+    # every change those episodes made as work nobody asked for (PROGRESS 245.3). What is still refused is the
+    # *clarification*: once a turn has yielded an ask, no later turn adds one — asserted four lines above.
+    check("a greeting before the request does not seal an empty contract",
+          [item["words"] for item in later_only["items"]] == [["lamp"]])
+    settled_contract = board_of(
+        [
+            {"role": "user", "content": "hello"},
+            {"role": "user", "content": "I want to return the lamp."},
+            {"role": "user", "content": "and the desk lamp too"},
+        ]
+    )
+    check("but a turn after the seal adds nothing", len(settled_contract["items"]) == 1)
     check("no user message is no request", request_of([{"role": "assistant", "content": "hi"}]) == "")
     check("an empty first message is skipped", request_of([{"role": "user", "content": "  "},
                                                          {"role": "user", "content": "return it"}]) == "return it")
@@ -996,6 +1238,82 @@ def self_test() -> int:
     )
     check("an ask that names nothing is settled by its family", faceless["items"][0]["settled_by"] == "cancel_pending_order")
     check("and it is not counted as unattributed", faceless["unattributed"] == [])
+
+    # The set ask, which is the shape R215 could not settle at all (AUDIT 34.225). One ask over several products:
+    # the first call settles it and the rest belong to it, so the board reports a ticked ask with a count instead of
+    # a ticked ask beside three changes nobody asked for.
+    set_messages = [
+        {"role": "user", "content": "I want to return everything from my two most recent orders."},
+        {"role": "assistant", "tool_calls": [{"name": "get_order_details", "arguments": {"order_id": "#W1"}}]},
+        {"role": "tool", "content": json.dumps(order)},
+        {"role": "assistant", "tool_calls": [{"name": "return_delivered_order_items",
+                                              "arguments": {"item_ids": ["1151293680"]}}]},
+        {"role": "tool", "content": "ok"},
+        {"role": "assistant", "tool_calls": [{"name": "return_delivered_order_items",
+                                              "arguments": {"item_ids": ["4983901480"]}}]},
+        {"role": "tool", "content": "ok"},
+    ]
+    set_board = board_of(set_messages)
+    check("a set ask is settled by its family", set_board["items"][0]["settled_by"] == "return_delivered_order_items")
+    check("and its second call belongs to it", set_board["items"][0]["absorbed"] == 1)
+    check("so nothing is left unattributed", set_board["unattributed"] == [])
+    check("and the total is counted on the board", set_board["absorbed"] == 1)
+    check("the block shows the count", "(+1 call)" in render(set_board))
+
+    # An ask one word short of the product it names, which is 28 of R215's own successes (PROGRESS 245.3). It settles
+    # now, at the loose grade, and the board says how many of its ticks were loose.
+    loose_board = board_of(
+        [
+            {"role": "user", "content": "I want to return the watch I received."},
+            {"role": "assistant", "tool_calls": [{"name": "get_order_details", "arguments": {"order_id": "#W9"}}]},
+            {"role": "tool", "content": json.dumps({"items": [{"item_id": "2222222222", "name": "Smart Watch"}]})},
+            {"role": "assistant", "tool_calls": [{"name": "return_delivered_order_items",
+                                                  "arguments": {"item_ids": ["2222222222"]}}]},
+            {"role": "tool", "content": "ok"},
+        ]
+    )
+    check("an ask one word short of its product settles", loose_board["items"][0]["settled_by"] is not None)
+    check("and the board counts it as loose", loose_board["loose"] == 1)
+    check("an untouched set ask stays open",
+          board_of([{"role": "user", "content": "return everything from my latest order"}])["items"][0]["settled_by"] is None)
+
+    # The three predicates the rule is built from, checked one at a time because each is the answer to a different
+    # question and a single end-to-end case would let one of them be wrong without saying so.
+    table = {"1151293680": "Mechanical Keyboard", "4983901480": "Desk Lamp"}
+    # The two grades, one at a time. A containment tick is the grade every R214/R215 tick was; an overlap tick is the
+    # grade R216 added, and the count of them is what a reader needs to know the reading's rule was loosened.
+    check("containment is the strict grade",
+          settlement({"family": "return", "words": ["mechanical", "keyboard"]},
+                     {"family": "return", "ok": True, "ids": ["1151293680"], "free": []}, table) == "name")
+    check("one shared word of a two-word name is the loose grade",
+          settlement({"family": "return", "words": ["watch", "received"]},
+                     {"family": "return", "ok": True, "ids": ["4983901480"], "free": []}, table) == "")
+    check("and half of a three-word name is enough",
+          grade_of({"hiking", "boots"}, {"boots", "ordered", "specifically"}) == "overlap")
+    check("a quarter of the shorter side is not enough",
+          grade_of({"water", "bottle", "steel"}, {"bottle", "please", "very", "much"}) == "")
+    check("and containment is never the loose grade",
+          grade_of({"garden", "hose"}, {"hose", "garden", "green"}) == "name")
+    check("no shared word is no grade", grade_of({"desk", "lamp"}, {"kettle"}) == "")
+    check("an empty side is no grade", grade_of(set(), {"lamp"}) == "")
+
+    check("a named product is found in the table",
+          names_a_product({"family": "return", "words": ["mechanical", "keyboard"]}, table) is True)
+    check("the table's own name is found in a longer ask",
+          names_a_product({"family": "return", "words": ["desk", "lamp", "shade"]}, table) is True)
+    check("a set phrase names no product",
+          names_a_product({"family": "return", "words": ["everything", "two"]}, table) is False)
+    check("an ask with no words names no product", names_a_product({"family": "cancel", "words": []}, table) is False)
+    check("a set phrase is settled by family",
+          settles_by_family({"family": "return", "words": ["everything", "two"]}, table) is True)
+    check("and it absorbs", absorbs_receipts({"family": "return", "words": ["everything", "two"]}, table) is True)
+    check("an ask naming a product is never settled by family",
+          settles_by_family({"family": "return", "words": ["desk", "lamp"]}, table) is False)
+    check("an unresolved object is not a set either",
+          settles_by_family({"family": "cancel", "words": ["pending", "order", "lamp"]}, {}) is False)
+    check("an order-level ask is settled by family but absorbs nothing",
+          (settles_by_family({"family": "cancel", "words": []}, table),
+           absorbs_receipts({"family": "cancel", "words": []}, table)) == (True, False))
     address = board_of(
         [
             {"role": "user", "content": "Please change the address to 123 Main Street Chicago"},
@@ -1216,6 +1534,20 @@ def self_test() -> int:
         {"role": "tool", "content": "ok"},
     ])
     check("a second receipt of the family finds no ask left", len(two_receipts["unattributed"]) == 1)
+    # The replay, which is the measurement this round was registered on: a document that already exists, parsed by
+    # the parser under test. Two fixtures, because the two ways it can mislead are a denominator over episodes that
+    # never ran and a numerator that counts an episode with no writes.
+    replayed = replay({"simulations": [
+        {"task_id": "1", "messages": set_messages},
+        {"task_id": "2", "messages": [{"role": "user", "content": "return the lamp"}]},
+        {"task_id": "3"},
+    ]})
+    check("a writing episode that ticks is the numerator", (replayed["writing"], replayed["ticked"]) == (1, 1))
+    check("and the share is over writing episodes", replayed["tickShare"] == 1.0)
+    check("an episode with no writes is not in the denominator", replayed["episodes"] == 3)
+    check("an episode with no messages is skipped, not counted", replayed["skipped"] == 1)
+    check("and a document with no writes has no share", replay({"simulations": []})["tickShare"] is None)
+
     tall = render({"items": [{"family": "return", "words": ["x" * 300], "settled_by": None}] * 3})
     check("three tall lines are cut at the ceiling", len(tall) <= BOARD_MAX_CHARS and tall.endswith("…"))
 
@@ -1224,6 +1556,11 @@ def self_test() -> int:
         with open(goals, "w", encoding="utf-8") as handle:
             json.dump(little, handle)
         check("the census runs from the command line", quiet(["--census", "--goals", goals]) == 0)
+        written = os.path.join(scratch, "replay.json")
+        with open(written, "w", encoding="utf-8") as handle:
+            json.dump({"simulations": [{"task_id": "1", "messages": set_messages}]}, handle)
+        check("the replay runs from the command line", quiet(["--replay", written]) == 0)
+        check("and reads as json when asked", quiet(["--replay", written, "--json"]) == 0)
         check("and reports as json", quiet(["--census", "--goals", goals, "--json"]) == 0)
         messages_path = os.path.join(scratch, "sim.json")
         with open(messages_path, "w", encoding="utf-8") as handle:
@@ -1274,6 +1611,7 @@ def main(argv: list) -> int:
     parser.add_argument("--census", action="store_true")
     parser.add_argument("--compare", nargs=2, default=None, metavar=("CONTROL", "BOARD"),
                         help="two result documents or directories: the paired one-attempt reading")
+    parser.add_argument("--replay", default="", help="a result document the arm already produced")
     parser.add_argument("--json", action="store_true")
     arguments = parser.parse_args(argv)
     if arguments.self_test:
@@ -1296,6 +1634,24 @@ def main(argv: list) -> int:
             )
             for family, bucket in sorted(reading["perFamily"].items()):
                 print(f"  {family:9s} {bucket['found']}/{bucket['required']} objects, {bucket['asks']} task(s)")
+        return 0
+    if arguments.replay:
+        with open(arguments.replay, "r", encoding="utf-8") as handle:
+            document = json.load(handle)
+        reading = replay(document)
+        if arguments.json:
+            print(json.dumps(reading, indent=1, sort_keys=True))
+        else:
+            share = reading["tickShare"]
+            print(
+                f"{reading['ticked']} of {reading['writing']} writing episode(s) ended with a tick "
+                f"({share:.1%})" if share is not None else "no episode in this document made a state-changing call"
+            )
+            print(
+                f"{reading['settled']}/{reading['asks']} ask(s) settled, {reading['loose']} of them loose, "
+                f"{reading['absorbed']} absorbed, {reading['unrequested']} unrequested, "
+                f"{reading['unattributed']} unattributed, {reading['skipped']} episode(s) skipped"
+            )
         return 0
     if arguments.compare:
         from rescue_rate import documents_of, merge  # lazy, for the same reason as `compare_of`'s import

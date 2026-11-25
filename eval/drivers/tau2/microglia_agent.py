@@ -248,6 +248,11 @@ _board_settled = 0
 _board_chars = 0
 _board_changes = 0
 _board_stable = 0
+#: R216. The tail placement's own two numbers: how often the block was written into the prompt, and how often a turn
+#: found it already in place and left it alone. The second is the turns that cost nothing, and it is the whole point
+#: of the placement — a block moved on every turn would pay for the messages behind it on every turn.
+_board_tail_appends = 0
+_board_tail_held = 0
 _board_open = 0
 _board_unrequested = 0
 _board_unattributed = 0
@@ -270,7 +275,26 @@ _UNSET = object()
 
 def board_mode() -> bool:
     """Whether this arm serves the goal board instead of a note."""
-    return os.environ.get(BOARD_ENV, "").strip().lower() in ("1", "true", "yes")
+    return os.environ.get(BOARD_ENV, "").strip().lower() in ("1", "true", "yes", "front", "tail")
+
+
+def board_placement() -> str:
+    """Where the block sits in the prompt: `front` in the system block, `tail` after the conversation.
+
+    R214 and R215 wrote the block into the system message, which sits in front of every token the episode will ever
+    send — so a block that changed re-bought the whole prompt at the miss rate, and R215's arm paid 37% more for a
+    200-character list. The measurement's own arithmetic says that price is not a property of the channel but of the
+    address: 247 changes × 4,756 prompt tokens = 1.17 M of re-bought prefix, and 114 of those changes were first turns,
+    which no per-turn block can avoid (AUDIT 34.226).
+
+    `tail` moves the block behind the conversation. A change then re-bills only what came after it — the newest tool
+    result, a few hundred tokens — and a turn whose block is unchanged re-bills nothing at all, because the block is
+    left exactly where it was written. The channel's price becomes its own length instead of the prefix it sits on.
+    """
+    raw = os.environ.get(BOARD_ENV, "").strip().lower()
+    if raw in ("1", "true", "yes", "front"):
+        return "front"
+    return "tail" if raw == "tail" else "off"
 
 
 def _memory_url() -> str:
@@ -735,6 +759,41 @@ class MicrogliaAgent(LLMAgent):
         self._turn = turn
         return held
 
+    def serve_tail(self, state: LLMAgentState, pack: str) -> LLMAgentState:
+        """The state whose prompt carries exactly one board, placed after the conversation and moved only on change.
+
+        Three properties, and each is a bug this did not have:
+
+        * **one** — a state carrying two boards is a state that accumulated, which is what R137 repaired for the
+          front placement and what a naive `kept + [injected]` would reintroduce here.
+        * **after the conversation** — the front placement re-bills every token behind it when it moves; behind the
+          conversation, a move re-bills only the messages that came after the old position.
+        * **on change only** — an unchanged board is left exactly where it was written, so the turn costs nothing.
+          A block re-written every turn would pay the message it sits behind on every turn, which is R215's bill
+          with a smaller constant.
+        """
+        global _injected_chars, _board_tail_appends, _board_tail_held, _pack_copies_dropped
+        carried = [message for message in state.messages if is_pack_message(message)]
+        if pack and carried and self.__dict__.get("_tail_body") == pack:
+            _board_tail_held += 1
+            return state
+        if not pack and not carried:
+            return state
+        fresh = state.model_copy(deep=True)
+        kept = [message for message in fresh.messages if not is_pack_message(message)]
+        _pack_copies_dropped += len(fresh.messages) - len(kept)
+        if pack:
+            injected = injected_message(pack, BOARD_TAG)
+            _injected_chars += len(injected.content)
+            _injected_lengths.append(len(injected.content))
+            if _episode_injected:
+                _episode_injected[-1] = True
+            kept = kept + [injected]
+            _board_tail_appends += 1
+        self._tail_body = pack or None
+        fresh.messages = kept
+        return fresh
+
     def generate_next_message(
         self, message: ValidAgentInputMessage, state: LLMAgentState
     ) -> tuple:
@@ -744,6 +803,10 @@ class MicrogliaAgent(LLMAgent):
         pack = self.pack_for(
             state, text if isinstance(text, str) else "", str(getattr(message, "role", "") or "")
         )
+        if board_mode() and board_placement() == "tail":
+            # The board arm at R216: behind the conversation, one copy, moved only when a receipt moves it. The
+            # front path below is kept unchanged so R214/R215's reading stays reproducible from a dispatch.
+            return super().generate_next_message(message, self.serve_tail(state, pack))
         # R137. The invariant is not "inject a block" but "the prompt carries at most one block, and it is
         # this episode's". A state that already carries one is a state this method wrote — tau2 threads the
         # state the agent returns — so the earlier copy is removed whether or not this turn has one of its
@@ -786,6 +849,7 @@ def memory_stats() -> dict:
         **(
             {
                 "board": {
+                    "placement": board_placement(),
                     "renders": _board_renders,
                     "items": _board_items,
                     "settled": _board_settled,
@@ -794,6 +858,9 @@ def memory_stats() -> dict:
                     # which is the number R214 could only read from the provider's bill after the fact.
                     "changes": _board_changes,
                     "stable": _board_stable,
+                    # The tail placement's price, per turn: appends are the writes and held is the free ones.
+                    "tailAppends": _board_tail_appends,
+                    "tailHeld": _board_tail_held,
                     # The checker's two refusals, apart: work nobody asked for, and the board's own blind spot.
                     "unrequested": _board_unrequested,
                     "unattributed": _board_unattributed,

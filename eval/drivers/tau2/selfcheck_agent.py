@@ -1768,6 +1768,144 @@ def a_board_with_nothing_to_say_says_nothing(checks):
 
 
 @case
+def the_block_sits_behind_the_conversation_and_moves_only_on_change(checks):
+    """R216. The placement, which is the half of R215's bill that emitting less often could not reach.
+
+    A block in the system message sits in front of every token the episode will send, so a change re-buys the whole
+    prompt; R215 measured 247 changes × 4,756 tokens against a control that buys 860 k tokens in total. Behind the
+    conversation, a change re-bills only what came after the old position, and a turn whose block is unchanged
+    re-bills nothing at all because the block is left where it was written.
+
+    Four properties, each of which a plausible implementation gets wrong: the block goes into the conversation and
+    not the system block; there is exactly one of it; an unchanged turn writes nothing; and a turn with nothing to
+    say takes the old block away rather than leaving the previous turn's state in front of the model.
+    """
+    saved = os.environ.get(subject.BOARD_ENV)
+    os.environ[subject.BOARD_ENV] = "tail"
+    before = subject.memory_stats().get("board") or {}
+    try:
+        agent, calls, original = fresh(pack="")
+        try:
+            state = LLMAgentState()
+            state = episode_step(agent, state, "I want to exchange the mechanical keyboard.")
+            opened = [m for m in state.messages if subject.is_pack_message(m)]
+            # Captured where it is true: the block is written behind the turn it answers, so it is the message after
+            # the request and nothing that came before it.
+            tail_after_first = state.messages.index(opened[0])
+            # A clarification is a new user turn and not a new ask, so the block that answers it is byte-identical
+            # — and the point of the placement is that such a turn writes nothing.
+            state = episode_step(agent, state, "yes, the clicky ones")
+            held = [m for m in state.messages if subject.is_pack_message(m)]
+            order = {"order_id": "#W2378156", "items": [{"item_id": "1151293680", "name": "Mechanical Keyboard"}]}
+            state.messages.append({"role": "assistant", "content": "", "tool_calls": [
+                {"name": "get_order_details", "arguments": {"order_id": "#W2378156"}},
+                {"name": "exchange_delivered_order_items", "arguments": {"item_ids": ["1151293680"]}},
+            ]})
+            state.messages.append({"role": "tool", "content": json.dumps(order)})
+            state.messages.append({"role": "tool", "content": json.dumps({"ok": True})})
+            state = episode_step(agent, state, "thanks")
+            ticked = [m for m in state.messages if subject.is_pack_message(m)]
+            after = subject.memory_stats().get("board") or {}
+        finally:
+            subject.recall = original
+        with_nothing_to_say = [("user", "cancel the order"), opened[0]]
+        cleared = subject.MicrogliaAgent().serve_tail(LLMAgentState(messages=with_nothing_to_say), "")
+    finally:
+        if saved is None:
+            os.environ.pop(subject.BOARD_ENV, None)
+        else:
+            os.environ[subject.BOARD_ENV] = saved
+    checks.equal(len(calls), 0, "the board arm does not consult the store")
+    checks.equal(len(opened), 1, "the first turn writes one block")
+    checks.equal(len(state.system_messages), 0, "and it is not in the system block")
+    checks.substring(opened[0].content, subject.BOARD_TAG, "it is tagged as the board")
+    checks.substring(opened[0].content, "[ ] exchange: mechanical keyboard", "and it lists the ask open")
+    checks.equal(len(held), 1, "an unchanged turn writes no second block")
+    checks.equal(held[0].content, opened[0].content, "and leaves the first one in place")
+    # The block sits at the tail of the conversation. That is the whole claim of the placement, so it is asserted on
+    # the position, and the unchanged turn is asserted on the *message count*: a re-write would have made it four.
+    checks.equal(tail_after_first, 1, "the block is written behind the request, at the tail of the conversation")
+    # Identity, not equality: an unchanged turn returns the state it was given, so the block the model reads is the
+    # same object as last turn's. A re-write would be byte-identical and would still be the defect this case is for.
+    checks.equal(held[0] is opened[0], True, "an unchanged turn does not re-create the block")
+    checks.equal(len(ticked), 1, "a change replaces the block rather than adding one")
+    checks.substring(ticked[0].content, "[x] exchange: mechanical keyboard", "and it carries the tick")
+    checks.equal(after["tailAppends"] - before["tailAppends"], 2, "two writes in three turns")
+    checks.equal(after["tailHeld"] - before["tailHeld"], 1, "one turn that cost nothing")
+    checks.equal(after["placement"], "tail", "and the artefact names the placement")
+    checks.equal(any(subject.is_pack_message(m) for m in cleared.messages), False,
+                 "a turn with nothing to say takes the old block away")
+
+
+@case
+def the_placement_is_read_from_the_environment(checks):
+    """R216. One variable, three arms, and no arm that is two at once.
+
+    `front` is R214/R215's reading and is kept reachable because a dispatch has to be able to re-run the arm a
+    previous reading came from; `tail` is R216's; absent is off. The mapping is asserted rather than assumed because
+    a typo here would run the wrong arm and report it as the right one — the defect this lane has counted more often
+    than any other.
+    """
+    saved = os.environ.pop(subject.BOARD_ENV, None)
+    try:
+        readings = {}
+        for value in ("", "0", "off", "1", "true", "yes", "front", "tail", "TAIL"):
+            if value:
+                os.environ[subject.BOARD_ENV] = value
+            else:
+                os.environ.pop(subject.BOARD_ENV, None)
+            readings[value] = (subject.board_mode(), subject.board_placement())
+    finally:
+        if saved is None:
+            os.environ.pop(subject.BOARD_ENV, None)
+        else:
+            os.environ[subject.BOARD_ENV] = saved
+    checks.equal(readings[""], (False, "off"), "an unset variable is no arm")
+    checks.equal(readings["0"], (False, "off"), "and so is an explicit zero")
+    checks.equal(readings["1"], (True, "front"), "one is the front placement R215 measured")
+    checks.equal(readings["tail"], (True, "tail"), "and tail is behind the conversation")
+    checks.equal(readings["TAIL"], (True, "tail"), "read case-insensitively, like every other switch here")
+    checks.equal(readings["front"], (True, "front"), "front stays reachable by name")
+
+
+@case
+def a_placement_with_nothing_to_say_writes_nothing(checks):
+    """R216. The two silent branches of the placement, and the guard that keeps the instrument off the critical path.
+
+    A turn with no board and no board behind it must return the state it was given, untouched: the alternative is a
+    copy per turn, which is a copy of the whole conversation per turn in a twenty-five-turn episode. And a block that
+    is written when no episode has been opened must not take the run down — the boundary list is the instrument's,
+    and an agent driven without a recall has none, which is what a unit fixture and a resumed run both look like.
+    """
+    saved_env = os.environ.get(subject.BOARD_ENV)
+    saved_boundaries = list(subject._episode_injected)  # noqa: SLF001 - the guard is the thing under test
+    try:
+        os.environ[subject.BOARD_ENV] = "tail"
+        quiet = subject.MicrogliaAgent()
+        given = LLMAgentState()
+        same = quiet.serve_tail(given, "")
+        # No episode has been opened by this agent, so the boundary list is emptied to the state a resumed run
+        # starts in. Both placements are driven through the real entry point, because the guard is in two places.
+        subject._episode_injected.clear()  # noqa: SLF001
+        tail_written = quiet.serve_tail(LLMAgentState(), "<microglia-board>\n[ ] return: lamp\n</microglia-board>")
+        os.environ[subject.BOARD_ENV] = "front"
+        front_agent = subject.MicrogliaAgent()
+        subject._episode_injected.clear()  # noqa: SLF001
+        front_state = episode_step(front_agent, LLMAgentState(), "return the lamp")
+        front_written = len(front_state.system_messages)
+    finally:
+        subject._episode_injected[:] = saved_boundaries  # noqa: SLF001
+        if saved_env is None:
+            os.environ.pop(subject.BOARD_ENV, None)
+        else:
+            os.environ[subject.BOARD_ENV] = saved_env
+    checks.equal(same.messages, [], "a turn with nothing to say writes nothing")
+    checks.equal(same is given, True, "and does not even copy the state")
+    checks.equal(len(tail_written.messages), 1, "a block is written when there is one")
+    checks.equal(front_written, 1, "and the front placement writes its own without a boundary to raise")
+
+
+@case
 def an_arm_with_no_sidecar_reads_no_file(checks):
     """R215. The three early returns that make "no sidecar" a state rather than a fault.
 
