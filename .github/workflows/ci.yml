@@ -126,12 +126,18 @@ jobs:
           # readable at all, so a defect here would be a reading about the *instrument* printed as a reading about
           # the memory. Its self-test drives a real subprocess with a fake runner, so the round's whole path is
           # measured without a provider.
-          python3 -m coverage run --append --branch eval/drivers/tau2/interleave.py --self-test
+          # `--include` on this one and the next, and the reason is a gate rather than tidiness: both modules import
+          # `goal_board`/`notes`, and a run without `--include` records **every** module under the working directory.
+          # goal_board's own suite lives in `working-memory.yml`, so here it arrives at 11% and fails the floor for a
+          # file this step is not about. The first push of these two lines failed CI for exactly that reason.
+          python3 -m coverage run --append --branch --include="*/eval/drivers/tau2/interleave.py" \
+            eval/drivers/tau2/interleave.py --self-test
           # R218d. The dose reader: it asks whether an attempt that received more material passed more often than its
           # own task's attempts that received less. Its first real answer was `NO_DOSE` on a treated arm, because a
           # front-placement block never enters the transcript — a measurement of the instrument, and the kind that
           # has to be under a gate rather than in a paragraph.
-          python3 -m coverage run --append --branch eval/verifiers/board_dose.py --self-test
+          python3 -m coverage run --append --branch --include="*/eval/verifiers/board_dose.py" \
+            eval/verifiers/board_dose.py --self-test
           python3 -m coverage json -o coverage-python.json
           python3 scripts/check-python-coverage.py --self-test
           python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 16
