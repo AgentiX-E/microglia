@@ -4657,3 +4657,37 @@ system block, so the workflow makes **one call** with a system turn after the us
 and the round is registered as three arms — control, `front` (the same parser, R215's placement), `tail` — so that
 `front − control` prices the parser and `tail − front` prices the address. A two-arm grid would have reported their
 sum, and the sum is the number nobody can act on.
+
+### 8.94 What the three-arm dispatch measured: the parser is worth +7.9 pp, and the placement is unmeasured
+
+Run `45546028726`, 342 episodes, **$1.2739**. Two arms of three returned.
+
+| arm | pass^1 | bill / episode | cache | block | changes |
+|---|---|---|---|---|---|
+| control | **90/114 (78.9%)** | $0.00442 | 90.5% | — | — |
+| front | **99/114 (86.8%)** | $0.00604 (+37%) | 84.0% | 148.2 | 258 |
+| tail | 10/114 (8.8%) | $0.00071 | 91.6% | 142.2 | 798 |
+
+**`front − control` = +7.9 pp** [−2.0, +17.6], McNemar p = 0.0784, 15 tasks moved against 6 that broke. That contrast
+holds the placement fixed and varies only the parser, so it is the four repairs' own contribution: the overlap grade,
+the sealed contract, the family rule, the absorbing set. `NO_LIFT` by the registered rule, and the largest movement
+this lane has measured.
+
+**Attribution cleared its bar in the live arm.** Replaying the front artefact: **83 of 110** writing episodes ended
+with a ticked ask (**75.5%**, bar 60%), 120 of 284 asks settled with 6 at the loose grade, `unattributed` down from
+62 to **14**. The offline prediction over R215's transcripts was 69.2%; the live arm is higher, and the direction is
+the one that matters: a board that shows a tick gives the agent a line to finish.
+
+**The tail arm never ran, and the reason is a protocol rule.** Every episode raised `An assistant message with
+'tool_calls' must be followed by tool messages responding to each 'tool_call_id'`: `serve_tail` appended the block at
+the end of `state.messages`, which on the turn a call is made puts a system message between the call and the results
+about to arrive. `tail_index` now computes the position — before the last assistant message carrying calls when its
+results do not yet answer every call — and the case that pins it fails on the old code. **94 of 114 episodes carried
+no messages**, and the mechanism gate passed that arm anyway: its bill was 16% of the control's because nothing ran.
+A cost ceiling is satisfied by an arm that stopped early, so the gate now requires liveness first and a cost **band**.
+
+**The control is drifting and the treated arm is not.** 86.0% (R214) → 83.3% (R215) → **78.9%** (R216) for the control
+on the same 114 tasks at seed 400, against 87.7% → 86.8% for the treated arm. Seven tasks against one. Whether that
+is sampling noise (~2 sd) or a provider change the board's material buffers, the rule it settles is the one this lane
+has applied since R211: **only a within-dispatch contrast may be quoted**, which is why the re-dispatch re-runs all
+three arms rather than reusing a control from two hours earlier.

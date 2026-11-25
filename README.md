@@ -1286,6 +1286,16 @@ The grid is one attempt over 114 tasks with both arms in one seed world, which i
 behavioural design in this lane: a floor near 9 points, against 20 for the 24-task grid every earlier reading
 was taken through.
 
+**Result (R216, three arms, 342 episodes, $1.2739).** Control **90/114 (78.9%)**, `front` — the repaired parser at
+R215's placement — **99/114 (86.8%)**: **+7.9 pp** [−2.0, +17.6], McNemar p = 0.0784, **15 tasks moved against 6**,
+the largest movement this lane has recorded. Attribution in the live arm went from 32.7% to **75.5%** of writing
+episodes ending with a ticked ask, against a 60% bar, with `unattributed` falling 62 → 14. The third arm — the same
+parser with the block behind the conversation — never reached the model: the provider refuses a system message
+inserted between an assistant message's `tool_calls` and the tool messages that answer them, which is what appending
+at the end of the conversation does on every turn a call is made. That is fixed, pinned by a test that fails on the
+old code, and gated; the placement's own price is still unmeasured. The control itself moved 86.0% → 83.3% → 78.9%
+across three dispatches on the same tasks and seed, so **only a within-dispatch contrast is quoted**.
+
 **Result (R215, 228 episodes, $1.1996).** Control **95/114 (83.3%)**, contract **100/114 (87.7%)**: **+4.4 pp**
 [−4.9, +13.6], McNemar p = 0.40, fourteen tasks turned over against nine that broke. Two rules changed between
 the rounds and both are visible in the counters: the asks come from the request, so the list fell from 10.6 a turn

@@ -6871,3 +6871,32 @@ Two habits the round bought:
 - **A guard that is right for a grid can be wrong for a pilot.** The off-peak guard refuses any run that would sit
   inside the provider's peak band, which is correct for a 342-episode grid and disproportionate for one call — so
   the smoke test that de-risks the placement is a *step inside* the guarded job, not a dispatch of its own.
+
+### 32.74 Three arms, and the reading that decides which half moved
+
+`--note-source board-front` is the repaired parser at R215's placement; `--note-source board` is the same parser with
+the block behind the conversation. With a control, that is a decomposition rather than a verdict:
+
+```
+control  →  front   the parser repairs (the four rules of §32.73's sibling round)
+front    →  board   the placement
+control  →  board   their sum, which is the number nobody can act on
+```
+
+Read them in this order, and stop at the first one that is out of registration:
+
+1. **Did every arm reach the model?** `--replay` reports `skipped`, and the mechanism gate fails on any arm whose
+   episodes carry no messages. An arm that failed early is a *cheap* arm, and a one-sided cost bar will pass it:
+   R216's tail arm billed 16% of the control's because 94 of its 114 episodes never happened.
+2. **The bill band.** −20% to +20% around the control. A large negative is the same finding as a large positive.
+3. **The cadence, for the front arm only.** A change at the front re-buys the prompt; a change behind the
+   conversation does not, so the ≤⅓ bar belongs to the placement it prices.
+4. **Attribution.** 60% of writing episodes must end with a tick. This is the mechanism; the accuracy is the claim.
+5. **The paired delta, within the dispatch.** Never across dispatches: R216's control read 78.9% where R214's read
+   86.0% on the same tasks and seed, seven tasks apart.
+
+Two failures worth recognising by sight:
+
+- *every episode errors with a `tool_calls` complaint* — the block was inserted between an assistant message's calls
+  and their results. `tail_index` computes the position for exactly this.
+- *one arm's bill is a fraction of the control's* — it stopped early. Check `skipped` before reading any counter.
