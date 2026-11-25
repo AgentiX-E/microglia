@@ -2615,3 +2615,28 @@ simulator says (R214: 10.6 asks an episode against the 1.58 a request states).
 **Scope** — where the parser reads asks from: `request` (the first user turn, the product's reading) or
 `conversation` (every user turn, R214's reading). Kept as an argument rather than a rewrite, so the difference
 between the two is a subtraction over one transcript rather than an argument about one.
+
+**Replay** — re-parsing a result document an arm already produced, to price a parser change before paying for a
+dispatch. `goal_board.py --replay`. It predicts a mechanism and not a result: the live arm shows the model what the
+replay only computes, and a model that sees ticks may behave differently.
+
+**Settlement grade** — how strongly a receipt proves an ask was performed. `name` is containment (one word set
+inside the other) and is the only grade R214/R215 used; `overlap` is at least one shared content word and at least
+half of the shorter side, which is what 28 of R215's refusals were one word short of. Overlap settlements are counted
+as `loose` so a reading can say which rule produced its ticks.
+
+**Set ask** — one ask over several products, recognised by a quantifier ("everything", "all", "both", "each"). It
+settles by family and **absorbs** the later calls of that family, because those are the same ask performed several
+times rather than work nobody asked for. Only a quantified ask absorbs: a second "cancel the order" is a duplicate
+and is reported as unattributed. Measured at two settlements in R215's 107 writing episodes, which is why the round
+that registered it also had to find the three defects that mattered more.
+
+**Sealed contract** — a contract fixed at the **first user turn that yields an ask** rather than at the first user
+turn. A request that opens with a greeting states its asks in the next sentence, and a contract sealed on the
+greeting is empty — which makes every change the episode makes *unrequested*. Sealing stops at the first productive
+turn, so the growth defect R214 measured is not re-opened: one message, not twenty-five.
+
+**Tail placement** — the block written into the conversation behind the turn it belongs to, instead of into the
+system message in front of it, and left untouched when a receipt does not move it. A change then costs the messages
+after the old position rather than the whole prompt, and an unchanged turn costs nothing. `--note-source board` is
+tail; `board-front` is R215's placement, kept so a reading can be reproduced.

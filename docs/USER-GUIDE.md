@@ -6829,3 +6829,45 @@ Two habits that R215 bought:
 - **Re-run the control in the same dispatch.** The control read 98/114 in R214 and 95/114 in R215 on the same
   tasks at the same seed. Three tasks of drift is larger than most effects this lane has measured, and the drift
   check exists because of it.
+
+### 32.73 Before you pay for a parser change: replay the arm you already ran
+
+Every result document this lane has produced carries the messages of every episode, which means a parser can be
+measured over an arm that has already run. It is the cheapest instrument here and it was the one missing for three
+rounds:
+
+```bash
+python3 eval/tools/goal_board.py --replay eval/results/working-memory/board.json
+python3 eval/tools/goal_board.py --replay eval/results/working-memory/board.json --json
+```
+
+```
+74 of 107 writing episode(s) ended with a tick (69.2%)
+104/258 ask(s) settled, 7 of them loose, 1 absorbed, 68 unrequested, 18 unattributed, 0 episode(s) skipped
+```
+
+Read it in this order:
+
+1. **`ticked / writing`.** The denominator is the episodes that *attempted* a state change, which is the population
+   the attribution bar is written over. An episode with no writes is not a failure to attribute; an episode with no
+   messages is skipped, because a document truncated mid-grid must not report a rate over episodes that never ran.
+2. **`loose` against `settled`.** A settlement has one of two grades — containment, or overlap at half of the
+   shorter side. Loose ticks are honest but weaker; a reading whose ticks are mostly loose is a reading about a
+   looser rule than the one that was registered.
+3. **`unrequested`.** Calls of a family the contract never stated. This is the checker's own output and the failure
+   τ² charges for, not a parser defect — a run where this is large has a *contract* that is wrong.
+4. **`unattributed`.** Calls of an asked family whose object the board could not name. The parser's blind spot.
+
+**What a replay cannot tell you.** It re-parses an arm that ran under the *old* parser, so it predicts a mechanism
+and not a result: the live arm's block shows ticks the replayed one never showed, and a model that sees them may act
+differently. R216 was registered on a replay that moved ticks from 37.4% to 69.2%, and the dispatch is what says
+whether that prediction survives contact with the agent.
+
+Two habits the round bought:
+
+- **Replay before you register.** R216's first registration named a set rule as the repair; the replay says that rule
+  is worth two settlements in a hundred and seven episodes, and the three defects that were worth the rest are
+  invisible without it. A round that spends money on a wrong diagnosis buys a null it cannot explain.
+- **A guard that is right for a grid can be wrong for a pilot.** The off-peak guard refuses any run that would sit
+  inside the provider's peak band, which is correct for a 342-episode grid and disproportionate for one call — so
+  the smoke test that de-risks the placement is a *step inside* the guarded job, not a dispatch of its own.

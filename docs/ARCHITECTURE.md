@@ -4582,3 +4582,78 @@ message, so its cost is its own length rather than the prefix it sits on. Both a
 
 For the product this is still an `off`: +4.4 points with an interval that includes zero is not a default, and the
 arm costs 37% more. The serve profile's five fields are unchanged.
+
+### 8.92 The replay: a parser change priced before it is paid for
+
+R215 registered a set rule as its repair and was wrong about the bulk. The way that was found cost nothing, and the
+instrument is worth more than the finding:
+
+```bash
+python3 eval/tools/goal_board.py --replay eval/results/working-memory/board.json
+```
+
+A result document carries every message the episode exchanged, so a parser can be run over an arm that already ran.
+`replay()` re-parses each episode, recomputes the board at its last turn, and reports the same readings the arm
+reports — ticks, settlements, loose ticks, absorptions, refusals — per episode rather than per turn. Over R215's
+107 writing episodes it produced the round's actual diagnosis:
+
+| cause | episodes | example |
+|---|---|---|
+| a call of a family the contract never stated | 25 | the contract says *exchange*, the agent *returned* |
+| an ask one word short of the product it names | 28 | `specifically boots ordered` against **Hiking Boots** |
+| a contract sealed on a greeting that carried no ask | 14 | `""` against a `modify_pending_order_items` |
+| a set ask | **2** | `return everything related` |
+
+The registered rule was worth two settlements. Three other defects were worth the rest, and no amount of
+re-registering would have found them, because the counter that would have said so — how many settlements came from
+which rule — did not exist. It does now (`loose`), and the replay is the first thing an arm should be measured with.
+
+**The four repairs.** `grade_of` gives a settlement one of two grades: **containment** (one word set inside the
+other, the strict grade and the only one R214/R215 ever used) and **overlap** (at least one shared content word and
+at least half of the shorter side). The second grade exists because 28 of the round's refusals were one word short:
+`watch received` against **Smart Watch**, `gaming related purchased` against **Gaming Mouse**. It is deliberately
+weaker than containment, so every settlement of that grade is counted and the count travels into the artefact.
+
+The contract now seals at the **first user turn that yields an ask**, not at the first user turn. It is the same
+message in most episodes and not in 14 of them, where the request opens "hi, I need help with a couple of orders" and
+states its asks in the next sentence; a contract sealed on the greeting is empty, and an empty contract calls every
+change the episode makes *unrequested* — the board's most damning line, printed at an agent doing what it was told.
+The growth defect is not re-opened, and the distinction is R215's whole finding: a rule that stops at the first
+productive turn takes one message, and R214's rule took twenty-five.
+
+The family rule now covers asks **with words**, guarded by the catalogue: an ask that names no product the episode
+has read, in an episode that has read at least one, is settled by the first successful call of its family. That is
+what reaches the account families — address, payment, transfer — whose receipts carry no item id at all and for
+which a name match is meaningless. A wordless ask needs no catalogue, because there is nothing to look for; and an
+ask that names a product, at either grade, is never settled by family.
+
+**Measured, before the dispatch**: 37.4% of R215's writing episodes ended with a tick under R215's parser, **69.2%**
+under this one, with `unattributed` falling from 62 to 18 and 7 of the 104 settlements at the loose grade. That is
+a prediction about the live arm, not a result; the arm's own artefact replaces it.
+
+### 8.93 The tail placement: the price of a block is its address
+
+A block written into the system message sits in front of every token the episode will ever send, so a change
+re-buys the whole prompt at the miss rate. R215's arithmetic, from its own counters: 247 changes × 4,756 prompt
+tokens = 1.17 M tokens of re-bought prefix, against a control that buys 860 k uncached in total — and **114 of those
+247 changes were first turns**, which no per-turn block can avoid. The arm cost 37% more for a 200-character list.
+
+`serve_tail` moves the block behind the conversation: appended to `state.messages` after the turn it belongs to, and
+**left exactly where it was written** when a receipt does not move it.
+
+| what happens | where it sits | what it costs |
+|---|---|---|
+| a turn whose block is unchanged | last turn's block, untouched | nothing — the prefix is intact |
+| a turn whose block changed | the old copy is removed, the new one appended | the messages that came after the old position |
+| a turn with nothing to say | the old copy is removed | nothing |
+
+Two properties hold the shape. **One copy**: a state carrying two blocks is a state that accumulated, which is what
+R137 repaired for the front placement and what a naive append would reintroduce under a different tag. **Written
+only on change**: an unchanged turn returns the state it was given, object-identical, which is what makes the cost
+zero rather than small.
+
+The placement is the first change in this lane that puts a message of its own into the conversation rather than the
+system block, so the workflow makes **one call** with a system turn after the user's before it spends on the grid,
+and the round is registered as three arms — control, `front` (the same parser, R215's placement), `tail` — so that
+`front − control` prices the parser and `tail − front` prices the address. A two-arm grid would have reported their
+sum, and the sum is the number nobody can act on.

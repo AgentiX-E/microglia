@@ -1263,8 +1263,24 @@ nobody asked for) or *unattributed* (the board's own blind spot) rather than cre
 Measured against the evaluator's own list of required changes, over all 114 retail requests, the parser finds
 **176 of 226 required objects (77.9%)**, mentions **150 of 180 required families (83.3%)**, and reports 235
 asks that no required object accounts for — 3.6 lines a task, at 42.8% precision. What it cannot do is stated
-rather than hidden: it reads what the request *says*, so a set phrase ("return everything from my two most recent
-orders") names no product and no receipt can settle it by name. That is the defect R215 found and R216 repairs.
+rather than hidden: it reads what the request *says*, so a phrase that names no product ("return everything from my
+two most recent orders") is settled by its family instead of by a name, and a name the episode never read cannot be
+matched at all.
+
+**The instrument to reach for first is the replay**, because it costs nothing and it is what turned R216's
+registration around. A result document carries every message of every episode, so any parser can be run over an arm
+that already ran:
+
+```bash
+python3 eval/tools/goal_board.py --replay eval/results/working-memory/board.json
+```
+
+Over R215's own episodes that reported 37.4% of writing episodes ending with a ticked ask — and, read against the
+four causes it classifies, said that the round's registered diagnosis (a set phrase that no containment can settle)
+was worth **two settlements in a hundred and seven**. The bulk was three other defects: an ask one word short of the
+product it names (28 episodes), a contract sealed on a greeting that carried no ask (14), and the account families —
+address, payment, transfer — whose receipts carry no item id at all. With those repaired the same replay reports
+**69.2%**, and `loose` says how many of the ticks came from the weaker of the two settlement grades.
 
 The grid is one attempt over 114 tasks with both arms in one seed world, which is the cheapest powered
 behavioural design in this lane: a floor near 9 points, against 20 for the 24-task grid every earlier reading
