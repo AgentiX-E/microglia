@@ -7033,3 +7033,56 @@ The configuration the evaluation measured lives in `eval/manifests/serving-defau
 `placement` in the manifest fails exactly one test in each place: the TypeScript constant no longer matches, and the
 dispatch's carrier arm (`board`) no longer serves the placement the manifest names. That is the whole mechanism, and
 it is mechanical on purpose. A review cannot catch a divergence between two codebases; a test can.
+
+### 32.77 Before you believe a delta, ask the grid to produce a zero
+
+Every number this project publishes is a difference between two arms, and there are two ways for such a difference
+to be about something other than the treatment: the grid (the two arms ran at different times), and the reading (the
+material never reached the transcript you are analysing). Both are cheap to check and neither is checked by default
+anywhere in this field.
+
+#### The placebo: two arms that are the same code
+
+```bash
+# 114 tasks, two identical arms, interleaved block by block: 30 invocations, ~$1.3
+gh workflow run working-memory.yml -f arms=interleave -f seed=400 -f concurrency=3
+# and read it without spending anything, as many times as you like
+python3 eval/drivers/tau2/interleave.py --read --dir eval/results/working-memory
+```
+
+The command prints one of six states, and the state is the whole report:
+
+| state | what you do next |
+|---|---|
+| `PLACEBO_HELD` | the grid can resolve a few points; contrasts measured inside one dispatch are about the material |
+| `GRID_ORDERED` | the order the arms ran in is inside every contrast on this grid — do not quote one until the interleave is the default |
+| `ORDER_ASYMMETRIC` | the second arm inherited something from the first: a warm cache, a warmed simulator, a database it wrote |
+| `BILL_DRIFT` | the two halves ran under different provider conditions; the interleave is necessary but not sufficient |
+| `SHARED_PROCESS` | the arms disagree on *nothing*, which means they were one process or the run did not happen |
+| `UNPAIRED` | the arms do not cover the same tasks; there is no reading |
+
+The reason to run it before a treatment round rather than after: this project's own record has the same arm reading
+86.84%, 81.60% and 78.07% across one afternoon, and a control reading 78.95% and then 84.21% — the ranking reversed,
+the material unchanged. A grid whose identical arms differ by more than five points cannot produce a delta about
+anything else, and no amount of statistics applied afterwards repairs that.
+
+`--run` writes a manifest before it spends anything and updates it after each invocation, so a run that dies at block
+eleven resumes rather than re-buys: pass `--resume` and the parts already on disk are kept, checked against the plan's
+own task lists.
+
+#### The dose: how much material did the attempt actually receive
+
+```bash
+python3 eval/verifiers/board_dose.py --document eval/results/working-memory/board.json
+```
+
+It answers `DOSE_READ`, `NO_PAIRS` or `NO_DOSE`, and the third is the one that catches an instrument rather than a
+treatment: it means the document you handed it carries no injected block at all. That is the answer it gives on every
+arm whose block goes into the **system message** — the request carries it, the saved transcript does not, and
+`grep -c microglia-board` over 32 MB of such a document is zero. The placement this project ships puts the block
+behind the conversation instead, where the transcript does carry it, so the reading works on the shipped arm and not
+on the earlier ones.
+
+Read the sentence with its confound intact: dose is endogenous — a longer episode receives more blocks *and* has more
+chances to fail — so a positive or negative dose effect is a decomposition of the arm's episodes, never a causal
+claim about the material.

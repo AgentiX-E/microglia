@@ -2694,6 +2694,29 @@ the whole difference between a block in front of a prefix and one behind it is w
 after the block at the front, the block itself at the end. Signed, so a call that hit the cache harder than the
 median reads negative.
 
+**Placebo (interleaved)** — two arms that are the *same code*, run block by block — block 0 on arm A, then block
+0 on arm B, then block 1 — so the only thing that differs between the two readings of a task is *when* it ran. Its
+registered answer is a delta of zero. It exists because an arm-level contrast has no control for time: the same
+treated arm read 86.84%, 81.60% and 78.07% across three dispatches of one afternoon while the control read 78.95% and
+then 84.21%, which reverses the ranking with no change of material. A grid that cannot produce a zero on two
+identical arms cannot produce a delta about anything else, so the placebo is read before the contrasts are.
+
+**Block (of a grid)** — the tasks one invocation runs. `interleave.py` schedules eight to a block, which is the
+resolution at which the two arms of a placebo are separated in time; the gap each block achieves is measured and
+reported, because a block size that buys a gap nobody looked at is the confound again with a smaller constant.
+
+**Instrument check** — a measurement that asks whether the *measurement* works rather than whether the treatment
+does: the placebo above, a control arm run through a dose reader, a probe whose shapes include the one the product
+ships. The rule this project applies to them is that a refuted prediction about the instrument is a finding, not a
+build failure — while the instrument's own invariants (every task twice, both arms alive, one disagreement somewhere)
+are gates.
+
+**Dose (of a material)** — how much of the material an episode actually received, in characters of injected block.
+It is the unit a **within-task** comparison needs: four attempts at one task receive different amounts of material,
+and the task, the domain, the opening and the seeded world are held fixed by construction, which is a decomposition
+no two-arm grid can make. Dose is endogenous — a longer conversation receives more blocks and also has more chances
+to fail — so a dose reading is a decomposition and never a causal claim, and it says so in the same sentence.
+
 **Ingest** — folding a raw read of a leaderboard directory into a pinned snapshot (`--ingest raw.json --out
 manifest.json`). It preserves what the submitter declared and leaves it absent when nothing was declared: a row with
 no `modality` keeps none, and the scope counts the undeclared rows instead of filling them in, because a default here

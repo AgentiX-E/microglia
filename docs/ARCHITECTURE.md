@@ -4801,3 +4801,60 @@ project keeps finding: three copies of a configuration in `§248.8`, a three-dom
 `§8.95`, a placement named in a product default that no probe built. Each was fixed by making the two sides share
 one artefact and one test, and the test is deliberately mechanical — change `placement` in the manifest and exactly
 one test fails on each side; change a shape in the probe and the arm that serves it stops matching.
+
+### 8.97 Two arms of the same code: the check that decides whether any other number is real
+
+`§8.96` priced the placement the product ships and named the population every rank is about. Both were repairs to
+the *claim*. This is a repair to the **instrument**, and it arrived from a number nobody could explain away.
+
+R218b ran its two arms thirty-five minutes apart. By the end of that afternoon the same treated arm had read
+**86.84%**, **81.60%** and **78.07%** while the control arm read **78.95%** and then **84.21%** — a swap of the
+ranking with no change of material. So every delta this lane has quoted from a single dispatch carries an unmeasured
+confound: the order the arms ran in. The cheapest test of it is not another treatment arm. It is **two arms of
+identical code, interleaved**, whose registered delta is zero.
+
+**The schedule is the experiment.** Block 0 on `control-a`, block 0 on `control-b`, then block 1 — eight tasks a
+block, thirty invocations over 114 tasks. What that buys is a gap of a couple of minutes between the two readings of
+a task rather than half an hour, and the gap is measured per block and reported rather than asserted.
+
+**One process per (block, arm), and the reason is the refutation.** The obvious implementation alternates arms inside
+one `run_tasks` call, and it cannot answer the question: two arms in one interpreter share the provider client and
+the `litellm` callback that counts this lane's tokens, so their bills and their latencies are one object's. The
+preregistration says it plainly — *a delta of exactly zero on every task would say the two arms shared a process* —
+so each invocation is a child process, and the interleave is over time rather than over memory.
+
+**The verdict is six states, and their order is the argument:**
+
+| state | what it says |
+|---|---|
+| `UNPAIRED` | the arms do not cover the same tasks; nothing is paired |
+| `SHARED_PROCESS` | the arms disagree on no task — the suspicious case, not the reassuring one |
+| `GRID_ORDERED` | the delta is above the bar: the order is inside every contrast this grid has measured |
+| `ORDER_ASYMMETRIC` | one arm moved more tasks than the other by more than two: the second reading inherited something |
+| `BILL_DRIFT` | the bills per episode are more than 10% apart: the two halves did not run under one provider |
+| `PLACEBO_HELD` | every endpoint held, which is what makes the grid's other contrasts readable |
+
+One endpoint needs no branch, and the arithmetic is the reason to say so rather than a style: with `moved` and
+`broke` within two tasks of each other, the exact McNemar p is at least 0.5 (the tightest such split, 2 against 0,
+is p = 0.5), so the registered `p > 0.05` bar is **implied** by the symmetry bar. The p is still printed beside it.
+
+**And the arm's material is not in its own transcript.** The second instrument asks a question no arm-level mean can:
+inside one task, did the attempts that received *more* material pass more often? It reads the dose from the
+episode's messages, and its first answer on R218b's own documents was `NO_DOSE` for **both** arms — including the
+treated one whose log counts 4,341 renders at 146.3 characters a render. A front-placement block goes into
+`state.system_messages`, which is composed into the request, and τ² saves the conversation: `grep -c
+microglia-board` over 32 MB of a treated document is **0**.
+
+Reconstructing the block from each turn's prefix was tried and is documented rather than shipped, because the number
+it produces is plausible and wrong: 7,813 turn boundaries against the arm's 4,341 renders, 121.0 characters a
+boundary against 146.3 a render, and an ordering dominated by **turn count** — the same variable that makes a retail
+episode fail. A within-task sign test on it would have reported "more material, fewer passes" and it would have been
+a finding about episode length. The repair is a recording rather than an analysis: the arm writes one line an
+episode, where the dose is known, and the next arm can be read per episode instead of per arm.
+
+**Why this is architecture.** A project that reports deltas has three layers of possible defect — the treatment, the
+grid, and the reading — and only the first is usually checked. An interleave that must read zero is the cheapest
+possible test of the second, and a dose reader that must answer `NO_DOSE` on an arm it cannot see is the cheapest
+test of the third. Both are gates on their own invariants and both print their prediction as a finding, so a
+refutation is recorded rather than rerun away: a red build for a refuted prediction teaches an operator to rerun
+until the grid is green, which is the opposite of what a placebo is for.
