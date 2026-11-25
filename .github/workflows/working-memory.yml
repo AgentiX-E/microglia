@@ -673,6 +673,16 @@ jobs:
           # made `set -e` kill the reading after the money was spent.
           BASE="${BOARD_DIR}/control.json"
           [ -f "${BASE}" ] || BASE="${BOARD_DIR}/front.json"
+          # R219. The `admission` grid has neither: its contrast is `policy - board`, the shipped arm against the
+          # same arm under the rule. The first dispatch of it died **here**, after the money was spent and the
+          # documents were uploaded — the fifth place in this file where an arm was named rather than looked for, and
+          # the reason this branch exists instead of a comment saying the fallback is safe. `policy.json` is looked
+          # for by name because it is the one arm whose absence would make the reading a comparison of an arm with
+          # itself.
+          if [ -f "${BOARD_DIR}/policy.json" ]; then
+            BASE="${BOARD_DIR}/board.json"
+            TREATED="${BOARD_DIR}/policy.json"
+          fi
           python3 eval/tools/goal_board.py \
             --compare "${BASE}" "${TREATED}" --k "${BOARD_K}" | tee "${RUNNER_TEMP}/reading.txt"
           python3 eval/tools/goal_board.py \

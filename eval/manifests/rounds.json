@@ -193,7 +193,7 @@
   {
    "id": "R219",
    "title": "the invocation policy — serve the state when a write needs it, not when it is renderable",
-   "status": "registered",
+   "status": "read",
    "dispatchBy": "2026-11-30T12:00:00Z",
    "arms": [
     "board",
@@ -207,7 +207,49 @@
    "prereg": "prereg/R219-admission.md",
    "amended": "Registered 2026-11-25 with arms front+policy. Amended 2026-11-26, before dispatch: the tail is the placement the product ships (R216b, serving-defaults.json), so the rule is tested at the tail; testing it at the front would price a treatment the product does not use.",
    "why": "The block has two state lines and two judgment lines. The judgments are the parser's claims about the request, and `goal_board.py --accusations` reads 1,808 of 1,965 of them (92.0%) on R218b's front arm as naming a family the task requires a write in. The rule admits state and refuses to admit judgment; the bar is a count in one stratum (regressions 6 -> <=1, rescues >=12 of 15).",
-   "instrument": "eval/tools/goal_board.py --accusations (free: reads an R218b artefact)"
+   "instrument": "eval/tools/goal_board.py --accusations (free: reads an R218b artefact)",
+   "dispatchedAt": "2026-11-26T03:24:00+08:00",
+   "run": 45684914838,
+   "readAt": "2026-11-26T04:05:00+08:00",
+   "actualUsd": 1.2329,
+   "outcome": "read; the effect is large and the bar is met against a cross-dispatch control, so a replication is registered before the product default moves",
+   "reading": {
+    "board": "87/114 (76.3%)",
+    "policy": "99/114 (86.8%)",
+    "delta": "+10.5 pp [+0.4, +20.5], McNemar p = 0.029; moved 19, broke 7",
+    "mechanism": {
+     "admission": {
+      "board": "all",
+      "policy": "state"
+     },
+     "charsMean": {
+      "board": 152.4,
+      "policy": 140.1
+     },
+     "changes": {
+      "board": 260,
+      "policy": 211
+     },
+     "tailHeld": {
+      "board": 854,
+      "policy": 937
+     }
+    },
+    "billPerEpisode": {
+     "board": 0.00552,
+     "policy": 0.0053,
+     "change": "-4%"
+    },
+    "strataVsR218bControl": {
+     "easy": 96,
+     "boardRegressions": 21,
+     "policyRegressions": 1,
+     "hard": 18,
+     "boardRescues": 16,
+     "policyRescues": 18
+    },
+    "caveat": "the strata use R218b's control arm because this dispatch ran no control; the paired board-vs-policy contrast is within one dispatch and is the claim"
+   }
   },
   {
    "id": "R220",
@@ -218,6 +260,23 @@
    "readAt": "2026-11-25T16:20:00Z",
    "actualUsd": 0.0,
    "outcome": "built; the probe now prices the shipped placement and --board names the population"
+  },
+  {
+   "id": "R219b",
+   "title": "the same two arms, again — a replication before the rule becomes a default",
+   "status": "registered",
+   "dispatchBy": "2026-11-27T12:00:00Z",
+   "prereg": "prereg/R219b-replication.md",
+   "arms": [
+    "board",
+    "policy"
+   ],
+   "episodes": 228,
+   "estimateUsd": 1.25,
+   "dependsOn": [
+    "R219"
+   ],
+   "why": "R219 read +10.5 pp [+0.4, +20.5] with p = 0.029 on 19 moved and 7 broke. The grid's identical arms turn over 25.4% of their tasks, so 26 discordant pairs is what noise produces and only the asymmetry is the signal. A replication is the cheapest instrument for a single dispatch, and the product default does not move until the sign repeats."
   }
  ]
 }

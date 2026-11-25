@@ -7098,3 +7098,81 @@ on the earlier ones.
 Read the sentence with its confound intact: dose is endogenous — a longer episode receives more blocks *and* has more
 chances to fail — so a positive or negative dose effect is a decomposition of the arm's episodes, never a causal
 claim about the material.
+### 32.78 What your memory block is allowed to say, and how to check it
+
+`§32.77` gave you the two checks that decide whether a *delta* means anything. This one is about the block itself:
+the difference between a memory that **states** and a memory that **accuses**, and why the second kind costs you
+tasks you would otherwise have solved.
+
+#### Two kinds of line
+
+The state board (`§32.74`) renders up to four kinds of line. Two of them are statements about what happened:
+
+```
+Open asks from the request — a line is ticked only when a tool receipt names it:
+[ ] return: lamp
+[x] exchange: keyboard
+```
+
+and two are judgments about the agent's calls:
+
+```
+Not asked for by the request: 1 call(s) — cancel_pending_order
+Not attributed to any ask: 1 call(s) — exchange_delivered_order_items
+```
+
+The judgments are only as good as the parser that writes them, and the parser is a closed cue list. Measure them against
+the evaluator's own list of required writes — the list the block never reads — and on this project's own artefact
+**1,808 of 1,965 entries (92.0%) name a family the task requires a write in.** The block was telling the agent it had
+done something nobody asked for, on tasks where somebody had, because the parser missed the ask.
+
+```bash
+# free: reads a results document an arm already produced, no model calls
+python3 eval/tools/goal_board.py --accusations eval/results/working-memory/board.json
+#  1,808 of 1,965 refusal entr(ies) name a family the task requires (92.0%)
+#  1,987 entr(ies) over 456 episode(s); 178 episode(s) carried at least one false accusation
+#    unattributed  461/470 false
+#    unrequested   1347/1517 false
+# and the cheaper view of the same document: each episode's last block only
+python3 eval/tools/goal_board.py --accusations eval/results/working-memory/board.json --whole-episode
+```
+
+#### Turning the rule on
+
+```bash
+# one dispatch: the shipped arm against the same arm under the rule
+gh workflow run working-memory.yml -f arms=admission -f seed=400 -f concurrency=3
+```
+
+`policy` is the tail placement — the one the product ships — with `state_only=True` at the renderer. Nothing else
+changes: same parser, same model, same seed, same 114 tasks. The phase census records it, so a reading cannot mistake
+a treatment that never applied for a treatment that did:
+
+```bash
+python3 - <<'PY'
+import json
+line = next(l for l in open("eval/results/working-memory/policy.log") if l.startswith('{"phase"'))
+print(json.loads(line)["diagnostics"]["memory"]["board"]["admission"])   # 'state' on the policy arm
+PY
+```
+
+In the product, the same switch is `SERVING_DEFAULTS.admissionPolicy`, whose measured value lives in
+`eval/manifests/serving-defaults.json` beside `placement` — one artefact, two readers, one test in each repository,
+exactly as `§32.76` describes for the placement.
+
+#### When to admit a memory at all
+
+The rule generalises past this block, and the field's own results say the same thing three different ways:
+
+- **A memory may state what it can support.** If it cannot name the thing it is talking about, it says nothing about
+  it. `unattributed` is the honest form of that, and it is 98.1% wrong about the task — so silence is better than a
+  guess that reads as a verdict.
+- **A memory that is re-asserted more often is not a memory that is more true.** Five of this project's rounds were
+  spent on the *content* of the block; the damage was in its *admission*.
+- **Prefer the state to the lesson.** The same state channel is priced at **+23.9 points** in the published ablation
+  of the system holding this benchmark's SOTA (Recuris, arXiv 2608.24876) against **+2.0 with an interval including
+  zero** for the distilled-lesson channel — and WikiTrace (arXiv 2611.14320) cuts memory-induced degradation from
+  **6.5% to 4.5%** not by writing better lessons but by letting the agent check each one against its evidence.
+
+The habit worth taking: **measure your memory's false accusations before you tune its content.** It is one command, it
+costs nothing, and on this corpus it found a defect that eleven rounds of content work had not.

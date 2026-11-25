@@ -4869,3 +4869,73 @@ possible test of the second, and a dose reader that must answer `NO_DOSE` on an 
 test of the third. Both are gates on their own invariants and both print their prediction as a finding, so a
 refutation is recorded rather than rerun away: a red build for a refuted prediction teaches an operator to rerun
 until the grid is green, which is the opposite of what a placebo is for.
+
+### 8.98 The block was accusing: an admission rule, from a measurement of its own lines
+
+`§8.97` established the grid's resolution and, with it, a rule the rest of the plan now obeys: an effect below ten
+points is not measurable at 114 tasks. That rule retired two planned rounds and promoted a third, because R216's split
+had produced an effect that is not a mean. The state board **rescued 15 of the 24 tasks no-memory cannot do and broke
+6 of the 90 it already does** — and a count in one stratum is resolvable where a five-point mean is not.
+
+The question the split left open was *why* a block that only states what the request asked could damage a trajectory
+that was already fine. The answer is that the block was not only stating: two of its lines are judgments.
+
+| line | what it claims | whose claim it is |
+|---|---|---|
+| `[x] return: lamp` | a receipt named this ask | the evaluator's — a tool succeeded |
+| `[ ] exchange: keyboard` | no receipt has named it yet | the reader's — the conversation shows the same thing |
+| `Not asked for by the request: 1 call(s)` | the agent changed state nobody asked for | **the parser's** |
+| `Not attributed to any ask: 1 call(s)` | the parser could not name what a call touched | **the parser's** |
+
+The last two are the only lines that assert something about the *request* rather than about what happened, and the
+assertion is only as good as a closed cue list. `goal_board.py --accusations` prices them against the evaluator's own
+`evaluation_criteria.actions`, which the block never reads, over an artefact the lane has already paid for:
+
+| reading, R218b's front arm (456 episodes, 1,965 entries, 107 tasks with criteria) | value |
+|---|---|
+| entries naming a family the task **requires** a write in | **1,808 / 1,965 = 92.0%** |
+| the same over each episode's last block only | 239 / 277 = 86.3% |
+| episodes carrying at least one such entry | 178 of 456 |
+| `unattributed` entries that are false | 461 / 470 = **98.1%** |
+| `unrequested` entries that are false | 1,347 / 1,517 = 88.8% |
+
+Nine tenths of the block's refusals tell the agent it did something nobody asked for on a task where somebody did. The
+line whose whole purpose is honesty about the parser's blind spot is wrong about the task 98 times in 100 — because
+"the parser could not name it" and "nobody asked for it" are different facts, and only the first is true.
+
+**The rule.** The block admits **state** and refuses to admit **judgment**. One switch at the renderer
+(`render(board, state_only=True)`), one variable in the environment (the same one that carries the placement, so two
+switches cannot disagree and produce a third treatment nobody registered), and one field in the phase census
+(`board.admission`) so a reading can tell a null from a wiring defect.
+
+What it does not do is improve the parser. A cue list that grows with the corpus is a parser fitted to the corpus, and
+the honest reading of a zero-recall ask is silence rather than an accusation. **A block that cannot name what the
+request asked is entitled to say nothing about it**, which is also why the rule removes the two lines instead of
+annotating them.
+
+**Why the count is the right bar.** The harm lands on trajectories the no-memory arm already solves, so the quantity
+is a paired count over one stratum — 6 to at most 1 out of 90 — and a paired exact test reads a 5-in-90 move at
+p < 0.05. The rescue count is the guard on the other side: the rule may not buy the regressions back by losing the
+hard stratum's gain, so `≥12 of 15` is registered beside it.
+
+**The literature converges on the same two sentences, and this is the first round here that can quote it.**
+
+- **WikiTrace** (arXiv 2611.14320, KAIST) names the failure *memory-induced degradation* — an agent failing a task it
+  would solve without memory — and reports **6.5% → 4.5%** after linking every lesson to the trajectory it came from,
+  +3.2 points over the same insights given without evidence. Our regression rate on the same definition is **6.7%**
+  (6 of 90, R216-1) and **10.8%** (10 of 93, R216b): the same phenomenon, measured on a different benchmark, with the
+  same order of magnitude.
+- **MemDev-Bench** finds memory making agents fail tasks they could solve, *more* often with irrelevant history,
+  because the agent reuses a lesson without re-checking whether it applies — which is the admission question stated
+  as a retrieval question.
+- **REM** reframes the bottleneck from *what to retrieve* to *when it should appear*, which is precisely the axis this
+  section adds: the block's content was measured for eleven rounds and its **admission** never was.
+- **"Useful Memories Become Faulty When Continuously Updated by LLMs"** (arXiv 2605.12978) shows the harm is in the
+  rewriting loop rather than in retrieval — 19 ARC-AGI tasks at 100% fall to 54% after consolidation — which is the
+  same lesson one level up: a memory that keeps asserting more than it can support loses the tasks it already had.
+
+**What is architectural here.** The switch is three lines of Python; the instrument is what makes it more than a
+preference. Every arm from this round on reports `admission` beside `placement`, and the number that justified the rule
+is reproducible from a document for free, in 2.4 seconds, by anyone with the artefact. A rendering rule with a
+falsifiable bar and a free instrument is the shape this project requires of a claim; the alternative — "the block felt
+noisy" — is the shape it has spent forty rounds learning to refuse.

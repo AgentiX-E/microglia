@@ -2721,3 +2721,17 @@ to fail — so a dose reading is a decomposition and never a causal claim, and i
 manifest.json`). It preserves what the submitter declared and leaves it absent when nothing was declared: a row with
 no `modality` keeps none, and the scope counts the undeclared rows instead of filling them in, because a default here
 would answer the question the scope is asking.
+
+**Admission policy** — the rule that decides **whether** a memory block is allowed into the prompt this turn, as
+distinct from what it says once there. This project's first eleven rounds on the state board tuned its *content*; the
+damage turned out to be in its admission, because two of the block's four line kinds were judgments rather than
+state. `policy` is therefore an arm name rather than a sentence: the shipped tail placement with the two judgment
+lines refused. The general form of the rule is "a memory may state what it can support, and says nothing about what it
+cannot name" — and the field's own results reach it from three directions (WikiTrace's evidence links, MemDev-Bench's
+irrelevant-history finding, REM's reframing of retrieval as lifecycle).
+
+**False accusation** — a line in the block that reports a call as `unrequested` or `unattributed` while the family it
+names is one the task *requires* a write in. The definition needs ground truth the block never sees, which is why the
+instrument (`--accusations`) reads a finished results document and takes the evaluator's
+`evaluation_criteria.actions` as that truth. Measured at **92.0% of 1,965 entries** on R218b's front arm and **98.1%**
+of the `unattributed` ones; the block was asserting the parser's blindness as if it were the agent's mistake.
