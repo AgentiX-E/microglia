@@ -113,9 +113,21 @@ jobs:
           # is the one tool in the lane whose defect would be published: a metric read off one attempt and placed
           # in a pass^4 column is a wrong claim with a plausible shape. Measured under the same floor.
           python3 -m coverage run --append --branch eval/tools/submission.py --self-test
+          # R216b. The clock. Two dispatches were armed on a `schedule:` trigger and neither fired, so the debt a
+          # round owes is now a file CI asserts on rather than a date in a roadmap: a registered round past its
+          # date fails the build on the next commit. Measured under the same floor for the same reason - a clock
+          # that silently returns zero is a clock that certifies nothing is owed.
+          python3 -m coverage run --append --branch eval/tools/round_clock.py --self-test
           python3 -m coverage json -o coverage-python.json
           python3 scripts/check-python-coverage.py --self-test
-          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 12
+          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 13
+
+      - name: The rounds this project owes, and the date each one was registered for
+        # The failure this prevents is not a wrong number, it is a round that quietly stops being planned: R216b's
+        # 10:02 UTC cron produced no run at all and nothing said so for four hours. A registry read on every push
+        # makes the debt visible at the next commit. It is a separate step from the coverage floor because its
+        # subject is the plan rather than the code.
+        run: python3 eval/tools/round_clock.py
 
       - name: Repository audit (source rules, manifests, published dependencies)
         run: pnpm audit:repo
