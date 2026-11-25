@@ -2666,3 +2666,35 @@ a custom entry must explain itself in `methodology.notes`, link its implementati
 it. Distinct from last place and from zero: a `pass^1` at one attempt is unranked on `pass^4`, and drawing it as a
 zero would report "reliably never" where the truth is "not measured". `--position` exits `1` in this state so a
 script cannot mistake it for a placement.
+
+**Population** — the rows a rank is computed over, named together with the rank: one snapshot (`1x`, `2x`), one
+benchmark version, one modality, and how many rows each scope dropped. "6th" is not a fact about a board; "6th of 49
+retail rows", "2nd of 9 text rows at τ² 1.0.1" and "3rd of 9 custom submissions" are three different facts about the
+same number, and the tool prints the population line before the table so a reader can tell which one they were
+handed.
+
+**Version scope** — the subset of board rows whose `methodology.tau2_bench_version` equals the scope's. The retail
+column mixes nine spellings (`1.0.1`, `1.0.0`, `0.1.3`, `v0.1.3`, `original tau-bench`, `v2.0`, two bare commit
+shas, and one row that states none), and a row measured on different tasks is not a comparison. `--position`
+**refuses** an artefact whose own version disagrees with the scope rather than placing it with a caveat.
+
+**Board 2x** — the leaderboard directory at tag `v2.0.0`: 72 `submission.json` files, 48 of which state a retail
+`pass^1`. It is a snapshot on purpose, and it is the tag rather than the default branch because `web/leaderboard` is
+no longer on the default branch — the largest set still readable is the tag's.
+
+**Written-on call** — the 1-based call on which a block was written into the prompt. It is an axis of the placement
+probe and not a constant, because a `tail` block sits behind the conversation *as it stood when it was written*: a
+block written on call three is behind the two turns that existed then, and the calls after it append after the
+block. A probe that re-sent the block at the end of every call would price a message order the arm never sends.
+
+**Move price** — `movePrice(ledger, call)`: the call's uncached prompt tokens minus the shape's own steady-state
+median. It is the quantity a placement actually changes. Held still, every placement's bill is the control's plus one
+write — which is why the confirmed `tail` placement is 4% cheaper and not the 37% an earlier estimate implied — and
+the whole difference between a block in front of a prefix and one behind it is what a *change* re-bills: everything
+after the block at the front, the block itself at the end. Signed, so a call that hit the cache harder than the
+median reads negative.
+
+**Ingest** — folding a raw read of a leaderboard directory into a pinned snapshot (`--ingest raw.json --out
+manifest.json`). It preserves what the submitter declared and leaves it absent when nothing was declared: a row with
+no `modality` keeps none, and the scope counts the undeclared rows instead of filling them in, because a default here
+would answer the question the scope is asking.

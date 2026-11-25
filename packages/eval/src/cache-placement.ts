@@ -49,6 +49,26 @@
  * boundary. `system-second` is the current arm. A probe that measured only the two system shapes
  * would price the cache and nothing else; the third is what makes the same 36 calls also answer
  * "what would the other placement cost", which is the question R102 would otherwise have to buy.
+ *
+ * ## R220b: the shape that ships, and the two axes it needs
+ *
+ * Four shapes priced the cache and none of them was `tail` — the placement `SERVING_DEFAULTS` names,
+ * which meant the product shipped a position no committed reading had measured. Adding the case is
+ * not enough, for two reasons that are about the model rather than the branch:
+ *
+ *  - **a tail block's position is a function of when it was written.** The arm appends the block
+ *    once and *holds* it (`serve_tail`), so later turns are appended **after** it. A probe that
+ *    re-sends the block at the end of every call sends a message order the arm never sends, and
+ *    would price the shipped placement as if it re-bought itself on every turn. `writtenOnCall`
+ *    is the axis: the block sits where it stood on that call, and the calls before it carry none.
+ *  - **the placement's price is the price of a change.** Held still, every shape's steady state is
+ *    the control's plus whatever it wrote once — R216b measured a 4% difference, not the 37% the
+ *    first dispatch paid. The difference is what a *move* costs, and a move needs a revision:
+ *    `revision` changes the block's content from a named call, which is the call whose uncached
+ *    tokens `movePrice` reads against the shape's own steady state.
+ *
+ * Both axes default to the behaviour the probe already had (a write on the first call, no revision),
+ * so every committed reading stays reproducible from this file.
  */
 
 /** A message in the shape the provider reads, which is all this module needs of a chat turn. */
@@ -58,7 +78,7 @@ export type PromptMessage = {
 };
 
 /** The placements a dispatch can ask for. `control` carries no block at all. */
-export const PACK_PLACEMENTS = ['control', 'system-second', 'system-merged', 'first-turn'] as const;
+export const PACK_PLACEMENTS = ['control', 'system-second', 'system-merged', 'first-turn', 'tail'] as const;
 
 export type PackPlacement = (typeof PACK_PLACEMENTS)[number];
 
@@ -70,6 +90,28 @@ export type PlacementPromptInput = {
   readonly block: string;
   /** The episode so far. The last turn is the one being answered. */
   readonly turns: readonly { readonly user: string; readonly assistant: string }[];
+  /**
+   * The call the block was written on, 1-based. Defaults to the first call, which is what every
+   * commitment before R220b assumed.
+   *
+   * It is an axis rather than a constant because a block does not teleport: a `tail` block written on
+   * call three sits behind the two turns that existed then, and the calls after it append **after**
+   * the block. A shape built with the block at the end of every call would be a shape the arm never
+   * sends, priced as if the placement re-bought itself on every turn.
+   *
+   * A call before the write carries no block, for **every** placement. That is one rule rather than a
+   * special case per shape: the block did not exist yet, whichever position it was later given.
+   */
+  readonly writtenOnCall?: number;
+  /**
+   * A later body for the block, sent from `fromCall` on. Unset means the block never changes, which
+   * is the held regime and the one whose bill is the control's plus one write.
+   *
+   * The change is where a placement's price actually lives: behind the conversation a change
+   * re-bills the block and nothing else, while in front of it a change re-bills everything the block
+   * sits in front of. `movePrice` is the reading, and it needs a call that moved.
+   */
+  readonly revision?: { readonly fromCall: number; readonly block: string };
 };
 
 /**
@@ -82,6 +124,32 @@ export function placementPromptFor(
   placement: PackPlacement,
   input: PlacementPromptInput,
 ): readonly PromptMessage[] {
+  const writtenOnCall = input.writtenOnCall ?? 1;
+  if (!Number.isSafeInteger(writtenOnCall) || writtenOnCall < 1) {
+    throw new Error(
+      `the block cannot be written on call ${writtenOnCall}: call 1 is the first, and a shape built ` +
+        'for a call before it would price a message the episode never sent',
+    );
+  }
+  const revision = input.revision;
+  if (revision !== undefined && revision.fromCall < writtenOnCall) {
+    throw new Error(
+      `a revision from call ${revision.fromCall} is before the block was written on call ` +
+        `${writtenOnCall}: that is a different treatment, not a revision of this block`,
+    );
+  }
+  if (placement === 'first-turn' && writtenOnCall !== 1) {
+    throw new Error(
+      `the first-turn placement attaches the block to the task statement, so its write is call 1 by ` +
+        `construction; a write on call ${writtenOnCall} has no position in it`,
+    );
+  }
+
+  // The call being built: the history holds n completed turns and this is call n + 1.
+  const call = input.turns.length + 1;
+  const present = call >= writtenOnCall;
+  const body = revision !== undefined && call >= revision.fromCall ? revision.block : input.block;
+
   const history: PromptMessage[] = [];
   for (const turn of input.turns) {
     history.push({ role: 'user', content: turn.user });
@@ -92,12 +160,14 @@ export function placementPromptFor(
   switch (placement) {
     case 'control':
       return [system(input.native), ...history];
-    // Today's arm: a second system message, after the policy and before the conversation.
+    // A second system message, after the policy and before the conversation.
     case 'system-second':
-      return [system(input.native), system(input.block), ...history];
+      return present
+        ? [system(input.native), system(body), ...history]
+        : [system(input.native), ...history];
     // One message, so the policy and the block are one prefix rather than two.
     case 'system-merged':
-      return [system(`${input.native}\n\n${input.block}`), ...history];
+      return [system(present ? `${input.native}\n\n${body}` : input.native), ...history];
     // ExpeL's placement: the block rides the task statement instead of the policy. Refused on an
     // empty episode rather than given a shape of its own, because a block with no turn to attach to
     // is a different treatment and a probe that quietly substituted one would price the wrong thing.
@@ -109,14 +179,46 @@ export function placementPromptFor(
             'a probe with none is measuring a shape it did not name',
         );
       }
+      // No `present` test here: the write is call 1 by the guard above, so every call carries the
+      // block and a branch on it would be a branch no input can reach.
       return [
         system(input.native),
-        { role: 'user', content: `${first.user}\n\n${input.block}` },
+        { role: 'user', content: `${first.user}\n\n${body}` },
         { role: 'assistant', content: first.assistant },
         ...history.slice(2),
       ];
     }
+    // R216's placement, and R220b's subject: behind the conversation **as it stood when the block was
+    // written**, with the later turns appended after it. On a first call there is nothing to be
+    // behind, and the shape is the second-system one — a fact about prefixes, not a defect, and the
+    // reason this case does not refuse an empty episode the way `first-turn` does.
+    case 'tail': {
+      if (!present) return [system(input.native), ...history];
+      const at = 2 * (writtenOnCall - 1);
+      return [system(input.native), ...history.slice(0, at), system(body), ...history.slice(at)];
+    }
   }
+}
+
+/**
+ * What one call costs beyond the shape's own steady state — the price of a move.
+ *
+ * R216b's reading is this number: the block moves on 23% of turns, and a move at the front of the
+ * prompt re-bills every token behind it while a move behind the conversation re-bills the block and
+ * nothing else. Signed on purpose: a call that hit the cache harder than the median reads negative,
+ * and clamping it would make every shape look like it paid at least nothing per move.
+ *
+ * The steady state is the ledger's own median rather than a caller-supplied constant, because a
+ * constant would be the caller's model of the shape and the median is the shape's own bill.
+ */
+export function movePrice(ledger: CacheLedger, call: number): number {
+  if (!Number.isSafeInteger(call) || call < 1) {
+    throw new Error(`the block cannot move on call ${call}: call 1 is the first`);
+  }
+  if (call > ledger.calls) {
+    throw new Error(`the ledger holds ${ledger.calls} call(s); call ${call} was not measured`);
+  }
+  return ledger.uncachedSeries[call - 1]! - ledger.steadyUncached;
 }
 
 /** One call's prompt, as the provider reported it. Nothing here is derived from a rate card. */
@@ -258,6 +360,10 @@ export function placementVerdict(
   const second = ledgers['system-second'];
   const merged = ledgers['system-merged'];
   const firstTurn = ledgers['first-turn'];
+  // R220b. Read when the probe sent it and absent when it did not, exactly as `first-turn` is: the
+  // four states are a diagnosis of *why* a block-bearing system message pays, and the shipped shape
+  // is a reading beside that diagnosis rather than a fifth verdict.
+  const tail = ledgers.tail;
 
   const readouts: PlacementReadout[] = [];
   const base = control?.steadyUncached ?? 0;
@@ -295,8 +401,10 @@ export function placementVerdict(
   const dSecond = second.steadyUncached - control.steadyUncached;
   const dMerged = merged.steadyUncached - control.steadyUncached;
   const dFirst = firstTurn === undefined ? undefined : firstTurn.steadyUncached - control.steadyUncached;
+  const dTail = tail === undefined ? undefined : tail.steadyUncached - control.steadyUncached;
   const firstClause =
-    dFirst === undefined ? '' : ` The first-turn placement reads ${dFirst.toFixed(0)} against it.`;
+    (dFirst === undefined ? '' : ` The first-turn placement reads ${dFirst.toFixed(0)} against it.`) +
+    (dTail === undefined ? '' : ` The tail placement reads ${dTail.toFixed(0)} against it.`);
 
   if (dSecond <= CACHE_TOLERANCE_TOKENS) {
     return {

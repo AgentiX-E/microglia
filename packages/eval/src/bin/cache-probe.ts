@@ -7,7 +7,8 @@
  * prefix (move it) or the second system message is a boundary the provider does not carry (merge it)
  * — and no amount of reading the arm's ledger can separate them, because both look like a bill.
  *
- * So this probe sends the same episode under four prompt shapes and reads `prompt_cache_hit_tokens`
+ * So this probe sends the same episode under the five prompt shapes in `PACK_PLACEMENTS` — four
+ * placements plus `tail`, the one this project ships (R220b) — and reads `prompt_cache_hit_tokens`
  * per call. It is not a benchmark and cannot score anything: it produces the one fact an arm would
  * otherwise have to buy at $0.83 and then be unable to attribute.
  *
@@ -17,7 +18,11 @@
  *
  * Usage:
  *   pnpm eval:cache-probe --out eval/results/cache-placement.json [--turns 9] [--native-tokens 3000]
- *     [--block-tokens 1200] [--wait-ms 5000] [--max-calls 80]
+ *     [--block-tokens 1200] [--wait-ms 5000] [--max-calls 96] [--write-at 1] [--rewrite-at 10]
+ *
+ * `--rewrite-at <call>` buys one extra call per shape with the block's body changed on that call,
+ * which is the only way to read a move: held still, every placement's steady state is the control's
+ * plus one write, and the difference R216b measured (−4%) lives entirely in what a change re-bills.
  *
  * Reads `SOTA_API_KEY` / `DEEPSEEK_API_KEY`, `SOTA_ENDPOINT` / `DEEPSEEK_ENDPOINT` and `SOTA_MODEL`,
  * the same three the lane reads, so the probe prices the model a dispatch would actually spend.
@@ -28,6 +33,7 @@ import { dirname } from 'node:path';
 import {
   PACK_PLACEMENTS,
   cacheLedgerOf,
+  movePrice,
   placementVerdict,
   placementPromptFor,
   syntheticText,
@@ -46,6 +52,10 @@ type Flags = {
   readonly waitMs: number;
   readonly warmup: number;
   readonly maxCalls: number;
+  /** The call the block is written on; 1 for an episode that serves a block from its first turn. */
+  readonly writeAt: number;
+  /** The call the block's body changes on, or 0 for a probe that never moves it. */
+  readonly rewriteAt: number;
 };
 
 function numberFlag(argv: readonly string[], name: string, fallback: number): number {
@@ -74,7 +84,11 @@ function flagsOf(argv: readonly string[]): Flags {
     // ~10s ago is not reliably readable, so a shorter wait prices the provider's bookkeeping.
     waitMs: Math.trunc(numberFlag(argv, '--wait-ms', 15_000)),
     warmup: Math.trunc(numberFlag(argv, '--warmup', 1)),
-    maxCalls: Math.trunc(numberFlag(argv, '--max-calls', 80)),
+    // Five shapes over nine turns plus a warmup and one move each is 55 calls; the default is the
+    // budget that fits the grid the probe documents, not a number chosen to be roomy.
+    maxCalls: Math.trunc(numberFlag(argv, '--max-calls', 96)),
+    writeAt: Math.trunc(numberFlag(argv, '--write-at', 1)),
+    rewriteAt: Math.trunc(numberFlag(argv, '--rewrite-at', 0)),
   };
 }
 
@@ -146,6 +160,7 @@ async function main(): Promise<void> {
   const turns = episodeOf(flags.turns);
 
   const readings: Partial<Record<PackPlacement, RawReading[]>> = {};
+  const moves: Partial<Record<PackPlacement, number>> = {};
   let calls = 0;
   for (const [index, placement] of PACK_PLACEMENTS.entries()) {
     // Every shape gets its **own** policy text, and the first run of this probe is why. One shared
@@ -168,7 +183,13 @@ async function main(): Promise<void> {
         throw new Error(`the probe's ${flags.maxCalls}-call budget is spent; raise --max-calls`);
       }
       calls += 1;
-      await send(url, credential.key, model, placementPromptFor(placement, { native, block, turns }), 16);
+      await send(
+        url,
+        credential.key,
+        model,
+        placementPromptFor(placement, { native, block, turns, writtenOnCall: flags.writeAt }),
+        16,
+      );
       await new Promise((resolve) => setTimeout(resolve, flags.waitMs));
     }
     const series: RawReading[] = [];
@@ -176,7 +197,12 @@ async function main(): Promise<void> {
       if (calls >= flags.maxCalls) {
         throw new Error(`the probe's ${flags.maxCalls}-call budget is spent; raise --max-calls`);
       }
-      const messages = placementPromptFor(placement, { native, block, turns: turns.slice(0, turn) });
+      const messages = placementPromptFor(placement, {
+        native,
+        block,
+        turns: turns.slice(0, turn),
+        writtenOnCall: flags.writeAt,
+      });
       calls += 1;
       series.push(await send(url, credential.key, model, messages, 16));
       // The provider writes a cache entry after answering, so the next call has to be late enough to
@@ -186,11 +212,43 @@ async function main(): Promise<void> {
     }
     readings[placement] = series;
     const folded = cacheLedgerOf(series);
+    // R220b. The move, if this run asked for one: the same final call with the block's body changed.
+    // The reading is taken against the **held** ledger's steady state rather than against a ledger
+    // built after the fact, so the number is "what a change cost minus what the call would have cost
+    // had nothing moved" — which is the difference between a placement in front of a prefix and one
+    // behind it, and the only number that separates them once the block is held.
+    let moved: number | undefined;
+    if (flags.rewriteAt > 0 && flags.rewriteAt <= turns.length + 1) {
+      if (calls >= flags.maxCalls) {
+        throw new Error(`the probe's ${flags.maxCalls}-call budget is spent; raise --max-calls`);
+      }
+      const revised = placementPromptFor(placement, {
+        native,
+        block,
+        turns,
+        writtenOnCall: flags.writeAt,
+        revision: { fromCall: flags.rewriteAt, block: `${block} rev` },
+      });
+      calls += 1;
+      const reading = await send(url, credential.key, model, revised, 16);
+      moved = movePrice(
+        {
+          ...folded,
+          calls: folded.calls + 1,
+          uncachedSeries: [...folded.uncachedSeries, reading.promptTokens - reading.cachedTokens],
+        },
+        folded.calls + 1,
+      );
+      await new Promise((resolve) => setTimeout(resolve, flags.waitMs));
+    }
     process.stdout.write(
       `${placement.padEnd(14)} prompt/call ${(folded.promptTokens / folded.calls).toFixed(0).padStart(6)}` +
         `  uncached/call first ${folded.firstUncached.toString().padStart(5)}` +
-        `  steady ${folded.steadyUncached.toString().padStart(5)}\n`,
+        `  steady ${folded.steadyUncached.toString().padStart(5)}` +
+        (moved === undefined ? '' : `  move ${moved.toFixed(0).padStart(6)}`) +
+        '\n',
     );
+    if (moved !== undefined) moves[placement] = moved;
   }
 
   const reported = Object.values(readings)
@@ -229,6 +287,9 @@ async function main(): Promise<void> {
       ]),
     ),
     block_tokens_measured: verdict.blockTokens,
+    write_at: flags.writeAt,
+    rewrite_at: flags.rewriteAt,
+    move_tokens: moves,
     state: verdict.state,
     sentence: verdict.sentence,
     readouts: verdict.readouts,

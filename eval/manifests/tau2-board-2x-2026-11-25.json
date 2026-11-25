@@ -1,0 +1,2318 @@
+{
+  "schema": "microglia.tau2-board/1",
+  "benchmark": "tau2-bench@v2.0.0",
+  "source": "https://github.com/sierra-research/tau2-bench, web/leaderboard/public/submissions/*/submission.json",
+  "ref": "v2.0.0",
+  "source_commit": "989d3285ae669e49503324bdb9981bf14fccedeb",
+  "read_on": "2026-11-25",
+  "note": "Read from the directory rather than from the rendered leaderboard page: the page is a view, the submission files are the rows. `modality` and `version` are the submitter's own declarations and are absent on rows that predate the fields, which `scope` counts rather than fills in.",
+  "counts": {
+    "rows": 72,
+    "readable": 72,
+    "unreadable": 0,
+    "with_retail": 48
+  },
+  "entries": [
+    {
+      "name": "A_EXAMPLE_new-model_example-org_2025-01-15",
+      "model": "Example-Model-v2.0",
+      "organization": "Example Organization",
+      "submitting_organization": "Example Organization",
+      "submission_type": "standard",
+      "submission_date": "2025-01-15",
+      "modality": null,
+      "version": "v2.0",
+      "user_simulator": "gpt-5.2",
+      "reasoning_effort": null,
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false,
+        "details": "Example template - full evaluation on all domains"
+      },
+      "results": {
+        "retail": {
+          "pass_1": 78.5,
+          "pass_2": 72.1,
+          "pass_3": 67.8,
+          "pass_4": 64.2,
+          "cost": 0.12345
+        },
+        "airline": {
+          "pass_1": 61.2,
+          "pass_2": 55.8,
+          "pass_3": 51.4,
+          "pass_4": 47.9,
+          "cost": 0.09876
+        },
+        "telecom": {
+          "pass_1": 45.6,
+          "pass_2": 40.2,
+          "pass_3": 36.1,
+          "pass_4": 32.8,
+          "cost": 0.15432
+        },
+        "banking_knowledge": {
+          "pass_1": 22.3,
+          "pass_2": 15.1,
+          "pass_3": 10.8,
+          "pass_4": 8.2,
+          "cost": 1.23456,
+          "retrieval_config": "terminal"
+        }
+      }
+    },
+    {
+      "name": "A_EXAMPLE_voice-model_example-org_2026-03-11",
+      "model": "Example-Voice-Model",
+      "organization": "Example Organization",
+      "submitting_organization": "Example Organization",
+      "submission_type": "standard",
+      "submission_date": "2026-03-11",
+      "modality": "voice",
+      "version": "v2.0",
+      "user_simulator": "v1.0",
+      "reasoning_effort": null,
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false,
+        "details": "Example template - full evaluation on all domains with regular speech complexity"
+      },
+      "results": {
+        "retail": {
+          "pass_1": 43.9
+        },
+        "airline": {
+          "pass_1": 40.0
+        },
+        "telecom": {
+          "pass_1": 21.1
+        }
+      }
+    },
+    {
+      "name": "claude-3-7-sonnet_anthropic_2024-06-20",
+      "model": "Claude-3.7-Sonnet",
+      "organization": "Anthropic",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2025-06-09",
+      "modality": null,
+      "version": "0.1.3",
+      "user_simulator": "gpt-4.1-2025-04-14",
+      "reasoning_effort": null,
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false,
+        "details": "Verified evaluation with full trajectory data available."
+      },
+      "results": {
+        "retail": {
+          "pass_1": 72.1,
+          "pass_2": 66.8,
+          "pass_3": 63.2,
+          "pass_4": 59.7
+        },
+        "airline": {
+          "pass_1": 64.2,
+          "pass_2": 58.9,
+          "pass_3": 55.4,
+          "pass_4": 52.1
+        },
+        "telecom": {
+          "pass_1": 49.0,
+          "pass_2": 43.7,
+          "pass_3": 40.1,
+          "pass_4": 37.2
+        }
+      }
+    },
+    {
+      "name": "claude-fable-5_sierra_2026-08-04",
+      "model": "Claude Fable 5",
+      "organization": "Anthropic",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-08-04",
+      "modality": "text",
+      "version": "1.0.1",
+      "user_simulator": "gpt-5.2",
+      "reasoning_effort": "max",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false
+      },
+      "results": {
+        "banking_knowledge": {
+          "pass_1": 39.69072164948454,
+          "pass_2": 32.817869415807564,
+          "pass_3": 30.15463917525773,
+          "pass_4": 28.865979381443296,
+          "cost": null,
+          "retrieval_config": "alltools"
+        }
+      }
+    },
+    {
+      "name": "claude-opus-4-1_anthropic_2025-01-15",
+      "model": "Claude Opus 4.1",
+      "organization": "Anthropic",
+      "submitting_organization": "Anthropic",
+      "submission_type": "standard",
+      "submission_date": "2025-08-05",
+      "modality": null,
+      "version": "original tau-bench",
+      "user_simulator": null,
+      "reasoning_effort": null,
+      "verification": {
+        "modified_prompts": null,
+        "omitted_questions": null,
+        "details": "Unverified submission - no trajectory data available, unknown evaluation methodology, telecom domain omitted, incomplete evaluation (Pass^1 only)"
+      },
+      "results": {
+        "retail": {
+          "pass_1": 82.4,
+          "pass_2": null,
+          "pass_3": null,
+          "pass_4": null
+        },
+        "airline": {
+          "pass_1": 56.0,
+          "pass_2": null,
+          "pass_3": null,
+          "pass_4": null
+        },
+        "telecom": {
+          "pass_1": null,
+          "pass_2": null,
+          "pass_3": null,
+          "pass_4": null
+        }
+      }
+    },
+    {
+      "name": "claude-opus-4-5_sierra_2026-02-26",
+      "model": "Claude Opus 4.5",
+      "organization": "Anthropic",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-02-26",
+      "modality": null,
+      "version": "1.0.1",
+      "user_simulator": "gpt-5.2",
+      "reasoning_effort": "high",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false,
+        "details": "Verified evaluation with full trajectory data available. Standard tau-bench scaffold."
+      },
+      "results": {
+        "airline": {
+          "pass_1": 84.0,
+          "pass_2": 77.67,
+          "pass_3": 73.5,
+          "pass_4": 70.0,
+          "cost": 0.39919
+        },
+        "retail": {
+          "pass_1": 79.61,
+          "pass_2": 67.4,
+          "pass_3": 58.77,
+          "pass_4": 51.75,
+          "cost": 0.38695
+        },
+        "telecom": {
+          "pass_1": 92.32,
+          "pass_2": 86.11,
+          "pass_3": 81.36,
+          "pass_4": 78.07,
+          "cost": 0.71992
+        },
+        "banking_knowledge": {
+          "pass_1": 24.74,
+          "pass_2": 17.18,
+          "pass_3": 13.66,
+          "pass_4": 11.34,
+          "cost": null,
+          "retrieval_config": "alltools"
+        }
+      }
+    },
+    {
+      "name": "claude-opus-4-6_sierra_2026-05-05",
+      "model": "Claude Opus 4.6",
+      "organization": "Anthropic",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-05-05",
+      "modality": null,
+      "version": "1.0.1",
+      "user_simulator": "gpt-5.2",
+      "reasoning_effort": "max",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false,
+        "details": "Banking_knowledge domain only, AllTools retrieval. Trajectories suppressed for this preliminary AllTools comparison; raw per-task results retained internally."
+      },
+      "results": {
+        "banking_knowledge": {
+          "pass_1": 27.32,
+          "pass_2": 18.73,
+          "pass_3": 14.18,
+          "pass_4": 11.34,
+          "cost": null,
+          "retrieval_config": "alltools"
+        }
+      }
+    },
+    {
+      "name": "claude-opus-4-7_sierra_2026-05-05",
+      "model": "Claude Opus 4.7",
+      "organization": "Anthropic",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-05-05",
+      "modality": "text",
+      "version": "1.0.1",
+      "user_simulator": "gpt-5.2",
+      "reasoning_effort": "max",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false
+      },
+      "results": {
+        "banking_knowledge": {
+          "pass_1": 40.20618556701031,
+          "pass_2": 31.099656357388323,
+          "pass_3": 27.061855670103093,
+          "pass_4": 24.742268041237114,
+          "cost": null,
+          "retrieval_config": "alltools"
+        }
+      }
+    },
+    {
+      "name": "claude-opus-4-8_sierra_2026-08-04",
+      "model": "Claude Opus 4.8",
+      "organization": "Anthropic",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-08-04",
+      "modality": "text",
+      "version": "1.0.1",
+      "user_simulator": "gpt-5.2",
+      "reasoning_effort": "max",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false
+      },
+      "results": {
+        "banking_knowledge": {
+          "pass_1": 39.69072164948454,
+          "pass_2": 31.271477663230247,
+          "pass_3": 26.288659793814436,
+          "pass_4": 22.68041237113402,
+          "cost": null,
+          "retrieval_config": "alltools"
+        }
+      }
+    },
+    {
+      "name": "claude-opus-4_anthropic_2025-05-22",
+      "model": "Claude Opus 4",
+      "organization": "Anthropic",
+      "submitting_organization": "Anthropic",
+      "submission_type": "standard",
+      "submission_date": "2025-05-22",
+      "modality": null,
+      "version": "original tau-bench",
+      "user_simulator": null,
+      "reasoning_effort": null,
+      "verification": {
+        "modified_prompts": null,
+        "omitted_questions": null,
+        "details": "Unverified submission - no trajectory data available, unknown evaluation methodology, telecom domain omitted, incomplete evaluation (Pass^1 only)"
+      },
+      "results": {
+        "retail": {
+          "pass_1": 81.4,
+          "pass_2": null,
+          "pass_3": null,
+          "pass_4": null
+        },
+        "airline": {
+          "pass_1": 59.6,
+          "pass_2": null,
+          "pass_3": null,
+          "pass_4": null
+        },
+        "telecom": {
+          "pass_1": null,
+          "pass_2": null,
+          "pass_3": null,
+          "pass_4": null
+        }
+      }
+    },
+    {
+      "name": "claude-opus-5_sierra_2026-08-04",
+      "model": "Claude Opus 5",
+      "organization": "Anthropic",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-08-04",
+      "modality": "text",
+      "version": "1.0.1",
+      "user_simulator": "gpt-5.2",
+      "reasoning_effort": "max",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false
+      },
+      "results": {
+        "banking_knowledge": {
+          "pass_1": 48.71134020618557,
+          "pass_2": 39.175257731958766,
+          "pass_3": 34.5360824742268,
+          "pass_4": 31.958762886597935,
+          "cost": null,
+          "retrieval_config": "alltools"
+        }
+      }
+    },
+    {
+      "name": "claude-sonnet-4-5_anthropic_2025-10-02",
+      "model": "Claude-Sonnet-4.5",
+      "organization": "Anthropic",
+      "submitting_organization": "Anthropic",
+      "submission_type": "standard",
+      "submission_date": "2025-09-29",
+      "modality": null,
+      "version": "0.1.3",
+      "user_simulator": null,
+      "reasoning_effort": null,
+      "verification": {
+        "modified_prompts": null,
+        "omitted_questions": null,
+        "details": "Unverified submission - no trajectory data available, unknown evaluation methodology, telecom domain omitted, incomplete evaluation (Pass^1 only)"
+      },
+      "results": {
+        "retail": {
+          "pass_1": 86.2,
+          "pass_2": null,
+          "pass_3": null,
+          "pass_4": null
+        },
+        "airline": {
+          "pass_1": 70.0,
+          "pass_2": null,
+          "pass_3": null,
+          "pass_4": null
+        },
+        "telecom": {
+          "pass_1": 98.0,
+          "pass_2": null,
+          "pass_3": null,
+          "pass_4": null
+        }
+      }
+    },
+    {
+      "name": "claude-sonnet-4-5_sierra_2026-02-26",
+      "model": "Claude Sonnet 4.5",
+      "organization": "Anthropic",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-02-26",
+      "modality": null,
+      "version": "1.0.1",
+      "user_simulator": "gpt-5.2",
+      "reasoning_effort": "enabled",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false,
+        "details": "Verified evaluation with full trajectory data available. Standard tau-bench scaffold."
+      },
+      "results": {
+        "airline": {
+          "pass_1": 72.0,
+          "pass_2": 62.0,
+          "pass_3": 54.5,
+          "pass_4": 48.0,
+          "cost": 0.29646
+        },
+        "retail": {
+          "pass_1": 72.37,
+          "pass_2": 57.46,
+          "pass_3": 47.37,
+          "pass_4": 39.47,
+          "cost": 0.25494
+        },
+        "telecom": {
+          "pass_1": 84.87,
+          "pass_2": 75.44,
+          "pass_3": 68.86,
+          "pass_4": 64.04,
+          "cost": 0.48769
+        },
+        "banking_knowledge": {
+          "pass_1": 25.26,
+          "pass_2": 15.81,
+          "pass_3": 12.63,
+          "pass_4": 10.31,
+          "cost": 4.04814,
+          "retrieval_config": "terminal"
+        }
+      }
+    },
+    {
+      "name": "claude-sonnet-4_anthropic_2025-05-22",
+      "model": "Claude Sonnet 4",
+      "organization": "Anthropic",
+      "submitting_organization": "Anthropic",
+      "submission_type": "standard",
+      "submission_date": "2025-05-22",
+      "modality": null,
+      "version": "original tau-bench",
+      "user_simulator": null,
+      "reasoning_effort": null,
+      "verification": {
+        "modified_prompts": null,
+        "omitted_questions": null,
+        "details": "Unverified submission - no trajectory data available, unknown evaluation methodology, telecom domain omitted, incomplete evaluation (Pass^1 only)"
+      },
+      "results": {
+        "retail": {
+          "pass_1": 80.5,
+          "pass_2": null,
+          "pass_3": null,
+          "pass_4": null
+        },
+        "airline": {
+          "pass_1": 60.0,
+          "pass_2": null,
+          "pass_3": null,
+          "pass_4": null
+        },
+        "telecom": {
+          "pass_1": null,
+          "pass_2": null,
+          "pass_3": null,
+          "pass_4": null
+        }
+      }
+    },
+    {
+      "name": "deepseek-v3.2_deepseek_2025-12-01",
+      "model": "DeepSeek-V3.2",
+      "organization": "DeepSeek",
+      "submitting_organization": "DeepSeek",
+      "submission_type": "standard",
+      "submission_date": "2025-12-01",
+      "modality": null,
+      "version": "v0.1.3",
+      "user_simulator": "DeepSeek-V3.2",
+      "reasoning_effort": null,
+      "verification": {
+        "modified_prompts": null,
+        "omitted_questions": null,
+        "details": "Unverified submission - results from technical report, no trajectory data available, exact evaluation methodology not specified"
+      },
+      "results": {
+        "retail": {
+          "pass_1": 81.1,
+          "pass_2": null,
+          "pass_3": null,
+          "pass_4": null,
+          "cost": null
+        },
+        "airline": {
+          "pass_1": 63.8,
+          "pass_2": null,
+          "pass_3": null,
+          "pass_4": null,
+          "cost": null
+        },
+        "telecom": {
+          "pass_1": 96.2,
+          "pass_2": null,
+          "pass_3": null,
+          "pass_4": null,
+          "cost": null
+        }
+      }
+    },
+    {
+      "name": "distyl-buttonagent_distyl_2026-03-25",
+      "model": "Distyl ButtonAgent",
+      "organization": "Distyl AI",
+      "submitting_organization": "Distyl AI",
+      "submission_type": "custom",
+      "submission_date": "2026-03-25",
+      "modality": null,
+      "version": "0.2.1-dev",
+      "user_simulator": "gpt-5.2",
+      "reasoning_effort": "high",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false,
+        "details": "Full evaluation on all 97 banking_knowledge tasks with 4 trials each. No prompts were modified for the banking domain."
+      },
+      "results": {
+        "banking_knowledge": {
+          "pass_1": 31.19,
+          "pass_2": 21.47,
+          "pass_3": 16.19,
+          "pass_4": 13.4,
+          "cost": null,
+          "retrieval_config": "mixedbread"
+        }
+      }
+    },
+    {
+      "name": "gemini-2-5-pro_sierra_2026-05-05",
+      "model": "Gemini 2.5 Pro",
+      "organization": "Google",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-05-05",
+      "modality": null,
+      "version": "1.0.1",
+      "user_simulator": "gpt-5.2",
+      "reasoning_effort": "high",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false,
+        "details": "Banking_knowledge domain only, AllTools retrieval. Trajectories suppressed for this preliminary AllTools comparison; raw per-task results retained internally."
+      },
+      "results": {
+        "banking_knowledge": {
+          "pass_1": 13.66,
+          "pass_2": 6.01,
+          "pass_3": 2.58,
+          "pass_4": 1.03,
+          "cost": null,
+          "retrieval_config": "alltools"
+        }
+      }
+    },
+    {
+      "name": "gemini-3-1-flash-live-preview-thinking-high-banking_google_2026-07-13",
+      "model": "gemini-3.1-flash-live-preview-thinking-high",
+      "organization": "Google",
+      "submitting_organization": "Sierra",
+      "submission_type": "custom",
+      "submission_date": "2026-07-13",
+      "modality": "voice",
+      "version": "1.0.1",
+      "user_simulator": "gpt-5.5-2026-04-23 (xhigh)",
+      "reasoning_effort": "high",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false
+      },
+      "results": {
+        "banking_knowledge": {
+          "pass_1": 11.34020618556701,
+          "retrieval_config": "alltools"
+        }
+      }
+    },
+    {
+      "name": "gemini-3-1-flash-live-preview-thinking-high_google_2026-04-02",
+      "model": "gemini-3.1-flash-live-preview-thinking-high",
+      "organization": "Google",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-04-02",
+      "modality": "voice",
+      "version": "1.0.0",
+      "user_simulator": "v1.0",
+      "reasoning_effort": "high",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false
+      },
+      "results": {
+        "retail": {
+          "pass_1": 45.614035087719294
+        },
+        "airline": {
+          "pass_1": 64.0
+        },
+        "telecom": {
+          "pass_1": 21.929824561403507
+        }
+      }
+    },
+    {
+      "name": "gemini-3-1-flash-live-preview-thinking-minimal_google_2026-04-13",
+      "model": "gemini-3.1-flash-live-preview-thinking-minimal",
+      "organization": "Google",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-04-13",
+      "modality": "voice",
+      "version": "1.0.0",
+      "user_simulator": "v1.0",
+      "reasoning_effort": "minimal",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false
+      },
+      "results": {
+        "retail": {
+          "pass_1": 26.31578947368421
+        },
+        "airline": {
+          "pass_1": 42.0
+        },
+        "telecom": {
+          "pass_1": 17.543859649122805
+        }
+      }
+    },
+    {
+      "name": "gemini-3-1-pro-preview_sierra_2026-05-05",
+      "model": "Gemini 3.1 Pro Preview",
+      "organization": "Google",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-05-05",
+      "modality": null,
+      "version": "1.0.1",
+      "user_simulator": "gpt-5.2",
+      "reasoning_effort": "high",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false,
+        "details": "Banking_knowledge domain only, AllTools retrieval. Trajectories suppressed for this preliminary AllTools comparison; raw per-task results retained internally."
+      },
+      "results": {
+        "banking_knowledge": {
+          "pass_1": 26.03,
+          "pass_2": 15.12,
+          "pass_3": 11.08,
+          "pass_4": 9.28,
+          "cost": null,
+          "retrieval_config": "alltools"
+        }
+      }
+    },
+    {
+      "name": "gemini-3-flash_sierra_2026-03-02",
+      "model": "Gemini 3 Flash",
+      "organization": "Google",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-03-02",
+      "modality": null,
+      "version": "1.0.1",
+      "user_simulator": "gpt-5.2",
+      "reasoning_effort": "high",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false,
+        "details": "Standard tau-bench scaffold."
+      },
+      "results": {
+        "airline": {
+          "pass_1": 82.5,
+          "pass_2": 76.33,
+          "pass_3": 72.0,
+          "pass_4": 68.0,
+          "cost": null
+        },
+        "retail": {
+          "pass_1": 76.75,
+          "pass_2": 65.94,
+          "pass_3": 57.89,
+          "pass_4": 51.75,
+          "cost": null
+        },
+        "telecom": {
+          "pass_1": 91.23,
+          "pass_2": 83.48,
+          "pass_3": 76.54,
+          "pass_4": 70.18,
+          "cost": null
+        },
+        "banking_knowledge": {
+          "pass_1": 27.32,
+          "pass_2": 15.46,
+          "pass_3": 10.31,
+          "pass_4": 7.22,
+          "cost": null,
+          "retrieval_config": "terminal"
+        }
+      }
+    },
+    {
+      "name": "gemini-3-pro_google_2025-11-18",
+      "model": "Gemini 3.0 Pro",
+      "organization": "Google",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2025-11-18",
+      "modality": null,
+      "version": "v0.1.3",
+      "user_simulator": "Gemini-3.0-Pro",
+      "reasoning_effort": null,
+      "verification": {
+        "modified_prompts": true,
+        "omitted_questions": false,
+        "details": "Prompt adjustments made to provide instructions relevant to each environment. User model uses Gemini with system instruction."
+      },
+      "results": {
+        "retail": {
+          "pass_1": 85.3,
+          "pass_2": null,
+          "pass_3": null,
+          "pass_4": null,
+          "cost": null
+        },
+        "airline": {
+          "pass_1": 73.0,
+          "pass_2": null,
+          "pass_3": null,
+          "pass_4": null,
+          "cost": null
+        },
+        "telecom": {
+          "pass_1": 98.0,
+          "pass_2": null,
+          "pass_3": null,
+          "pass_4": null,
+          "cost": null
+        }
+      }
+    },
+    {
+      "name": "gemini-3-pro_sierra_2026-03-02",
+      "model": "Gemini 3 Pro",
+      "organization": "Google",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-03-02",
+      "modality": null,
+      "version": "1.0.1",
+      "user_simulator": "gpt-5.2",
+      "reasoning_effort": "high",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false,
+        "details": "Standard tau-bench scaffold."
+      },
+      "results": {
+        "airline": {
+          "pass_1": 80.5,
+          "pass_2": 74.67,
+          "pass_3": 70.0,
+          "pass_4": 66.0,
+          "cost": null
+        },
+        "retail": {
+          "pass_1": 75.88,
+          "pass_2": 63.45,
+          "pass_3": 54.39,
+          "pass_4": 47.37,
+          "cost": null
+        },
+        "telecom": {
+          "pass_1": 91.01,
+          "pass_2": 84.5,
+          "pass_3": 79.17,
+          "pass_4": 74.56,
+          "cost": null
+        },
+        "banking_knowledge": {
+          "pass_1": 18.04,
+          "pass_2": 9.28,
+          "pass_3": 5.67,
+          "pass_4": 4.12,
+          "cost": null,
+          "retrieval_config": "terminal"
+        }
+      }
+    },
+    {
+      "name": "gemini-live-2.5-flash_sierra_2026-03-03",
+      "model": "gemini-live-2.5-flash-native-audio",
+      "organization": "Google",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-03-03",
+      "modality": "voice",
+      "version": "1.0.0",
+      "user_simulator": "v1.0",
+      "reasoning_effort": null,
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false
+      },
+      "results": {
+        "airline": {
+          "pass_1": 30.0
+        },
+        "retail": {
+          "pass_1": 29.8
+        },
+        "telecom": {
+          "pass_1": 17.5
+        }
+      }
+    },
+    {
+      "name": "glm-5-2_sierra_2026-08-04",
+      "model": "GLM-5.2",
+      "organization": "Z.ai",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-08-04",
+      "modality": "text",
+      "version": "1.0.1",
+      "user_simulator": "gpt-5.2",
+      "reasoning_effort": "xhigh",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false
+      },
+      "results": {
+        "banking_knowledge": {
+          "pass_1": 37.11340206185567,
+          "pass_2": 25.257731958762886,
+          "pass_3": 18.298969072164947,
+          "pass_4": 13.402061855670103,
+          "cost": null,
+          "retrieval_config": "alltools"
+        }
+      }
+    },
+    {
+      "name": "glm-5-think_sierra_2026-03-02",
+      "model": "GLM-5",
+      "organization": "Zhipu AI",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-03-02",
+      "modality": null,
+      "version": "1.0.1",
+      "user_simulator": "gpt-5.2",
+      "reasoning_effort": "enabled",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false,
+        "details": "Standard tau-bench scaffold."
+      },
+      "results": {
+        "airline": {
+          "pass_1": 82.5,
+          "pass_2": 76.0,
+          "pass_3": 72.0,
+          "pass_4": 70.0,
+          "cost": null
+        },
+        "retail": {
+          "pass_1": 73.68,
+          "pass_2": 60.38,
+          "pass_3": 51.1,
+          "pass_4": 43.86,
+          "cost": null
+        },
+        "telecom": {
+          "pass_1": 86.84,
+          "pass_2": 76.32,
+          "pass_3": 68.2,
+          "pass_4": 62.28,
+          "cost": null
+        },
+        "banking_knowledge": {
+          "pass_1": 9.79,
+          "pass_2": 7.22,
+          "pass_3": 5.67,
+          "pass_4": 3.09,
+          "cost": null,
+          "retrieval_config": "text-emb-3-large"
+        }
+      }
+    },
+    {
+      "name": "gpt-4-1-mini_openai_2024-06-20",
+      "model": "GPT-4.1-mini",
+      "organization": "OpenAI",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2025-06-09",
+      "modality": null,
+      "version": "0.1.3",
+      "user_simulator": "gpt-4.1-2025-04-14",
+      "reasoning_effort": null,
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false,
+        "details": "Verified evaluation with full trajectory data available"
+      },
+      "results": {
+        "retail": {
+          "pass_1": 61.4,
+          "pass_2": 49.8,
+          "pass_3": 42.3,
+          "pass_4": 36.9
+        },
+        "airline": {
+          "pass_1": 48.7,
+          "pass_2": 38.9,
+          "pass_3": 32.1,
+          "pass_4": 27.8
+        },
+        "telecom": {
+          "pass_1": 48.9,
+          "pass_2": 38.7,
+          "pass_3": 31.2,
+          "pass_4": 26.1
+        }
+      }
+    },
+    {
+      "name": "gpt-4-1_openai_2024-06-20",
+      "model": "GPT-4.1",
+      "organization": "OpenAI",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2025-06-09",
+      "modality": null,
+      "version": "0.1.3",
+      "user_simulator": "gpt-4.1-2025-04-14",
+      "reasoning_effort": null,
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false,
+        "details": "Verified evaluation with full trajectory data available"
+      },
+      "results": {
+        "retail": {
+          "pass_1": 74.0,
+          "pass_2": 64.2,
+          "pass_3": 58.1,
+          "pass_4": 52.3
+        },
+        "airline": {
+          "pass_1": 56.0,
+          "pass_2": 47.8,
+          "pass_3": 42.4,
+          "pass_4": 38.1
+        },
+        "telecom": {
+          "pass_1": 34.0,
+          "pass_2": 27.6,
+          "pass_3": 23.8,
+          "pass_4": 20.4
+        }
+      }
+    },
+    {
+      "name": "gpt-5-2-none_sierra_2026-02-26",
+      "model": "GPT-5.2",
+      "organization": "OpenAI",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-02-26",
+      "modality": null,
+      "version": "1.0.1",
+      "user_simulator": "gpt-5.2",
+      "reasoning_effort": "none",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false,
+        "details": "Verified evaluation with full trajectory data available. Standard tau-bench scaffold."
+      },
+      "results": {
+        "airline": {
+          "pass_1": 52.5,
+          "pass_2": 35.66666666666667,
+          "pass_3": 27.0,
+          "pass_4": 22.0,
+          "cost": 0.053692803500000004
+        },
+        "retail": {
+          "pass_1": 75.0,
+          "pass_2": 62.13450292397662,
+          "pass_3": 53.07017543859649,
+          "pass_4": 45.614035087719294,
+          "cost": 0.048219267434210525
+        },
+        "telecom": {
+          "pass_1": 57.23684210526315,
+          "pass_2": 42.83625730994152,
+          "pass_3": 35.526315789473685,
+          "pass_4": 30.701754385964914,
+          "cost": 0.04937742280701755
+        },
+        "banking_knowledge": {
+          "pass_1": 12.63,
+          "pass_2": 7.22,
+          "pass_3": 5.15,
+          "pass_4": 4.12,
+          "cost": 0.2433424974226804,
+          "retrieval_config": "qwen_embeddings"
+        }
+      }
+    },
+    {
+      "name": "gpt-5-2_sierra_2026-02-26",
+      "model": "GPT-5.2",
+      "organization": "OpenAI",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-02-26",
+      "modality": null,
+      "version": "1.0.1",
+      "user_simulator": "gpt-5.2",
+      "reasoning_effort": "high",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false,
+        "details": "Verified evaluation with full trajectory data available. Standard tau-bench scaffold."
+      },
+      "results": {
+        "airline": {
+          "pass_1": 83.0,
+          "pass_2": 78.33,
+          "pass_3": 75.0,
+          "pass_4": 72.0,
+          "cost": 0.11379
+        },
+        "retail": {
+          "pass_1": 81.58,
+          "pass_2": 69.59,
+          "pass_3": 59.87,
+          "pass_4": 51.75,
+          "cost": 0.07156
+        },
+        "telecom": {
+          "pass_1": 89.69,
+          "pass_2": 82.46,
+          "pass_3": 76.75,
+          "pass_4": 71.93,
+          "cost": 0.09312
+        },
+        "banking_knowledge": {
+          "pass_1": 32.22,
+          "pass_2": 23.88,
+          "pass_3": 20.62,
+          "pass_4": 18.56,
+          "cost": null,
+          "retrieval_config": "alltools"
+        }
+      }
+    },
+    {
+      "name": "gpt-5-4_sierra_2026-03-25",
+      "model": "GPT-5.4",
+      "organization": "OpenAI",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-03-25",
+      "modality": null,
+      "version": "1.0.1",
+      "user_simulator": "gpt-5.2",
+      "reasoning_effort": "xhigh",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false,
+        "details": "Full evaluation on all 97 banking_knowledge tasks with 4 trials each. Standard tau-bench scaffold."
+      },
+      "results": {
+        "banking_knowledge": {
+          "pass_1": 39.43,
+          "pass_2": 29.55,
+          "pass_3": 24.48,
+          "pass_4": 21.65,
+          "cost": 1.8423,
+          "retrieval_config": "alltools"
+        }
+      }
+    },
+    {
+      "name": "gpt-5-5_sierra_2026-05-05",
+      "model": "GPT-5.5",
+      "organization": "OpenAI",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-05-05",
+      "modality": "text",
+      "version": "1.0.1",
+      "user_simulator": "gpt-5.2",
+      "reasoning_effort": "xhigh",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false
+      },
+      "results": {
+        "banking_knowledge": {
+          "pass_1": 44.58762886597938,
+          "pass_2": 37.62886597938145,
+          "pass_3": 33.24742268041237,
+          "pass_4": 29.896907216494846,
+          "cost": null,
+          "retrieval_config": "alltools"
+        }
+      }
+    },
+    {
+      "name": "gpt-5-6-sol_sierra_2026-08-04",
+      "model": "GPT-5.6-sol",
+      "organization": "OpenAI",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-08-04",
+      "modality": "text",
+      "version": "1.0.1",
+      "user_simulator": "gpt-5.2",
+      "reasoning_effort": "xhigh",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false
+      },
+      "results": {
+        "banking_knowledge": {
+          "pass_1": 46.90721649484536,
+          "pass_2": 37.28522336769759,
+          "pass_3": 31.958762886597935,
+          "pass_4": 27.835051546391753,
+          "cost": null,
+          "retrieval_config": "alltools"
+        }
+      }
+    },
+    {
+      "name": "gpt-5_sierra_2025-08-09",
+      "model": "GPT-5",
+      "organization": "OpenAI",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2025-10-02",
+      "modality": null,
+      "version": "0.1.3",
+      "user_simulator": "gpt-4.1-2025-04-14",
+      "reasoning_effort": null,
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false,
+        "details": "Verified evaluation with full trajectory data available"
+      },
+      "results": {
+        "retail": {
+          "pass_1": 81.57894736842105,
+          "pass_2": 71.78362573099416,
+          "pass_3": 64.69298245614036,
+          "pass_4": 58.77192982456141,
+          "cost": 0.10552710142543861
+        },
+        "airline": {
+          "pass_1": 62.5,
+          "pass_2": 55.33333333333332,
+          "pass_3": 51,
+          "pass_4": 48,
+          "cost": 0.13399991125
+        },
+        "telecom": {
+          "pass_1": 95.83333333333334,
+          "pass_2": 91.95906432748538,
+          "pass_3": 88.37719298245614,
+          "pass_4": 85.08771929824562,
+          "cost": 0.16471152192982458
+        }
+      }
+    },
+    {
+      "name": "gpt-live-1-astra-high-banking_openai_2026-09-16",
+      "model": "gpt-live-1",
+      "organization": "OpenAI",
+      "submitting_organization": "OpenAI",
+      "submission_type": "custom",
+      "submission_date": "2026-09-16",
+      "modality": "voice",
+      "version": "1.0.1",
+      "user_simulator": "gpt-5.5 (xhigh)",
+      "reasoning_effort": "Backend: GPT-6 Astra (high)",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false
+      },
+      "results": {
+        "banking_knowledge": {
+          "pass_1": 37.11340206185567,
+          "retrieval_config": "alltools"
+        }
+      }
+    },
+    {
+      "name": "gpt-live-1-diamond-alpha-user-sim-gpt-5-5_openai_2026-09-09",
+      "model": "gpt-live-1",
+      "organization": "OpenAI",
+      "submitting_organization": "Sierra",
+      "submission_type": "custom",
+      "submission_date": "2026-09-09",
+      "modality": "voice",
+      "version": "1.0.1",
+      "user_simulator": "gpt-5.5-2026-04-23 (xhigh)",
+      "reasoning_effort": "Backend: GPT-6 Astra (medium)",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false
+      },
+      "results": {
+        "retail": {
+          "pass_1": 84.21052631578947
+        },
+        "airline": {
+          "pass_1": 78.0
+        },
+        "telecom": {
+          "pass_1": 96.49122807017544
+        },
+        "banking_knowledge": {
+          "pass_1": 31.958762886597935,
+          "retrieval_config": "alltools"
+        }
+      }
+    },
+    {
+      "name": "gpt-live-1-diamond-alpha_openai_2026-09-09",
+      "model": "gpt-live-1",
+      "organization": "OpenAI",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-09-09",
+      "modality": "voice",
+      "version": "1.0.1",
+      "user_simulator": "v1.0",
+      "reasoning_effort": "Backend: GPT-6 Astra (medium)",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false
+      },
+      "results": {
+        "retail": {
+          "pass_1": 78.94736842105263
+        },
+        "airline": {
+          "pass_1": 82.0
+        },
+        "telecom": {
+          "pass_1": 84.21052631578947
+        }
+      }
+    },
+    {
+      "name": "gpt-realtime-1-0_openai_2026-04-13",
+      "model": "gpt-realtime-1.0",
+      "organization": "OpenAI",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-04-13",
+      "modality": "voice",
+      "version": "1.0.0",
+      "user_simulator": "v1.0",
+      "reasoning_effort": null,
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false
+      },
+      "results": {
+        "retail": {
+          "pass_1": 35.96491228070175
+        },
+        "airline": {
+          "pass_1": 36.0
+        },
+        "telecom": {
+          "pass_1": 19.298245614035086
+        }
+      }
+    },
+    {
+      "name": "gpt-realtime-1.5_sierra_2026-03-03",
+      "model": "gpt-realtime-1.5",
+      "organization": "OpenAI",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-03-03",
+      "modality": "voice",
+      "version": "1.0.0",
+      "user_simulator": "v1.0",
+      "reasoning_effort": null,
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false
+      },
+      "results": {
+        "airline": {
+          "pass_1": 40.0
+        },
+        "retail": {
+          "pass_1": 44.7
+        },
+        "telecom": {
+          "pass_1": 21.1
+        }
+      }
+    },
+    {
+      "name": "gpt-realtime-2-banking_openai_2026-07-12",
+      "model": "gpt-realtime-2",
+      "organization": "OpenAI",
+      "submitting_organization": "Sierra",
+      "submission_type": "custom",
+      "submission_date": "2026-07-12",
+      "modality": "voice",
+      "version": "1.0.1",
+      "user_simulator": "gpt-5.5-2026-04-23 (xhigh)",
+      "reasoning_effort": "xhigh",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false
+      },
+      "results": {
+        "banking_knowledge": {
+          "pass_1": 10.309278350515463,
+          "retrieval_config": "alltools"
+        }
+      }
+    },
+    {
+      "name": "gpt-realtime-2-minimal_openai_2026-07-01",
+      "model": "gpt-realtime-2",
+      "organization": "OpenAI",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-07-01",
+      "modality": "voice",
+      "version": "1.0.0",
+      "user_simulator": "v1.0",
+      "reasoning_effort": "minimal",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false
+      },
+      "results": {
+        "retail": {
+          "pass_1": 39.473684210526315
+        },
+        "airline": {
+          "pass_1": 56.00000000000001
+        },
+        "telecom": {
+          "pass_1": 20.175438596491226
+        }
+      }
+    },
+    {
+      "name": "gpt-realtime-2_openai_2026-06-24",
+      "model": "gpt-realtime-2",
+      "organization": "OpenAI",
+      "submitting_organization": "Sierra",
+      "submission_type": "custom",
+      "submission_date": "2026-06-29",
+      "modality": "voice",
+      "version": "1.0.0",
+      "user_simulator": "gpt-5.5-2026-04-23 (xhigh)",
+      "reasoning_effort": "xhigh",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false
+      },
+      "results": {
+        "retail": {
+          "pass_1": 50.0
+        },
+        "airline": {
+          "pass_1": 66.0
+        },
+        "telecom": {
+          "pass_1": 37.719298245614034
+        }
+      }
+    },
+    {
+      "name": "gpt-realtime-2_openai_2026-06-29",
+      "model": "gpt-realtime-2",
+      "organization": "OpenAI",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-06-29",
+      "modality": "voice",
+      "version": "1.0.0",
+      "user_simulator": "v1.0",
+      "reasoning_effort": "xhigh",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false
+      },
+      "results": {
+        "retail": {
+          "pass_1": 47.368421052631575
+        },
+        "airline": {
+          "pass_1": 57.99999999999999
+        },
+        "telecom": {
+          "pass_1": 21.929824561403507
+        }
+      }
+    },
+    {
+      "name": "grok-4-1-fast_sierra_2026-05-05",
+      "model": "Grok 4.1 fast",
+      "organization": "xAI",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-05-05",
+      "modality": null,
+      "version": "1.0.1",
+      "user_simulator": "gpt-5.2",
+      "reasoning_effort": "high",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false,
+        "details": "Banking_knowledge domain only, AllTools retrieval. Trajectories suppressed for this preliminary AllTools comparison; raw per-task results retained internally."
+      },
+      "results": {
+        "banking_knowledge": {
+          "pass_1": 13.14,
+          "pass_2": 7.73,
+          "pass_3": 5.67,
+          "pass_4": 5.15,
+          "cost": null,
+          "retrieval_config": "alltools"
+        }
+      }
+    },
+    {
+      "name": "grok-4-2_sierra_2026-05-05",
+      "model": "Grok 4.2",
+      "organization": "xAI",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-05-05",
+      "modality": null,
+      "version": "1.0.1",
+      "user_simulator": "gpt-5.2",
+      "reasoning_effort": "high",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false,
+        "details": "Banking_knowledge domain only, AllTools retrieval. Trajectories suppressed for this preliminary AllTools comparison; raw per-task results retained internally."
+      },
+      "results": {
+        "banking_knowledge": {
+          "pass_1": 18.04,
+          "pass_2": 12.37,
+          "pass_3": 10.05,
+          "pass_4": 8.25,
+          "cost": null,
+          "retrieval_config": "alltools"
+        }
+      }
+    },
+    {
+      "name": "grok-4-5_sierra_2026-08-04",
+      "model": "Grok 4.5",
+      "organization": "xAI",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-08-04",
+      "modality": "text",
+      "version": "1.0.1",
+      "user_simulator": "gpt-5.2",
+      "reasoning_effort": "high",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false
+      },
+      "results": {
+        "banking_knowledge": {
+          "pass_1": 47.93814432989691,
+          "pass_2": 39.51890034364261,
+          "pass_3": 35.30927835051546,
+          "pass_4": 31.958762886597935,
+          "cost": null,
+          "retrieval_config": "alltools"
+        }
+      }
+    },
+    {
+      "name": "grok-4-fast_sierra_2026-05-05",
+      "model": "Grok 4 fast",
+      "organization": "xAI",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-05-05",
+      "modality": null,
+      "version": "1.0.1",
+      "user_simulator": "gpt-5.2",
+      "reasoning_effort": "high",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false,
+        "details": "Banking_knowledge domain only, AllTools retrieval. Trajectories suppressed for this preliminary AllTools comparison; raw per-task results retained internally."
+      },
+      "results": {
+        "banking_knowledge": {
+          "pass_1": 15.72,
+          "pass_2": 8.42,
+          "pass_3": 5.67,
+          "pass_4": 4.12,
+          "cost": null,
+          "retrieval_config": "alltools"
+        }
+      }
+    },
+    {
+      "name": "grok-voice-3-0_xai_2026-10-14",
+      "model": "Grok Voice 3.0",
+      "organization": "xAI",
+      "submitting_organization": "Sierra",
+      "submission_type": "custom",
+      "submission_date": "2026-10-14",
+      "modality": "voice",
+      "version": "4ce7c0397c1eb65c9bbe59aeacfe1ca44a1cd699",
+      "user_simulator": "gpt-5.5 (xhigh)",
+      "reasoning_effort": null,
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false,
+        "details": "All 278 base tasks have one scored canonical trajectory. The initial retail run encountered ungraded connection timeouts at 80 concurrency and was resumed at 40 concurrency; all 114 retail tasks have a final scored result. Airline ran at up to 80 concurrency and telecom at 40. The submitted scores were computed from the saved trajectories. Reviewed trajectories and canonical audio are hosted by the leaderboard."
+      },
+      "results": {
+        "retail": {
+          "pass_1": 76.31578947368422
+        },
+        "airline": {
+          "pass_1": 80.0
+        },
+        "telecom": {
+          "pass_1": 82.45614035087719
+        }
+      }
+    },
+    {
+      "name": "grok-voice-think-fast-1-0-tool-mentor_pickle_2026-07-07",
+      "model": "grok-voice-think-fast-1.0 + tool-mentor",
+      "organization": "Pickle",
+      "submitting_organization": "Pickle",
+      "submission_type": "custom",
+      "submission_date": "2026-07-07",
+      "modality": "voice",
+      "version": "1.0.0",
+      "user_simulator": "gpt-5.5-2026-04-23 (xhigh)",
+      "reasoning_effort": "enabled",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false,
+        "details": "Standard agent and user-simulator prompts are byte-identical to upstream. The added mentor component has its own prompt (published in the referenced fork; no benchmark proper nouns or task-derived facts, per the fork's mentor-prompt-constitution). Full base splits evaluated: retail 114, airline 50, telecom 114; no task omitted. Sierra verification (2026-07-14, fork tag tool-mentor-v1.0 = 8ba2f72, Sierra-internal held-out voices): 10-task parity check agreed on 9/10 tasks with the single flip scoring higher than submitted; a full 278-task re-run reached ~230 tasks before the submitter's xAI API key expired, with per-domain scores tracking at or above the submitted results throughout (airline complete: 0.780 vs submitted 0.700). Submitted scores recomputed from trajectories and confirmed."
+      },
+      "results": {
+        "retail": {
+          "pass_1": 76.31578947368422
+        },
+        "airline": {
+          "pass_1": 70.0
+        },
+        "telecom": {
+          "pass_1": 78.0701754385965
+        }
+      }
+    },
+    {
+      "name": "grok-voice-think-fast-1-0_xai_2026-04-21",
+      "model": "grok-voice-think-fast-1.0",
+      "organization": "xAI",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-04-21",
+      "modality": "voice",
+      "version": "1.0.0",
+      "user_simulator": "v1.0",
+      "reasoning_effort": "enabled",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false
+      },
+      "results": {
+        "retail": {
+          "pass_1": 62.28070175438597
+        },
+        "airline": {
+          "pass_1": 66.0
+        },
+        "telecom": {
+          "pass_1": 73.68421052631578
+        }
+      }
+    },
+    {
+      "name": "grok-voice-think-fast-2-0_xai_2026-08-06",
+      "model": "grok-voice-think-fast-2.0",
+      "organization": "xAI",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-08-06",
+      "modality": "voice",
+      "version": "1.0.1",
+      "user_simulator": "v1.0",
+      "reasoning_effort": "high",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false
+      },
+      "results": {
+        "retail": {
+          "pass_1": 59.64912280701754,
+          "cost": 0.23825263157894733
+        },
+        "airline": {
+          "pass_1": 56.00000000000001,
+          "cost": 0.20933333333333337
+        },
+        "telecom": {
+          "pass_1": 71.9298245614035,
+          "cost": 0.38721871345029246
+        }
+      }
+    },
+    {
+      "name": "inkling_sierra_2026-08-04",
+      "model": "Inkling",
+      "organization": "Thinking Machines Lab",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-08-04",
+      "modality": "text",
+      "version": "1.0.1",
+      "user_simulator": "gpt-5.2",
+      "reasoning_effort": "max",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false
+      },
+      "results": {
+        "banking_knowledge": {
+          "pass_1": 25.0,
+          "pass_2": 16.666666666666664,
+          "pass_3": 13.402061855670103,
+          "pass_4": 11.34020618556701,
+          "cost": null,
+          "retrieval_config": "alltools"
+        }
+      }
+    },
+    {
+      "name": "kimi-k2_moonshot-ai_2025-07-11",
+      "model": "Kimi-k2",
+      "organization": "Moonshot AI",
+      "submitting_organization": "Moonshot AI",
+      "submission_type": "standard",
+      "submission_date": "2025-07-28",
+      "modality": null,
+      "version": "0.1.3",
+      "user_simulator": null,
+      "reasoning_effort": null,
+      "verification": {
+        "modified_prompts": null,
+        "omitted_questions": null,
+        "details": "Unverified submission - no trajectory data available, unknown evaluation methodology, incomplete evaluation (Pass^1 only)"
+      },
+      "results": {
+        "retail": {
+          "pass_1": 70.6,
+          "pass_2": null,
+          "pass_3": null,
+          "pass_4": null
+        },
+        "airline": {
+          "pass_1": 56.5,
+          "pass_2": null,
+          "pass_3": null,
+          "pass_4": null
+        },
+        "telecom": {
+          "pass_1": 65.8,
+          "pass_2": null,
+          "pass_3": null,
+          "pass_4": null
+        }
+      }
+    },
+    {
+      "name": "kimi-k3_sierra_2026-08-04",
+      "model": "Kimi K3",
+      "organization": "Moonshot AI",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-08-04",
+      "modality": "text",
+      "version": "1.0.1",
+      "user_simulator": "gpt-5.2",
+      "reasoning_effort": "max",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false
+      },
+      "results": {
+        "banking_knowledge": {
+          "pass_1": 37.11340206185567,
+          "pass_2": 25.257731958762886,
+          "pass_3": 20.103092783505154,
+          "pass_4": 17.525773195876287,
+          "cost": null,
+          "retrieval_config": "alltools"
+        }
+      }
+    },
+    {
+      "name": "livekit-cascaded_livekit_2026-05-19",
+      "model": "Cascaded baseline",
+      "organization": "Multiple providers",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-05-19",
+      "modality": "voice",
+      "version": "1.0.0",
+      "user_simulator": "v1.0",
+      "reasoning_effort": null,
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false
+      },
+      "results": {
+        "retail": {
+          "pass_1": 28.947368421052634
+        },
+        "airline": {
+          "pass_1": 48.0
+        },
+        "telecom": {
+          "pass_1": 16.666666666666664
+        }
+      }
+    },
+    {
+      "name": "muse-spark-1-1_sierra_2026-08-04",
+      "model": "Muse Spark 1.1",
+      "organization": "Meta",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-08-04",
+      "modality": "text",
+      "version": "1.0.1",
+      "user_simulator": "gpt-5.2",
+      "reasoning_effort": "xhigh",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false
+      },
+      "results": {
+        "banking_knowledge": {
+          "pass_1": 40.4639175257732,
+          "pass_2": 29.55326460481099,
+          "pass_3": 23.969072164948454,
+          "pass_4": 20.618556701030926,
+          "cost": null,
+          "retrieval_config": "alltools"
+        }
+      }
+    },
+    {
+      "name": "o3_openai_2025-01-15",
+      "model": "o3",
+      "organization": "OpenAI",
+      "submitting_organization": "OpenAI",
+      "submission_type": "standard",
+      "submission_date": "2025-04-16",
+      "modality": null,
+      "version": "0.1.3",
+      "user_simulator": null,
+      "reasoning_effort": null,
+      "verification": {
+        "modified_prompts": null,
+        "omitted_questions": null,
+        "details": "Unverified submission - no trajectory data available, unknown evaluation methodology, incomplete evaluation (Pass@1 only)"
+      },
+      "results": {
+        "retail": {
+          "pass_1": 73.9,
+          "pass_2": null,
+          "pass_3": null,
+          "pass_4": null
+        },
+        "airline": {
+          "pass_1": 52.0,
+          "pass_2": null,
+          "pass_3": null,
+          "pass_4": null
+        },
+        "telecom": {
+          "pass_1": null,
+          "pass_2": null,
+          "pass_3": null,
+          "pass_4": null
+        }
+      }
+    },
+    {
+      "name": "o4-mini_openai_2024-06-20",
+      "model": "o4-mini",
+      "organization": "OpenAI",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2025-06-09",
+      "modality": null,
+      "version": "0.1.3",
+      "user_simulator": "gpt-4.1-2025-04-14",
+      "reasoning_effort": null,
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false,
+        "details": "Verified evaluation with full trajectory data available"
+      },
+      "results": {
+        "retail": {
+          "pass_1": 68.3,
+          "pass_2": 58.7,
+          "pass_3": 52.1,
+          "pass_4": 46.8
+        },
+        "airline": {
+          "pass_1": 52.1,
+          "pass_2": 44.2,
+          "pass_3": 38.9,
+          "pass_4": 34.7
+        },
+        "telecom": {
+          "pass_1": 50.2,
+          "pass_2": 42.1,
+          "pass_3": 36.8,
+          "pass_4": 32.4
+        }
+      }
+    },
+    {
+      "name": "pine-voice-preview-user-sim-gpt-5-5_pineai_2026-08-17",
+      "model": "Pine Voice Preview",
+      "organization": "Pine AI",
+      "submitting_organization": "Pine AI",
+      "submission_type": "custom",
+      "submission_date": "2026-08-17",
+      "modality": "voice",
+      "version": "1.0.1",
+      "user_simulator": "gpt-5.5-2026-04-23 (xhigh)",
+      "reasoning_effort": "enabled",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false,
+        "details": "Standard tau-voice agent prompt, user-simulator prompt, domain policies (data/tau2/domains/<domain>/policy.md), tool schemas, tool results, and evaluator are byte-identical to upstream -- no file in the tau-voice repo is modified. The agent additionally receives a prepended scaffold system message defining each agent's identity and role (real-time voice agent vs. background tool-calling agent), the responsibilities it owns, and how the two coordinate and share context. Sierra independently ran the full base splits: retail 114, airline 50, telecom 114; 1 trial per task at regular speech complexity; no task omitted. The four telecom infrastructure errors are retained as non-passes, preserving the 114-task denominator. User-side voices are local ElevenLabs personas from setup_voices (not Sierra-managed submission voices)."
+      },
+      "results": {
+        "retail": {
+          "pass_1": 85.08771929824562
+        },
+        "airline": {
+          "pass_1": 80.0
+        },
+        "telecom": {
+          "pass_1": 75.43859649122807
+        }
+      }
+    },
+    {
+      "name": "pine-voice-preview-user-sim-v1-0_pineai_2026-08-17",
+      "model": "Pine Voice Preview",
+      "organization": "Pine AI",
+      "submitting_organization": "Pine AI",
+      "submission_type": "standard",
+      "submission_date": "2026-08-17",
+      "modality": "voice",
+      "version": "1.0.1",
+      "user_simulator": "v1.0",
+      "reasoning_effort": "enabled",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false,
+        "details": "Standard tau-voice agent prompt, user-simulator prompt, domain policies (data/tau2/domains/<domain>/policy.md), tool schemas, tool results, and evaluator are byte-identical to upstream -- no file in the tau-voice repo is modified. Sierra independently ran the full base splits: retail 114, airline 50, telecom 114; 1 trial per task at regular speech complexity; no task omitted. The single telecom infrastructure error is retained as a non-pass, preserving the 114-task denominator. User-side voices are local ElevenLabs personas from setup_voices (not Sierra-managed submission voices)."
+      },
+      "results": {
+        "retail": {
+          "pass_1": 70.17543859649122
+        },
+        "airline": {
+          "pass_1": 70.0
+        },
+        "telecom": {
+          "pass_1": 85.96491228070175
+        }
+      }
+    },
+    {
+      "name": "qwen3-5-omni-plus-realtime_qwen_2026-08-06",
+      "model": "qwen3.5-omni-plus-realtime",
+      "organization": "Qwen",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-08-06",
+      "modality": "voice",
+      "version": "1.0.1",
+      "user_simulator": "v1.0",
+      "reasoning_effort": null,
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false
+      },
+      "results": {
+        "retail": {
+          "pass_1": 46.49122807017544,
+          "cost": 0.580765906741573
+        },
+        "airline": {
+          "pass_1": 54.0,
+          "cost": 0.5397773999999999
+        },
+        "telecom": {
+          "pass_1": 60.526315789473685,
+          "cost": 1.467414694736842
+        }
+      }
+    },
+    {
+      "name": "qwen3-8-max_sierra_2026-08-04",
+      "model": "Qwen 3.8 Max",
+      "organization": "Qwen",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-08-04",
+      "modality": "text",
+      "version": "1.0.1",
+      "user_simulator": "gpt-5.2",
+      "reasoning_effort": "xhigh",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false
+      },
+      "results": {
+        "banking_knowledge": {
+          "pass_1": 55.154639175257735,
+          "pass_2": 45.18900343642611,
+          "pass_3": 39.69072164948454,
+          "pass_4": 35.051546391752574,
+          "cost": null,
+          "retrieval_config": "alltools"
+        }
+      }
+    },
+    {
+      "name": "qwen3-max_qwen_2024_09_23",
+      "model": "Qwen3-Max",
+      "organization": "Qwen",
+      "submitting_organization": "Alibaba",
+      "submission_type": "standard",
+      "submission_date": "2024-09-23",
+      "modality": null,
+      "version": "0.1.3",
+      "user_simulator": null,
+      "reasoning_effort": null,
+      "verification": {
+        "modified_prompts": null,
+        "omitted_questions": null,
+        "details": "Unverified submission - no trajectory data available, unknown evaluation methodology, incomplete evaluation (Pass^1, Pass^2 and Pass^4 only)"
+      },
+      "results": {
+        "retail": {
+          "pass_1": 72.2,
+          "pass_2": 67.5,
+          "pass_3": null,
+          "pass_4": 57.0
+        },
+        "airline": {
+          "pass_1": 59.5,
+          "pass_2": 55.0,
+          "pass_3": null,
+          "pass_4": 46.0
+        },
+        "telecom": {
+          "pass_1": 84.2,
+          "pass_2": 77.6,
+          "pass_3": null,
+          "pass_4": 61.4
+        }
+      }
+    },
+    {
+      "name": "qwen3-max_qwen_2025-10-30",
+      "model": "Qwen3-Max-Thinking-Preview",
+      "organization": "Qwen",
+      "submitting_organization": "Qwen",
+      "submission_type": "standard",
+      "submission_date": "2025-11-01",
+      "modality": null,
+      "version": "v0.1.3",
+      "user_simulator": "gpt-4.1-2025-04-14",
+      "reasoning_effort": null,
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false,
+        "details": "Complete evaluation with all standard tasks"
+      },
+      "results": {
+        "retail": {
+          "pass_1": 75.44,
+          "pass_2": 66.23,
+          "pass_3": 60.09,
+          "pass_4": 55.26,
+          "cost": 0.0
+        },
+        "airline": {
+          "pass_1": 71.0,
+          "pass_2": 65.33333333333334,
+          "pass_3": 62.5,
+          "pass_4": 60.0,
+          "cost": 0.0
+        },
+        "telecom": {
+          "pass_1": 95.83333333333334,
+          "pass_2": 91.95906432748538,
+          "pass_3": 88.37719298245614,
+          "pass_4": 85.08771929824562,
+          "cost": 0.0
+        }
+      }
+    },
+    {
+      "name": "qwen3-max_qwen_2026-01-23",
+      "model": "Qwen3-Max-Thinking",
+      "organization": "Qwen",
+      "submitting_organization": "Qwen",
+      "submission_type": "standard",
+      "submission_date": "2026-01-26",
+      "modality": null,
+      "version": "v0.1.3",
+      "user_simulator": "gpt-4.1-2025-04-14",
+      "reasoning_effort": null,
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false,
+        "details": "Complete evaluation with all standard tasks"
+      },
+      "results": {
+        "retail": {
+          "pass_1": 79.3859649122807,
+          "pass_2": 69.44444444444446,
+          "pass_3": 62.71929824561403,
+          "pass_4": 57.89473684210527,
+          "cost": null
+        },
+        "airline": {
+          "pass_1": 69.0,
+          "pass_2": 65.33333333333333,
+          "pass_3": 63.5,
+          "pass_4": 62.0,
+          "cost": null
+        },
+        "telecom": {
+          "pass_1": 98.24561403508771,
+          "pass_2": 96.63742690058479,
+          "pass_3": 95.17543859649122,
+          "pass_4": 93.85964912280701,
+          "cost": null
+        }
+      }
+    },
+    {
+      "name": "qwen3.5-397b-a17b-think_sierra_2026-03-02",
+      "model": "Qwen3.5-397B-A17B",
+      "organization": "Alibaba Cloud",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-03-02",
+      "modality": null,
+      "version": "1.0.1",
+      "user_simulator": "gpt-5.2",
+      "reasoning_effort": "enabled",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false,
+        "details": "Standard tau-bench scaffold. Clean 4-trial runs with no infrastructure errors across all domains."
+      },
+      "results": {
+        "airline": {
+          "pass_1": 81.5,
+          "pass_2": 75.67,
+          "pass_3": 71.5,
+          "pass_4": 68.0,
+          "cost": null
+        },
+        "retail": {
+          "pass_1": 84.43,
+          "pass_2": 74.42,
+          "pass_3": 66.45,
+          "pass_4": 59.65,
+          "cost": null
+        },
+        "telecom": {
+          "pass_1": 97.81,
+          "pass_2": 95.76,
+          "pass_3": 93.86,
+          "pass_4": 92.11,
+          "cost": null
+        },
+        "banking_knowledge": {
+          "pass_1": 9.79,
+          "pass_2": 6.36,
+          "pass_3": 5.41,
+          "pass_4": 5.15,
+          "cost": null,
+          "retrieval_config": "text-emb-3-large"
+        }
+      }
+    },
+    {
+      "name": "raft-30b-a3b_neu_2026-04-29",
+      "model": "RAFT-30B-A3B",
+      "organization": "Northeastern University HAI Lab",
+      "submitting_organization": "Northeastern University HAI Lab",
+      "submission_type": "custom",
+      "submission_date": "2026-04-30",
+      "modality": "text",
+      "version": null,
+      "user_simulator": "claude-sonnet-4-5-20250929",
+      "reasoning_effort": null,
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false
+      },
+      "results": {
+        "retail": {
+          "pass_1": 82.45614035087719,
+          "pass_2": 72.95321637426902,
+          "pass_3": 66.22807017543859,
+          "pass_4": 61.40350877192983,
+          "cost": 0.0
+        }
+      }
+    },
+    {
+      "name": "salesforce-launa-v1_salesforce_2026-10-06",
+      "model": "Salesforce Launa v1",
+      "organization": "Salesforce",
+      "submitting_organization": "Salesforce",
+      "submission_type": "custom",
+      "submission_date": "2026-10-06",
+      "modality": "voice",
+      "version": "b7ea9074c1cba482b30687fecdb5c8425fd6f619",
+      "user_simulator": "v1.0",
+      "reasoning_effort": "none",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false,
+        "details": "Benchmark-supplied prompts, domain policies, tools, tasks and evaluator were unchanged. All 278 tasks have one scored canonical trajectory. Trajectories and audio are hosted by the leaderboard."
+      },
+      "results": {
+        "retail": {
+          "pass_1": 71.9298245614035
+        },
+        "airline": {
+          "pass_1": 66
+        },
+        "telecom": {
+          "pass_1": 80.7017543859649
+        }
+      }
+    },
+    {
+      "name": "toolorchestra_nvidia_2025-12-02",
+      "model": "Nemotron-Orchestrator-8B",
+      "organization": "NVIDIA",
+      "submitting_organization": "NVIDIA",
+      "submission_type": "custom",
+      "submission_date": "2025-12-18",
+      "modality": null,
+      "version": "0.1.3",
+      "user_simulator": "gpt-5",
+      "reasoning_effort": null,
+      "verification": {
+        "modified_prompts": true,
+        "omitted_questions": false,
+        "details": "Modified the agent system prompt to support orchestrator framework. No questions were omitted."
+      },
+      "results": {
+        "retail": {
+          "pass_1": 84.2,
+          "pass_2": null,
+          "pass_3": null,
+          "pass_4": null
+        },
+        "airline": {
+          "pass_1": 56.0,
+          "pass_2": null,
+          "pass_3": null,
+          "pass_4": null
+        },
+        "telecom": {
+          "pass_1": 88.6,
+          "pass_2": null,
+          "pass_3": null,
+          "pass_4": null
+        }
+      }
+    },
+    {
+      "name": "xai-realtime-banking_xai_2026-07-13",
+      "model": "xai-realtime",
+      "organization": "xAI",
+      "submitting_organization": "Sierra",
+      "submission_type": "custom",
+      "submission_date": "2026-07-13",
+      "modality": "voice",
+      "version": "1.0.1",
+      "user_simulator": "gpt-5.5-2026-04-23 (xhigh)",
+      "reasoning_effort": "enabled",
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false
+      },
+      "results": {
+        "banking_knowledge": {
+          "pass_1": 16.49484536082474,
+          "retrieval_config": "alltools"
+        }
+      }
+    },
+    {
+      "name": "xai-realtime_sierra_2026-03-03",
+      "model": "grok-voice-fast-1.0",
+      "organization": "xAI",
+      "submitting_organization": "Sierra",
+      "submission_type": "standard",
+      "submission_date": "2026-03-03",
+      "modality": "voice",
+      "version": "1.0.0",
+      "user_simulator": "v1.0",
+      "reasoning_effort": null,
+      "verification": {
+        "modified_prompts": false,
+        "omitted_questions": false
+      },
+      "results": {
+        "airline": {
+          "pass_1": 36.0
+        },
+        "retail": {
+          "pass_1": 38.6
+        },
+        "telecom": {
+          "pass_1": 40.4
+        }
+      }
+    }
+  ],
+  "board": "2x"
+}

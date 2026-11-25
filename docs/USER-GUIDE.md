@@ -6952,3 +6952,84 @@ comparing a `pass^1` to a three-domain mean.
 
 If you only want the cheapest correct statement about a run, it is the one `--emit` prints back: the rates it
 computed, the bill per trajectory, and whether the row would be listed Verified or Unverified.
+### 32.76 Naming the population, and pricing a placement change before you ship it
+
+Two questions that look administrative and are not: *who else is on the board you are quoting* and *is the position
+your product ships the one the evaluation measured*.
+
+#### A rank is a rank of a population
+
+`--position` has always refused to place a metric the artefact does not state. It now also refuses to place a metric
+against rows it should not be compared with. Four flags, one rule:
+
+```bash
+# the population the reading is about: the 72-row 2.0 directory, one benchmark version, text rows only
+python3 eval/tools/submission.py --position submission.json --metric pass_1 --domain retail \
+  --board 2x --version 1.0.1 --text-only
+```
+
+Every placement prints its population before the table:
+
+```
+RANKED: pass_1 over retail, 8 board row(s)
+  population: 2x (read 2026-11-25, commit 989d3285), version 1.0.1, text rows only, 8 of 72 row(s);
+  dropped 58 by version, 6 by modality, 0 kept row(s) declare none
+```
+
+Read it as three facts and one caveat. The **board** is which snapshot — `1x` is the 46-row read at `768f3d8f`,
+`2x` is the 72-row directory at tag `v2.0.0`, which is the largest set still readable because `web/leaderboard` is no
+longer on the repository's default branch. The **version** scope drops every row whose
+`methodology.tau2_bench_version` differs: the board's retail column holds nine spellings of that field, and a
+`0.1.3` row was measured on different tasks. The **modality** scope drops voice submissions, which 21 of the 48
+retail rows are. The caveat is the last clause: rows that predate the `modality` field declare nothing, and the tool
+counts them rather than assuming they are text.
+
+`--position` exits `1` and prints `tau2-submission-refused: wrong-version: …` when the artefact's own
+`methodology.tau2_bench_version` disagrees with `--version`. That is deliberate: comparing a number measured on one
+benchmark version with rows measured on another is the same mistake as comparing a three-domain mean with a retail
+cell, and the exit code is how a script finds out.
+
+`--census` grew the same two axes, so the denominators are visible rather than inferred:
+
+```bash
+python3 eval/tools/submission.py --census --board 2x
+#   "by_version":  {"1.0.1": 14, "1.0.0": 12, "0.1.3": 10, "v0.1.3": 4, "original tau-bench": 3, "v2.0": 2, …}
+#   "by_modality": {"(unstated)": 26, "voice": 21, "text": 1}
+```
+
+#### The probe prices the placement the product ships
+
+`SERVING_DEFAULTS.placement` is `tail`. `pnpm eval:cache-probe` is what prices it, and it gained two flags and one
+reading:
+
+```bash
+# the shipped placement, written on the first call and moved once at the tenth
+pnpm eval:cache-probe --out eval/results/cache-placement.json --turns 9 \
+  --write-at 1 --rewrite-at 10
+```
+
+`--write-at <call>` is the call the block is written on. Behind the conversation the block sits where it stood on
+that call and later turns are appended **after** it, so a probe that re-sent the block at the end of every call
+would price a message order the arm never sends. `--rewrite-at <call>` changes the block's body on that call, which
+is the only way to read a **move**: held still, every placement's steady state is the control's plus one write, and
+the difference between a position in front of a prefix and one behind it lives entirely in what a change re-bills.
+
+The per-shape line gains a `move` column, and the module exposes the arithmetic as `movePrice(ledger, call)` — the
+call's uncached tokens minus the shape's own steady median. Signed, so a call that hit the cache harder than the
+median reads negative; clamping it would make every move look free-or-worse.
+
+Three invariants the suite holds, and what each one protects:
+
+| invariant | what it stops |
+|---|---|
+| a call before the write carries no block, for every placement | a shape that prices a message the episode never sent |
+| the first call of `tail` equals `system-second` | "fixing" an equality that is a fact about empty prefixes |
+| a revision before the write is refused | a probe that prices two changes and calls it one |
+
+#### Closing the loop between product and evaluation
+
+The configuration the evaluation measured lives in `eval/manifests/serving-defaults.json`, and
+`packages/core/src/memory/serving.ts` restates it. Two tests read the manifest — one per repository — so changing
+`placement` in the manifest fails exactly one test in each place: the TypeScript constant no longer matches, and the
+dispatch's carrier arm (`board`) no longer serves the placement the manifest names. That is the whole mechanism, and
+it is mechanical on purpose. A review cannot catch a divergence between two codebases; a test can.

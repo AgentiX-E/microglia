@@ -2057,6 +2057,7 @@ export {
   CACHE_TOLERANCE_TOKENS,
   PACK_PLACEMENTS,
   cacheLedgerOf,
+  movePrice,
   placementVerdict,
   placementPromptFor,
   syntheticText,

@@ -12,10 +12,14 @@
  * cannot catch a divergence, and a test can.
  *
  * **What this is not.** It is not an implementation of the placements. `packages/eval/src/cache-placement.ts` owns
- * the probe and the prompt shapes for the four placements it prices; `tail` is the one this file recommends and the
- * probe does not yet build, which is registered as R220b rather than implied by a type. A product that imports
- * `SERVING_DEFAULTS.placement` and passes it to a call site that does not accept it fails to compile, which is the
- * correct outcome: the recommendation cannot silently outrun the implementation.
+ * the probe and the prompt shapes for the five placements it prices, `tail` among them since R220b — before that
+ * round this file recommended a position no reading had measured, which is the same divergence as the three places
+ * above, one level down. The probe's `tail` shape is built with `writtenOnCall`, because behind the conversation the
+ * block's position is a function of when it was written, and with `revision`, because held still every placement
+ * pays the same and the difference lives in what a change re-bills.
+ *
+ * A product that imports `SERVING_DEFAULTS.placement` and passes it to a call site that does not accept it fails to
+ * compile, which is the correct outcome: the recommendation cannot silently outrun the implementation.
  */
 
 /** The placements the probe and the driver know between them. `tail` is measured, not yet priced by the probe. */

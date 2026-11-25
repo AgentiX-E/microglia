@@ -33,6 +33,15 @@ The board snapshot is a pinned file (`eval/manifests/tau2-board-1x-2026-11-25.js
 board that moves under a quoted number makes the number unquotable, and the lane's rule everywhere else is that a
 reading names the artefact it was taken from.
 
+**R220b — the population is part of the claim.** The 1.x snapshot holds 46 entries read at commit `768f3d8f`. The
+2.0 leaderboard holds 72, and until this round nothing here had read them, so "rank 2" was a statement about a
+population of 46 that was described as the board. Two more axes were missing, and both are in the rows:
+`modality` (a voice submission and a text submission are not the same experiment, and 25 of the 72 are voice) and
+`methodology.tau2_bench_version` (a 0.1.3 row and a 1.0.1 row are not the same tasks, and the board's retail column
+mixes seven spellings of the version). So `--position` now names its board, can scope to one version and to text
+rows, and **refuses to place an artefact whose version disagrees with the scope** — a number measured on one
+benchmark version, placed against rows measured on another, is exactly the defect this file was written to stop.
+
 Usage:
   python3 eval/tools/submission.py --emit --arm eval/results/working-memory/control.json \\
     --harness replace --harness-name microglia --injects "a state block behind the conversation" \\
@@ -41,7 +50,10 @@ Usage:
     --out /tmp/submission.json
   python3 eval/tools/submission.py --check /tmp/submission.json
   python3 eval/tools/submission.py --position /tmp/submission.json --metric pass_1 --domain retail
-  python3 eval/tools/submission.py --census
+  python3 eval/tools/submission.py --position /tmp/submission.json --metric pass_1 --board 2x --version 1.0.1 --text-only
+  python3 eval/tools/submission.py --census --board 2x
+  python3 eval/tools/submission.py --ingest board-v2.0.0.json --board-name 2x \
+    --out eval/manifests/tau2-board-2x-2026-11-25.json
   python3 eval/tools/submission.py --self-test
 """
 
@@ -55,9 +67,18 @@ from pathlib import Path
 SCHEMA = "microglia.submission/1"
 BOARD_SCHEMA = "microglia.tau2-board/1"
 
-#: Where the pinned snapshot lives, relative to this file. One copy: a second path in a script is the copy that
-#: goes stale the day the snapshot is re-read.
-BOARD_PATH = Path(__file__).resolve().parents[1] / "manifests" / "tau2-board-1x-2026-11-25.json"
+#: The pinned snapshots, relative to this file. One copy each: a second path in a script is the copy that goes
+#: stale the day the snapshot is re-read. `1x` is the 46-entry snapshot R218 read; `2x` is the 72-entry
+#: leaderboard directory at tag `v2.0.0`, read in R220b after `web/leaderboard` disappeared from the repo's
+#: default branch (the largest set still readable is the tag's).
+_MANIFESTS = Path(__file__).resolve().parents[1] / "manifests"
+BOARDS = {
+    "1x": _MANIFESTS / "tau2-board-1x-2026-11-25.json",
+    "2x": _MANIFESTS / "tau2-board-2x-2026-11-25.json",
+}
+
+#: The snapshot the tool reads when a caller does not name one, kept for the commands that predate `--board`.
+DEFAULT_BOARD = "1x"
 
 #: The domains `Results` accepts, spelled as the schema spells them. `additionalProperties: false` on `Results`
 #: means a domain outside this set is not a domain the board will read.
@@ -334,19 +355,26 @@ def check(document: dict) -> tuple[list[str], list[str]]:
         if isinstance(methodology, dict):
             allowed = {"evaluation_date", "tau2_bench_version", "user_simulator", "notes", "verification"}
             require(set(methodology) <= allowed, f"methodology has unknown keys {sorted(set(methodology) - allowed)}")
-            verification = methodology.get("verification")
-            if verification is not None:
-                require(isinstance(verification, dict), "verification is not an object")
-                if isinstance(verification, dict):
-                    allowed_verification = {"modified_prompts", "omitted_questions", "details"}
-                    require(
-                        set(verification) <= allowed_verification,
-                        f"verification has unknown keys {sorted(set(verification) - allowed_verification)}",
-                    )
-                    require(
-                        isinstance(verification.get("modified_prompts"), bool),
-                        "verification.modified_prompts must be declared true or false, not left unstated",
-                    )
+
+    # R220b. Moved out of the guard above, because it was a check that refused the quiet omission and passed the
+    # loud one: an entry that leaves `modified_prompts` out of its verification block was caught, and an entry
+    # that leaves the whole block out — or the whole methodology — was read as having nothing to say and let
+    # through. The board's prose rule is that the field is *declared*, so absence is refused here.
+    verification = (methodology or {}).get("verification") if isinstance(methodology, dict) else None
+    require(
+        isinstance(verification, dict),
+        "verification is not an object: an entry must declare modified_prompts, not leave the block out",
+    )
+    if isinstance(verification, dict):
+        allowed_verification = {"modified_prompts", "omitted_questions", "details"}
+        require(
+            set(verification) <= allowed_verification,
+            f"verification has unknown keys {sorted(set(verification) - allowed_verification)}",
+        )
+        require(
+            isinstance(verification.get("modified_prompts"), bool),
+            "verification.modified_prompts must be declared true or false, not left unstated",
+        )
 
     references = document.get("references")
     if references is not None:
@@ -386,11 +414,26 @@ def _is_date(value) -> bool:
     return all(part.isdigit() for part in parts) and 1 <= int(parts[1]) <= 12 and 1 <= int(parts[2]) <= 31
 
 
-def load_board(path: str = "") -> dict:
-    with open(path or BOARD_PATH, encoding="utf-8") as stream:
+def load_board(name: str = DEFAULT_BOARD) -> dict:
+    """One pinned snapshot, by name — `1x` or `2x`, or a path to a snapshot this file does not ship.
+
+    A name rather than a path, because the name is what a reading quotes and a path is where it happens to live.
+    The path form is kept for the self-test's throwaway snapshots and for a snapshot under review; it is resolved
+    only when the file exists, so a typo in a board name is refused with the names that do exist instead of an
+    `ENOENT` from three frames down.
+    """
+    path = BOARDS.get(name)
+    if path is None:
+        candidate = Path(name)
+        if not candidate.is_file():
+            raise Refusal(f"unknown-board: {name!r} is not one of {sorted(BOARDS)} and is not a snapshot file")
+        path = candidate
+        name = candidate.stem
+    with open(path, encoding="utf-8") as stream:
         board = json.load(stream)
     if board.get("schema") != BOARD_SCHEMA:
         raise Refusal(f"board snapshot schema {board.get('schema')!r} is not {BOARD_SCHEMA}")
+    board["board"] = name
     return board
 
 
@@ -400,20 +443,57 @@ def stated(document: dict, domain: str, metric: str) -> float | None:
     return float(value) if isinstance(value, (int, float)) else None
 
 
-def position(ours: dict, board: dict, metric: str, domain: str) -> dict:
+def scope(entries: list[dict], version: str = "", text_only: bool = False) -> tuple[list[dict], dict]:
+    """The rows a claim is about, and what was dropped to get them.
+
+    The drops are counted rather than silently applied: a population that shrank without saying so is how a
+    "rank 2 of 46" claim survives on a board of 72. `undeclared` is the third count and the reason the text scope
+    is not a claim about modality — the older snapshot has no `modality` field at all, and a tool that read an
+    absent field as `text` would be inventing the answer to the question it is scoping on.
+    """
+    kept: list[dict] = []
+    dropped = {"version": 0, "modality": 0}
+    for entry in entries:
+        if version and entry.get("version") != version:
+            dropped["version"] += 1
+            continue
+        if text_only and entry.get("modality") == "voice":
+            dropped["modality"] += 1
+            continue
+        kept.append(entry)
+    undeclared = sum(1 for entry in kept if entry.get("modality") is None)
+    return kept, {**dropped, "kept": len(kept), "undeclared": undeclared}
+
+
+def position(
+    ours: dict,
+    board: dict,
+    metric: str,
+    domain: str,
+    version: str = "",
+    text_only: bool = False,
+) -> dict:
     """Our row among the board's rows, on one metric in one domain — or the refusal to place it.
 
-    Two refusals, both of them states that would otherwise produce a number about nothing:
+    Three refusals, each a state that would otherwise produce a number about nothing:
 
       `unsupported-metric`  our artefact does not state the metric (one attempt has no pass^4)
       `unknown-metric`      the caller asked for something the board does not have a column for
+      `wrong-version`       the scope is one benchmark version and our artefact was measured on another
     """
     if metric not in METRICS:
         raise Refusal(f"unknown-metric: {metric!r}")
     if domain not in DOMAINS:
         raise Refusal(f"unknown-domain: {domain!r}")
+    our_version = ((ours.get("methodology") or {}).get("tau2_bench_version") or "").strip()
+    if version and our_version and our_version != version:
+        raise Refusal(
+            f"wrong-version: our artefact was measured on τ²-bench {our_version} and the scope is {version}; "
+            "a row from one benchmark version placed against another is not a placement"
+        )
+    entries, dropped = scope(board.get("entries") or [], version, text_only)
     theirs = []
-    for entry in board["entries"]:
+    for entry in entries:
         value = (entry.get("results") or {}).get(domain) or {}
         number = value.get(metric)
         if isinstance(number, (int, float)):
@@ -444,6 +524,19 @@ def position(ours: dict, board: dict, metric: str, domain: str) -> dict:
         "rank": None,
         "rows": sorted(theirs, key=lambda row: -row["value"]),
         "our_user_simulator": ((ours.get("methodology") or {}).get("user_simulator")),
+        "our_version": our_version,
+        # What the claim is about. Printed with every placement, because a rank without its population is the
+        # number this file exists to stop being quoted.
+        "population": {
+            "board": board.get("board", DEFAULT_BOARD),
+            "read_on": board.get("read_on"),
+            "source_commit": board.get("source_commit"),
+            "version": version or "any",
+            "text_only": bool(text_only),
+            "rows": len(theirs),
+            "of": len(board.get("entries") or []),
+            "dropped": dropped,
+        },
     }
     if mine is None:
         reading["status"] = "UNRANKED"
@@ -456,6 +549,21 @@ def position(ours: dict, board: dict, metric: str, domain: str) -> dict:
     reading["rank"] = 1 + sum(1 for row in theirs if row["value"] > mine)
     reading["beaten_by"] = [row["name"] for row in theirs if row["value"] > mine]
     return reading
+
+
+def histogram(entries: list[dict], domain: str, field: str) -> dict:
+    """Rows per value of one field, over the entries that state the domain at all.
+
+    Over the entries that state the domain rather than over every entry: a voice row with no retail cell is not a
+    retail row in a version nobody measured, and counting it as one would make the histogram a count of the file.
+    """
+    counts: dict[str, int] = {}
+    for entry in entries:
+        if not isinstance(((entry.get("results") or {}).get(domain) or {}).get("pass_1"), (int, float)):
+            continue
+        key = entry.get(field) or "(unstated)"
+        counts[key] = counts.get(key, 0) + 1
+    return dict(sorted(counts.items(), key=lambda item: (-item[1], item[0])))
 
 
 def census(board: dict) -> dict:
@@ -483,6 +591,11 @@ def census(board: dict) -> dict:
             if isinstance(((entry.get("results") or {}).get(domain) or {}).get("cost"), (int, float))
         ]
         block["cost"] = {"rows": len(costs), "min": min(costs) if costs else None, "max": max(costs) if costs else None}
+        # R220b. The two axes a placement has to name, counted rather than assumed: a board where 25 of 72 rows
+        # are voice submissions and the version column holds seven spellings has denominators that are not one
+        # number, and a rank quoted against "the board" is a rank against whichever denominator was imagined.
+        block["by_version"] = histogram(board["entries"], domain, "version")
+        block["by_modality"] = histogram(board["entries"], domain, "modality")
         block["custom"] = sorted(entry["name"] for entry in board["entries"] if entry.get("submission_type") == "custom")
         out["domains"][domain] = block
     return out
@@ -499,16 +612,121 @@ def mean_over_domains(entry: dict) -> float | None:
     return sum(values) / len(values) if values else None
 
 
+def ingest(raw: dict) -> dict:
+    """A leaderboard directory read as data, folded into a snapshot `--position` can place a row on.
+
+    The 2.0 directory is 72 `submission.json` files under `web/leaderboard/public/submissions/`, and the fields
+    this tool needs are three levels apart in them: the model at the top, the results per domain, and the version
+    and user simulator inside `methodology`. Reading them by hand is how the version column acquired seven
+    spellings; reading them here means every consumer sees the same fold.
+
+    Absent is preserved as absent. A row that declares no modality keeps `modality: None` rather than being
+    labelled text, because `scope` counts undeclared rows separately and a default here would make that count zero
+    by construction.
+    """
+    repo = raw.get("repo")
+    if repo != "sierra-research/tau2-bench":
+        raise Refusal(f"ingest: {repo!r} is not the board this tool reads")
+    commit = raw.get("commit")
+    if not isinstance(commit, str) or len(commit) < 7:
+        raise Refusal("ingest: the raw read states no commit, so the snapshot would not be pinned")
+    rows = raw.get("rows")
+    if not isinstance(rows, list) or not rows:
+        raise Refusal("ingest: no rows")
+    entries = []
+    for row in rows:
+        name = row.get("dir")
+        if not isinstance(name, str) or not name:
+            raise Refusal("ingest: a row without a directory name")
+        submission = row.get("submission")
+        if not isinstance(submission, dict):
+            # A directory that failed to read is a hole in the population, and a hole that is dropped silently
+            # is a denominator that moved. It is named here and left out of the entries.
+            entries.append({"name": name, "error": str(row.get("error") or "no submission.json"), "results": {}})
+            continue
+        model = submission.get("model_name") or submission.get("model")
+        if not isinstance(model, str) or not model.strip():
+            raise Refusal(f"ingest: {name} states no model name, so its row could not be read on the board")
+        methodology = submission.get("methodology") or {}
+        if not isinstance(methodology, dict):
+            raise Refusal(f"ingest: {name} states a methodology that is not an object")
+        results = submission.get("results") or {}
+        if not isinstance(results, dict):
+            raise Refusal(f"ingest: {name} states results that are not an object")
+        entries.append(
+            {
+                "name": name,
+                "model": model.strip(),
+                "organization": submission.get("model_organization"),
+                "submitting_organization": submission.get("submitting_organization"),
+                "submission_type": submission.get("submission_type") or "standard",
+                "submission_date": submission.get("submission_date"),
+                "modality": submission.get("modality"),
+                "version": methodology.get("tau2_bench_version"),
+                "user_simulator": methodology.get("user_simulator"),
+                "reasoning_effort": submission.get("reasoning_effort"),
+                "verification": methodology.get("verification") or {},
+                # A domain with no cell is dropped rather than kept as `null`: `stated` reads a missing key and a
+                # null the same way, and a file that says `"retail": null` invites a reader to believe a row was
+                # measured on retail and scored nothing.
+                "results": {domain: cell for domain, cell in results.items() if isinstance(cell, dict)},
+            }
+        )
+    readable = [entry for entry in entries if "error" not in entry]
+    return {
+        "schema": BOARD_SCHEMA,
+        "benchmark": f"tau2-bench@{raw.get('ref') or commit[:8]}",
+        "source": f"https://github.com/{repo}, {raw.get('path') or 'web/leaderboard/public/submissions'}/*/submission.json",
+        "ref": raw.get("ref"),
+        "source_commit": commit,
+        "read_on": raw.get("read_on") or "",
+        "note": (
+            "Read from the directory rather than from the rendered leaderboard page: the page is a view, the "
+            "submission files are the rows. `modality` and `version` are the submitter's own declarations and are "
+            "absent on rows that predate the fields, which `scope` counts rather than fills in."
+        ),
+        "counts": {
+            "rows": len(entries),
+            "readable": len(readable),
+            "unreadable": len(entries) - len(readable),
+            "with_retail": sum(1 for entry in readable
+                               if isinstance((entry["results"].get("retail") or {}).get("pass_1"), (int, float))),
+        },
+        "entries": entries,
+    }
+
+
 def write(document: dict, path: str) -> None:
     destination = Path(path)
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
+def population_line(population: dict) -> str:
+    """One line that says what the rank below it is a rank *of*.
+
+    Three facts and no more: which snapshot, which benchmark version, and how many rows survived the scope. The
+    last number is written as `kept of total` rather than as a count of its own, because "8 rows" and "8 of 72" are
+    different claims and only one of them can be checked against the board.
+    """
+    scope_note = [f"version {population['version']}"] if population["version"] != "any" else ["every version"]
+    if population["text_only"]:
+        scope_note.append("text rows only")
+    dropped = population["dropped"]
+    return (
+        f"  population: {population['board']} (read {population['read_on']}, commit "
+        f"{str(population['source_commit'])[:8]}), {', '.join(scope_note)}, "
+        f"{population['rows']} of {population['of']} row(s); dropped {dropped['version']} by version, "
+        f"{dropped['modality']} by modality, {dropped['undeclared']} kept row(s) declare none"
+    )
+
+
 def table(reading: dict, ours_name: str) -> str:
     lines = [
         f"{reading['status']}: {reading['metric']} over {reading['domain']}, {reading['board_rows']} board row(s)",
     ]
+    if reading.get("population"):
+        lines.append(population_line(reading["population"]))
     if reading["status"] == "RANKED":
         lines.append(f"  rank {reading['rank']} of {reading['board_rows'] + 1}")
     else:
@@ -528,16 +746,23 @@ def table(reading: dict, ours_name: str) -> str:
     return "\n".join(lines)
 
 
+def _tally(name: str, condition: bool, counters: dict) -> None:
+    """One assertion, counted in a dict so the failure path is reachable from a test of the harness itself.
+
+    A suite's red is the half nobody runs. Left inline, the three lines below are covered only on the day
+    something is broken, which means the report a failing run produces is the least-tested part of the tool.
+    """
+    counters["checks"] += 1
+    if not condition:
+        counters["failures"] += 1
+        print(f"FAIL {name}")
+
+
 def self_test() -> int:
-    checks = 0
-    failures = 0
+    counters = {"checks": 0, "failures": 0}
 
     def expect(name: str, condition: bool) -> None:
-        nonlocal checks, failures
-        checks += 1
-        if not condition:
-            failures += 1
-            print(f"FAIL {name}")
+        _tally(name, condition, counters)
 
     def arm(trials: int = 1, domain: str = "retail", reward=None, cost=(0.003, 0.001), offset: int = 0) -> dict:
         simulations = []
@@ -690,6 +915,15 @@ def self_test() -> int:
     expect("a verification that is not an object is caught",
            any("verification is not an object" in error
                for error in check(_with(document, methodology={"notes": "x", "verification": "y"}))[0]))
+    expect("a methodology that omits the verification block is refused rather than read as silent",
+           any("modified_prompts" in error for error in check(_with(document, methodology={"notes": "x"}))[0]))
+    expect("an entry with no methodology at all is refused for the same reason",
+           any("modified_prompts" in error for error in check(_without(document, "methodology"))[0]))
+    expect("a model_release is optional", check(_without(document, "model_release"))[0] == [])
+    expect("a model_release without an announcement needs no release date",
+           check(_with(document, model_release={"release_date": "2026-01-01"}))[0] == [])
+    expect("an entry with no references block is refused for a custom type, not skipped",
+           any("link its implementation" in error for error in check(_without(document, "references"))[0]))
     expect("references that are not a list is caught",
            any("not a list" in error for error in check(_with(document, references="x"))[0]))
     expect("a reference that is not an object is caught",
@@ -744,6 +978,25 @@ def self_test() -> int:
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             return main(arguments)
 
+    # One raw read, used twice: by `ingest` below and by the command line inside the temporary directory.
+    raw = {
+        "repo": "sierra-research/tau2-bench",
+        "ref": "v2.0.0",
+        "commit": "989d3285ae66" + "0" * 28,
+        "read_on": "2026-11-25",
+        "path": "web/leaderboard/public/submissions",
+        "rows": [
+            {
+                "dir": "a_model_org_2026-01-01",
+                "submission": {
+                    "model_name": "M",
+                    "results": {"retail": {"pass_1": 50.0, "cost": 0.5}, "airline": None},
+                    "methodology": {"tau2_bench_version": "1.0.1", "user_simulator": "gpt-5.2"},
+                },
+            },
+            {"dir": "b_model_org_2026-01-01", "error": "boom"},
+        ],
+    }
     with tempfile.TemporaryDirectory() as temporary:
         path = str(Path(temporary) / "nested" / "submission.json")
         write(document, path)
@@ -787,9 +1040,92 @@ def self_test() -> int:
         broken = str(Path(temporary) / "broken.json")
         Path(broken).write_text(json.dumps(_with(document, model_name="")), encoding="utf-8")
         expect("the command line reports an invalid document", cli(["--check", broken]) == 2)
+        expect("the command line takes a census of the 2.x board", cli(["--census", "--board", "2x"]) == 0)
+        expect("the command line refuses a board it does not ship", cli(["--census", "--board", "3x"]) == 1)
+        expect("the command line refuses a version scope the artefact is not from",
+               cli(["--position", emitted, "--version", "0.1.3"]) == 1)
+        expect("the command line scopes a placement to text rows at one version",
+               cli(["--position", emitted, "--board", "2x", "--version", "1.0.1", "--text-only"]) == 0)
+        raw_path = str(Path(temporary) / "raw.json")
+        Path(raw_path).write_text(json.dumps(raw), encoding="utf-8")
+        ingested = str(Path(temporary) / "ingested.json")
+        expect("the command line folds a directory read into a snapshot",
+               cli(["--ingest", raw_path, "--board-name", "2x", "--out", ingested]) == 0
+               and json.loads(Path(ingested).read_text())["counts"]["rows"] == 2)
+        expect("an ingest without an out path is refused",
+               _exits(lambda: cli(["--ingest", raw_path]), "tau2-submission-missing"))
+        unnamed = str(Path(temporary) / "unnamed.json")
+        expect("an ingest without a board name still writes its snapshot",
+               cli(["--ingest", raw_path, "--out", unnamed]) == 0
+               and "board" not in json.loads(Path(unnamed).read_text()))
 
-    print(f"\n{checks} checks, {failures} failure(s)")
-    return 0 if failures == 0 else 1
+    # --- R220b: the population a rank is a rank of --------------------------------------------------------
+    two = load_board("2x")
+    expect("the 2.x snapshot is the 72-row directory at the tag", len(two["entries"]) == 72 and two["board"] == "2x")
+    expect("an unknown board name is refused", _raises(lambda: load_board("3x"), "unknown-board"))
+    expect("the refusal lists the boards that do exist", _raises(lambda: load_board("3x"), "'1x'"))
+    kept, dropped = scope(two["entries"], version="1.0.1")
+    expect("the version scope keeps the 1.0.1 rows and counts the rest",
+           len(kept) == 37 and dropped["version"] == 72 - 37)
+    kept_text, dropped_text = scope(two["entries"], "1.0.1", True)
+    expect("the text scope drops the voice rows it was asked to drop",
+           dropped_text["modality"] > 0 and dropped_text["kept"] == len(kept_text) < len(kept))
+    expect("a row that declares no modality is counted, not assumed to be text", dropped_text["undeclared"] > 0)
+    expect("the version histogram sums to the rows that state a retail pass^1",
+           sum(histogram(two["entries"], "retail", "version").values()) == two["counts"]["with_retail"])
+    expect("the histogram leaves out a domain the row does not state",
+           sum(histogram(two["entries"], "telecom", "version").values()) < two["counts"]["with_retail"])
+
+    placed_two = position(ours, two, "pass_1", "retail", "1.0.1", True)
+    expect("a 2.x placement states its board", placed_two["population"]["board"] == "2x")
+    expect("the population's rows are the rows the rank was read over",
+           placed_two["population"]["rows"] == placed_two["board_rows"])
+    expect("the population says how many rows the scope dropped", placed_two["population"]["dropped"]["version"] > 0)
+    expect("the population line reads kept of total",
+           f"of {placed_two['population']['of']} row(s)" in population_line(placed_two["population"]))
+    expect("an artefact from another benchmark version is refused, not placed",
+           _raises(lambda: position(ours, two, "pass_1", "retail", "0.1.3"), "wrong-version"))
+    expect("a scope without a version places against every version",
+           position(ours, two, "pass_1", "retail")["population"]["version"] == "any")
+    expect("the 2.x retail column holds at least as many rows as the 1.x one",
+           position(ours, two, "pass_1", "retail")["board_rows"] >= position(ours, board, "pass_1", "retail")["board_rows"])
+
+    # --- R220b: a directory read, folded ----------------------------------------------------------------
+    snapshot = ingest(raw)
+    expect("ingest reads a row's version and user simulator",
+           snapshot["entries"][0]["version"] == "1.0.1" and snapshot["entries"][0]["user_simulator"] == "gpt-5.2")
+    expect("ingest drops a domain that has no cell", "airline" not in snapshot["entries"][0]["results"])
+    expect("ingest names a directory that failed to read rather than dropping it",
+           snapshot["counts"]["unreadable"] == 1 and snapshot["entries"][1]["error"] == "boom")
+    expect("ingest pins the commit it read", snapshot["source_commit"].startswith("989d3285"))
+    expect("ingest refuses another repository", _raises(lambda: ingest({**raw, "repo": "x"}), "not the board this tool reads"))
+    expect("ingest refuses a read with no commit", _raises(lambda: ingest({**raw, "commit": ""}), "no commit"))
+    expect("ingest refuses a read with no rows", _raises(lambda: ingest({**raw, "rows": []}), "no rows"))
+    expect("ingest refuses a row with no directory",
+           _raises(lambda: ingest({**raw, "rows": [{"submission": {}}]}), "without a directory name"))
+    expect("ingest refuses a row with no model name",
+           _raises(lambda: ingest({**raw, "rows": [{"dir": "c", "submission": {"results": {}}}]}), "no model name"))
+    expect("ingest refuses a methodology that is not an object",
+           _raises(lambda: ingest({**raw, "rows": [{"dir": "c", "submission": {"model_name": "M", "methodology": "x"}}]}),
+                   "methodology that is not an object"))
+    expect("ingest refuses results that are not an object",
+           _raises(lambda: ingest({**raw, "rows": [{"dir": "c", "submission": {"model_name": "M", "results": "x"}}]}),
+                   "results that are not an object"))
+
+    # The harness's own failure path, once, on a counter of its own: a FAIL line that has never been printed is
+    # a failure report nobody has read.
+    probe = {"checks": 0, "failures": 0}
+    with contextlib.redirect_stdout(io.StringIO()) as transcript:
+        _tally("a condition nobody could meet", False, probe)
+    expect("the harness counts a failed assertion", probe["failures"] == 1 and probe["checks"] == 1)
+    expect("the harness says which assertion failed", "FAIL a condition nobody could meet" in transcript.getvalue())
+    expect("a table drawn from a reading stored before R220b still prints",
+           "pass_1 over retail" in table({key: value for key, value in
+                                          position(ours, board, "pass_1", "retail").items()
+                                          if key != "population"}, "microglia"))
+
+    print(f"\n{counters['checks']} checks, {counters['failures']} failure(s)")
+    return 0 if counters["failures"] == 0 else 1
 
 
 def _emit_arguments(**overrides) -> dict:
@@ -875,7 +1211,11 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--means", action="store_true", help="print every entry's mean over domains beside its retail cell")
     parser.add_argument("--metric", default="pass_1")
     parser.add_argument("--domain", default="retail")
-    parser.add_argument("--board", default="")
+    parser.add_argument("--board", default=DEFAULT_BOARD, help="1x or 2x: which pinned population a reading is about")
+    parser.add_argument("--version", default="", help="scope the population to one methodology.tau2_bench_version")
+    parser.add_argument("--text-only", action="store_true", help="drop the rows that declare a voice modality")
+    parser.add_argument("--ingest", default="", help="a raw directory read, folded into a snapshot")
+    parser.add_argument("--board-name", default="", help="the name the ingested snapshot is written under")
     parser.add_argument("--ours-name", default="microglia")
     parser.add_argument("--self-test", action="store_true")
     arguments = parser.parse_args(argv)
@@ -925,14 +1265,42 @@ def main(argv: list[str]) -> int:
         print(f"{len(errors)} error(s)")
         return 0 if not errors else 2
 
+    if arguments.ingest:
+        if not arguments.out:
+            raise SystemExit("tau2-submission-missing: --out")
+        raw = json.loads(Path(arguments.ingest).read_text(encoding="utf-8"))
+        snapshot = ingest(raw)
+        if arguments.board_name:
+            snapshot["board"] = arguments.board_name
+        write(snapshot, arguments.out)
+        print(json.dumps({"out": arguments.out, "counts": snapshot["counts"]}, indent=1))
+        return 0
+
+    # A refusal is an answer, not a crash: a workflow that reads the exit code gets one either way, and a traceback
+    # in a job log reads as a defect in the tool rather than as a fact about the artefact.
     if arguments.position:
         document = json.loads(Path(arguments.position).read_text(encoding="utf-8"))
-        reading = position(document, load_board(arguments.board), arguments.metric, arguments.domain)
+        try:
+            reading = position(
+                document,
+                load_board(arguments.board),
+                arguments.metric,
+                arguments.domain,
+                arguments.version,
+                arguments.text_only,
+            )
+        except Refusal as refusal:
+            print(f"tau2-submission-refused: {refusal}", file=sys.stderr)
+            return 1
         print(table(reading, arguments.ours_name))
         return 0 if reading["status"] == "RANKED" else 1
 
     if arguments.census:
-        board = load_board(arguments.board)
+        try:
+            board = load_board(arguments.board)
+        except Refusal as refusal:
+            print(f"tau2-submission-refused: {refusal}", file=sys.stderr)
+            return 1
         reading = census(board)
         if arguments.means:
             reading["means_over_domains"] = sorted(

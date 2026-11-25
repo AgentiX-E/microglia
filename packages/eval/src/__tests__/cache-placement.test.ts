@@ -2,13 +2,16 @@ import { describe, expect, it } from 'vitest';
 
 import {
   CACHE_TOLERANCE_TOKENS,
+  PACK_PLACEMENTS,
   cacheLedgerOf,
+  movePrice,
   placementVerdict,
   placementPromptFor,
   syntheticText,
   type CacheLedger,
   type CacheReading,
   type PlacementPromptInput,
+  type PromptMessage,
 } from '../cache-placement.js';
 
 const input = (turns = 2): PlacementPromptInput => ({
@@ -244,5 +247,151 @@ describe('syntheticText', () => {
     expect(text).not.toBe(syntheticText(100, 1));
     expect(text.length).toBeGreaterThanOrEqual(400);
     expect(syntheticText(0).length).toBeLessThan(20);
+  });
+});
+
+/**
+ * R220b. The probe priced four shapes and not the one this project ships, which is the gap that let
+ * `SERVING_DEFAULTS.placement` name a shape no committed reading had ever measured. Two things were
+ * missing with it: `tail`'s position is a function of **when the block was written** (a probe that
+ * re-sends it at the end of every call prices a shape the arm never sends), and the price of a
+ * **change** — which is the quantity R216b's −4% is made of and which no shape without a revision
+ * could show.
+ */
+describe('the tail placement, which is the one this project ships', () => {
+  const turns = (count: number): PlacementPromptInput['turns'] =>
+    Array.from({ length: count }, (_, index) => ({ user: `u${index}`, assistant: `a${index}` }));
+
+  it('writes the block behind the conversation as it stood when the block was written', () => {
+    const messages = placementPromptFor('tail', {
+      native: 'POLICY',
+      block: 'BLOCK',
+      turns: turns(3),
+      writtenOnCall: 2,
+    });
+    expect(messages.map((message) => message.content)).toEqual([
+      'POLICY',
+      'u0',
+      'a0',
+      'BLOCK',
+      'u1',
+      'a1',
+      'u2',
+      'a2',
+    ]);
+  });
+
+  it('is the second-system shape on a first call, because there is nothing to be behind yet', () => {
+    // Asserted rather than forbidden: an empty conversation is a legal position, and the equality is
+    // a fact about prefixes. A `tail` that threw here would refuse the first call of every episode.
+    const first = { native: 'POLICY', block: 'BLOCK', turns: turns(1), writtenOnCall: 1 } as const;
+    expect(placementPromptFor('tail', first)).toEqual(placementPromptFor('system-second', first));
+  });
+
+  it('carries no block on the calls before the write, whichever placement is asked for', () => {
+    const early = { native: 'POLICY', block: 'BLOCK', turns: turns(1), writtenOnCall: 3 } as const;
+    for (const placement of PACK_PLACEMENTS) {
+      if (placement === 'control' || placement === 'first-turn') continue;
+      expect(placementPromptFor(placement, early).some((message) => message.content.includes('BLOCK'))).toBe(false);
+    }
+  });
+
+  it('sends the revision from the call it names and the original before it', () => {
+    // The call index is one more than the history's length: zero completed turns is call 1. Written
+    // out because getting it wrong is how this test first failed — it asked a two-turn history for
+    // call one and read the revision it had just named.
+    const shape = (count: number): readonly PromptMessage[] =>
+      placementPromptFor('tail', {
+        native: 'POLICY',
+        block: 'BLOCK',
+        turns: turns(count),
+        writtenOnCall: 1,
+        revision: { fromCall: 2, block: 'REV' },
+      });
+    expect(shape(0).some((message) => message.content === 'BLOCK')).toBe(true);
+    expect(shape(1).some((message) => message.content === 'REV')).toBe(true);
+    expect(shape(1).some((message) => message.content === 'BLOCK')).toBe(false);
+  });
+
+  it('refuses a revision that predates the write, which is a different treatment', () => {
+    expect(() =>
+      placementPromptFor('tail', {
+        native: 'POLICY',
+        block: 'BLOCK',
+        turns: turns(2),
+        writtenOnCall: 3,
+        revision: { fromCall: 2, block: 'REV' },
+      }),
+    ).toThrow(/before the block was written/);
+  });
+
+  it('refuses to give the first-turn placement a write it has no position for', () => {
+    expect(() =>
+      placementPromptFor('first-turn', { native: 'POLICY', block: 'BLOCK', turns: turns(2), writtenOnCall: 2 }),
+    ).toThrow(/write is call 1 by construction/);
+  });
+
+  it('refuses a write on a call that does not exist', () => {
+    expect(() =>
+      placementPromptFor('tail', { native: 'POLICY', block: 'BLOCK', turns: turns(2), writtenOnCall: 0 }),
+    ).toThrow(/call 1 is the first/);
+  });
+
+  it('is priced beside the verdict without deciding it', () => {
+    const verdict = placementVerdict({
+      control: ledger(4000, 300),
+      'system-second': ledger(5100, 1425),
+      'system-merged': ledger(5100, 300),
+      tail: ledger(5100, 300),
+    });
+    expect(verdict.state).toBe('placement-is-the-boundary');
+    expect(verdict.readouts.map((readout) => readout.placement)).toEqual([
+      'control',
+      'system-second',
+      'system-merged',
+      'tail',
+    ]);
+    expect(verdict.sentence).toContain('The tail placement reads 0 against it');
+  });
+
+  it('says nothing about the tail when the probe did not send it', () => {
+    const verdict = placementVerdict({
+      control: ledger(4000, 300),
+      'system-second': ledger(5100, 1425),
+      'system-merged': ledger(5100, 300),
+    });
+    expect(verdict.sentence).not.toContain('tail');
+  });
+});
+
+describe('movePrice', () => {
+  it('prices one call against the shape’s own steady state', () => {
+    const shape = cacheLedgerOf([
+      { promptTokens: 4000, cachedTokens: 0 },
+      { promptTokens: 4000, cachedTokens: 3900 },
+      { promptTokens: 4000, cachedTokens: 3900 },
+      { promptTokens: 4000, cachedTokens: 0 },
+    ]);
+    // The fourth call is the one the block moved on: it re-bought the whole prompt, and the steady
+    // state it is read against is the median of the three calls after the first — 3,900 tokens of
+    // re-billed prefix rather than 4,000, because a normal call already pays the 100-token tail.
+    expect(movePrice(shape, 4)).toBe(3900);
+    expect(movePrice(shape, 2)).toBe(0);
+  });
+
+  it('reads a call that hit more than the median as a negative excess rather than clamping it', () => {
+    const shape = cacheLedgerOf([
+      { promptTokens: 1000, cachedTokens: 0 },
+      { promptTokens: 1000, cachedTokens: 0 },
+      { promptTokens: 1000, cachedTokens: 900 },
+      { promptTokens: 1000, cachedTokens: 950 },
+    ]);
+    expect(movePrice(shape, 4)).toBe(-50);
+  });
+
+  it('refuses a call the series does not hold', () => {
+    const shape = cacheLedgerOf([{ promptTokens: 1000, cachedTokens: 0 }]);
+    expect(() => movePrice(shape, 0)).toThrow(/call 1 is the first/);
+    expect(() => movePrice(shape, 2)).toThrow(/1 call/);
   });
 });

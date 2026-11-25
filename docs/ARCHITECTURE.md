@@ -4741,6 +4741,63 @@ What the two readings say, on the same 114 tasks and one dispatch:
 | cost per conversation | **$0.006043** | the priced rows run $0.0482–$0.3870; one states $0.0000 for self-hosted weights |
 
 So the honest sentence is narrower than the one it replaces and stronger than the one before it: **on the column the
-board states most often, this project is at the top by point estimate with a resolution of three points, at a
-fifteenth of the cheapest published price — and the column that measures reliability has never been run.** That last
-clause is R218's paid half: four trials, two arms, 912 episodes, ≈ $4.2.
+board states most often, this project is at the top by point estimate with a resolution of three points, at an eighth
+of the cheapest published price and a sixty-fourth of the most expensive — and the column that measures reliability
+has never been run.** That last clause is R218's paid half: four trials, two arms, 912 episodes, ≈ $4.75.
+### 8.96 A rank names its population, and the probe prices the placement the product ships
+
+`§8.95` closed the gap between a table this project wrote by hand and the cells a leaderboard actually publishes. It
+left two gaps open, and both were structural rather than clerical.
+
+**The population.** The snapshot `§8.95` read holds 46 submissions at commit `768f3d8f`. The leaderboard at tag
+`v2.0.0` holds **72** — and the repository's default branch no longer carries `web/leaderboard` at all, so the tag is
+the largest set still readable. Reading those 72 files as data says three things the 46-row table could not:
+
+| axis | what the 72 rows say |
+|---|---|
+| how many state a retail `pass^1` | **48**, of which 21 are voice submissions and 26 declare no modality |
+| the benchmark version | nine distinct spellings — `1.0.1` (14 retail rows), `1.0.0` (12), `0.1.3` (10), `v0.1.3` (4), `original tau-bench` (3), `v2.0` (2), a bare commit sha twice, and one row that states none |
+| the submission type | 8 of the retail rows are `custom`; the other 40 are a stock model through the benchmark's own scaffold |
+
+A rank is therefore a statement about four things at once — metric, domain, benchmark version, modality — and a
+number missing any of them is a number that will be compared to the wrong row. `submission.py` grew the axes:
+
+- `--board 1x|2x` names the snapshot, and every placement prints `population: … N of M row(s); dropped … by version,
+  … by modality` before the table, because "8 rows" and "8 of 72" are different claims and only one is checkable.
+- `--version 1.0.1` scopes to the rows measured on the same tasks, and `--text-only` drops the voice rows. Both
+  count what they dropped rather than shrinking the denominator quietly.
+- `--position` **refuses** (`wrong-version`) when the artefact's own `methodology.tau2_bench_version` disagrees with
+  the scope. A `pass^1` measured on 1.0.1 placed against 0.1.3 rows is not a placement; it is the same defect as a
+  three-domain mean in a retail column, one level down.
+- `--ingest` folds a raw directory read into a snapshot, so the 72-row manifest is produced by the tool rather than
+  by a script beside it, and `modality`/`version` are preserved as the submitter declared them — absent stays absent,
+  and the scope counts the undeclared rows instead of filling them in.
+
+The same number, at three scopes, from the tool's own census: **6th of 49** over every retail row, **2nd of 9** among
+the text rows measured on 1.0.1, **3rd of 9** among custom submissions. The first is the weakest claim and the
+easiest to quote; the second is the one that compares like with like.
+
+**The placement.** `packages/core/src/memory/serving.ts` exports the configuration the evaluation measured as best,
+and its `placement` is `tail` — the block behind the conversation. The probe in `packages/eval/src/cache-placement.ts`
+priced four shapes and `tail` was not among them, which meant the product's shipped position was the one position no
+committed reading had measured. Adding the case is not enough, because the shape is not a fixed index:
+
+- **a tail block's position is a function of when it was written.** The arm appends the block once and *holds* it, so
+  later turns are appended after it. `writtenOnCall` is the axis: the block sits where it stood on that call, the
+  calls before it carry none, and the first call degenerates to the second-system shape — a fact about prefixes,
+  asserted in the suite rather than special-cased away.
+- **a placement's price is the price of a change.** Held still, every shape's steady state is the control's plus one
+  write; that is why the confirmed placement is **4%** cheaper and not 37%. `revision` changes the block's body from a
+  named call, and `movePrice(ledger, call)` reads that call's uncached tokens against the shape's own steady median.
+  Signed on purpose: a call that hit the cache harder than the median reads negative, and clamping it would make
+  every shape look as if a move cost at least nothing.
+
+Both axes default to the probe's previous behaviour — a write on the first call, no revision — so every committed
+reading stays reproducible from the same file, and the five shapes keep their per-shape seed because `tail` is
+appended to `PACK_PLACEMENTS` rather than inserted.
+
+**Why this is architecture and not plumbing.** A recommendation that outruns its measurement is the failure mode this
+project keeps finding: three copies of a configuration in `§248.8`, a three-domain mean in a retail column in
+`§8.95`, a placement named in a product default that no probe built. Each was fixed by making the two sides share
+one artefact and one test, and the test is deliberately mechanical — change `placement` in the manifest and exactly
+one test fails on each side; change a shape in the probe and the arm that serves it stops matching.
