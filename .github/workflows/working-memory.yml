@@ -57,13 +57,13 @@ on:
         description: 'Episodes at a time, inside one invocation'
         required: false
         default: '3'
-  schedule:
-    # R216. One opening of the provider's off-peak window, and the dispatch is armed rather than paid for twice:
-    # the rate card's peak bands are 01-04 and 06-10 UTC on weekdays, so 10:02 UTC is the first minute of the first
-    # off-peak hour after the round's first dispatch returned (06:05). The cron names one date on purpose —
-    # `2 10 25 11 *` is 25 November and not "every night" — and the job's own `if:` compares the schedule string, so a
-    # stale entry cannot spend money on a day nobody registered.
-    - cron: '2 10 25 11 *'
+  # R219. No `schedule:` trigger, and the removal is the repair rather than the tidy-up. A cron armed for 25 November
+  # at 10:02 UTC fired at **19:41 UTC** — nine hours late — and started a `placement` dispatch (front, board, 228
+  # episodes, ≈$1.3) for a round that had been read that morning. The job-level guard compares `github.event.schedule`
+  # against the cron string, which *any* firing of that entry satisfies, so a guard written to stop a stale cron from
+  # spending money could not see lateness; it also held the concurrency group, keeping R219b pending behind it
+  # (AUDIT 34.260). A paid grid is dispatched with a date, an arm set and a registered bar. It is not armed and hoped
+  # for.
   push:
     branches: [master]
     paths:
@@ -219,9 +219,7 @@ jobs:
     needs: contract
     # A dispatch, or the one scheduled opening this round armed. Anything else — a push, a cron from another date —
     # runs the contract job and stops there, which is the cheap half.
-    if: >-
-      github.event_name == 'workflow_dispatch'
-      || (github.event_name == 'schedule' && github.event.schedule == '2 10 25 11 *')
+    if: github.event_name == 'workflow_dispatch' 
     runs-on: ubuntu-latest
     # Install (8 min) plus 228 episodes divided by the concurrency plus two imports plus the reading. Generous
     # rather than tight: a step killed mid-grid writes no document and the money is spent.
