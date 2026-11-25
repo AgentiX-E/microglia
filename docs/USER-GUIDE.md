@@ -7066,6 +7066,18 @@ The reason to run it before a treatment round rather than after: this project's 
 the material unchanged. A grid whose identical arms differ by more than five points cannot produce a delta about
 anything else, and no amount of statistics applied afterwards repairs that.
 
+**What it read here, because the number is the point.** Two identical arms over 114 retail tasks, 71 seconds apart:
+80.70% against 83.33%, δ = **+2.63 pp**, McNemar p = 0.711, bills within 3%. The delta is inside the bar and the
+direction is not significant — and **29 of the 114 tasks still flipped**, 25.4% of the grid. That last number is what
+a placebo buys you: at a 25% discordance rate, 114 tasks resolve **13.2 pp at 80% power** and would need **799 tasks**
+to resolve five points. The 8.8-point afternoon was not a time confound at all — it is the model and the user
+simulator sampling differently from the same seed — so the honest reading of any effect below ten points on this
+benchmark is "not measurable here", which is cheaper to learn from two arms of the same code than from a year of
+treatment rounds.
+
+Every reading prints that resolution beside its delta, computed from the grid's own discordance. If you take one habit
+from this guide: **quote a delta with the smallest effect your grid could have seen**, or do not quote it.
+
 `--run` writes a manifest before it spends anything and updates it after each invocation, so a run that dies at block
 eleven resumes rather than re-buys: pass `--resume` and the parts already on disk are kept, checked against the plan's
 own task lists.
