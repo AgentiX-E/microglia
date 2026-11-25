@@ -28,8 +28,10 @@ MANIFEST = ROOT / "eval" / "manifests" / "serving-defaults.json"
 WORKFLOW = ROOT / ".github" / "workflows" / "working-memory.yml"
 
 #: The `--note-source` values and the placement each one puts the block in. `board` appends behind the conversation;
-#: `board-front` writes into the system message. Anything else is a note source that says nothing about placement.
-PLACEMENT_OF = {"board": "tail", "board-front": "front"}
+#: `board-front` writes into the system message; `board-policy` is the tail placement under R219's admission rule,
+#: which changes what the block says and not where it sits. Anything else is a note source that says nothing about
+#: placement, and a policy arm that was mapped to a placement of its own would be read as a third address.
+PLACEMENT_OF = {"board": "tail", "board-front": "front", "board-policy": "tail"}
 
 #: The fields a reader may compare. Kept as data so the report can name a mismatch rather than assert into the void.
 COMPARED = ("placement", "askSource", "settlementGrades", "blockCeilingChars", "openAskCeiling", "trials")
@@ -238,7 +240,7 @@ def self_test() -> int:
 
     # --- the workflow ----------------------------------------------------------------------------------------
     expect("run_arm lines are read", arm_note_sources(WORKFLOW) == {
-        "front": "board-front", "board": "board"})
+        "front": "board-front", "board": "board", "policy": "board-policy"})
     refuses("a workflow with no run_arm is refused",
             lambda: arm_note_sources(workflow("echo nothing")), "no `run_arm")
     refuses("a missing workflow is refused",

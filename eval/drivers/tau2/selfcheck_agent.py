@@ -1931,6 +1931,67 @@ def the_placement_is_read_from_the_environment(checks):
 
 
 @case
+def the_admission_is_read_from_the_same_variable(checks):
+    """R219. One variable, one placement, one rule — and no value that means two things at once.
+
+    The admission rule rides the placement's own variable because two switches for one arm is how an arm becomes a
+    third treatment nobody registered: `policy` is the tail placement with the rule on, `tail` is the same placement
+    with it off, and every other value an arm has ever used must read as `all` rather than as the new rule.
+    """
+    saved = os.environ.pop(subject.BOARD_ENV, None)
+    try:
+        readings = {}
+        for value in ("", "tail", "front", "policy", "POLICY"):
+            if value:
+                os.environ[subject.BOARD_ENV] = value
+            else:
+                os.environ.pop(subject.BOARD_ENV, None)
+            readings[value] = (subject.board_mode(), subject.board_placement(), subject.board_admission())
+    finally:
+        if saved is None:
+            os.environ.pop(subject.BOARD_ENV, None)
+        else:
+            os.environ[subject.BOARD_ENV] = saved
+    checks.equal(readings[""], (False, "off", "all"), "an unset variable admits everything and serves nothing")
+    checks.equal(readings["tail"], (True, "tail", "all"), "the shipped arm is the block as R218b measured it")
+    checks.equal(readings["front"], (True, "front", "all"), "and the front placement is not a rule")
+    checks.equal(readings["policy"], (True, "tail", "state"), "the policy is the tail under the rule, not a placement")
+    checks.equal(readings["POLICY"], (True, "tail", "state"), "read case-insensitively, like every other switch here")
+
+
+@case
+def the_admission_rule_refuses_to_accuse(checks):
+    """R219. The one thing the block said that it could not know, asserted at the entry point the arm uses.
+
+    The fixture is an episode whose request asks for a return and whose agent cancels an order instead: a call of a
+    family nobody asked for. The shipped block reports it — `Not asked for by the request` — and the rule refuses to,
+    because `false_accusations` reads 92.0% of those lines as naming a family the task requires a write in. What the
+    rule may not do is lose the ask, so the same case asserts the ask is still stated.
+    """
+    state = LLMAgentState()
+    state.messages.append({"role": "user", "content": "I want to return the lamp."})
+    state.messages.append({"role": "assistant", "tool_calls": [
+        {"name": "cancel_pending_order", "arguments": {"order_id": "#W1"}}]})
+    state.messages.append({"role": "tool", "content": "ok"})
+    saved = os.environ.get(subject.BOARD_ENV)
+    try:
+        os.environ[subject.BOARD_ENV] = "tail"
+        whole = subject.MicrogliaAgent().board_for(state, "")
+        os.environ[subject.BOARD_ENV] = "policy"
+        admitted = subject.MicrogliaAgent().board_for(state, "")
+    finally:
+        if saved is None:
+            os.environ.pop(subject.BOARD_ENV, None)
+        else:
+            os.environ[subject.BOARD_ENV] = saved
+    checks.substring(whole, "Not asked for by the request", "the shipped block reports the invented call")
+    checks.equal("Not asked for by the request" not in admitted, True,
+                 "the admission rule refuses to report it")
+    checks.substring(admitted, "[ ] return", "and still states the ask")
+    checks.equal(len(admitted) < len(whole), True, "the block it serves is shorter, which is the whole price")
+
+
+@case
 def a_placement_with_nothing_to_say_writes_nothing(checks):
     """R216. The two silent branches of the placement, and the guard that keeps the instrument off the critical path.
 

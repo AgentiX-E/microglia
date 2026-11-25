@@ -28,7 +28,7 @@ on:
   workflow_dispatch:
     inputs:
       arms:
-        description: "three (control, front, tail — R216), placement (front, tail — R216b), pair (control, front — R218b), interleave (control-a, control-b — R218c), both (control, tail), board, control"
+        description: "three (control, front, tail — R216), placement (front, tail — R216b), pair (control, front — R218b), interleave (control-a, control-b — R218c), admission (tail, policy — R219), both (control, tail), board, control, policy"
         required: false
         default: 'placement'
       tasks:
@@ -277,7 +277,7 @@ jobs:
           trials = int('${BOARD_TRIALS}')
           # `interleave` is two arms as well, and its own driver is what divides the grid: an estimate that read it
           # as one arm would arm the window guard with half the run it is guarding.
-          arms = {'three': 3, 'both': 2, 'pair': 2, 'interleave': 2}.get('${BOARD_ARMS}', 1)
+          arms = {'three': 3, 'both': 2, 'pair': 2, 'interleave': 2, 'admission': 2}.get('${BOARD_ARMS}', 1)
           concurrency = max(1, int('${BOARD_CONCURRENCY}'))
           print(int((arms * tasks * trials * 26) / concurrency / 60) + 9 + 1)
           ")"
@@ -473,7 +473,21 @@ jobs:
               run_arm control
               run_arm board --note-source board
               ;;
+            admission)
+              # R219. **One variable.** `board` is the shipped configuration — the tail placement, the block as R218b
+              # measured it — and `policy` is that same block under the admission rule: the asks and their ticks,
+              # and neither refusal line. The contrast is the rule and nothing else, which is why the placement, the
+              # parser, the model and the grid are held fixed by construction rather than by argument.
+              #
+              # The reason the rule exists is a measurement, not a preference: over R218b's 456 episodes the two
+              # refusal lines name a family the task requires a write in on 1,808 of 1,965 entries (92.0%), so the
+              # block spends nine tenths of its accusations telling the agent it did something nobody asked for on a
+              # task where somebody did. `goal_board.py --accusations` reads that off an artefact for free.
+              run_arm board --note-source board
+              run_arm policy --note-source board-policy
+              ;;
             board) run_arm board --note-source board ;;
+            policy) run_arm policy --note-source board-policy ;;
             *)     run_arm control ;;
           esac
 
@@ -547,6 +561,23 @@ jobs:
             assert appends <= (board.get("changes") or 0), (appends, board.get("changes"))
             assert held > 0, "no turn found the block already in place: it is being re-written every turn"
 
+          policy = (summary.get("policy") or {}).get("diagnostics", {}).get("memory", {}).get("board") or {}
+          if board and policy:
+            # R219. The one variable this round changed, asserted on the counters rather than trusted from the flag
+            # that was passed. A policy arm reporting `all` is the rule never having been applied, and the reading
+            # would then be a null about a treatment that did not run — the wiring defect this lane has counted six
+            # times, and the one an accuracy delta cannot distinguish from a real null.
+            assert policy.get("admission") == "state", policy.get("admission")
+            assert board.get("admission") == "all", board.get("admission")
+            assert policy.get("placement") == "tail", policy.get("placement")
+            assert (policy.get("renders") or 0) > 0, "the policy arm served no turn"
+            # A rule that removes two lines cannot lengthen the block. This is an invariant rather than the registered
+            # prediction (5-25% shorter): it fails only if the renderer kept the lines, which is a different defect.
+            assert (policy.get("charsMean") or 0) <= (board.get("charsMean") or 0), (
+                f"the rule made the block longer: {policy.get('charsMean')} against {board.get('charsMean')}")
+            print(f"policy: {policy.get('renders')} render(s), {policy.get('charsMean')} chars a turn against "
+                  f"board's {board.get('charsMean')}, admission {policy.get('admission')!r}")
+
           if front:
               # The parser arm's own counters, which must show the other placement: a run where both arms report
               # the same placement is a dispatch that passed the same flag twice.
@@ -567,6 +598,17 @@ jobs:
           # `placement`, whose baseline is `front`: the question there is what moving the block costs **the parser
           # arm**, and comparing it to a control that was never run would have been an assertion that silently did
           # not execute - a cost bar that passes by not looking.
+          # R219. The contrast this dispatch prices: the rule against the arm it is a rule about, both behind the
+          # conversation at the same seed and the same 114 tasks. It is written as its own branch rather than by
+          # renaming the baseline, because `board` is the treated arm in one dispatch and the baseline in the other
+          # and a name that means both is how a bill gets compared to itself.
+          if per_episode.get("policy") and per_episode.get("board"):
+              ratio = per_episode["policy"] / per_episode["board"]
+              print(f"bill per episode: board ${per_episode['board']:.5f}, policy ${per_episode['policy']:.5f} "
+                    f"({100 * (ratio - 1):+.0f}%)")
+              assert 0.80 <= ratio <= 1.20, (
+                  f"the policy arm's bill is {100 * (ratio - 1):+.0f}% of the board's; a block with two lines fewer "
+                  "behind the conversation cannot cost 20% more, and a large negative is a run that did not happen")
           baseline_name = "control" if per_episode.get("control") else "front"
           baseline, treated = per_episode.get(baseline_name), per_episode.get("board")
           if baseline and treated and baseline_name != "board":

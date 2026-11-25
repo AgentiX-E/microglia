@@ -4,7 +4,7 @@
  "rounds": [
   {
    "id": "R216b",
-   "title": "the placement's price \u2014 front against tail, one dispatch",
+   "title": "the placement's price — front against tail, one dispatch",
    "status": "read",
    "dispatchedAt": "2026-11-25T13:45:00Z",
    "dispatchBy": "2026-11-25T12:00:00Z",
@@ -41,7 +41,7 @@
   },
   {
    "id": "R218b",
-   "title": "the reliability column \u2014 four attempts, control against front",
+   "title": "the reliability column — four attempts, control against front",
    "status": "read",
    "dispatchBy": "2026-11-27T12:00:00Z",
    "prereg": "prereg/R218b-pass4.md",
@@ -96,7 +96,7 @@
   },
   {
    "id": "R218c",
-   "title": "the placebo, interleaved \u2014 two identical arms, task by task, registered delta of zero",
+   "title": "the placebo, interleaved — two identical arms, task by task, registered delta of zero",
    "status": "read",
    "dispatchBy": "2026-11-26T18:00:00Z",
    "prereg": "prereg/R218c-interleave.md",
@@ -150,7 +150,7 @@
   },
   {
    "id": "R218d",
-   "title": "the dose inside the task \u2014 does an attempt that received more material pass more often",
+   "title": "the dose inside the task — does an attempt that received more material pass more often",
    "status": "read",
    "dispatchBy": "2026-11-26T12:00:00Z",
    "estimateUsd": 0.0,
@@ -160,24 +160,24 @@
     "R218b"
    ],
    "outcome": "built and read on R218b's documents: NO_DOSE on both arms, because a front-placement block never enters the transcript",
-   "why": "Every flat reading this lane has is a between-arm mean. Within one task, the four attempts of R218b received different amounts of material, and comparing them holds the difficulty fixed \u2014 the one decomposition a two-arm grid cannot make.",
+   "why": "Every flat reading this lane has is a between-arm mean. Within one task, the four attempts of R218b received different amounts of material, and comparing them holds the difficulty fixed — the one decomposition a two-arm grid cannot make.",
    "reading": {
     "control": "456 episodes, 0 with a block, state NO_DOSE",
-    "front": "456 episodes, 0 with a block, state NO_DOSE \u2014 while the log counts 4,341 renders",
+    "front": "456 episodes, 0 with a block, state NO_DOSE — while the log counts 4,341 renders",
     "whyNoDose": "the block goes into `state.system_messages`, which is composed into the request; `grep -c microglia-board` over 32 MB of front.json is 0",
     "reconstructionTried": {
      "boundaries": 7813,
      "renders": 4341,
      "charsPerBoundary": 121.0,
      "charsPerRender": 146.3,
-     "verdict": "not implemented \u2014 the ordering is turn count, which is the same variable that makes a retail episode fail"
+     "verdict": "not implemented — the ordering is turn count, which is the same variable that makes a retail episode fail"
     },
     "repair": "R218e records the dose at the source, per episode"
    }
   },
   {
    "id": "R218e",
-   "title": "the dose, recorded where it is known \u2014 one line an episode, written by the arm",
+   "title": "the dose, recorded where it is known — one line an episode, written by the arm",
    "status": "registered",
    "dispatchBy": "2026-12-02T12:00:00Z",
    "arms": [
@@ -188,26 +188,30 @@
    "dependsOn": [
     "R218d"
    ],
-   "why": "R218d could not read a treated arm's material because the material was never written down: the block is in the request and the transcript is the conversation. One JSONL line an episode \u2014 turns, block characters, renders, the final verdict \u2014 turns the question the lane keeps asking into one it can answer per episode."
+   "why": "R218d could not read a treated arm's material because the material was never written down: the block is in the request and the transcript is the conversation. One JSONL line an episode — turns, block characters, renders, the final verdict — turns the question the lane keeps asking into one it can answer per episode."
   },
   {
    "id": "R219",
-   "title": "the invocation policy \u2014 serve the state when a write needs it, not when it is renderable",
+   "title": "the invocation policy — serve the state when a write needs it, not when it is renderable",
    "status": "registered",
    "dispatchBy": "2026-11-30T12:00:00Z",
    "arms": [
-    "front",
+    "board",
     "policy"
    ],
    "episodes": 228,
    "estimateUsd": 1.2,
    "dependsOn": [
     "R216b"
-   ]
+   ],
+   "prereg": "prereg/R219-admission.md",
+   "amended": "Registered 2026-11-25 with arms front+policy. Amended 2026-11-26, before dispatch: the tail is the placement the product ships (R216b, serving-defaults.json), so the rule is tested at the tail; testing it at the front would price a treatment the product does not use.",
+   "why": "The block has two state lines and two judgment lines. The judgments are the parser's claims about the request, and `goal_board.py --accusations` reads 1,808 of 1,965 of them (92.0%) on R218b's front arm as naming a family the task requires a write in. The rule admits state and refuses to admit judgment; the bar is a count in one stratum (regressions 6 -> <=1, rescues >=12 of 15).",
+   "instrument": "eval/tools/goal_board.py --accusations (free: reads an R218b artefact)"
   },
   {
    "id": "R220",
-   "title": "one manifest, two readers \u2014 the configuration the eval measured is the one the product ships",
+   "title": "one manifest, two readers — the configuration the eval measured is the one the product ships",
    "status": "read",
    "dispatchBy": "2026-11-29T12:00:00Z",
    "estimateUsd": 0.0,

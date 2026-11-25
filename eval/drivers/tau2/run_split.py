@@ -776,7 +776,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     # has to be able to reproduce the arm it came from. The two differ in one thing — where the block sits — and the
     # dispatch that compares them is the one that prices the address.
     parser.add_argument(
-        "--note-source", choices=("model", "verdict", "board", "board-front"), default="model"
+        "--note-source", choices=("model", "verdict", "board", "board-front", "board-policy"), default="model"
     )
     # A full-quality run is six hours and four arms; at double price that is a doubled bill for a
     # number that does not improve. The guard is off by default because a smoke run is cheap enough
@@ -1242,13 +1242,19 @@ def main(argv: list[str]) -> int:
     # round boundary and no writer. The environment is set here rather than left to the dispatch for the same reason
     # the note path is: the agent reads it once, at its first turn, and an arm that says it served a board while the
     # variable was never set is the wiring defect this lane has counted five times.
-    if args.note_source in ("board", "board-front"):
+    if args.note_source in ("board", "board-front", "board-policy"):
         if args.notes:
             raise SystemExit("tau2-board-takes-no-notes")
         # The value *is* the placement: `tail` writes the block behind the conversation, `front` into the system
-        # message. A single truth read by one function (`board_placement`) rather than two switches that could
+        # message, and `policy` is the tail with the admission rule on — the block states asks and ticks and not the
+        # two refusal lines, which `goal_board.false_accusations` reads as 92.0% wrong about the task (R219). A single
+        # truth read by two functions (`board_placement`, `board_admission`) rather than four switches that could
         # disagree, which is how an arm ends up being a third treatment nobody registered.
-        os.environ["MICROGLIA_BOARD"] = "tail" if args.note_source == "board" else "front"
+        os.environ["MICROGLIA_BOARD"] = {
+            "board": "tail",
+            "board-front": "front",
+            "board-policy": "policy",
+        }[args.note_source]
         if "MICROGLIA_NOTES" in os.environ:
             del os.environ["MICROGLIA_NOTES"]
     elif "MICROGLIA_BOARD" in os.environ:

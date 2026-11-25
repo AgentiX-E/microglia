@@ -746,7 +746,7 @@ def board_of(messages, scope: str = REQUEST) -> dict:
     }
 
 
-def render(board: dict) -> str:
+def render(board: dict, state_only: bool = False) -> str:
     """The block the agent reads: the asks, the ones a receipt settled, and what could not be attributed.
 
     Written as a status list rather than as advice, because the thing being measured is whether *state* helps. An
@@ -756,9 +756,26 @@ def render(board: dict) -> str:
     Three lines and two of them are refusals. `Not asked for by the request` is the checker's most useful output: a
     state-changing call the contract never asked for is the failure this benchmark charges for, and it is the one
     thing a transcript cannot make visible without a fixed contract to compare against.
+
+    **R219, and the one thing this function was wrong about.** The two refusal lines are the only part of the block
+    that makes a claim about the *request* rather than about the state, and the claim is the parser's, not the
+    evaluator's: an entry says a call was unrequested when the parser found no ask of that family, and says it was
+    unattributable when the parser could not name the object. `false_accusations` judges both against the evaluator's
+    own action list over the episodes R218b already paid for — 456 episodes, 107 tasks with criteria — and **1,808 of
+    1,965 entries (92.0%) name a family the task requires a write in**; over the last block of each episode it is
+    239 of 277 (86.3%), on 178 episodes. The block tells the agent it did something nobody asked for, on a task where
+    somebody did, because the parser missed the ask. A refusal that is wrong nine times in ten is not state and it is
+    not a check; it is the lesson channel wearing a list, and the literature already prices that channel at +2.0
+    points with an interval that includes zero (Recuris, arXiv 2608.24876) against +23.9 for state.
+
+    `state_only` is therefore the admission rule, kept here as a rendering switch rather than as a second renderer:
+    the block admits the asks and their ticks and refuses to admit either refusal. The counters in `board_of` keep
+    counting both, because a reading still has to be able to see what the arm did not say.
     """
     items = board.get("items") or []
-    if not items and not (board.get("unrequested") or board.get("unattributed")):
+    unrequested = [] if state_only else (board.get("unrequested") or [])
+    unattributed = [] if state_only else (board.get("unattributed") or [])
+    if not items and not (unrequested or unattributed):
         return ""
     where = "from the request" if board.get("scope", REQUEST) == REQUEST else "from the conversation"
     # The header promises lines, so it is only printed when there are some: a block that opens "Open asks" and then
@@ -776,11 +793,9 @@ def render(board: dict) -> str:
     hidden = len(items) - MAX_ITEMS
     if hidden > 0:
         lines.append(f"… and {hidden} more ask(s) not shown")
-    unrequested = board.get("unrequested") or []
     if unrequested:
         names = sorted({entry["name"] for entry in unrequested})
         lines.append(f"Not asked for by the request: {len(unrequested)} call(s) — {', '.join(names[:3])}")
-    unattributed = board.get("unattributed") or []
     if unattributed:
         names = sorted({entry["name"] for entry in unattributed})
         lines.append(f"Not attributed to any ask: {len(unattributed)} call(s) — {', '.join(names[:3])}")
@@ -915,6 +930,92 @@ def replay(document: dict) -> dict:
         "loose": loose,
         "unrequested": unrequested,
         "unattributed": unattributed,
+    }
+
+
+def _required_families(task) -> set:
+    """The write families the evaluator requires of a task, read from the evaluator's own action list.
+
+    The block never sees this list — that is the point of using it as ground truth. τ² writes it as
+    `evaluation_criteria.actions` in the results document, one entry per call the task is graded on, and the write
+    tools among them are exactly the changes the task is about. A task whose document carries no criteria is a task
+    this instrument cannot judge, and it returns an empty set rather than a verdict: the alternative is to count
+    every refusal on such a task as correct.
+    """
+    if not isinstance(task, dict):
+        return set()
+    criteria = task.get("evaluation_criteria") or task.get("criteria") or {}
+    actions = criteria.get("actions") if isinstance(criteria, dict) else None
+    found = set()
+    for action in actions or []:
+        name = action.get("name") if isinstance(action, dict) else None
+        if isinstance(name, str) and name in FAMILIES:
+            found.add(FAMILIES[name])
+    return found
+
+
+def false_accusations(document: dict, whole_episode: bool = False) -> dict:
+    """How often the block's two judgment lines are wrong about the task, over a document an arm already produced.
+
+    R219's instrument, and the reason the admission rule exists. The unit is an **entry** — one call the block
+    reported as `unrequested` or `unattributed` — counted on every turn the block would have shown it, because the
+    question is what the agent *read* rather than what the episode ended with. An entry is false when the family it
+    names is a family the evaluator requires a write in: the block is then telling the agent that a required change
+    was not asked for, or could not be attributed, on the strength of a parser that missed the ask.
+
+    Nothing here is a model call and nothing is sampled: the document carries the transcripts and the evaluator's
+    own list, so the rate is exact for the episodes it covers. What it is *not* is causal — a false accusation is a
+    defect in the block's content, and whether it moved an outcome is what the dispatch measures. Keeping the two
+    apart is the difference between fixing a lie and claiming a rescue.
+
+    Cost is quadratic in episode length (the board is recomputed per turn, as the arm does), so `whole_episode`
+    exists for a document large enough that the per-turn reading is not worth its seconds: it judges the last block
+    only, which is the one the count of *episodes* is about.
+    """
+    tasks = {str(task.get("id")): task for task in document.get("tasks") or []}
+    buckets = {"unrequested": {"entries": 0, "false": 0}, "unattributed": {"entries": 0, "false": 0}}
+    entries = wrong = judged = episodes = episodes_judged = flagged = 0
+    for simulation in document.get("simulations") or []:
+        messages = simulation.get("messages") or []
+        if not messages:
+            continue
+        episodes += 1
+        required = _required_families(tasks.get(str(simulation.get("task_id"))))
+        episodes_judged += 1 if required else 0
+        seen = False
+        stops = (len(messages),) if whole_episode else range(1, len(messages) + 1)
+        for stop in stops:
+            board = board_of(messages[:stop])
+            for bucket in ("unrequested", "unattributed"):
+                for entry in board.get(bucket) or []:
+                    entries += 1
+                    buckets[bucket]["entries"] += 1
+                    if not required:
+                        continue
+                    judged += 1
+                    family = FAMILIES.get(entry.get("name") or "")
+                    if family and family in required:
+                        wrong += 1
+                        buckets[bucket]["false"] += 1
+                        seen = True
+        if seen:
+            flagged += 1
+    return {
+        "episodes": episodes,
+        "entries": entries,
+        "judged": judged,
+        "false": wrong,
+        # `None` rather than `0` when the document carried no criteria: a rate over nothing is the absence-as-zero
+        # this lane has now read four times, and a reader who saw `0.0` would take it for a clean block.
+        "falseShare": (wrong / judged) if judged else None,
+        "episodesFalse": flagged,
+        # Over the episodes this document could judge, not over all of them: a task with no criteria contributes a
+        # zero that means "not asked" rather than "clean", and that is the absence-as-zero this lane has read four
+        # times. `tasksJudged` is the other half of the same sentence.
+        "episodesJudged": episodes_judged,
+        "episodesFalseShare": (flagged / episodes_judged) if episodes_judged else None,
+        "perBucket": buckets,
+        "tasksJudged": sum(1 for task in tasks.values() if _required_families(task)),
     }
 
 
@@ -1412,6 +1513,24 @@ def self_test() -> int:
     check("and the ask it did not touch stays open", invented["items"][0]["settled_by"] is None)
     check("the render names the invented call", "Not asked for by the request" in render(invented))
     check("a board with no ask but an invented call still renders", render(invented).startswith("Open asks"))
+    # R219. The admission rule, as a property of the renderer: the same board, read with `state_only`, states the
+    # asks and refuses to state either judgment. The board is otherwise unchanged — the counters still hold both —
+    # so a reading can still see what the arm declined to say.
+    check("the state-only render drops the invented call", "Not asked for by the request" not in render(invented, state_only=True))
+    check("and still states the ask", "[ ] exchange" in render(invented, state_only=True))
+    check("the admission rule leaves the board's own counters alone", invented["unrequested"] == [{"name": "cancel_pending_order"}])
+    statements = board_of([{"role": "user", "content": "I want to exchange the mechanical keyboard."}])
+    check("a board with asks renders the same either way",
+          render(statements, state_only=True) == render(statements))
+    lonely = board_of(
+        [
+            {"role": "user", "content": "Hello, I need some help today."},
+            {"role": "assistant", "tool_calls": [{"name": "cancel_pending_order", "arguments": {"order_id": "#W1"}}]},
+            {"role": "tool", "content": "ok"},
+        ]
+    )
+    check("a board with no ask and an invented call renders nothing under the rule",
+          render(lonely).startswith("Not asked for") and render(lonely, state_only=True) == "")
     blind = board_of(
         [
             {"role": "user", "content": "I want to exchange the mechanical keyboard."},
@@ -1602,6 +1721,45 @@ def self_test() -> int:
     check("an episode with no messages is skipped, not counted", replayed["skipped"] == 1)
     check("and a document with no writes has no share", replay({"simulations": []})["tickShare"] is None)
 
+    # R219's instrument, on the document shape τ² writes: the evaluator's criteria carry the required writes and the
+    # transcript carries the calls, so the same episode is judged without the block ever reading the criteria. The
+    # fixture is the smallest one that has both failures at once — a required write the parser cannot name (three
+    # turns of it, because the block is re-read every turn) and a write of a family the task requires nothing in.
+    accused = {
+        "tasks": [{"id": "7", "evaluation_criteria": {"actions": [
+            {"name": "find_user_id_by_name_zip"}, {"name": "return_delivered_order_items"}]}}],
+        "simulations": [{"task_id": "7", "messages": [
+            {"role": "user", "content": "I want to return the lamp."},
+            {"role": "assistant", "tool_calls": [{"name": "return_delivered_order_items",
+                                                  "arguments": {"item_ids": ["999"]}}]},
+            {"role": "tool", "content": "ok"},
+            {"role": "assistant", "tool_calls": [{"name": "cancel_pending_order", "arguments": {"order_id": "#W9"}}]},
+            {"role": "tool", "content": "ok"},
+        ]}],
+    }
+    judged = false_accusations(accused)
+    check("a required write the parser cannot name is a false accusation",
+          judged["perBucket"]["unattributed"] == {"entries": 3, "false": 3})
+    check("a write of a family the task requires nothing in is a true one",
+          judged["perBucket"]["unrequested"] == {"entries": 1, "false": 0})
+    check("the rate is over the entries that can be judged", judged["falseShare"] == 0.75)
+    check("and the episode is counted once against its own denominator",
+          (judged["episodesFalse"], judged["episodesJudged"]) == (1, 1))
+    check("the last block alone is cheaper and smaller",
+          (false_accusations(accused, whole_episode=True)["entries"],
+           false_accusations(accused, whole_episode=True)["false"]) == (2, 1))
+    blank = {"tasks": [], "simulations": accused["simulations"]}
+    check("a document with no criteria judges nothing", false_accusations(blank)["falseShare"] is None)
+    check("and reports its episode share as absent rather than zero",
+          false_accusations(blank)["episodesFalseShare"] is None)
+    check("an episode with no messages is skipped rather than judged",
+          false_accusations({"tasks": accused["tasks"], "simulations": [{"task_id": "7"}]})["episodes"] == 0)
+    check("a task that is not a dict has no requirements", _required_families(None) == set())
+    check("a criteria block that is not a dict has none", _required_families({"evaluation_criteria": "x"}) == set())
+    check("an action that names no write tool is not a requirement", _required_families(
+        {"criteria": {"actions": [{"name": "get_order_details"}, "junk"]}}) == set())
+    check("and the criteria are read by tool name", _required_families(accused["tasks"][0]) == {"return"})
+
     tall = render({"items": [{"family": "return", "words": ["x" * 300], "settled_by": None}] * 3})
     check("three tall lines are cut at the ceiling", len(tall) <= BOARD_MAX_CHARS and tall.endswith("…"))
 
@@ -1614,6 +1772,17 @@ def self_test() -> int:
         with open(written, "w", encoding="utf-8") as handle:
             json.dump({"simulations": [{"task_id": "1", "messages": set_messages}]}, handle)
         check("the replay runs from the command line", quiet(["--replay", written]) == 0)
+        accused_path = os.path.join(scratch, "accused.json")
+        with open(accused_path, "w", encoding="utf-8") as handle:
+            json.dump(accused, handle)
+        check("the accusations run from the command line", quiet(["--accusations", accused_path]) == 0)
+        check("and read as json, whole episode or per turn",
+              quiet(["--accusations", accused_path, "--json"]) == 0
+              and quiet(["--accusations", accused_path, "--whole-episode"]) == 0)
+        with open(accused_path, "w", encoding="utf-8") as handle:
+            json.dump(blank, handle)
+        check("a document with no criteria prints the no-verdict sentence",
+              quiet(["--accusations", accused_path]) == 0)
         check("and reads as json when asked", quiet(["--replay", written, "--json"]) == 0)
         check("and reports as json", quiet(["--census", "--goals", goals, "--json"]) == 0)
         messages_path = os.path.join(scratch, "sim.json")
@@ -1668,6 +1837,10 @@ def main(argv: list) -> int:
     parser.add_argument("--k", type=int, default=1,
                         help="attempts a task must survive to count as passed (default 1; a four-attempt arm wants 4)")
     parser.add_argument("--replay", default="", help="a result document the arm already produced")
+    parser.add_argument("--accusations", default="",
+                        help="a result document carrying the evaluator's criteria: how often the refusal lines are wrong")
+    parser.add_argument("--whole-episode", action="store_true",
+                        help="judge the last block only, which is cheaper on a large document")
     parser.add_argument("--json", action="store_true")
     arguments = parser.parse_args(argv)
     if arguments.self_test:
@@ -1708,6 +1881,27 @@ def main(argv: list) -> int:
                 f"{reading['absorbed']} absorbed, {reading['unrequested']} unrequested, "
                 f"{reading['unattributed']} unattributed, {reading['skipped']} episode(s) skipped"
             )
+        return 0
+    if arguments.accusations:
+        with open(arguments.accusations, "r", encoding="utf-8") as handle:
+            document = json.load(handle)
+        reading = false_accusations(document, whole_episode=arguments.whole_episode)
+        if arguments.json:
+            print(json.dumps(reading, indent=1, sort_keys=True))
+        else:
+            share = reading["falseShare"]
+            print(
+                f"{reading['false']} of {reading['judged']} refusal entr(ies) name a family the task requires "
+                f"({share:.1%})" if share is not None
+                else "no entry in this document can be judged: it carries no evaluator criteria"
+            )
+            print(
+                f"{reading['entries']} entr(ies) over {reading['episodes']} episode(s); "
+                f"{reading['episodesFalse']} episode(s) carried at least one false accusation; "
+                f"{reading['tasksJudged']} task(s) had criteria"
+            )
+            for bucket, counts in sorted(reading["perBucket"].items()):
+                print(f"  {bucket:13s} {counts['false']}/{counts['entries']} false")
         return 0
     if arguments.compare:
         from rescue_rate import documents_of, merge  # lazy, for the same reason as `compare_of`'s import

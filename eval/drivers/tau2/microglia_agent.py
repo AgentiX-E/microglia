@@ -280,7 +280,23 @@ _UNSET = object()
 
 def board_mode() -> bool:
     """Whether this arm serves the goal board instead of a note."""
-    return os.environ.get(BOARD_ENV, "").strip().lower() in ("1", "true", "yes", "front", "tail")
+    return os.environ.get(BOARD_ENV, "").strip().lower() in ("1", "true", "yes", "front", "tail", "policy")
+
+
+def board_admission() -> str:
+    """What the block is allowed to say: `all` as measured through R218b, `state` under R219's admission rule.
+
+    R219. The value is carried by the same environment variable as the placement, because an arm that has one switch
+    for where the block sits and another for what it says is an arm whose two switches can disagree — and a
+    disagreement of that kind is a third treatment nobody registered, which is the defect the placement switch was
+    made single-valued to avoid.
+
+    `policy` is therefore `state` at the tail: the shipped placement, with the block admitting the asks and their
+    ticks and refusing to admit either refusal line. The refusals are the only part of the block that asserts a
+    judgment about the agent's calls, and `goal_board.false_accusations` reads 1,808 of 1,965 of them (92.0%) as
+    naming a family the task requires a write in — the parser's blindness reported as the agent's mistake.
+    """
+    return "state" if os.environ.get(BOARD_ENV, "").strip().lower() == "policy" else "all"
 
 
 def board_placement() -> str:
@@ -299,7 +315,7 @@ def board_placement() -> str:
     raw = os.environ.get(BOARD_ENV, "").strip().lower()
     if raw in ("1", "true", "yes", "front"):
         return "front"
-    return "tail" if raw == "tail" else "off"
+    return "tail" if raw in ("tail", "policy") else "off"
 
 
 def _memory_url() -> str:
@@ -742,7 +758,7 @@ class MicrogliaAgent(LLMAgent):
         if isinstance(text, str) and text.strip() and role in ("", "user", "human"):
             messages = messages + [{"role": "user", "content": text}]
         board = goal_board_of(messages)
-        body = render_goal_board(board)
+        body = render_goal_board(board, state_only=board_admission() == "state")
         if body == "":
             return ""
         items = board.get("items") or []
@@ -899,6 +915,10 @@ def memory_stats() -> dict:
             {
                 "board": {
                     "placement": board_placement(),
+                    # R219. What the block was allowed to say. A reading that reported the policy arm's numbers without
+                    # this field would leave the one variable the round changed unstated, and a `state` value on an arm
+                    # whose environment never carried it is the wiring defect this lane has counted six times.
+                    "admission": board_admission(),
                     "renders": _board_renders,
                     "items": _board_items,
                     "settled": _board_settled,
