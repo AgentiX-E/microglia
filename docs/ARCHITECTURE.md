@@ -4939,3 +4939,20 @@ preference. Every arm from this round on reports `admission` beside `placement`,
 is reproducible from a document for free, in 2.4 seconds, by anyone with the artefact. A rendering rule with a
 falsifiable bar and a free instrument is the shape this project requires of a claim; the alternative — "the block felt
 noisy" — is the shape it has spent forty rounds learning to refuse.
+
+**What it read, twice, and why the default did not move.** R219 dispatched the two arms and read `policy` 99/114
+(86.8%) against `board` 87/114 (76.3%): +10.5 pp [+0.4, +20.5], McNemar p = 0.0290, 19 moved and 7 broke. R219b
+repeated the identical experiment 45 minutes later and read 93/114 against 94/114: **−0.9 pp, p = 1.0**, 11 moved and
+12 broke. Pooled, **+4.8 pp [−1.2, +10.8]**, p = 0.152.
+
+The mechanism replicated exactly both times — `admission` `all`→`state`, an 8% shorter block, 19–23% fewer changes, a
+4–7% lower bill — so the null is about the *effect* and not about the treatment. And the number that predicted the
+outcome was printed before either dispatch: at a 25.4% discordance rate a 114-task grid resolves **13.2 pp**, and
++10.5 is inside it.
+
+`admissionPolicy` therefore stays out of `defaults`. The product's configuration is a *measured* configuration, and
+this measurement returns no effect at this grid; a default moved on a point estimate whose interval includes zero is
+the failure this project has spent forty rounds learning to refuse. What survives is narrower and better supported:
+the two judgment lines are false about the task **92.0%** of the time, which is a correctness argument for removing
+them; the rule makes the block cheaper and less mobile, replicated; and R222 prices the 1,600-episode reading that
+would settle the accuracy question at **≈¥53**, registered rather than queued.

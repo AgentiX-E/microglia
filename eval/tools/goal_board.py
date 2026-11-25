@@ -1037,6 +1037,60 @@ def _siblings() -> str:
     return here
 
 
+def strata_of(reference: dict, treatment: dict, k: int = 1) -> dict:
+    """The split a treatment's harm and its gain are read from, on the tasks a *reference* arm solves.
+
+    R216 read this split from two artefacts by hand and quoted it for four rounds; R219 quoted a version of it from a
+    shell one-liner and got a different answer from the same documents, which is why it is a function here rather than
+    an idiom in a terminal. The reference is normally the no-memory arm: the tasks it solves are the ones a block can
+    only damage, and the tasks it fails are the ones a block can only rescue.
+
+        regressions  tasks the reference solves and the treatment does not
+        rescues      tasks the reference fails and the treatment does
+
+    Both are counts of the same paired quantity, so they pool across dispatches without an estimator — which is what
+    makes a replication cheap — and both are stratified by the **reference**, not by the treatment, because a stratum
+    defined by the treated arm's own outcome would make the two counts true by construction.
+
+    `only` is the count of tasks the reference ran and the treatment did not, reported rather than dropped: a treatment
+    grid that covers fewer tasks than its reference is a paired reading over a subset, and the number says whether the
+    subset is the whole thing.
+    """
+    left = _attempts_of(reference, k)
+    right = _attempts_of(treatment, k)
+    shared = sorted(set(left) & set(right), key=_task_key)
+    solved = [task for task in shared if left[task] >= 1.0]
+    failed = [task for task in shared if left[task] < 1.0]
+    return {
+        "k": k,
+        "shared": len(shared),
+        "only": len(set(left) ^ set(right)),
+        "solved": len(solved),
+        "failed": len(failed),
+        "regressions": sum(1 for task in solved if right[task] < 1.0),
+        "rescues": sum(1 for task in failed if right[task] >= 1.0),
+        "regressionShare": (sum(1 for task in solved if right[task] < 1.0) / len(solved)) if solved else None,
+        "rescueShare": (sum(1 for task in failed if right[task] >= 1.0) / len(failed)) if failed else None,
+    }
+
+
+def render_strata(reading: dict, names: tuple[str, str] = ("reference", "treatment")) -> str:
+    """One sentence: what the treatment broke of what the reference had, and what it saved of what it did not."""
+    regressions, rescues = reading["regressions"], reading["rescues"]
+    share = reading["regressionShare"]
+    rescue = reading["rescueShare"]
+    head = f"{names[1]} against {names[0]}: "
+    if not reading["solved"] and not reading["failed"]:
+        return head + "no task in common — there is no stratum to read"
+    parts = []
+    if reading["solved"]:
+        parts.append(f"breaks {regressions} of the {reading['solved']} tasks {names[0]} solves ({share:.1%})")
+    if reading["failed"]:
+        parts.append(f"rescues {rescues} of the {reading['failed']} it does not ({rescue:.1%})")
+    tail = f"; {reading['only']} task(s) in one arm only" if reading["only"] else ""
+    return head + ", ".join(parts) + tail
+
+
 def _task_key(task: str):
     """Tasks sort numerically when they are numbers, which every τ² id is, and lexically when they are not."""
     return (0, int(task)) if str(task).isdigit() else (1, str(task))
@@ -1703,6 +1757,34 @@ def self_test() -> int:
     check("and defaults to the names the grid has always used",
           " control 1/1 " in render_comparison(compare_of(arm({"0": 1}), arm({"0": 0}))))
 
+    # R219's stratum split, which was quoted from a shell one-liner once and disagreed with the documents. The
+    # fixture is the smallest one with all four counts distinct: the reference solves 0 and 1, fails 2 and 3; the
+    # treatment solves 0 and 2, so it breaks 1 and rescues 2 and leaves 3 alone.
+    split = strata_of(arm({"0": 1, "1": 1, "2": 0, "3": 0}), arm({"0": 1, "1": 0, "2": 1, "3": 0}))
+    check("a broken task is counted against the reference's own outcome",
+          (split["regressions"], split["rescues"]) == (1, 1))
+    check("and the strata are the reference's", (split["solved"], split["failed"]) == (2, 2))
+    check("the shares are over each stratum", (split["regressionShare"], split["rescueShare"]) == (0.5, 0.5))
+    check("the sentence says both halves",
+          render_strata(split, ("control", "policy")) ==
+          "policy against control: breaks 1 of the 2 tasks control solves (50.0%), rescues 1 of the 2 it does not "
+          "(50.0%)")
+    check("a task only one arm ran is counted rather than dropped",
+          strata_of(arm({"0": 1, "1": 1}), arm({"0": 1}))["only"] == 1)
+    lonely_split = strata_of(arm({"0": 1}), arm({"1": 1}))
+    check("no shared task is no stratum", (lonely_split["solved"], lonely_split["failed"]) == (0, 0))
+    check("and the sentence refuses rather than divides",
+          render_strata(lonely_split).endswith("there is no stratum to read"))
+    one_sided = strata_of(arm({"0": 1}), arm({"0": 0}))
+    check("a reference that solved everything says nothing about rescues",
+          "rescues" not in render_strata(one_sided))
+    other_side = strata_of(arm({"0": 0}), arm({"0": 1}))
+    check("and a reference that solved nothing says nothing about regressions",
+          "breaks" not in render_strata(other_side) and "rescues 1 of the 1" in render_strata(other_side))
+    check("a task only one arm ran is named in the sentence",
+          "1 task(s) in one arm only" in render_strata(
+              strata_of(arm({"0": 1, "1": 1}), arm({"0": 1})), ("control", "policy")))
+
     # Handlers the arm never calls but the operator does: the census, the board on a document, and the paired
     # reading from two paths. Exercised through `main` because that is the surface a dispatch uses, and a CLI that
     # is only ever exercised by hand is the part of the lane that breaks without a red build.
@@ -1831,6 +1913,8 @@ def self_test() -> int:
         with open(right, "w", encoding="utf-8") as handle:
             json.dump(arm({"0": 1, "1": 1, "2": 0}), handle)
         check("the paired reading runs from two documents", quiet(["--compare", left, right]) == 0)
+        check("the stratum split runs from two documents", quiet(["--strata", left, right]) == 0)
+        check("and reads as json", quiet(["--strata", left, right, "--json"]) == 0)
         check("and reports as json", quiet(["--compare", left, right, "--json"]) == 0)
         directory = os.path.join(scratch, "results")
         os.mkdir(directory)
@@ -1868,6 +1952,8 @@ def main(argv: list) -> int:
     parser.add_argument("--k", type=int, default=1,
                         help="attempts a task must survive to count as passed (default 1; a four-attempt arm wants 4)")
     parser.add_argument("--replay", default="", help="a result document the arm already produced")
+    parser.add_argument("--strata", nargs=2, default=None, metavar=("REFERENCE", "TREATMENT"),
+                        help="two result documents: what the treatment breaks of what the reference solves, and what it rescues")
     parser.add_argument("--accusations", default="",
                         help="a result document carrying the evaluator's criteria: how often the refusal lines are wrong")
     parser.add_argument("--whole-episode", action="store_true",
@@ -1912,6 +1998,17 @@ def main(argv: list) -> int:
                 f"{reading['absorbed']} absorbed, {reading['unrequested']} unrequested, "
                 f"{reading['unattributed']} unattributed, {reading['skipped']} episode(s) skipped"
             )
+        return 0
+    if arguments.strata:
+        documents = []
+        for path in arguments.strata:
+            with open(path, "r", encoding="utf-8") as handle:
+                documents.append(json.load(handle))
+        reading = strata_of(documents[0], documents[1], k=max(1, arguments.k))
+        if arguments.json:
+            print(json.dumps(reading, indent=1, sort_keys=True))
+        else:
+            print(render_strata(reading, names=(Path(arguments.strata[0]).stem, Path(arguments.strata[1]).stem)))
         return 0
     if arguments.accusations:
         with open(arguments.accusations, "r", encoding="utf-8") as handle:

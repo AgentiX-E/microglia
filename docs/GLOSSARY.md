@@ -2728,7 +2728,10 @@ damage turned out to be in its admission, because two of the block's four line k
 state. `policy` is therefore an arm name rather than a sentence: the shipped tail placement with the two judgment
 lines refused. The general form of the rule is "a memory may state what it can support, and says nothing about what it
 cannot name" — and the field's own results reach it from three directions (WikiTrace's evidence links, MemDev-Bench's
-irrelevant-history finding, REM's reframing of retrieval as lifecycle).
+irrelevant-history finding, REM's reframing of retrieval as lifecycle). Measured twice on 114 retail tasks the rule's
+accuracy effect is **+4.8 pp pooled [−1.2, +10.8]** — no effect at this grid's 13.2 pp resolution — while its cost
+effect (−8% block, −4% to −7% bill) replicated exactly; it is therefore a *correctness* repair, not a measured
+default.
 
 **False accusation** — a line in the block that reports a call as `unrequested` or `unattributed` while the family it
 names is one the task *requires* a write in. The definition needs ground truth the block never sees, which is why the

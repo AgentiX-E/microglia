@@ -45,7 +45,7 @@
   }
  },
  "notYet": {
-  "admissionPolicy": "R219 — the invocation policy, read 2026-11-26 (run 45684914838). The rule admits state and refuses the block's two judgment lines; over R218b's 456 episodes those lines name a family the task requires a write in on 1,808 of 1,965 entries (92.0%). The dispatch read policy 99/114 against board 87/114: +10.5 pp [+0.4, +20.5], McNemar p = 0.0290, 19 moved and 7 broke, at 4% lower bill and 8% shorter block. It is NOT a default yet, and the reason is in the number: the interval excludes zero by four tenths of a point, on one dispatch of a grid whose identical arms turn over 25.4% of their tasks. R219b repeats the identical two-arm experiment; the sign and the pooled discordant pairs decide, and `admissionPolicy` moves to `defaults` only when they do."
+  "admissionPolicy": "R219 — the invocation policy, read twice. The rule admits the block's state lines and refuses its two judgment lines, which name a family the task requires a write in on 1,808 of 1,965 entries (92.0%) over R218b's 456 episodes. Two identical dispatches read +10.5 pp (p = 0.029) and -0.9 pp (p = 1.0); pooled +4.8 pp [-1.2, +10.8], p = 0.152. The mechanism replicated exactly both times (admission all/state, 8% shorter block, 19% fewer changes, 4% and 7% cheaper), so the null is about the effect and not about the treatment. NOT promoted: a product default is a measured configuration, and this measurement returns no effect at 114 tasks. It stays a correctness repair with a measured cost saving; R222 prices the 1,600-episode reading that could support an accuracy claim."
  },
  "carrier": {
   "arm": "board",

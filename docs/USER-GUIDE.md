@@ -7176,3 +7176,23 @@ The rule generalises past this block, and the field's own results say the same t
 
 The habit worth taking: **measure your memory's false accusations before you tune its content.** It is one command, it
 costs nothing, and on this corpus it found a defect that eleven rounds of content work had not.
+
+#### What the rule bought, measured twice, and what it did not
+
+| | board (shipped) | policy (the rule) |
+|---|---|---|
+| R219 `pass^1` | 87/114 (76.3%) | 99/114 (86.8%) |
+| R219b `pass^1` | 94/114 (82.5%) | 93/114 (81.6%) |
+| pooled δ | — | **+4.8 pp [−1.2, +10.8]**, McNemar p = 0.152 |
+| chars a turn | 152.4 → 150.0 | **140.1 → 137.6** (−8%) |
+| bill an episode | $0.00552 → $0.00562 | **$0.00530 → $0.00521** (−4%, −7%) |
+
+The treatment is provably present in both dispatches and provably cheaper in both. Its accuracy effect is **not**
+established: the first reading's +10.5 pp did not replicate, and the pooled interval includes zero. That is the same
+answer the grid's own resolution predicted — 114 tasks resolve 13.2 pp, and +10.5 is inside it.
+
+So if you are choosing a default for a product, the honest sequence is: fix the false lines because they are *false*
+(92% of them, measured), claim no accuracy win, and register the reading that could support one (~1,600 episodes,
+≈¥53) instead of moving a default on a draw. If you are choosing for a research paper, the same numbers are the more
+interesting result: **a mechanism that applied exactly and cost 7% less moved accuracy by +10.5 points and then by
+−0.9**, which is a measurement of the grid rather than of the memory.

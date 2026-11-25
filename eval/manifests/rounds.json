@@ -212,7 +212,7 @@
    "run": 45684914838,
    "readAt": "2026-11-26T04:05:00+08:00",
    "actualUsd": 1.2329,
-   "outcome": "read; the effect is large and the bar is met against a cross-dispatch control, so a replication is registered before the product default moves",
+   "outcome": "read, then not replicated. The first dispatch read +10.5 pp; the identical second read -0.9 pp. Pooled +4.8 pp [-1.2, +10.8], McNemar p = 0.152: no accuracy claim. The mechanism replicated exactly in both (admission all/state, chars -8%, changes -19%, bill -4% and -7%), so the null is about the effect and not about the treatment.",
    "reading": {
     "board": "87/114 (76.3%)",
     "policy": "99/114 (86.8%)",
@@ -248,7 +248,13 @@
      "boardRescues": 16,
      "policyRescues": 18
     },
-    "caveat": "the strata use R218b's control arm because this dispatch ran no control; the paired board-vs-policy contrast is within one dispatch and is the claim"
+    "caveat": "the strata use R218b's control arm because this dispatch ran no control; the paired board-vs-policy contrast is within one dispatch and is the claim",
+    "pooled": {
+     "moved": 30,
+     "broke": 19,
+     "delta": "+4.8 pp [-1.2, +10.8]",
+     "mcnemarP": 0.1524
+    }
    }
   },
   {
@@ -264,7 +270,7 @@
   {
    "id": "R219b",
    "title": "the same two arms, again — a replication before the rule becomes a default",
-   "status": "registered",
+   "status": "read",
    "dispatchBy": "2026-11-27T12:00:00Z",
    "prereg": "prereg/R219b-replication.md",
    "arms": [
@@ -276,7 +282,56 @@
    "dependsOn": [
     "R219"
    ],
-   "why": "R219 read +10.5 pp [+0.4, +20.5] with p = 0.029 on 19 moved and 7 broke. The grid's identical arms turn over 25.4% of their tasks, so 26 discordant pairs is what noise produces and only the asymmetry is the signal. A replication is the cheapest instrument for a single dispatch, and the product default does not move until the sign repeats."
+   "why": "R219 read +10.5 pp [+0.4, +20.5] with p = 0.029 on 19 moved and 7 broke. The grid's identical arms turn over 25.4% of their tasks, so 26 discordant pairs is what noise produces and only the asymmetry is the signal. A replication is the cheapest instrument for a single dispatch, and the product default does not move until the sign repeats.",
+   "run": 45690987353,
+   "dispatchedAt": "2026-11-26T04:10:00+08:00",
+   "readAt": "2026-11-26T04:32:00+08:00",
+   "actualUsd": 1.235,
+   "outcome": "NO_LIFT: the first reading did not replicate",
+   "reading": {
+    "board": "94/114 (82.5%)",
+    "policy": "93/114 (81.6%)",
+    "delta": "-0.9 pp [-10.9, +9.2], McNemar p = 1.0000; moved 11, broke 12",
+    "mechanism": {
+     "admission": {
+      "board": "all",
+      "policy": "state"
+     },
+     "charsMean": {
+      "board": 150.0,
+      "policy": 137.6
+     },
+     "changes": {
+      "board": 262,
+      "policy": 201
+     },
+     "tailHeld": {
+      "board": 845,
+      "policy": 883
+     }
+    },
+    "billPerEpisode": {
+     "board": 0.00562,
+     "policy": 0.00521,
+     "change": "-7%"
+    }
+   }
+  },
+  {
+   "id": "R222",
+   "title": "the admission rule at a resolution that could see it — 800 tasks, or not at all",
+   "status": "registered",
+   "dispatchBy": "2026-12-12T12:00:00Z",
+   "arms": [
+    "board",
+    "policy"
+   ],
+   "episodes": 1600,
+   "estimateUsd": 7.4,
+   "dependsOn": [
+    "R219b"
+   ],
+   "why": "Pooled over two dispatches the rule is +4.8 pp [-1.2, +10.8]: inside the 13.2 pp a 114-task grid can resolve (R218c), which is why the first dispatch's +10.5 pp did not replicate. An accuracy claim would need ~800 tasks a contrast, 1,600 episodes, about $7.4 = CNY 53. Registered so the option is priced rather than forgotten; it is NOT the next item, because the rule is a correctness repair and the cost saving is already measured at -4% and -7%."
   }
  ]
 }
