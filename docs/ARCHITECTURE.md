@@ -5164,8 +5164,8 @@ all of your upcoming flights", "all your future reservations that contain any fl
 records (cabin, duration, date-equality), so no token in the request can name its extension; the reference is a query,
 not a phrase. Six more are bookings whose object **the policy chooses** — "the cheapest business round trip", "exactly
 the same as your current reservation" — and at the moment the user speaks that object does not exist to be named. Two
-are records the request genuinely leaves unnamed (nine reservations on the account, "the reservation"), one is a
-transfer, which is a refusal and not a write, and one is a change the policy settles with two receipts over two
+is a record the request genuinely leaves unnamed (nine reservations on the account, "the reservation"), one is a
+transfer, which is a refusal and not a write, and two are changes the policy settles with two receipts over two
 records.
 
 **The architectural consequence, and it is where the anchor moves.** The identifier a write carries is almost never in

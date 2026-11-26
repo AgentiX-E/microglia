@@ -710,9 +710,9 @@
           "total": 23,
           "setPredicate": 13,
           "policyChosenBooking": 6,
-          "unnameableRecord": 2,
-          "noRecord": 1,
-          "chained": 1
+          "chained": 2,
+          "unnameableRecord": 1,
+          "noRecord": 1
         }
       }
     },

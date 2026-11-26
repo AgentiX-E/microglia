@@ -24,9 +24,9 @@ The 23 misses are not a parser defect, and this is the part that decides the suc
 |---|---|---|
 | **a set selected by a predicate** | 13 | "cancel all of your upcoming flights", "all your future reservations that contain any flights that are longer than 4 hours", "booked multiple flights for the same day", "downgrade all business flights to economy" |
 | **the policy chooses the object** | 6 | "the cheapest business round trip", "exactly the same as your current reservation", "a flight from NY to explore the West Coast" |
-| **the record is unnamed by design** | 2 | "change the passenger name on the reservation", with nine reservations on the account |
+| **the record is genuinely unnamed** | 1 | "change the passenger name on the reservation", with nine reservations on the account |
 | **no record at all** | 1 | a transfer to a human, which is a refusal and not a write |
-| **one ask, two records** | 1 | a change settled by cancel-and-rebook |
+| **one ask, two records** | 2 | "change my upcoming reservation", which the policy settles with cancel-and-rebook |
 
 A set defined by a predicate over state — cabin, duration, date-equality — cannot be named by any token rule, because
 the tokens are *computed from the records*, not stated by the user. And an object the policy chooses cannot be named
