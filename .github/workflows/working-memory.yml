@@ -771,8 +771,13 @@ jobs:
           assert dose["identity"] == "round", f"the attempts were {dose['identity']!r}, not one a round"
           assert dose["rows"] == counts.get("joined"), (dose["rows"], counts)
           # 114 tasks twice, minus whatever the harness cost: a short grid is a different experiment and its floor is
-          # a function of the count.
-          assert dose["rows"] >= 220, (dose["rows"], counts)
+          # a function of the count. The bound is on the **attribution** rather than on an absolute row count,
+          # because the loss is produced by retries and by boundary texts that resolve to no task — 11 of 236 on the
+          # first dispatch — and a bar at 220 rows would fail a correct run whose marks happened to land low. What
+          # must not happen is a join that quietly attributes a third of the grid (PROGRESS 249.16).
+          lost = int(counts.get("missing") or 0) + int(counts.get("unresolved") or 0)
+          assert lost <= 0.10 * rows_written, (lost, rows_written, counts)
+          assert dose["rows"] >= 200, (dose["rows"], counts)
           # The recording against the counters that were produced independently of it. These three are the reason
           # the sidecar is worth a round: a recording that disagrees with the census describes an episode that is not
           # the one it says it describes, and every per-episode attribution downstream would inherit the error.
