@@ -171,7 +171,7 @@ rather than a preference.
 
 R218b's `front` arm holds **four attempts at each of 114 tasks in one arm** — 684 within-task attempt pairs, and the
 only artefact on disk where one task's attempts can be compared without changing the arm. Measured over it
-(`eval/tools/dose_power.py --document <an arm with four attempts a task>`, no model calls):
+(`eval/tools/dose_power.py --document "the arm with four attempts at each task"`, no model calls):
 
 | quantity | value |
 |---|---|
