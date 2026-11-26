@@ -1,0 +1,1241 @@
+#!/usr/bin/env python3
+"""R228 — bind the item to the read, not to the words.
+
+Three anchors have been measured and closed. R223 asked whether the *request* declares enough to settle an item, and
+found 385 cut points at -2.81σ. R225 asked whether what the episode *reveals* does, and found 565 cut points at
++1.04σ with the chosen one reversing sign on the confirmation half. R227 asked whether the request *names the record*
+a receipt touches, and found 54.0% against a bar of 0.75 — the misses being 13 predicate asks over sets and 6 bookings
+whose object the policy chooses.
+
+This round tests the anchor those three failures point at: **the record the episode read**. In τ² a write is always
+preceded by a read of the record it touches, because the identifiers are not in the request. So the board becomes
+
+    an item is a record the episode opened, carrying what the read returned
+    it is settled by a successful write that touches it, whatever family that write is in
+    a write no read reached is `unrequested`, which is the failure τ² itself charges for
+
+and the claim is that a board built this way cannot miss a discharge. That claim is *definitionally* true when the
+record was read, which is why the round's bar is not coverage alone: a rule that can only pass by construction is not a
+bar. The cost side of the trade is measured on the same artefact and on the same episodes:
+
+    coverage        of the writes the evaluator required **and** the episode performed, how many did the board
+                    credit — per write, then rolled up to episodes
+    unaccounted     writes that happened and that the board credited to nothing: the read rule is wider, so this is
+                    the number that can kill it
+    overCredit      credited calls the evaluator did not require. This is the harm channel R213 measured at 8.5%: a
+                    board that says "done" about work nobody graded is the block lying in the direction that costs
+                    task success. It is a proxy — the graded set is not the user's set — and is reported as
+                    "outside the graded set" rather than "unasked"
+    openUnneeded    items the board still shows as open that no required write needs
+
+## Two scopes, both declared before the reading
+
+    strict   a record is open when a read returned **its contents** (`get_order_details`, `get_user_details`) or a
+             lookup returned **its identity** (`find_user_id_*`)
+    loose    …plus every order id merely *listed* inside a user record
+
+`strict` is the product-meaningful rule — a working memory shows what the agent looked at — and it is the one the bar
+is written over. `loose` is reported as the upper bound of generosity, because `get_user_details` returns the user's
+whole order list and a rule that counted those as items would open five items for a task that needs one.
+
+## Where the ground truth comes from, and what it is not
+
+Both boards are replayed from R218b's artefact: 456 episodes of a paid grid, with the transcripts, the calls, and the
+evaluator's own action list. Nothing here is a model call. `required` is `evaluation_criteria.actions` restricted to
+the write families, and a performed write is **discharged** when it matches a required write one-to-one on family and
+record — one-to-one because a second cancel of the same order is not a second piece of required work.
+
+The control grid is the primary reading because the block was absent from its prompts, so a replay of a board over it
+cannot be scoring its own content. `front.json` is the replication, and a reading that only holds on one of them is a
+reading about a grid.
+
+Run: `python3 eval/tools/read_anchor.py --self-test`
+     `python3 eval/tools/read_anchor.py --document /path/control.json --json`
+     `python3 eval/tools/read_anchor.py --document /path/control.json --replicate /path/front.json`
+"""
+from __future__ import annotations
+
+import argparse
+import collections
+import json
+import os
+import re
+import sys
+
+#: Records a read **opens**: the tool, the kind of record, and the argument that names it.
+#:
+#: Two kinds and no more, because two kinds is what the retail domain has: an order is the unit every graded write
+#: touches, and a user is the unit `modify_user_address` touches. Products are read constantly and written never, so
+#: making them items would open four items for a task that needs one — the open tax that would make the board noise.
+OPENS = {
+    "get_order_details": ("order", "order_id"),
+    "get_user_details": ("user", "user_id"),
+}
+
+#: Reads whose **result** is a record's identity rather than its contents. The agent authenticates through one of
+#: these, so the record it names is one the episode holds even though nothing was returned but an id.
+LOOKUPS = {
+    "find_user_id_by_name_zip": "user",
+    "find_user_id_by_email": "user",
+}
+
+#: Reads that open nothing. Enumerated rather than left implicit: a tool this module has never heard of is a tool the
+#: rule forgot, and `ledger` reports it instead of quietly treating it as a non-read.
+OPENS_NOTHING = frozenset({"get_product_details", "get_item_details", "list_all_product_types", "calculate"})
+
+#: An order's identity in a result. τ² codes orders `#W` and seven digits, and the field is the only place a result
+#: spells one, so the pattern is read off the corpus rather than guessed at.
+ORDER = re.compile(r"#[A-Z]\d{6,}")
+
+#: R229's soundness bar: the share of an ask board's ticks that a graded write back. Registered at 0.90 before the
+#: reading, and it is a constant so the number a reading was judged against is not a local in a function.
+SOUNDNESS = 0.90
+
+#: A user's identity, as a lookup returns it: `first_last_1234`. Anchored, because `credit_card_9513926` is a payment
+#: method and is also a lower-case word with digits after it.
+USER = re.compile(r"^[a-z][a-z_]*_\d{4}$")
+
+
+def _siblings() -> str:
+    """Put this file's own directory on `sys.path`, and answer it.
+
+    `goal_board` lives beside this file and is imported for the reading it already implementss — the request-anchored
+    board, its receipts and its settlement grades. The import is lazy for the reason `goal_board` gives its own: script
+    mode puts the directory on the path and `python3 -m coverage run` does not, and CI measures this module through
+    `-m`.
+    """
+    here = os.path.dirname(os.path.abspath(__file__))
+    if here not in sys.path:
+        sys.path.insert(0, here)
+    return here
+
+
+def _board():
+    """The sibling module, imported at the call rather than at the module."""
+    _siblings()
+    import goal_board  # noqa: PLC0415 - see `_siblings`
+
+    return goal_board
+
+
+def record_of(arguments) -> "tuple | None":
+    """The record a call names, as `(kind, id)`, or `None` when it names none.
+
+    `order_id` is an order and `user_id` is an account; every other argument is content. Stated as a function because
+    the same rule has to hold for the evaluator's required actions and for the agent's own calls, and a rule written
+    twice is a rule that can disagree with itself.
+    """
+    if not isinstance(arguments, dict):
+        return None
+    for key, kind in (("order_id", "order"), ("user_id", "user")):
+        value = arguments.get(key)
+        if isinstance(value, str) and value:
+            return (kind, value)
+    return None
+
+
+def ledger(messages) -> dict:
+    """Reads and writes in the order the episode made them.
+
+    One pass, because the question is **when** a record became visible: a write to an order the episode opened two
+    turns later is `unrequested` at the moment it happens, and a board that sorted by kind instead of by time would
+    credit it and hide the one failure this rule can produce.
+
+    Results are paired positionally with calls — τ² answers the k-th call with the k-th result — so a queue of pending
+    calls is kept and one entry is consumed per result. A document whose queue runs dry is truncated, and the reads it
+    lost are counted in `dropped` rather than assumed.
+    """
+    board = _board()
+    receipts = board.receipts_of(messages)
+    events: list = []
+    pending: collections.deque = collections.deque()
+    writes = 0
+    dropped = 0
+    unknown: set = set()
+    for message in messages:
+        role = board.role_of(message)
+        if role in ("assistant", "agent"):
+            for call in board._field(message, "tool_calls") or []:  # noqa: SLF001 - the board's own accessor
+                name = board._field(call, "name")  # noqa: SLF001
+                if not isinstance(name, str) or not name:
+                    continue
+                if name in board.FAMILIES:
+                    events.append(("write", writes))
+                    pending.append(("write", writes))
+                    writes += 1
+                elif name in OPENS:
+                    kind, key = OPENS[name]
+                    arguments = board._field(call, "arguments")  # noqa: SLF001
+                    value = arguments.get(key) if isinstance(arguments, dict) else None
+                    record = (kind, value) if isinstance(value, str) and value else None
+                    events.append(("open", record))
+                    pending.append(("open", record))
+                elif name in LOOKUPS:
+                    kind = LOOKUPS[name]
+                    events.append(("lookup", kind))
+                    pending.append(("lookup", kind))
+                elif name in OPENS_NOTHING:
+                    events.append(("nothing", name))
+                    pending.append(("nothing", name))
+                else:
+                    unknown.add(name)
+                    events.append(("unknown", name))
+                    pending.append(("unknown", name))
+        elif role == "tool":
+            text = board._field(message, "content")  # noqa: SLF001
+            text = text if isinstance(text, str) else ""
+            if not pending:
+                dropped += 1
+                continue
+            kind, payload = pending.popleft()
+            listed = [("order", found) for found in ORDER.findall(text)]
+            if kind == "open" and payload:
+                # A read that opened a record also *names* it in its own result. Listing it again would be the same
+                # record twice, and the second copy is the one a reader would have to explain.
+                listed = [record for record in listed if record != payload]
+            for record in listed:
+                events.append(("listed", record))
+            if kind == "lookup":
+                candidate = text.strip().strip("\"'")
+                if USER.match(candidate):
+                    events.append(("open", (payload, candidate)))
+            elif kind == "open":
+                # A read that was asked for one record can also *name* another: `get_order_details` returns the user
+                # the order belongs to. That is a listing rather than an opening — the episode holds the order's
+                # state, not the account's — and the distinction is the same one that keeps a user record's order
+                # list from opening five orders.
+                user = _user_in(text)
+                if user:
+                    events.append(("listed", ("user", user)))
+    if len(receipts) != writes:  # pragma: no cover - a defensive check, never reached by this corpus
+        raise SystemExit(f"receipt positions drifted: {len(receipts)} from goal_board, {writes} counted here")
+    return {
+        "events": events,
+        "writes": receipts,
+        "unknown": sorted(unknown),
+        "dropped": dropped,
+        "calls": len(events),
+    }
+
+
+def _user_in(text: str) -> str:
+    """The user id an order record carries, if it carries one.
+
+    Not a general search of the text: the field has to be a JSON `"user_id": "…"` pair, because a product name or an
+    address containing a similar shape would otherwise open a record that does not exist.
+    """
+    match = re.search(r'"user_id"\s*:\s*"([a-z][a-z_]*_\d{4})"', text)
+    return match.group(1) if match else ""
+
+
+def board(entry: dict, scope: str = "strict") -> dict:
+    """The read-anchored board: items are records opened, ticks are writes that touch them.
+
+    `scope` decides what counts as open. `strict` is a read that returned the record's contents or its identity;
+    `loose` adds every order id merely listed inside a user record. Both are computed from the same event list, so the
+    difference between them is exactly the listing rule and nothing else.
+    """
+    if scope not in ("strict", "loose"):
+        raise ValueError(f"unknown scope {scope!r}")
+    seen: dict = {}
+    credited: list = []
+    unaccounted: list = []
+    unbound: list = []
+    opened_at: dict = {}
+    position = 0
+    for kind, payload in entry["events"]:
+        position += 1
+        if kind == "open" and payload:
+            seen.setdefault(payload, position)
+            opened_at.setdefault(payload, position)
+        elif kind == "listed" and payload and scope == "loose":
+            seen.setdefault(payload, position)
+        elif kind == "write":
+            receipt = entry["writes"][payload]
+            # A call the environment refused changed nothing, so it is neither credited nor accused. Tested before the
+            # record because a refused transfer is a refused transfer, not an unbound call.
+            if not receipt.get("ok"):
+                continue
+            record = record_of(receipt.get("args"))
+            if record is None:
+                # A transfer names no record. It is neither credited (there is nothing to bind) nor unrequested (the
+                # request asked for exactly this), so it is a third bucket and is reported as one.
+                unbound.append(payload)
+                continue
+            if record in seen:
+                credited.append(payload)
+            else:
+                unaccounted.append(payload)
+    items = [
+        {"record": record, "settled": any(record_of(entry["writes"][p].get("args")) == record for p in credited)}
+        for record in seen
+    ]
+    return {
+        "scope": scope,
+        "items": items,
+        "credited": credited,
+        "unaccounted": unaccounted,
+        "unbound": unbound,
+        "open": [item["record"] for item in items if not item["settled"]],
+    }
+
+
+def ask_board(entry: dict, messages, scope: str = "request") -> dict:
+    """R229's rule: an item is an **ask**, and the read supplies only the binding.
+
+    R228 measured the two anchors' failures as a trade rather than as a deficit: the request board attributes 63.6% of
+    the writes the evaluator requires because it will only tick a *named* ask on a receipt that names the product, and
+    the read board attributes 98.5% because it ticks any write to any record it opened — at the price of 2.5 items per
+    episode that no required write needs. The two columns point at one rule:
+
+        an item is an ask the request states
+        it is settled by a successful write **of its family to a record the episode opened**, one ask per call
+
+    So relevance comes from the request, which is the only thing that knows what is required, and attribution comes
+    from the read, which is the only thing that knows which record a call touched. Neither board above can express
+    this: the request board's settlement rule asks a receipt to *name* the ask's object, and the read board has no
+    notion of an ask at all.
+
+    What it gives up. An ask whose family has no open member left is a write nobody asked for, and the board says so —
+    it does not fall back to the request board's containment rule, because a fallback would make the measurement a
+    union of the two rules rather than a test of one. What it can get wrong. Two asks of one family and two records
+    opened bind in the order the writes arrive, so a tick can name the wrong record; that is the over-credit column
+    and it is the bar's third test.
+    """
+    module = _board()
+    asks = module.board_of(messages, module.CONVERSATION if scope == "conversation" else module.REQUEST)["items"]
+    asks = [{"family": item["family"], "words": item["words"]} for item in asks]
+    # R230's seed, taken here because it costs one more parse and decides what the next round is about: an ask the
+    # board never read is not the same deficit as an ask it read and spent. `CONVERSATION` scope is the board's own
+    # parser run over **every** user turn, so the difference between the two is disclosure order and nothing else.
+    later = module.board_of(messages, module.CONVERSATION).get("items") or []
+    later_families = {item["family"] for item in later}
+    unaccounted_by = collections.Counter()
+    open_asks: dict = collections.defaultdict(list)
+    for index, ask in enumerate(asks):
+        open_asks[ask["family"]].append(index)
+    settled: dict = {}
+    credited: list = []
+    unaccounted: list = []
+    unbound: list = []
+    seen: set = set()
+    for kind, payload in entry["events"]:
+        if kind == "open" and payload:
+            seen.add(payload)
+        elif kind == "write":
+            receipt = entry["writes"][payload]
+            if not receipt.get("ok"):
+                continue
+            record = record_of(receipt.get("args"))
+            if record is None:
+                unbound.append(payload)
+                continue
+            family = receipt.get("family")
+            waiting = [index for index in open_asks.get(family, []) if index not in settled]
+            if waiting and record in seen:
+                index = waiting[0]
+                settled[index] = payload
+                credited.append(payload)
+            else:
+                unaccounted.append(payload)
+                # Three causes, and they are three different rounds. The ask was never stated anywhere; it was stated
+                # in a later turn, which the board does not read; or it was stated and the episode wrote more than it
+                # asked for.
+                if family not in open_asks and family in later_families:
+                    unaccounted_by["disclosedLater"] += 1
+                elif family in open_asks:
+                    unaccounted_by["consumed"] += 1
+                else:
+                    unaccounted_by["neverStated"] += 1
+    items = [
+        {
+            "family": ask["family"],
+            "words": ask["words"],
+            "record": record_of(entry["writes"][position].get("args")) if position is not None else None,
+            "settled": position is not None,
+        }
+        for ask, position in zip(asks, [settled.get(index) for index in range(len(asks))])
+    ]
+    return {
+        "scope": f"ask-{scope}",
+        "items": items,
+        "credited": credited,
+        "unaccounted": unaccounted,
+        "unbound": unbound,
+        "open": [{"family": item["family"], "words": item["words"]} for item in items if not item["settled"]],
+        "unaccountedBy": dict(unaccounted_by),
+    }
+
+
+def required_writes(task) -> list:
+    """The writes the evaluator requires, each with the record it names.
+
+    Read from `evaluation_criteria.actions`, the same list `goal_board.census` reads, restricted to the write families.
+    A task with no criteria is a task this instrument cannot judge and returns nothing for, which is the absence the
+    caller has to report rather than a zero.
+    """
+    if not isinstance(task, dict):
+        return []
+    criteria = task.get("evaluation_criteria") or task.get("criteria") or {}
+    actions = criteria.get("actions") if isinstance(criteria, dict) else None
+    found = []
+    for action in actions or []:
+        name = action.get("name") if isinstance(action, dict) else None
+        if not isinstance(name, str) or name not in _board().FAMILIES:
+            continue
+        arguments = action.get("arguments") if isinstance(action, dict) else None
+        found.append({"name": name, "family": _board().FAMILIES[name], "record": record_of(arguments)})
+    return found
+
+
+def discharge(writes: list, required: list) -> dict:
+    """Which performed calls discharge a required write, one required write per call.
+
+    One-to-one, in the order the episode made them: a task that requires `cancel_pending_order` on `#W1` and the
+    episode cancels `#W1` twice has discharged one requirement and made one extra call. Matching by family alone would
+    credit the second cancel to the first requirement and call the episode more complete than it is.
+    """
+    matched: dict = {}
+    taken: set = set()
+    for position, receipt in enumerate(writes):
+        if not receipt.get("ok"):
+            continue
+        family = receipt.get("family")
+        record = record_of(receipt.get("args"))
+        for index, want in enumerate(required):
+            if index in taken or want["family"] != family:
+                continue
+            # A requirement that names no record (a transfer) is matched by family alone; one that names a record is
+            # matched on it, because a cancel of the wrong order is not the cancel the task grades.
+            if want["record"] is not None and want["record"] != record:
+                continue
+            taken.add(index)
+            matched[position] = index
+            break
+    return {"byPosition": matched, "discharged": len(matched), "unmatched": len(required) - len(matched)}
+
+
+def episode(document_task, simulation: dict) -> dict:
+    """One episode, read three ways: the read board at both scopes and the request board.
+
+    Returned as raw counts rather than rates so that the aggregation can pair episodes and report an interval over the
+    same units the bar is written over; a rate computed here and averaged later would weight a one-write episode the
+    same as a four-write one.
+    """
+    messages = simulation.get("messages") or []
+    module = _board()
+    entry = ledger(messages)
+    required = required_writes(document_task)
+    done = discharge(entry["writes"], required)
+    requested = module.board_of(messages)
+    required_records = {want["record"] for want in required if want["record"] is not None}
+    out = {
+        "id": simulation.get("id"),
+        "task": str(simulation.get("task_id")),
+        "writes": sum(1 for receipt in entry["writes"] if receipt.get("ok")),
+        "required": len(required),
+        "discharged": done["discharged"],
+        "dropped": entry["dropped"],
+        "unknown": entry["unknown"],
+        "boards": {},
+    }
+    required_families = {want["family"] for want in required}
+    for scope in ("strict", "loose", "ask", "askAll"):
+        if scope == "askAll":
+            found = ask_board(entry, messages, "conversation")
+        elif scope == "ask":
+            found = ask_board(entry, messages)
+        else:
+            found = board(entry, scope)
+        covered = [position for position in found["credited"] if position in done["byPosition"]]
+        opening = [item for item in found["items"] if not item["settled"]]
+        if scope in ("ask", "askAll"):
+            # An open ask is unneeded when no required write is of its family. Its *record* is whatever the episode
+            # happened to bind, so the record test the two read boards use would say nothing here.
+            unneeded = sum(1 for item in opening if item["family"] not in required_families)
+        else:
+            unneeded = sum(1 for item in opening if item["record"] not in required_records)
+        out["boards"][scope] = {
+            "credited": len(found["credited"]),
+            "covered": len(covered),
+            "unaccounted": len(found["unaccounted"]),
+            "unbound": len(found["unbound"]),
+            "items": len(found["items"]),
+            "open": len(opening),
+            "openUnneeded": unneeded,
+            # A credited call the evaluator does not require. Named for what it is: outside the graded set.
+            "overCredit": sum(1 for position in found["credited"] if position not in done["byPosition"]),
+            "unaccountedBy": found.get("unaccountedBy") or {},
+        }
+    credited = set(requested.get("credited") or [])
+    covered = [position for position in credited if position in done["byPosition"]]
+    record_carrying = [p for p, r in enumerate(entry["writes"]) if r.get("ok") and record_of(r.get("args"))]
+    dropping = [p for p in record_carrying if p not in credited]
+    out["boards"]["request"] = {
+        "credited": len(credited),
+        "covered": len(covered),
+        # For the request board the unaccounted column is the calls it credited to nothing: the same sentence as the
+        # read board's, over the same write set, which is what makes the comparison a comparison.
+        "unaccounted": len(dropping),
+        "unbound": 0,
+        "items": len(requested.get("items") or []),
+        "open": sum(1 for item in requested.get("items") or [] if not item.get("settled_by")),
+        "openUnneeded": sum(
+            1
+            for item in requested.get("items") or []
+            if not item.get("settled_by") and item.get("family") not in {want["family"] for want in required}
+        ),
+        "overCredit": sum(1 for position in credited if position not in done["byPosition"]),
+        "asked": len(requested.get("items") or []),
+        "unrequestedNamed": len(requested.get("unrequested") or []),
+        "unattributedNamed": len(requested.get("unattributed") or []),
+    }
+    out["recordCarrying"] = len(record_carrying)
+    return out
+
+
+def compare(document: dict, scope: str = "strict") -> dict:
+    """The reading: both boards over the same episodes, paired, with the bar evaluated where it was written.
+
+    The denominator is episodes the episode **wrote in and the evaluator grades**, because that is the population both
+    boards are claims about. An episode whose required writes were all performed and all credited is `complete`; the
+    share of complete episodes is the column the registered bar names, and mean coverage over discharged writes is
+    reported beside it so that a board which is complete less often but misses less is visible as what it is.
+    """
+    tasks = {str(task.get("id")): task for task in document.get("tasks") or []}
+    rows = []
+    skipped = 0
+    for simulation in document.get("simulations") or []:
+        if not (simulation.get("messages") or []):
+            skipped += 1
+            continue
+        row = episode(tasks.get(str(simulation.get("task_id"))), simulation)
+        rows.append(row)
+    graded = [row for row in rows if row["discharged"]]
+    summary: dict = {
+        "episodes": len(rows),
+        "skipped": skipped,
+        "graded": len(graded),
+        "writes": sum(row["writes"] for row in rows),
+        "required": sum(row["required"] for row in rows),
+        "discharged": sum(row["discharged"] for row in rows),
+        "dropped": sum(row["dropped"] for row in rows),
+        "unknownTools": sorted({name for row in rows for name in row["unknown"]}),
+        "boards": {},
+    }
+    for name in ("strict", "loose", "ask", "askAll", "request"):
+        block = [row["boards"][name] for row in graded]
+        covered = sum(one["covered"] for one in block)
+        summary["boards"][name] = {
+            "covered": covered,
+            "credited": sum(one["credited"] for one in block),
+            "coverage": (covered / summary["discharged"]) if summary["discharged"] else None,
+            "complete": sum(1 for row in graded if row["boards"][name]["covered"] == row["discharged"]),
+            "completeShare": (
+                sum(1 for row in graded if row["boards"][name]["covered"] == row["discharged"]) / len(graded)
+            )
+            if graded
+            else None,
+            "unaccounted": sum(one["unaccounted"] for one in block),
+            "unbound": sum(one["unbound"] for one in block),
+            "overCredit": sum(one["overCredit"] for one in block),
+            "overCreditPerEpisode": (sum(one["overCredit"] for one in block) / len(graded)) if graded else None,
+            "open": sum(one["open"] for one in block),
+            "openPerEpisode": (sum(one["open"] for one in block) / len(graded)) if graded else None,
+            "openUnneeded": sum(one["openUnneeded"] for one in block),
+            "openUnneededPerEpisode": (sum(one["openUnneeded"] for one in block) / len(graded)) if graded else None,
+            "items": sum(one["items"] for one in block),
+            # Only the ask boards classify their misses; the read boards and the request board have no taxonomy, and a
+            # column of zeros for them would be a claim that their misses were counted and came to nothing.
+            "unaccountedBy": dict(sorted(collections.Counter(
+                {key: sum((one.get("unaccountedBy") or {}).get(key, 0) for one in block)
+                 for key in ("disclosedLater", "consumed", "neverStated")}
+            ).items())) if name in ("ask", "askAll") else None,
+            # Of the calls this board ticked, the share the evaluator also requires. A tick that is not backed by a
+            # graded write is the harm channel: the block saying done about work nobody asked for.
+            "precision": (covered / sum(one["credited"] for one in block)) if sum(one["credited"] for one in block) else None,
+        }
+    chosen = summary["boards"][scope]
+    requested = summary["boards"]["request"]
+    summary["paired"] = {
+        "coverageDelta": _delta(chosen["coverage"], requested["coverage"]),
+        "completeDelta": chosen["complete"] - requested["complete"],
+        "unaccountedDelta": chosen["unaccounted"] - requested["unaccounted"],
+        "overCreditDelta": chosen["overCredit"] - requested["overCredit"],
+        "episodesCompleteGained": sum(
+            1
+            for row in graded
+            if row["boards"][scope]["covered"] == row["discharged"]
+            and row["boards"]["request"]["covered"] != row["discharged"]
+        ),
+        "episodesCompleteLost": sum(
+            1
+            for row in graded
+            if row["boards"][scope]["covered"] != row["discharged"]
+            and row["boards"]["request"]["covered"] == row["discharged"]
+        ),
+    }
+    summary["bar"] = _bar(graded, summary, scope)
+    summary["tasksJudged"] = sum(1 for task in tasks.values() if required_writes(task))
+    return summary
+
+
+def _delta(one, other):
+    """`one - other`, or `None` when either side is unread: a difference against a missing reading is missing."""
+    if one is None or other is None:
+        return None
+    return one - other
+
+
+def _bar(graded: list, summary: dict, scope: str) -> dict:
+    """The three bars, evaluated where they were registered.
+
+    B1 and B2 are R228's own registration. **B3 was added to it before this file was first run**, because B1 as
+    written can only be satisfied by a rule that credits every write to a record it opened — the read anchor cannot
+    miss a discharge by construction — and a bar a rule passes by being itself is not a bar. B3 is the cost side made
+    binding: the items the board shows open that no required write needs must not outnumber the writes the task
+    requires, so the block is at least half signal.
+    """
+    if not graded:
+        # A bar over nothing is not a pass. This lane has read absence-as-zero five times, and the sixth would be a
+        # rule that "holds" because the document carried no graded episode at all.
+        return {"holds": False, "reason": "no episode discharged a required write, so no bar can be evaluated"}
+    chosen = summary["boards"][scope]
+    requested = summary["boards"]["request"]
+    meanRequired = summary["required"] / len(graded)
+    b1 = (chosen["covered"] >= requested["covered"]) and (chosen["complete"] >= requested["complete"])
+    b2 = chosen["unaccounted"] <= requested["unaccounted"]
+    if scope == "ask":
+        # R229's B3. The ask board's items are the request's asks, so it cannot nag — an open item is an ask somebody
+        # stated — and the cost it can pay instead is a tick against the wrong ask. The bar is the share of ticks that
+        # a graded write backs: 0.90, registered before the reading, because below nine in ten a tick is not evidence
+        # and the block's entire claim is that a tick is evidence.
+        b3 = (chosen["precision"] or 0.0) >= SOUNDNESS
+        third = {
+            "B3_soundness": {
+                "holds": b3,
+                "precision": chosen["precision"],
+                "bar": SOUNDNESS,
+                "overCredit": chosen["overCredit"],
+            }
+        }
+    else:
+        b3 = (chosen["openUnneededPerEpisode"] or 0.0) <= meanRequired
+        third = {
+            "B3_openTax": {
+                "holds": b3,
+                "openUnneededPerEpisode": chosen["openUnneededPerEpisode"],
+                "requiredPerEpisode": meanRequired,
+            }
+        }
+    return {
+        "B1_settlement": {
+            "holds": b1,
+            "covered": chosen["covered"],
+            "against": requested["covered"],
+            "complete": chosen["complete"],
+            "againstComplete": requested["complete"],
+        },
+        "B2_accusation": {
+            "holds": b2,
+            "unaccounted": chosen["unaccounted"],
+            "against": requested["unaccounted"],
+        },
+        **third,
+        "holds": b1 and b2 and b3,
+    }
+
+
+def render(reading: dict, scope: str = "strict") -> str:
+    """The reading as sentences, in the order the bars are written.
+
+    Every board is printed on every run, including the three the bar was not evaluated over: the round's finding is a
+    *trade* between boards, and a reader who saw only the chosen one would see a score rather than a trade.
+    """
+    def share(value) -> str:
+        return "n/a" if value is None else f"{value:.1%}"
+
+    boards = reading["boards"]
+    chosen = boards[scope]
+    requested = boards["request"]
+    paired = reading["paired"]
+    bar = reading["bar"]
+    lines = [
+        f"{reading['episodes']} episode(s), {reading['graded']} of them graded with a discharged write, "
+        f"{reading['discharged']}/{reading['required']} required write(s) discharged, "
+        f"{reading['writes']} successful write(s) in all",
+        f"{'board':9s} {'covered':>7s} {'coverage':>8s} {'complete':>8s} {'unacc':>6s} {'over':>5s} "
+        f"{'items':>6s} {'open':>5s} {'unneeded':>8s} {'precision':>9s}",
+    ]
+    for name in ("strict", "loose", "ask", "askAll", "request"):
+        one = boards[name]
+        lines.append(
+            f"{name:9s} {one['covered']:7d} {share(one['coverage']):>8s} {one['complete']:8d} "
+            f"{one['unaccounted']:6d} {one['overCredit']:5d} {one['items']:6d} {one['open']:5d} "
+            f"{one['openUnneeded']:8d} {share(one['precision']):>9s}"
+        )
+    lines.append(
+        f"coverage delta {paired['coverageDelta']:+.1%} against the request board; "
+        f"episodes complete gained {paired['episodesCompleteGained']}, lost {paired['episodesCompleteLost']}"
+    )
+    lines.append(
+        f"B1 settlement  {'holds' if bar['B1_settlement']['holds'] else 'FAILS'} "
+        f"({chosen['covered']} vs {requested['covered']} covered, {chosen['complete']} vs {requested['complete']} "
+        f"episodes complete)"
+    )
+    lines.append(
+        f"B2 accusation  {'holds' if bar['B2_accusation']['holds'] else 'FAILS'} "
+        f"({chosen['unaccounted']} unaccounted vs {requested['unaccounted']})"
+    )
+    if "B3_openTax" in bar:
+        lines.append(
+            f"B3 open tax    {'holds' if bar['B3_openTax']['holds'] else 'FAILS'} "
+            f"({chosen['openUnneededPerEpisode']:.2f} unneeded open item(s) per episode vs "
+            f"{bar['B3_openTax']['requiredPerEpisode']:.2f} required write(s) per episode)"
+        )
+    else:
+        lines.append(
+            f"B3 soundness   {'holds' if bar['B3_soundness']['holds'] else 'FAILS'} "
+            f"({share(chosen['precision'])} of ticks backed by a graded write against a bar of "
+            f"{bar['B3_soundness']['bar']:.2f})"
+        )
+    if reading["unknownTools"]:
+        lines.append(f"tools no rule classifies: {', '.join(reading['unknownTools'])}")
+    if reading["dropped"]:
+        lines.append(f"{reading['dropped']} result(s) had no pending call — the document is truncated")
+    return "\n".join(lines)
+
+
+def _digest(path: str) -> str:
+    """The sha256 of a file, so a reading says which bytes it was taken from."""
+    import hashlib
+
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for block in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def note(failed: list, name: str, condition) -> None:
+    """Record an assertion that did not hold. A function rather than a closure, so that the branch which records a
+    failure is exercised by the suite: a self-test whose failure path is never run is a suite that cannot fail."""
+    if not condition:
+        failed.append(name)
+
+
+def check_manifest(reading: dict) -> list:
+    """Whatever about a saved reading does not add up, as a list of sentences.
+
+    A reading is an arithmetic claim and the documents quote its parts. Every audit entry this repository has written
+    in the last three rounds was a quantity that a document asserted and an artefact did not carry, so the parts are
+    checked against each other rather than against the prose: the boards must agree on the denominator, the taxonomy
+    must sum to the writes it explains, and a bar must be the one its own numbers imply.
+    """
+    problems: list = []
+    boards = reading.get("boards") or {}
+    graded = reading.get("graded")
+    if not boards or not graded:
+        return ["the reading carries no board or no graded episode"]
+    for name, one in boards.items():
+        if one["covered"] > (one["credited"] or 0):
+            problems.append(f"{name}: more covered writes than credited calls")
+        if one["open"] > one["items"]:
+            problems.append(f"{name}: more open items than items")
+        if one["openUnneeded"] > one["open"]:
+            problems.append(f"{name}: more unneeded open items than open items")
+        if one["overCredit"] > (one["credited"] or 0):
+            problems.append(f"{name}: more over-credited calls than credited calls")
+        if one["covered"] + one["overCredit"] != (one["credited"] or 0):
+            problems.append(f"{name}: covered plus over-credited does not equal credited")
+        if one["complete"] > graded:
+            problems.append(f"{name}: more complete episodes than graded episodes")
+        if one["coverage"] is not None and reading.get("discharged"):
+            expected = one["covered"] / reading["discharged"]
+            if abs(one["coverage"] - expected) > 1e-9:
+                problems.append(f"{name}: coverage is not covered over discharged")
+    ask = boards.get("ask") or {}
+    taxonomy = ask.get("unaccountedBy") or {}
+    if taxonomy:
+        if sum(taxonomy.values()) != ask.get("unaccounted"):
+            problems.append("the taxonomy does not sum to the writes it explains")
+    for name, one in boards.items():
+        if one.get("unaccountedBy") and sum(one["unaccountedBy"].values()) != one["unaccounted"]:
+            problems.append(f"{name}: the taxonomy does not sum to its unaccounted writes")
+    bar = reading.get("bar") or {}
+    if bar.get("holds") and any(value.get("holds") is False for value in bar.values() if isinstance(value, dict)):
+        problems.append("the bar holds while one of its tests does not")
+    return problems
+
+
+def _report(failed: list) -> int:
+    """The names of the assertions that failed, or a line saying they all held."""
+    if failed:
+        print("FAILED:")
+        for name in failed:
+            print(f"  {name}")
+        return 1
+    print("read anchor: all assertions hold")
+    return 0
+
+
+def _call(name: str, **arguments) -> dict:
+    """One assistant message carrying one call, in the shape τ² writes."""
+    return {"role": "assistant", "content": "", "tool_calls": [{"name": name, "arguments": arguments}]}
+
+
+def _result(content, error=False) -> dict:
+    """One tool message, in the shape τ² writes."""
+    return {"role": "tool", "content": content, "error": error}
+
+
+def self_test() -> int:
+    """Assertions over episodes small enough to check by eye."""
+    failed: list = []
+
+    def check(name: str, condition) -> None:
+        note(failed, name, condition)
+
+    # Every retail tool this module has ever seen is classified. The corpus's own list is the check, because a tool
+    # nobody classified is a tool the rule silently treated as a non-read.
+    board_module = _board()
+    toolset = set(board_module.FAMILIES) | set(OPENS) | set(LOOKUPS) | set(OPENS_NOTHING)
+    check("every retail tool is classified", {
+        "get_order_details", "get_product_details", "get_user_details", "find_user_id_by_name_zip",
+        "return_delivered_order_items", "modify_pending_order_items", "exchange_delivered_order_items",
+        "find_user_id_by_email", "cancel_pending_order", "modify_pending_order_address", "transfer_to_human_agents",
+        "calculate", "modify_user_address", "get_item_details", "list_all_product_types",
+        "modify_pending_order_payment",
+    } <= toolset)
+
+    check("an order id is a record", record_of({"order_id": "#W1234567"}) == ("order", "#W1234567"))
+    check("a user id is a record", record_of({"user_id": "mia_garcia_4516"}) == ("user", "mia_garcia_4516"))
+    check("an item id is not a record", record_of({"item_ids": ["1"], "new_item_ids": ["2"]}) is None)
+    check("a summary is not a record", record_of({"summary": "the customer asked for a human"}) is None)
+    check("arguments that are not a dict name no record", record_of("not a dict") is None)
+    check("an empty id names no record", record_of({"order_id": ""}) is None)
+
+    # An episode that opens an order and cancels it: the read board credits the call, and so does the request board
+    # once the request has been read for an ask.
+    order = '{"order_id": "#W1234567", "user_id": "mia_garcia_4516", "items": []}'
+    opened_then_written = [
+        {"role": "user", "content": "Please cancel my order #W1234567."},
+        _call("get_order_details", order_id="#W1234567"),
+        _result(order),
+        _call("cancel_pending_order", order_id="#W1234567", reason="no longer needed"),
+        _result(order),
+    ]
+    entry = ledger(opened_then_written)
+    strict = board(entry, "strict")
+    # The order is opened; the account the order names is only listed, because the episode holds the order's state and
+    # not the account's. That distinction is what keeps a user record's five orders from becoming five items.
+    check("the read opens the order it names, and only it", len(strict["items"]) == 1)
+    check("the account the order names is known but not open", board(entry, "loose")["items"][0]["record"][0] == "order")
+    check("the cancel is credited", len(strict["credited"]) == 1)
+    check("nothing is unaccounted", not strict["unaccounted"])
+    check("nothing is left open", not strict["open"])
+
+    # A write to an order the episode never opened is the one failure this rule can produce, and it is not hidden.
+    written_unread = [
+        {"role": "user", "content": "Cancel both of my orders."},
+        _call("cancel_pending_order", order_id="#W1234567", reason="duplicate"),
+        _result("{}"),
+    ]
+    blind = board(ledger(written_unread), "strict")
+    check("a write to a record nobody read is unaccounted", len(blind["unaccounted"]) == 1)
+    check("and it credits nothing", not blind["credited"])
+
+    # The listing rule: an order id inside the user record is *known* but not *opened*, which is the only difference
+    # between the two scopes.
+    user = '{"user_id": "mia_garcia_4516", "orders": ["#W1234567", "#W7654321"]}'
+    listed = [
+        {"role": "user", "content": "Cancel the lamp order."},
+        _call("get_user_details", user_id="mia_garcia_4516"),
+        _result(user),
+        _call("cancel_pending_order", order_id="#W7654321", reason="customer changed their mind"),
+        _result("{}"),
+    ]
+    listed_entry = ledger(listed)
+    check("strict does not open an order that was only listed", len(board(listed_entry, "strict")["items"]) == 1)
+    check("and therefore does not credit a write to it", not board(listed_entry, "strict")["credited"])
+    check("loose opens it", len(board(listed_entry, "loose")["items"]) == 3)
+    check("and credits the write", len(board(listed_entry, "loose")["credited"]) == 1)
+
+    # A lookup opens the record its result names, and a payment method is not a record.
+    lookup = [
+        {"role": "user", "content": "Change the address on my account."},
+        _call("find_user_id_by_name_zip", first_name="Mia", last_name="Garcia", zip="60614"),
+        _result("mia_garcia_4516"),
+        _call("modify_user_address", user_id="mia_garcia_4516", address1="1 Main St", zip="60614"),
+        _result("{}"),
+    ]
+    found = board(ledger(lookup), "strict")
+    check("a lookup opens the user it returns", len(found["items"]) == 1)
+    check("and the address change is credited to it", len(found["credited"]) == 1)
+    check("a payment method id is not a user", not USER.match("credit_card_9513926"))
+
+    # A transfer names no record, so it is neither credited nor accused. The bucket exists because calling it
+    # unrequested would charge the board for the one call a refusal task exists to produce.
+    transfer = [
+        {"role": "user", "content": "I want to speak to a human."},
+        _call("transfer_to_human_agents", summary="customer asked for a representative"),
+        _result("{}"),
+    ]
+    handed = board(ledger(transfer), "strict")
+    check("a transfer is unbound rather than unaccounted", len(handed["unbound"]) == 1 and not handed["unaccounted"])
+
+    # A failed call changed nothing. Crediting it would be the board saying done about a change the environment
+    # refused, which is the failure `receipts_of` already refuses for the request board.
+    refused = [
+        {"role": "user", "content": "Cancel my order."},
+        _call("get_order_details", order_id="#W1234567"),
+        _result(order),
+        _call("cancel_pending_order", order_id="#W1234567", reason="x"),
+        _result('{"error": "order is delivered"}', error=True),
+    ]
+    check("a refused cancel credits nothing", not board(ledger(refused), "strict")["credited"])
+
+    # An unclassified tool is reported rather than dropped.
+    strange = [{"role": "assistant", "content": "", "tool_calls": [{"name": "teleport", "arguments": {}}]},
+               _result("{}")]
+    check("an unknown tool is reported", ledger(strange)["unknown"] == ["teleport"])
+    check("a result with no pending call is counted as dropped", ledger([_result("{}")])["dropped"] == 1)
+
+    # Discharge is one-to-one on family **and** record.
+    writes = ledger(opened_then_written)["writes"]
+    required = [{"name": "cancel_pending_order", "family": "cancel", "record": ("order", "#W1234567")}]
+    done = discharge(writes, required)
+    check("a required write on the record is discharged", done["discharged"] == 1)
+    other = [{"name": "cancel_pending_order", "family": "cancel", "record": ("order", "#W9999999")}]
+    check("a required write on another record is not", discharge(writes, other)["discharged"] == 0)
+    twice = [
+        {"role": "user", "content": "cancel"},
+        _call("cancel_pending_order", order_id="#W1", reason="a"),
+        _result("{}"),
+        _call("cancel_pending_order", order_id="#W1", reason="b"),
+        _result("{}"),
+    ]
+    check("a second cancel of the same order is one discharge",
+          discharge(ledger(twice)["writes"], [{"name": "cancel_pending_order", "family": "cancel",
+                                               "record": ("order", "#W1")}])["discharged"] == 1)
+    check("a requirement that names no record is matched by family",
+          discharge(ledger(transfer)["writes"], [{"name": "transfer_to_human_agents", "family": "transfer",
+                                                  "record": None}])["discharged"] == 1)
+
+    # The evaluator's list is read from the evaluator's own document, and a task without one contributes nothing.
+    task = {"id": "1", "evaluation_criteria": {"actions": [
+        {"name": "cancel_pending_order", "arguments": {"order_id": "#W1234567"}},
+        {"name": "get_order_details", "arguments": {"order_id": "#W1234567"}},
+    ]}}
+    check("only the write families are required", [one["family"] for one in required_writes(task)] == ["cancel"])
+    check("a task without criteria requires nothing", required_writes({"id": "2"}) == [])
+    check("a task that is not a dict requires nothing", required_writes(None) == [])
+
+    # The comparison, end to end, over two episodes that differ in the way the bar is about: one where the request's
+    # words and the receipt's product meet, and one where only the record does.
+    document = {
+        "tasks": [
+            task,
+            {"id": "2", "evaluation_criteria": {"actions": [
+                {"name": "return_delivered_order_items", "arguments": {"order_id": "#W7654321"}},
+            ]}},
+        ],
+        "simulations": [
+            {"id": "s1", "task_id": "1", "messages": opened_then_written},
+            {"id": "s2", "task_id": "2", "messages": [
+                {"role": "user", "content": "I want to send back the thing I bought last week."},
+                _call("get_order_details", order_id="#W7654321"),
+                _result('{"order_id": "#W7654321", "user_id": "mia_garcia_4516", "items": [{"name": "Desk Lamp"}]}'),
+                _call("return_delivered_order_items", order_id="#W7654321", item_ids=["1"], payment_method_id="c"),
+                _result("{}"),
+            ]},
+            {"id": "s3", "task_id": "1", "messages": []},
+        ],
+    }
+    reading = compare(document)
+    check("an empty episode is skipped, not counted as unticked", reading["episodes"] == 2 and reading["skipped"] == 1)
+    check("both boards credit the first episode", reading["boards"]["strict"]["covered"] == 2)
+    check("the read board also credits the second", reading["boards"]["strict"]["coverage"] == 1.0)
+    check("the request board misses the one the words never named",
+          reading["boards"]["request"]["coverage"] < reading["boards"]["strict"]["coverage"])
+    check("the paired delta is positive", reading["paired"]["coverageDelta"] > 0)
+    check("the bar evaluates", reading["bar"]["holds"] is True)
+    check("and the settlement bar is the one that carried it", reading["bar"]["B1_settlement"]["holds"] is True)
+
+    # The reading is rendered, not summarised by hand.
+    text = render(reading)
+    check("the reading states its denominator", "graded with a discharged write" in text)
+    check("the reading names all three boards", "strict" in text and "loose" in text and "request" in text)
+    check("the reading states the three bars", "B1" in text and "B2" in text and "B3" in text)
+    check("the reading names every board it prints",
+          all(name in text for name in ("strict", "loose", "ask", "askAll", "request")))
+    check("a clean reading names no unknown tool", "tools no rule classifies" not in text)
+    check("an unknown tool is named when there is one",
+          "tools no rule classifies" in render({**reading, "unknownTools": ["teleport"]}))
+    check("a dropped result is named when there is one", "truncated" in render({**reading, "dropped": 1}))
+    check("the ask scope evaluates its own third bar", "B3 soundness" in render(compare(document, "ask"), "ask"))
+    check("a clean reading names no unknown tool", "tools no rule classifies" not in text)
+    check("an unknown tool is named when there is one",
+          "tools no rule classifies" in render({**reading, "unknownTools": ["teleport"]}))
+    check("a dropped result is named when there is one", "truncated" in render({**reading, "dropped": 1}))
+
+    # A bar that cannot fail is not a bar: B3 has to be able to say no, so a board whose open tax runs away is refused.
+    listed_grid = {
+        "tasks": [task],
+        "simulations": [
+            {"id": "s1", "task_id": "1", "messages": [
+                {"role": "user", "content": "cancel"},
+                _call("get_user_details", user_id="mia_garcia_4516"),
+                _result('{"user_id": "mia_garcia_4516", "orders": ["#W1111111", "#W2222222", "#W3333333", '
+                        '"#W4444444", "#W5555555"]}'),
+                _call("cancel_pending_order", order_id="#W1234567", reason="x"),
+                _result("{}"),
+            ]},
+        ],
+    }
+    greedy = compare(listed_grid, scope="loose")
+    check("a loose board that opens five items for one write fails the open tax",
+          greedy["bar"]["B3_openTax"]["holds"] is False)
+    check("and it is the open tax that refuses it, not the settlement bar alone",
+          greedy["bar"]["B3_openTax"]["openUnneededPerEpisode"] == 6)
+    tight = compare(listed_grid, scope="strict")
+    check("the strict board on the same episode keeps the tax inside the bar",
+          tight["bar"]["B3_openTax"]["holds"] is True)
+    check("and the two scopes differ only through the listing rule",
+          tight["boards"]["loose"]["items"] - tight["boards"]["strict"]["items"] == 5)
+
+    # The command line, over documents this test writes.
+    import tempfile
+
+    def quiet(argv: list) -> int:
+        # `argparse` reports a bad choice by raising `SystemExit`, and a suite that let it through would end the run
+        # rather than record the assertion. The exit code is what the shell would see, so it is what is returned.
+        import contextlib
+        import io
+
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            try:
+                return main(argv)
+            except SystemExit as exit_code:
+                return int(exit_code.code or 0)
+
+    def capture(argv: list) -> str:
+        import contextlib
+        import io
+
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer), contextlib.redirect_stderr(io.StringIO()):
+            try:
+                main(argv)
+            except SystemExit:
+                pass
+        return buffer.getvalue()
+
+    with tempfile.TemporaryDirectory() as temporary:
+        path = os.path.join(temporary, "grid.json")
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump(document, handle)
+        check("the comparison runs from the command line", quiet(["--document", path]) == 0)
+        check("a missing argument prints the usage", quiet([]) == 2)
+        parsed = json.loads(capture(["--document", path, "--json"]))
+        check("the json form parses", parsed["graded"] == 2)
+        check("and carries both bars", parsed["bar"]["B1_settlement"]["holds"] is True)
+        check("a scope of loose is honoured", quiet(["--document", path, "--scope", "loose"]) == 0)
+        check("an unknown scope is refused", quiet(["--document", path, "--scope", "wide"]) == 2)
+        check("a bar that holds exits zero", quiet(["--document", path, "--bar"]) == 0)
+        check("a bad choice is refused by the parser", capture(["--document", path, "--scope", "wide"]) == "")
+        failing = os.path.join(temporary, "greedy.json")
+        with open(failing, "w", encoding="utf-8") as handle:
+            json.dump(listed_grid, handle)
+        check("a bar that fails exits one", quiet(["--document", failing, "--scope", "loose", "--bar"]) == 1)
+        check("the ask scope runs end to end", quiet(["--document", path, "--scope", "ask"]) == 0)
+        check("and a replication that fails exits one too",
+              quiet(["--document", path, "--replicate", failing, "--scope", "loose", "--bar"]) == 1)
+        saved = os.path.join(temporary, "reading.json")
+        check("the reading saves", quiet(["--document", path, "--save", saved]) == 0)
+        check("and what it saved adds up", quiet(["--check", saved]) == 0)
+        payload = json.loads(open(saved, encoding="utf-8").read())
+        check("a saved reading names the bytes it came from", len(payload["document"]["sha256"]) == 64)
+        check("and the size of them", payload["document"]["bytes"] > 0)
+        with open(saved, "w", encoding="utf-8") as handle:
+            json.dump({"boards": {}, "graded": 0}, handle)
+        check("a manifest that does not add up fails", quiet(["--check", saved]) == 1)
+        check("and says what is wrong", "no board" in capture(["--check", saved]))
+        # The replication: the same document twice is the same reading, and a reading that fails its bar on either
+        # grid is a reading that failed.
+        check("a replication is reported", "replication" in capture(["--document", path, "--replicate", path]))
+
+    def quiet_report(names: list) -> int:
+        import contextlib
+        import io
+
+        with contextlib.redirect_stdout(io.StringIO()):
+            return _report(names)
+
+    check("the failing branch records the name", (lambda box: (note(box, "x", False), box == ["x"])[1])([]))
+    check("a call with no name is not a record of anything",
+          ledger([{"role": "assistant", "tool_calls": [{"arguments": {}}]},
+                  {"role": "assistant", "tool_calls": [{"name": "", "arguments": {}}]}])["calls"] == 0)
+    check("a read that opens nothing is classified as one",
+          ledger([_call("calculate", expression="1+1"), _result("2")])["unknown"] == [])
+    check("a lookup whose result is not an id opens nothing",
+          ledger([_call("find_user_id_by_email", email="nobody@example.com"), _result("No user found.")])["events"]
+          == [("lookup", "user")])
+    check("an order result without an account lists nothing",
+          [event for event, _ in ledger([_call("get_order_details", order_id="#W1234567"),
+                                         _result('{"order_id": "#W1234567"}')])["events"]] == ["open"])
+    check("an order result names its account as a listing",
+          ("listed", ("user", "mia_garcia_4516")) in ledger([
+              _call("get_order_details", order_id="#W1234567"), _result(order)])["events"])
+    refused_scope = False
+    try:
+        board(entry, "wide")
+    except ValueError:
+        refused_scope = True
+    check("an unknown scope is refused", refused_scope)
+    check("a difference against a missing reading is missing", _delta(None, 1) is None and _delta(1, 2) == -1)
+    failed_write = [
+        {"role": "user", "content": "cancel"},
+        _call("cancel_pending_order", order_id="#W1234567", reason="x"),
+        _result('{"error": "delivered"}', error=True),
+    ]
+    check("a refused write discharges nothing",
+          discharge(ledger(failed_write)["writes"], [{"name": "cancel_pending_order", "family": "cancel",
+                                                      "record": ("order", "#W1234567")}])["discharged"] == 0)
+    nothing_graded = compare({"tasks": [], "simulations": [
+        {"id": "s", "task_id": "9", "messages": [
+            {"role": "user", "content": "hello"},
+            _call("get_order_details", order_id="#W1234567"), _result(order)]}]})
+    check("a grid with nothing graded fails the bar rather than passing it",
+          nothing_graded["bar"]["holds"] is False and "no episode" in nothing_graded["bar"]["reason"])
+
+    # The ask board's three refusals, and the taxonomy of a miss that was disclosed after the first turn.
+    disclosed = [
+        {"role": "user", "content": "Please cancel my order #W1234567."},
+        _call("get_order_details", order_id="#W1234567"),
+        _result(order),
+        {"role": "user", "content": "Actually, also return the lamp I bought."},
+        _call("return_delivered_order_items", order_id="#W1234567", item_ids=["1"], payment_method_id="c"),
+        _result("{}"),
+    ]
+    check("a write with no open ask of its family is unaccounted", ask_board(ledger(disclosed), disclosed)[
+        "unaccounted"] == [0])
+    check("and a family only a later turn states is classified as disclosed late",
+          ask_board(ledger(disclosed), disclosed)["unaccountedBy"] == {"disclosedLater": 1})
+    check("a refused call is not an unaccounted one", ask_board(ledger(failed_write), failed_write)["unaccounted"] == [])
+    check("a transfer is unbound on the ask board too",
+          ask_board(ledger(transfer), transfer)["unbound"] == [0])
+    consumed = [
+        {"role": "user", "content": "Cancel my order #W1234567."},
+        _call("get_order_details", order_id="#W1234567"),
+        _result(order),
+        _call("cancel_pending_order", order_id="#W1234567", reason="a"),
+        _result("{}"),
+        _call("cancel_pending_order", order_id="#W1234567", reason="b"),
+        _result("{}"),
+    ]
+    check("a second cancel of the same record finds the ask spent",
+          ask_board(ledger(consumed), consumed)["unaccountedBy"] == {"consumed": 1})
+
+    # The saved reading has to add up against itself, because the documents quote its parts (AUDIT 34.311/34.315).
+    check("a reading that adds up has no problem", check_manifest(reading) == [])
+    check("an empty reading is a problem", len(check_manifest({})) == 1)
+    broken = json.loads(json.dumps(reading))
+    broken["boards"]["strict"]["openUnneeded"] = broken["boards"]["strict"]["open"] + 1
+    check("more unneeded open items than open items is caught", check_manifest(broken) != [])
+    doctored = json.loads(json.dumps(reading))
+    doctored["boards"]["ask"]["unaccountedBy"] = {"disclosedLater": 99}
+    check("a taxonomy that does not sum is caught", check_manifest(doctored) != [])
+    lying = json.loads(json.dumps(reading))
+    lying["bar"]["B1_settlement"]["holds"] = False
+    check("a bar that holds while a test fails is caught", check_manifest(lying) != [])
+    covered_over = json.loads(json.dumps(reading))
+    covered_over["boards"]["request"]["covered"] = 99
+    check("more covered writes than credited calls is caught", check_manifest(covered_over) != [])
+    miscounted = json.loads(json.dumps(reading))
+    miscounted["boards"]["request"]["coverage"] = 0.5
+    check("a coverage that is not covered over discharged is caught", check_manifest(miscounted) != [])
+    open_heavy = json.loads(json.dumps(reading))
+    open_heavy["boards"]["request"]["open"] = open_heavy["boards"]["request"]["items"] + 1
+    check("more open items than items is caught", check_manifest(open_heavy) != [])
+    over_credited = json.loads(json.dumps(reading))
+    over_credited["boards"]["request"]["overCredit"] = 99
+    check("more over-credited calls than credited ones is caught", check_manifest(over_credited) != [])
+    for name in ("strict", "request"):
+        missing = json.loads(json.dumps(reading))
+        missing["boards"][name]["covered"] = missing["boards"][name]["credited"] + 1
+        check(f"a board whose covered exceeds its credited is caught ({name})", check_manifest(missing) != [])
+    taxonomy_only = json.loads(json.dumps(reading))
+    taxonomy_only["boards"]["askAll"]["unaccountedBy"] = {"consumed": 5}
+    check("an askAll taxonomy that does not sum is caught", check_manifest(taxonomy_only) != [])
+    over_complete = json.loads(json.dumps(reading))
+    over_complete["boards"]["request"]["complete"] = over_complete["graded"] + 1
+    check("more complete episodes than graded ones is caught", check_manifest(over_complete) != [])
+
+    check("the reporter on an empty list exits zero", quiet_report([]) == 0)
+    check("the reporter on a failure exits one", quiet_report(["negative control (must fail)"]) == 1)
+    return _report(failed)
+
+
+def main(argv: list) -> int:
+    parser = argparse.ArgumentParser(description="Bind the item to the read, not to the words.")
+    parser.add_argument("--document", default="", help="a results document with transcripts and tasks")
+    parser.add_argument("--replicate", default="", help="a second document, read the same way")
+    parser.add_argument("--scope", default="strict", choices=("strict", "loose", "ask"))
+    parser.add_argument("--bar", action="store_true", help="exit non-zero when a registered bar fails")
+    parser.add_argument("--save", default="", help="write the reading to this path, for the documents to quote")
+    parser.add_argument("--check", default="", help="check that a saved reading adds up, and exit non-zero if not")
+    parser.add_argument("--json", action="store_true")
+    parser.add_argument("--self-test", action="store_true")
+    arguments = parser.parse_args(argv)
+    if arguments.self_test:
+        return self_test()
+    if arguments.check:
+        with open(arguments.check, "r", encoding="utf-8") as handle:
+            saved = json.load(handle)
+        # A saved reading is the reading plus the bytes it came from; a bare reading is accepted too, because the
+        # self-test has one in memory and a tool that only reads its own wrapper is a tool with a private format.
+        problems = check_manifest(saved.get("reading", saved))
+        if not isinstance(saved.get("reading"), dict):
+            problems = problems or ["the saved form carries no reading"]
+        for problem in problems:
+            print(problem)
+        if problems:
+            return 1
+        print("reading: the parts add up")
+        return 0
+    if not arguments.document:
+        parser.print_help()
+        return 2
+    with open(arguments.document, "r", encoding="utf-8") as handle:
+        document = json.load(handle)
+    reading = compare(document, arguments.scope)
+    if arguments.replicate:
+        with open(arguments.replicate, "r", encoding="utf-8") as handle:
+            second = compare(json.load(handle), arguments.scope)
+        reading["replication"] = second
+    if arguments.json:
+        print(json.dumps(reading, indent=1, sort_keys=True, default=str))
+    else:
+        print(render(reading, arguments.scope))
+        if arguments.replicate:
+            print("")
+            print("replication")
+            print(render(reading["replication"], arguments.scope))
+    if arguments.save:
+        payload = {"document": {"sha256": _digest(arguments.document), "bytes": os.path.getsize(arguments.document)},
+                   "replicateDocument": ({"sha256": _digest(arguments.replicate),
+                                          "bytes": os.path.getsize(arguments.replicate)}
+                                         if arguments.replicate else None),
+                   "scope": arguments.scope, "reading": reading}
+        with open(arguments.save, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle, indent=1, sort_keys=True, default=str)
+            handle.write("\n")
+    if arguments.bar and (not reading["bar"]["holds"]
+                          or (arguments.replicate and not reading["replication"]["bar"]["holds"])):
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

@@ -7448,3 +7448,71 @@ To apply it to your own domain you need two things and no model: the requests wi
 and each user's own records in the fields a read returns. `scripts/build_airline_records.py` is the forty-line
 projection that produced this one from a 7 MB database, and it records the source's sha256 so the table can be rebuilt
 from the bytes it was made from.
+
+### 32.85 Before you bind an item to anything, measure what your corpus lets you bind to
+
+Sections 32.83 and 32.84 are the two halves of a promise that this project made and then could not keep: settle an item
+when a receipt touches the record the ask names, and check first that requests name records. The check failed at 54.0%,
+so the anchor moved — from the record the *request* names to the record the *episode read*. This section is what that
+move cost, measured on a grid the project had already paid for, so that you can decide whether to make the same move
+before you spend anything on it.
+
+**Four rules, and a way to price them without a single model call.** Every rule below turns one transcript into items
+and ticks. If you have a results document with transcripts and the evaluator's own action list — τ²'s `results.json`
+is one — you can price all four on it in under a second:
+
+| rule | an item is | it is settled by | what it costs you |
+|---|---|---|---|
+| `request` | an ask the request states | a receipt that names the ask's object, or the first of its family when it names none | misses work whose words and receipt never meet |
+| `strict` | a record the episode **opened** | any successful write that touches it | opens an item for everything you looked at |
+| `loose` | …plus every id merely *listed* inside another record | the same | opens more |
+| `ask` | an ask the request states | a write **of its family to a record the episode opened** | binds one ask per call, in arrival order |
+
+**What this project measured, on 456 episodes and 654 required writes the episodes performed.**
+
+| rule | work accounted for | episodes complete | writes credited to nothing | items opened | open that nobody needs |
+|---|---|---|---|---|---|
+| `request` | 416 / 654 (**63.6%**) | 225 / 403 | 232 | 970 | 0.69 per episode |
+| `strict` | 644 / 654 (**98.5%**) | 393 / 403 | **0** | 1,633 | **2.53 per episode** |
+| `ask` | 415 / 654 (63.5%) | 223 / 403 | 232 | 970 | 0.69 per episode |
+
+Read the first two rows together, because either alone is misleading. The record rule **never fails to account for a
+change** — in this corpus every successful write touches a record the episode had already opened, so its "credited to
+nothing" column is empty and it beats the request rule by 34.9 points. It also opens 2.53 items per episode that no
+required write needs, because it opens an item for every record the agent looked at. It cannot tell *work* from
+*looking*. The third row shows that joining the two — relevance from the request, attribution from the read — does not
+recover the coverage: it lands within one write of the request rule, because the rule that made the record board
+complete was not "the read" but "no ask at all".
+
+**Then measure the misses, not the rate.** The request rule's 232 unattributed writes decompose into three causes, and
+the decomposition is the only thing in this section that changes what you should do:
+
+| cause | writes | what to change |
+|---|---|---|
+| the ask is stated in a **later user turn** | **155** (66.8%) | your contract stops reading at the first message |
+| the ask was stated and already spent | 61 (26.3%) | your rule binds one ask per call; the user asked for less than was done |
+| never stated, in any turn | 16 (6.9%) | nothing — these are refusal tasks, where no write is the correct outcome |
+
+Two thirds of the deficit is **disclosure order**. Simulated users — and real ones — disclose progressively: they say
+"my keyboard" only once you ask which order. A contract frozen at the first message describes a task the agent is not
+performing, and no amount of parser work fixes that, because the words arrived after the snapshot.
+
+**And reading the whole conversation is not the fix either.** The same binding rule over every user turn reaches
+**95.6%** of the work and leaves 19 writes unaccounted — at **4,761 items**, 4.9 times the turn-one contract, 3.90 per
+episode of which nobody needs anything. The extra items are the user's *answers* being read as asks: "the mechanical
+keyboard", "box", "manuals", "processing time". An answer can contain a verb that your cue list matches.
+
+**The rule this leaves you with.** If your block is a list of what is outstanding, then its content is a function of
+*when* you take the snapshot, and both ends of that dial are wrong — too early and you are incomplete by a third, too
+late and you are swamped fivefold. Before you tune the parser, plot your own corpus on the two axes above: coverage of
+the work the evaluator grades, and open items per episode that nothing requires. A rule that scores well on one and
+badly on the other has not been chosen, it has been picked.
+
+```bash
+python3 eval/tools/read_anchor.py --document results.json --scope strict
+python3 eval/tools/read_anchor.py --document results.json --scope ask --json | jq .boards.ask.unaccountedBy
+```
+
+The second command prints the three causes. If `disclosedLater` dominates, the defect is your snapshot, not your
+vocabulary — and the repair is an admission rule for new asks, which is a different round from the one a cue list
+would start.

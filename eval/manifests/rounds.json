@@ -719,7 +719,7 @@
     {
       "id": "R228",
       "title": "bind the item to the read, not to the words \u2014 the settlement a policy domain can support",
-      "status": "registered",
+      "status": "read",
       "dispatchBy": "2026-12-19T12:00:00Z",
       "prereg": "prereg/R228-read-anchored.md",
       "arms": [
@@ -731,7 +731,137 @@
         "R227"
       ],
       "why": "R227 closed the record rule at 54.0% and named why: 13 of its 23 misses are asks over a *set* of records selected by a predicate the request never spells as tokens (\"all your upcoming flights\", \"flights longer than four hours\", \"multiple flights for the same day\"), and 6 are bookings whose object the policy chooses. A reference that neither the words nor the record can supply is supplied by the agent's own reads, which this lane has never used as the anchor. The successor binds each item to the record the episode reads and settles it on the write that touches that record, and it is measurable at zero cost on the retail grid the lane already owns.",
-      "bar": "on the retail grid already on disk, the read-anchored board must settle at least as many of its writing episodes as the request-anchored board does (the 1.18 pp admission R226 priced), while its false-accusation rate does not rise"
+      "bar": "on the retail grid already on disk, the read-anchored board must settle at least as many of its writing episodes as the request-anchored board does (the 1.18 pp admission R226 priced), while its false-accusation rate does not rise",
+      "instrument": "python3 eval/tools/read_anchor.py --document <grid>/control.json --replicate <grid>/front.json --scope strict",
+      "readAt": "2026-11-26T10:40:00Z",
+      "actualUsd": 0.0,
+      "outcome": "REFUTED on B3: the read-anchored board settles 644 of 654 discharged required writes (98.5%) against the request board's 416 (63.6%) and credits zero calls to nothing, but it opens 1019 items no required write needs (2.53 per episode against 1.79 required), and the open-tax bar refuses it on both grids (2.53/1.79 and 2.54/1.81)",
+      "reading": {
+        "grid": {
+          "episodes": 456,
+          "graded": 403,
+          "discharged": 654,
+          "required": 720
+        },
+        "boards": {
+          "strict": {
+            "covered": 644,
+            "complete": 393,
+            "unaccounted": 0,
+            "overCredit": 6,
+            "items": 1633,
+            "open": 1035,
+            "openUnneeded": 1019,
+            "precision": 0.991
+          },
+          "request": {
+            "covered": 416,
+            "complete": 225,
+            "unaccounted": 232,
+            "overCredit": 3,
+            "items": 970,
+            "open": 527,
+            "openUnneeded": 278,
+            "precision": 0.993
+          }
+        },
+        "replication": {
+          "strict": {
+            "coverage": 0.981,
+            "openUnneededPerEpisode": 2.54
+          },
+          "request": {
+            "coverage": 0.611,
+            "unaccounted": 240
+          }
+        },
+        "bars": {
+          "B1_settlement": true,
+          "B2_accusation": true,
+          "B3_openTax": false
+        }
+      }
+    },
+    {
+      "id": "R229",
+      "title": "an item is an ask, and the read supplies the binding",
+      "status": "read",
+      "dispatchBy": "2026-12-23T12:00:00Z",
+      "prereg": "prereg/R229-ask-bound.md",
+      "instrument": "python3 eval/tools/read_anchor.py --document <grid>/control.json --replicate <grid>/front.json --scope ask",
+      "readAt": "2026-11-26T10:55:00Z",
+      "actualUsd": 0.0,
+      "arms": [
+        "none"
+      ],
+      "episodes": 0,
+      "estimateUsd": 0.0,
+      "dependsOn": [
+        "R228"
+      ],
+      "why": "R228 priced two rules against each other and neither is a working memory: the request board attributes 63.6% of the required writes and accuses 232 calls, the read board attributes 98.5% and opens 2.53 unneeded items per episode. The two failures are one representational fact \u2014 what is required is only in the request, and which record a call touched is only in the read \u2014 so the successor binds an ask to a write of its family that touches a record the episode opened.",
+      "bar": "coverage of discharged required writes at or above the request board's on the same episodes, unaccounted writes at or below its 232, and at least 0.90 of the board's ticks backed by a graded write",
+      "outcome": "REFUTED on B1: the conjunction keeps the request board's items and gains 10 complete episodes while losing 12, covering 415 of 654 writes (63.5%) against the request board's 416, so the read rule's completeness came from having no ask at all; it holds on the replication (+1.7pp, 404 against 393), which is reported as a property of the grids, not as a pass. Its taxonomy is the round's real result: 155 of the 232 misses are asks stated after the first user turn, 61 are asks already spent, 16 are never stated",
+      "reading": {
+        "ask": {
+          "covered": 415,
+          "complete": 223,
+          "unaccounted": 232,
+          "items": 970,
+          "precision": 0.993,
+          "unaccountedBy": {
+            "disclosedLater": 155,
+            "consumed": 61,
+            "neverStated": 16
+          }
+        },
+        "request": {
+          "covered": 416,
+          "complete": 225,
+          "unaccounted": 232,
+          "items": 970
+        },
+        "askAll": {
+          "covered": 625,
+          "complete": 375,
+          "unaccounted": 19,
+          "items": 4761,
+          "openUnneededPerEpisode": 3.9
+        },
+        "replication": {
+          "ask": {
+            "covered": 404
+          },
+          "request": {
+            "covered": 393
+          },
+          "askAll": {
+            "covered": 611
+          }
+        },
+        "bars": {
+          "B1_settlement": false,
+          "B2_accusation": true,
+          "B3_soundness": true
+        }
+      }
+    },
+    {
+      "id": "R230",
+      "title": "admit a later-turn ask only from a turn that is not an answer",
+      "status": "registered",
+      "dispatchBy": "2026-12-24T12:00:00Z",
+      "prereg": "prereg/R230-not-an-answer.md",
+      "arms": [
+        "none"
+      ],
+      "episodes": 0,
+      "estimateUsd": 0.0,
+      "dependsOn": [
+        "R229"
+      ],
+      "why": "R229's taxonomy put 155 of its 232 unattributed writes on asks the conversation states after the first user turn, which makes disclosure order the largest defect this lane has measured in the block's own content. Following the conversation is not the repair either: the same binding rule over every user turn reaches 95.6% of the required writes at 4761 items, 4.9x the turn-one contract, because a user's *answer* can contain a cue word and be read as an ask. The successor tests the one discriminator that needs no vocabulary: an ask is admitted from a later turn only when the agent's previous turn did not ask the user a question, so a reply to a question is not a requirement.",
+      "bar": "of the 155 writes R229 attributed to later-turn asks, at least 60% must still be accounted for; the admitted asks must not exceed twice the turn-one contract's 970 items; and coverage must rise at least 10 points over the request board's 63.6%"
     }
   ]
 }

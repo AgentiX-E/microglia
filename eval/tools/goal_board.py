@@ -459,11 +459,19 @@ def receipts_of(messages) -> list[dict]:
     """
     calls: list[dict] = []
     results: list[dict] = []
+    position = 0
     for message in messages:
         role = role_of(message)
         if role in ("assistant", "agent"):
             for call in _field(message, "tool_calls") or []:
                 name = _field(call, "name")
+                # The position is counted over **every** call and not over the write calls, because the results this
+                # loop collects are not filtered: τ² answers the k-th call of the episode with the k-th tool message,
+                # so a write's result sits at the index of the call and not at the index of the write. AUDIT 34.320:
+                # counting writes only made a write inherit the verdict of the read before it, which is how a refused
+                # cancel was reported as a change that happened on 37 of the 456 episodes this lane has on disk.
+                here = position
+                position += 1
                 if not isinstance(name, str) or name not in FAMILIES:
                     continue
                 arguments = _field(call, "arguments")
@@ -475,8 +483,15 @@ def receipts_of(messages) -> list[dict]:
                     {
                         "name": name,
                         "family": FAMILIES[name],
+                        "position": here,
                         "ids": ids,
                         "free": free,
+                        # R228. The arguments as the call carried them, because a measurement that binds a receipt to
+                        # a **record** needs the key the identifier arrived under (`order_id` is an order, `user_id`
+                        # is an account) and `ids` has already flattened that away. The board itself never reads this;
+                        # it travels so that the read-anchored comparison can index the same receipt list rather than
+                        # pairing the calls a second time and drifting from this one.
+                        "args": arguments if isinstance(arguments, dict) else {},
                     }
                 )
         elif role == "tool":
@@ -487,9 +502,10 @@ def receipts_of(messages) -> list[dict]:
                 }
             )
     receipts: list[dict] = []
-    for index, call in enumerate(calls):
+    for call in calls:
         # A call with no result is not a receipt: the episode ended, the tool raised, or the message was dropped, and
         # in every one of those the environment changed nothing this document can show.
+        index = call["position"]
         ok = False
         if index < len(results):
             ok = bool(results[index]["ok"]) and "error" not in str(results[index]["content"]).lower()[:40]
@@ -690,7 +706,14 @@ def board_of(messages, scope: str = REQUEST) -> dict:
     sets = {index for index, item in enumerate(unique) if settles_by_family(item, table)}
     absorbing = {index for index, item in enumerate(unique) if absorbs_receipts(item, table)}
     loose = 0
-    for receipt in receipts:
+    # R228. Which receipt settled which ask, by **position** in `receipts_of`'s list. The block a reader sees needs the
+    # name (`settled_by`); a measurement that asks "did this board account for the call the evaluator required" needs
+    # the position, because the call's family and the ask's family are the only thing a name can be compared on and a
+    # set ask absorbs several calls under one tick. Recording the position costs nothing and it is the difference
+    # between a column that can be recomputed and a column that has to be argued for.
+    settled_index: dict = {}
+    absorbed_index: dict = {index: [] for index in absorbing}
+    for position, receipt in enumerate(receipts):
         hit = False
         for index, item in enumerate(unique):
             if index in settled:
@@ -698,6 +721,7 @@ def board_of(messages, scope: str = REQUEST) -> dict:
             grade = settlement(item, receipt, table)
             if grade:
                 settled[index] = receipt
+                settled_index[index] = position
                 loose += 1 if grade == "overlap" else 0
                 hit = True
         if not hit:
@@ -710,6 +734,7 @@ def board_of(messages, scope: str = REQUEST) -> dict:
                     continue
                 if unique[index]["family"] == receipt["family"] and receipt.get("ok"):
                     settled[index] = receipt
+                    settled_index[index] = position
                     hit = True
                     break
         if hit:
@@ -737,6 +762,7 @@ def board_of(messages, scope: str = REQUEST) -> dict:
         )
         if owner is not None:
             absorbed[owner] = absorbed.get(owner, 0) + 1
+            absorbed_index[owner].append(position)
             continue
         family_asked = any(item["family"] == receipt["family"] for item in unique)
         (unattributed if family_asked else unrequested).append(receipt)
@@ -746,6 +772,7 @@ def board_of(messages, scope: str = REQUEST) -> dict:
             {
                 **item,
                 "settled_by": (settled.get(index) or {}).get("name"),
+                "settledIndex": settled_index.get(index),
                 "absorbed": absorbed.get(index, 0),
             }
             for index, item in enumerate(unique)
@@ -753,6 +780,13 @@ def board_of(messages, scope: str = REQUEST) -> dict:
         "unattributed": [{"name": receipt["name"]} for receipt in unattributed],
         "unrequested": [{"name": receipt["name"]} for receipt in unrequested],
         "absorbed": sum(absorbed.values()),
+        # The positions of the calls this board credited to some ask: the settling call of every ticked ask, plus the
+        # calls a set ask absorbed. Anything else the episode wrote is a call the board did not account for, which is
+        # what `unrequested` already says by name and what R228's coverage column has to say by position.
+        "credited": sorted(
+            [position for position in settled_index.values()]
+            + [position for positions in absorbed_index.values() for position in positions]
+        ),
         # How many of the ticks came from the weaker grade. A reading whose ticks are mostly loose is a reading about
         # a looser rule than the one that was registered, and the number is here so that can be said rather than
         # discovered (see `settlement`).
@@ -1417,6 +1451,27 @@ def self_test() -> int:
     )
     check("a failed call is a receipt that did not happen", failed[0]["ok"] is False)
     check("a failed call settles nothing", settles({"family": "cancel", "words": []}, failed[0], {}) is False)
+
+    # R228 / AUDIT 34.320. The pair is positional over **every** call, not over the write calls: a write that follows a
+    # read is answered by the result that follows the read's. Counting writes only made a write inherit a verdict from
+    # the read before it, in both directions, and this is the pair of assertions that would have caught it.
+    after_a_failed_read = receipts_of([
+        {"role": "assistant", "tool_calls": [{"name": "get_order_details", "arguments": {"order_id": "#W1"}}]},
+        {"role": "assistant", "tool_calls": [{"name": "cancel_pending_order", "arguments": {"order_id": "#W1"}}]},
+        {"role": "tool", "content": "Error: no such order", "error": True},
+        {"role": "tool", "content": json.dumps({"success": True})},
+    ])
+    check("a write's verdict is the write's result, not the read's",
+          after_a_failed_read[0]["ok"] is True)
+    after_a_good_read = receipts_of([
+        {"role": "assistant", "tool_calls": [{"name": "get_order_details", "arguments": {"order_id": "#W1"}}]},
+        {"role": "assistant", "tool_calls": [{"name": "cancel_pending_order", "arguments": {"order_id": "#W1"}}]},
+        {"role": "tool", "content": json.dumps({"order_id": "#W1"})},
+        {"role": "tool", "content": "Error: order is delivered", "error": True},
+    ])
+    check("and a refused write is refused even after a successful read",
+          after_a_good_read[0]["ok"] is False)
+    check("the receipt carries the position of its own call", after_a_good_read[0]["position"] == 1)
 
     # Settling: the containment rule and its two refusals.
     board_messages = messages + [

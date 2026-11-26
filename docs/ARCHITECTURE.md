@@ -5188,3 +5188,94 @@ The last line prints the ladder, the family column, the union, and every write n
 touched and how many identity tokens it had. `--family-found` is not a knob: it is the family count from
 `goal_board --census` over the same corpus, and a disagreement between the two implementations of one allocation rule
 fails the run instead of being reported.
+
+### 8.104 An item is an ask, a read is its binding, and the two rules do not join
+
+Section 8.103 ended with a contract registered and unmeasured: settle an item when a receipt touches the **record** the
+ask names. R227 refuted it at 54.0% against a bar of 0.75 and said why — the requests do not name records, they
+describe queries over state. The successor therefore moved the anchor one step further, from the record the request
+names to the record the **episode read**, and the round that measured it is the first in this lane to price four rules
+on one grid at once.
+
+**Four boards, one grid, no dispatch.** Each is a rule for turning a transcript into items and ticks:
+
+| board | an item is | settled by |
+|---|---|---|
+| `request` | an ask the request states | a receipt that *names* the ask's object, or the first receipt of the ask's family when it names none |
+| `strict` | a record the episode **opened** (`get_order_details`, `get_user_details`, a lookup that returns an identity) | any successful write that touches that record |
+| `loose` | …plus every order id **listed** inside a user record | the same |
+| `ask` | an ask the request states | a successful write **of its family to a record the episode opened**, one ask per call |
+
+The grid is R218b's: 456 episodes over 114 tasks, of which 403 have a required write the episode performed
+(**654 of 720** required writes discharged), and 712 successful writes in all. Nothing here is a model call.
+
+**The reading.**
+
+| board | covered | complete | unaccounted | over-credited | items | open | unneeded open | precision |
+|---|---|---|---|---|---|---|---|---|
+| `strict` | 644 (**98.5%**) | 393 | **0** | 6 | 1,633 | 1,035 | 1,019 (**2.53**/ep) | 99.1% |
+| `loose` | 644 (98.5%) | 393 | 0 | 6 | 1,648 | 1,050 | 1,034 (2.57/ep) | 99.1% |
+| `ask` | 415 (63.5%) | 223 | 232 | 3 | 970 | 552 | 278 (0.69/ep) | 99.3% |
+| `request` | 416 (63.6%) | 225 | 232 | 3 | 970 | 527 | 278 (0.69/ep) | 99.3% |
+
+**The read anchor cannot miss a discharge, and that is not a compliment.** Every successful write in this corpus touches
+a record the episode had opened, so `unaccounted` is **zero** and coverage is 98.5% against the request board's 63.6%,
+netting 169 episodes complete and losing 1. It reads as the answer until the last column: it opens 1,633 items over 403
+episodes and leaves **1,019 of them open that no required write needs** — 2.53 per episode against 1.79 required writes
+per episode. It cannot tell work from looking.
+
+**The conjunction does not rescue the coverage.** `ask` binds each write to an ask of its family, one ask per call,
+provided the write's record was opened — relevance from the request, attribution from the read. It lands at 415 of 654
+(**63.5%**), one write *below* the request board and 240 above nothing: it keeps the request board's items (970 in both)
+and gains 10 complete episodes while losing 12. The rule that made the read board complete was not "the read" but "no
+ask at all", and any rule that keeps the ask keeps the request board's ceiling.
+
+**Why 63.6% is not an attribution failure, which is the round's actual finding.** The 232 writes the turn-one contract
+cannot account for decompose into three causes, and the tool reports them:
+
+| cause | writes | what it means |
+|---|---|---|
+| the ask is stated in a **later user turn** | **155** (66.8%) | the contract reads the first user message and nothing else |
+| the ask was stated and already **spent** | 61 (26.3%) | the episode wrote more of that family than the request asked |
+| **never stated** in any turn | 16 (6.9%) | refusal tasks and transfers, where the correct outcome is no write |
+
+Two thirds of the deficit is **disclosure order**. τ²'s user simulator is instructed to "disclose information
+progressively" and to wait for the agent to ask, so on a third of these tasks the operative ask appears in turn three or
+five, and a block that froze its contract at turn one is describing a task that is not the one being performed.
+
+**And following the conversation is not the repair.** Reading every user turn (`askAll`, same binding rule) lifts
+coverage to 625 of 654 (**95.6%**) and drops `unaccounted` to 19 — at **4,761 items**: 4.9× the turn-one contract, of
+which 1,571 are open and unneeded (3.90 per episode). The extra items are the user's *answers* to the agent's questions
+being parsed as asks — "the mechanical keyboard", "box", "manuals", "processing time" — because the parser matches an
+action cue and an answer can contain one.
+
+So the dial has two ends and both are wrong: a contract read once is incomplete by a third, and a contract read
+continuously is complete and swamped fivefold. That is a property of *when* a contract is read rather than of *which*
+anchor it uses, and it is the first thing this lane has measured that explains the block's negative result as a defect
+of its own content rather than as an absence of effect.
+
+**What the tooling guarantees.** `eval/tools/read_anchor.py` builds all four boards from one pass over the transcript,
+because the question is *when* a record became visible and a board that sorted by kind instead of by time would credit
+a write to a record read after it. Discharge is matched one-to-one on family **and** record, so a second cancel of the
+same order is not a second piece of required work. Every reading is saved with the grid's sha256 and re-checked by
+`--check`, which verifies that the boards agree with their own parts, that each taxonomy sums to the writes it
+explains, and that the bars are the ones the numbers imply.
+
+The same five points are drawn on the plane a working memory is chosen on — coverage against open tax — by
+`scripts/anchors.py`, which reads the two saved readings rather than retyping their numbers:
+![five rules, one grid](docs/benchmarks/anchors.svg).
+
+```bash
+python3 scripts/anchors.py --print --out-svg docs/benchmarks/anchors.svg
+python3 eval/tools/read_anchor.py --self-test
+python3 eval/tools/read_anchor.py --document /path/to/control.json --replicate /path/to/front.json --scope strict
+python3 eval/tools/read_anchor.py --document /path/to/control.json --scope ask --bar
+python3 eval/tools/read_anchor.py --check eval/manifests/r228-reading.json
+```
+
+**The verdict, stated as the registration asked for it.** R228's three bars: settlement holds, accusation holds, open
+tax fails at 2.53 against 1.79 — so the round is **REFUTED**, on the same grid and again on the replication (2.54
+against 1.81). R229's three bars: settlement fails by one write (415 against 416) on the control grid and holds on the
+replication (+1.7 points) — refused, and the reversal is reported as a property of the grids rather than as a pass. Five
+anchors have now been measured and five have been refused: request (R223), reveal (R225), record (R227), read (R228),
+ask-bound (R229).

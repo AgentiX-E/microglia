@@ -2871,3 +2871,28 @@ matters to every census that counts spare asks: an ask on a refusal task that ne
 noise, and in the airline manifest 29 of 52 spare asks sit on the 23 refusal tasks. Retail has seven such tasks and the
 airline note carried that seven across as its own count for a month (AUDIT 34.317), which is why both are now pinned
 in CI rather than described in prose.
+
+**Read anchor** — a rule that binds a board item to a **record the episode opened** rather than to a phrase the request
+states. An item is a record (`get_order_details`, `get_user_details`, a lookup that returns an identity), and it is
+settled by the first successful write that touches it, whatever family that write is in. Measured on 456 episodes it
+accounts for **98.5%** of the writes the evaluator requires and credits **zero** calls to nothing, against the request
+rule's 63.6% — and it opens 2.53 items per episode that no required write needs, because it opens an item for every
+record the agent looked at. The anchor is complete and cannot tell work from looking.
+
+**Ask binding** — the conjunction of the two anchors: an item is an ask the request states, and it is settled by a
+successful write **of its family to a record the episode opened**, one ask per call. Relevance comes from the request,
+which is the only thing that knows what is required; attribution comes from the read, which is the only thing that
+knows which record a call touched. Measured on the same grid it reaches 63.5% — one write below the request rule — which
+says the read rule's completeness came from having no ask at all.
+
+**Open tax** — the number of items a board leaves open at the end of an episode that **no required write needs**. It is
+the price of a wider rule and the column that refuses the read anchor: 2.53 per episode against 1.79 required writes per
+episode, so the block is more than half noise. A rule is priced by coverage *and* open tax together; a rule that scores
+well on one is not a rule that has been chosen.
+
+**Disclosure order** — the turn of the conversation a requirement first appears in. Simulated and real users disclose
+progressively ("I need to update my pending small t-shirt orders" … "the purple one, order W4776164"), so a contract
+that reads only the first user message misses the operative ask on a third of these tasks. Of the 232 airline-retail
+writes the turn-one contract cannot account for, **155 (66.8%)** are asks the conversation states after the first turn,
+61 are asks already spent, and 16 are never stated at all. It is the first measured property of the block's *content*
+that explains a negative result as a defect rather than as an absence of effect.

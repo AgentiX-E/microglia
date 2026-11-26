@@ -196,13 +196,17 @@ jobs:
           # nobody re-ran, and this lane has already bought one instrument it turned out could not report.
           python3 -m coverage run --append --branch --include="*/eval/tools/record_census.py" \
             eval/tools/record_census.py --self-test
+          # R228/R229. Which anchor settles an item: the request's words, the record the episode read, or an ask bound
+          # to that record. The tool is under the same floor as the rest because the round's claims are its numbers.
+          python3 -m coverage run --append --branch --include="*/eval/tools/read_anchor.py" \
+            eval/tools/read_anchor.py --self-test
           # The projection the census reads: the 50 tasks' users, their reservations, and the evaluator's own writes.
           # It carries the source's sha256 because a manifest without one is a table of claims.
           python3 -m coverage run --append --branch --include="*/scripts/build_airline_records.py" \
             scripts/build_airline_records.py --self-test
           python3 -m coverage json -o coverage-python.json
           python3 scripts/check-python-coverage.py --self-test
-          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 24
+          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 25
 
       - name: The rounds this project owes, and the date each one was registered for
         # The failure this prevents is not a wrong number, it is a round that quietly stops being planned: R216b's
@@ -212,6 +216,53 @@ jobs:
         run: |
           python3 eval/tools/round_clock.py
           python3 eval/tools/serving_defaults.py
+
+      - name: The two readings the anchor rounds were judged on, and whether their parts add up
+        # R228 asked whether binding an item to the record the episode **read** settles more of the work than binding it
+        # to the request's words; R229 asked whether the two can be joined. Neither reading is recomputed here — the
+        # grid they were taken over is a 32 MB artefact from a paid dispatch and is not in this repository — so what is
+        # gated is the arithmetic: every board agrees with its own parts, the taxonomy sums to the writes it explains,
+        # and a bar is the one its numbers imply. That is the class of defect this repository has audited three rounds
+        # running (AUDIT 34.311, 34.315, 34.317), and it is the one a document can introduce without touching code.
+        run: |
+          set -euo pipefail
+          python3 eval/tools/read_anchor.py --check eval/manifests/r228-reading.json
+          python3 eval/tools/read_anchor.py --check eval/manifests/r229-reading.json
+          python3 - <<'CHECK'
+          import json
+
+          r228 = json.load(open("eval/manifests/r228-reading.json"))
+          r229 = json.load(open("eval/manifests/r229-reading.json"))
+          assert r228["scope"] == "strict" and r229["scope"] == "ask", (r228["scope"], r229["scope"])
+          reading = r228["reading"]
+          boards = reading["boards"]
+          # The reading R228 was refused on: the read board settles 98.5% of the discharged writes and opens 2.53
+          # items per episode that no required write needs, against 1.79 required per episode. A later round that
+          # moves either number has to move this line on purpose.
+          assert boards["strict"]["covered"] == 644, boards["strict"]["covered"]
+          assert boards["strict"]["unaccounted"] == 0, boards["strict"]["unaccounted"]
+          assert boards["request"]["covered"] == 416, boards["request"]["covered"]
+          assert boards["request"]["unaccounted"] == 232, boards["request"]["unaccounted"]
+          assert reading["bar"]["B1_settlement"]["holds"] is True
+          assert reading["bar"]["B2_accusation"]["holds"] is True
+          assert reading["bar"]["B3_openTax"]["holds"] is False, "R228 was refused on its open-tax bar"
+          assert reading["replication"]["bar"]["B3_openTax"]["holds"] is False, "and so it was on the second grid"
+          # R229: the conjunction keeps relevance and pays for it with attribution, so it fails B1 by one write on the
+          # control grid and holds on the replication. Both are pinned, because a bar that passes on one grid and not
+          # the other is a finding about the grids and not a pass.
+          second = r229["reading"]
+          assert second["boards"]["ask"]["covered"] == 415, second["boards"]["ask"]["covered"]
+          assert second["boards"]["ask"]["unaccounted"] == 232, second["boards"]["ask"]["unaccounted"]
+          assert second["bar"]["B1_settlement"]["holds"] is False, "R229 was refused on its settlement bar"
+          assert second["replication"]["bar"]["B1_settlement"]["holds"] is True
+          # The diagnostic the next round is registered on: of the 232 writes the turn-one contract cannot account for,
+          # two thirds are asks the conversation states after the first turn.
+          assert second["boards"]["ask"]["unaccountedBy"]["disclosedLater"] == 155
+          assert second["boards"]["ask"]["unaccountedBy"]["consumed"] == 61
+          assert second["boards"]["ask"]["unaccountedBy"]["neverStated"] == 16
+          print(f"ok  read {boards['strict']['coverage']:.1%} vs request {boards['request']['coverage']:.1%}; "
+                f"ask {second['boards']['ask']['coverage']:.1%} with 155/232 misses disclosed after turn one")
+          CHECK
 
       - name: Does the request name the record, which is R227's bar and the reason the grid is still unbought
         # R227. R217a refused the airline grid because the family rule found 30.0% of its writes. The successor
