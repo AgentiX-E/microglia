@@ -50,6 +50,20 @@ import tempfile
 from pathlib import Path
 
 
+def _tools_on_path() -> None:
+    """Put this file's own directory on the path once, so a sibling module is importable by bare name.
+
+    `python3 <script>.py` inserts the script's directory on 3.11 and **not** on 3.10, so a suite that imports a sibling
+    lazily — this one imports `goal_board.strata_of` for the cross-check — passes on the development interpreter and
+    raises `ModuleNotFoundError` in CI, which runs 3.10. The coverage step's own header names this defect; this file
+    then reproduced it, in the one import the cross-check added, and `python3 -P` reproduces it locally on 3.11 because
+    the flag removes exactly the insertion the interpreter is doing for free.
+    """
+    here = str(Path(__file__).resolve().parent)
+    if here not in sys.path:
+        sys.path.insert(0, here)
+
+
 def _verdict(simulation) -> int:
     """One episode's pass flag, from either shape a reward arrives in."""
     reward = simulation.get("reward_info") or {}
@@ -293,7 +307,12 @@ def self_test() -> int:
 
         # The cross-check against the tree's older strata reader: on a k = attempts fixture the damaged set must be the
         # same set, because both call a task damaged when it passed every attempt and then stopped passing them all.
+        _tools_on_path()
         from goal_board import strata_of
+
+        check("the sibling's directory is on the path exactly once",
+              sys.path.count(str(Path(__file__).resolve().parent)) == 1,
+              sys.path.count(str(Path(__file__).resolve().parent)))
 
         def loaded(path):
             return json.loads(Path(path).read_text(encoding="utf-8"))
