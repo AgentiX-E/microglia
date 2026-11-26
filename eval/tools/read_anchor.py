@@ -111,6 +111,16 @@ ADMIT_NOISE = 2.0
 #: moves the request board does not move this bar with it.
 ADMIT_COVERAGE = 0.736
 
+#: R231's three bars, registered in `prereg/R231-the-clause.md` before the reading. B1 and B3 are R230's, unchanged
+#: and on purpose: the round has to be judged on the bar its predecessor failed, or a rescored bar becomes the result.
+CLAUSE_RECOVERY = 0.60
+#: **Efficiency**, and it is a **restatement rather than an inheritance**: R230 passed a count limit (1,110 items
+#: against 1,940) while rescuing a sixth of what it targeted, because a ceiling on items is passed by any rule that
+#: admits almost nothing (AUDIT 34.323). A ratio binds in the direction the round cares about — every item the rule
+#: buys has to come with a write it rescued.
+CLAUSE_EFFICIENCY = 1.5
+CLAUSE_COVERAGE = 0.736
+
 
 def _siblings() -> str:
     """Put this file's own directory on `sys.path`, and answer it.
@@ -317,6 +327,78 @@ def admitted_asks(messages) -> dict:
     }
 
 
+def clause_asks(messages) -> dict:
+    """R231's reading: the contract's turn as a whole, every other turn one clause at a time.
+
+    R230 priced the positional test and it failed for a reason that is not about position: of 2,453 user turns,
+    **1,893 (77.2%)** follow a question from the agent, so the requirement and the answer share a turn and a whole-turn
+    filter cannot keep one without the other. The material is *inside* the turn, so the next discriminator has to be,
+    and it already exists — it is the parser's inheritance rule, which R229 priced as the source of its 4,761 items:
+
+        a clause with no cue of its own takes the family of the clause before it, within the same sentence
+
+    Inside a request that rule is what makes "the smart thermostat for one compatible with Google Home" an exchange
+    rather than a fragment. Inside an **answer** it is what manufactures an ask out of a value: "yes, the purple one"
+    inherits the exchange the agent proposed and becomes a second ask carrying the answer's words. So the round does
+    not add a rule; it restricts where one may reach:
+
+    * **The contract's turn is read whole.** Not turn one — the first turn that states an ask, which is turn three or
+      later on 52 of 403 episodes (AUDIT 34.324). This is the invariant that round's audit asked every later rule to
+      state: the board's item set **contains the contract's asks**, so a rule that reads more turns can no longer
+      cover fewer writes, and coverage moving down is a finding about the binding rather than about the gate.
+    * **Every other turn contributes only its self-naming clauses.** No cue of its own, no ask — whatever precedes it.
+
+    What it gives up is stated because the reading is decided by it: an object list continued across clauses ("return
+    the lamp and the chair") loses everything after the first object, because only inheritance reaches the second. That
+    is the cost the round exists to price, and `offered - kept` is that cost as a count rather than as a shortfall.
+    """
+    module = _board()
+    turns: list = []
+    seen = 0
+    for message in messages:
+        role = module.role_of(message)
+        if role not in ("user", "human"):
+            continue
+        content = module._field(message, "content")  # noqa: SLF001 - the board's own accessor
+        text = content if isinstance(content, str) else ""
+        position = seen
+        seen += 1
+        if not text.strip():
+            # Nothing to read, and nothing the rule refused. The turn is still counted, because `admitted_asks` counts
+            # it: a turn that stated nothing is an event in the conversation even when neither rule reads it, and two
+            # rules whose turn counts disagree cannot be compared on the denominator they share.
+            continue
+        turns.append({"position": position, "whole": module.items_of(text),
+                      "own": module.items_of(text, inherit=False)})
+    contract = next((turn["position"] for turn in turns if turn["whole"]), None)
+    asks: list = []
+    whole_turns: list = []
+    partial: list = []
+    offered = kept = 0
+    for turn in turns:
+        take = turn["whole"] if turn["position"] == contract else turn["own"]
+        offered += len(turn["whole"])
+        kept += len(take)
+        if turn["position"] == contract:
+            whole_turns.append(turn["position"])
+        elif len(turn["own"]) < len(turn["whole"]):
+            partial.append(turn["position"])
+        asks.extend(take)
+    return {
+        "asks": module._folded(asks),
+        "turns": seen,
+        "contract": contract,
+        "wholeTurns": whole_turns,
+        "partialTurns": partial,
+        # The asks the parser offers across these turns, and the asks the boundary kept. Their difference is exactly
+        # what only inheritance reached — the objects of a list, and the value of an answer.
+        "offered": offered,
+        "kept": kept,
+        "refusedInherited": offered - kept,
+        "containsContract": contract is not None,
+    }
+
+
 def board(entry: dict, scope: str = "strict") -> dict:
     """The read-anchored board: items are records opened, ticks are writes that touch them.
 
@@ -392,15 +474,20 @@ def ask_board(entry: dict, messages, scope: str = "request") -> dict:
     and it is the bar's third test.
     """
     module = _board()
-    if scope not in ("request", "conversation", "admitted"):
+    if scope not in ("request", "conversation", "admitted", "clause"):
         # Named rather than defaulted: an unknown scope used to fall through to the request board, which would make a
         # typo on the command line a quiet re-run of the previous round.
         raise ValueError(f"unknown ask scope {scope!r}")
-    admission = admitted_asks(messages) if scope == "admitted" else None
+    if scope == "admitted":
+        admission = admitted_asks(messages)
+    elif scope == "clause":
+        admission = clause_asks(messages)
+    else:
+        admission = None
     if admission is not None:
-        # R230. The asks come from the turns a question did not ask for; the binding is unchanged, so the difference
+        # R230 and R231. The asks come from the turns the rule admits; the binding is unchanged, so the difference
         # between this board and `askAll` is exactly the admission rule and nothing else. The diagnostics travel with
-        # the board because the round's finding is the composition of the transcript, not the point it lands on.
+        # the board because the rounds' findings are the composition of the transcript, not the point they land on.
         asks = admission["asks"]
     else:
         asks = module.board_of(messages, module.CONVERSATION if scope == "conversation" else module.REQUEST)["items"]
@@ -547,27 +634,25 @@ def episode(document_task, simulation: dict) -> dict:
         "boards": {},
     }
     required_families = {want["family"] for want in required}
-    # Hoisted rather than read inside the loop: R230's recovery needs the ask board's per-write causes and the admitted
-    # board's credits, and reading them out of whichever loop entry happened to run first would make the measurement
-    # depend on the order of a tuple.
+    # Hoisted rather than read inside the loop: both admission rounds need the ask board's per-write causes, and reading
+    # them out of whichever loop entry happened to run first would make the measurement depend on the order of a tuple.
     ask_found = ask_board(entry, messages)
     late = ask_found.get("unaccountedByPosition") or {}
-    admitted_credit: set = set()
-    admission: dict = {}
-    for scope in ("strict", "loose", "ask", "askAll", "admitted"):
+    disclosed = {position for position, cause in late.items() if cause == "disclosedLater"}
+    admissions: dict = {}
+    for scope in ("strict", "loose", "ask", "askAll", "admitted", "clause"):
         if scope == "askAll":
             found = ask_board(entry, messages, "conversation")
-        elif scope == "admitted":
-            found = ask_board(entry, messages, "admitted")
-            admitted_credit = set(found["credited"])
-            admission = found["admission"] or {}
+        elif scope in ("admitted", "clause"):
+            found = ask_board(entry, messages, scope)
+            admissions[scope] = found["admission"] or {}
         elif scope == "ask":
             found = ask_found
         else:
             found = board(entry, scope)
         covered = [position for position in found["credited"] if position in done["byPosition"]]
         opening = [item for item in found["items"] if not item["settled"]]
-        if scope in ("ask", "askAll", "admitted"):
+        if scope in ("ask", "askAll", "admitted", "clause"):
             # An open ask is unneeded when no required write is of its family. Its *record* is whatever the episode
             # happened to bind, so the record test the two read boards use would say nothing here.
             unneeded = sum(1 for item in opening if item["family"] not in required_families)
@@ -584,6 +669,10 @@ def episode(document_task, simulation: dict) -> dict:
             # A credited call the evaluator does not require. Named for what it is: outside the graded set.
             "overCredit": sum(1 for position in found["credited"] if position not in done["byPosition"]),
             "unaccountedBy": found.get("unaccountedBy") or {},
+            # R230's recovery column, on **every** board rather than only the two admission rules: the question it
+            # answers — of the writes a later turn states, how many does this rule account for — is a property any
+            # rule has, and the request board's zero is the arithmetic that makes the round a round.
+            "recoveredFromLate": sum(1 for position in found["credited"] if position in disclosed),
         }
     credited = set(requested.get("credited") or [])
     covered = [position for position in credited if position in done["byPosition"]]
@@ -607,20 +696,34 @@ def episode(document_task, simulation: dict) -> dict:
         "asked": len(requested.get("items") or []),
         "unrequestedNamed": len(requested.get("unrequested") or []),
         "unattributedNamed": len(requested.get("unattributed") or []),
+        # Zero by construction, and that is the point rather than a column without content: a write the contract
+        # cannot account for *because a later turn states its family* is a write whose family the contract never
+        # names, so no ask of the contract can settle it. The three admission rounds are measured against this zero.
+        "recoveredFromLate": sum(1 for position in credited if position in disclosed),
     }
     out["recordCarrying"] = len(record_carrying)
-    # R230. Recovery is measured per episode and on positions, so it is the same write on both sides of the
-    # comparison: the writes the turn-one contract could not account for *because a later turn states their family*,
-    # and how many of them the admitted board now credits. A rate aggregated here would pair a two-write episode with
-    # a nine-write one; the counts are summed in `compare` for the reason every other column is.
-    disclosed = [position for position, cause in late.items() if cause == "disclosedLater"]
+    # Recovery is measured per episode and on positions, so it is the same write on both sides of the comparison: the
+    # writes the contract could not account for *because a later turn states their family*, and how many of them a
+    # given board now credits. A rate aggregated here would pair a two-write episode with a nine-write one; the counts
+    # are summed in `compare` for the reason every other column is. `recovered` keeps R230's meaning — the admitted
+    # board's column — because that reading is saved and pinned, and a saved reading has to stay reproducible by the
+    # code that quotes it.
     out["lateWrites"] = len(disclosed)
-    out["recovered"] = sum(1 for position in disclosed if position in admitted_credit)
+    out["recovered"] = out["boards"]["admitted"]["recoveredFromLate"]
+    admission = admissions.get("admitted") or {}
     out["turns"] = admission.get("turns", 0)
     out["admittedTurns"] = len(admission.get("admitted") or [])
     out["skippedTurns"] = len(admission.get("skipped") or [])
     out["contractLater"] = 1 if admission.get("contract") not in (None, 0) else 0
     out["contractLost"] = 1 if admission and not admission.get("contractAdmitted") else 0
+    # R231's diagnostics: what the boundary kept, and what only inheritance would have reached. The second is the
+    # round's cost, counted rather than inferred — a rule that is priced only by its coverage cannot say whether it
+    # lost object lists or answers.
+    clause = admissions.get("clause") or {}
+    out["clauseWholeTurns"] = len(clause.get("wholeTurns") or [])
+    out["clausePartialTurns"] = len(clause.get("partialTurns") or [])
+    out["clauseOffered"] = clause.get("offered", 0)
+    out["clauseKept"] = clause.get("kept", 0)
     return out
 
 
@@ -658,9 +761,13 @@ def compare(document: dict, scope: str = "strict") -> dict:
         "contractLost": sum(row["contractLost"] for row in graded),
         "lateWrites": sum(row["lateWrites"] for row in graded),
         "recovered": sum(row["recovered"] for row in graded),
+        "clauseWholeTurns": sum(row["clauseWholeTurns"] for row in graded),
+        "clausePartialTurns": sum(row["clausePartialTurns"] for row in graded),
+        "clauseOffered": sum(row["clauseOffered"] for row in graded),
+        "clauseKept": sum(row["clauseKept"] for row in graded),
         "boards": {},
     }
-    for name in ("strict", "loose", "ask", "askAll", "admitted", "request"):
+    for name in ("strict", "loose", "ask", "askAll", "admitted", "clause", "request"):
         block = [row["boards"][name] for row in graded]
         covered = sum(one["covered"] for one in block)
         summary["boards"][name] = {
@@ -687,7 +794,10 @@ def compare(document: dict, scope: str = "strict") -> dict:
             "unaccountedBy": dict(sorted(collections.Counter(
                 {key: sum((one.get("unaccountedBy") or {}).get(key, 0) for one in block)
                  for key in ("disclosedLater", "consumed", "neverStated")}
-            ).items())) if name in ("ask", "askAll", "admitted") else None,
+            ).items())) if name in ("ask", "askAll", "admitted", "clause") else None,
+            # Of the writes a later turn states, the ones this board accounts for. Every board has the column,
+            # because the difference between them is the round: the contract's zero against a rule's rescue.
+            "recoveredFromLate": sum(one["recoveredFromLate"] for one in block),
             # Of the calls this board ticked, the share the evaluator also requires. A tick that is not backed by a
             # graded write is the harm channel: the block saying done about work nobody asked for.
             "precision": (covered / sum(one["credited"] for one in block)) if sum(one["credited"] for one in block) else None,
@@ -712,7 +822,12 @@ def compare(document: dict, scope: str = "strict") -> dict:
             and row["boards"]["request"]["covered"] == row["discharged"]
         ),
     }
-    summary["bar"] = admit_bar(summary) if scope == "admitted" else _bar(graded, summary, scope)
+    if scope == "admitted":
+        summary["bar"] = admit_bar(summary)
+    elif scope == "clause":
+        summary["bar"] = clause_bar(graded, summary)
+    else:
+        summary["bar"] = _bar(graded, summary, scope)
     summary["tasksJudged"] = sum(1 for task in tasks.values() if required_writes(task))
     return summary
 
@@ -829,6 +944,60 @@ def admit_bar(summary: dict) -> dict:
     }
 
 
+def clause_bar(graded: list, summary: dict) -> dict:
+    """R231's three bars, evaluated where the registration wrote them.
+
+    B1 and B3 are R230's, unchanged and on purpose: a round judged on a rescored bar is not judged. B2 is the one that
+    had to be rewritten, and the rewrite is the finding — R230 passed "items within twice the contract" while rescuing
+    a sixth of what it targeted, because a ceiling on cost is satisfied by any rule that admits almost nothing
+    (AUDIT 34.323). The ratio removes that route; what it adds is a second one, closed here:
+
+    **A ratio with a zero denominator is not satisfied by a zero numerator.** A rule that adds no item and rescues no
+    write would pass `added <= 1.5 * recovered` at `0 <= 0` — the degenerate rule passing the bar written to stop it,
+    which is the same defect in the other direction. Recovery of zero is therefore a failure, not a pass, and the
+    ratio is reported as `None` rather than as a number the arithmetic would have to invent.
+    """
+    if not graded:
+        return {"holds": False, "reason": "no episode discharged a required write, so no bar can be evaluated"}
+    if not summary["lateWrites"]:
+        return {"holds": False, "reason": "no write was attributed to a later turn, so recovery cannot be evaluated"}
+    chosen = summary["boards"]["clause"]
+    requested = summary["boards"]["request"]
+    recovered = chosen["recoveredFromLate"]
+    recovery = recovered / summary["lateWrites"]
+    # Can be negative only if the clause board holds fewer asks than the contract, which the contract's own turn makes
+    # impossible — so the budget below is read as a ceiling rather than clamped, and a negative reading would show up
+    # as an efficiency improvement that no rule could have earned.
+    added = chosen["items"] - requested["items"]
+    b1 = recovery >= CLAUSE_RECOVERY
+    b2 = recovered > 0 and added <= CLAUSE_EFFICIENCY * recovered
+    b3 = (chosen["coverage"] or 0.0) >= CLAUSE_COVERAGE
+    return {
+        "B1_recovery": {
+            "holds": b1,
+            "recovered": recovered,
+            "against": summary["lateWrites"],
+            "recovery": recovery,
+            "bar": CLAUSE_RECOVERY,
+        },
+        "B2_efficiency": {
+            "holds": b2,
+            "added": added,
+            "recovered": recovered,
+            "perWrite": (added / recovered) if recovered else None,
+            "budget": CLAUSE_EFFICIENCY * recovered,
+            "bar": CLAUSE_EFFICIENCY,
+        },
+        "B3_coverage": {
+            "holds": b3,
+            "coverage": chosen["coverage"],
+            "bar": CLAUSE_COVERAGE,
+            "againstRequest": requested["coverage"],
+        },
+        "holds": b1 and b2 and b3,
+    }
+
+
 def render(reading: dict, scope: str = "strict") -> str:
     """The reading as sentences, in the order the bars are written.
 
@@ -853,7 +1022,7 @@ def render(reading: dict, scope: str = "strict") -> str:
         f"{'board':9s} {'covered':>7s} {'coverage':>8s} {'complete':>8s} {'unacc':>6s} {'over':>5s} "
         f"{'items':>6s} {'open':>5s} {'unneeded':>8s} {'precision':>9s}",
     ]
-    for name in ("strict", "loose", "ask", "askAll", "admitted", "request"):
+    for name in ("strict", "loose", "ask", "askAll", "admitted", "clause", "request"):
         one = boards[name]
         lines.append(
             f"{name:9s} {one['covered']:7d} {share(one['coverage']):>8s} {one['complete']:8d} "
@@ -864,12 +1033,43 @@ def render(reading: dict, scope: str = "strict") -> str:
         f"coverage delta {signed(paired['coverageDelta'])} against the request board; "
         f"episodes complete gained {paired['episodesCompleteGained']}, lost {paired['episodesCompleteLost']}"
     )
-    if reading.get("contractLost"):
+    if scope == "admitted" and reading.get("contractLost"):
+        # R230's diagnosis, printed by the scope rather than by the bar: a reading whose bar has no tests is still a
+        # reading, and the sentence explains a *loss* the bars cannot see. Kept off a clause reading on purpose —
+        # that number is about the turn filter's refusals, and this round has no filter.
         lines.append(
             f"the contract's turn is not turn one in {reading['contractLater']} episode(s) — the first turn stated no "
             f"ask — and the filter refused that very turn in {reading['contractLost']} of them"
         )
-    if "B1_recovery" in bar:
+    if "B2_efficiency" in bar:
+        # R231's bars, printed with their own denominators. The efficiency line is the one the round was built around,
+        # so it is printed as a ratio and a budget together: a reader who saw only the ratio could not tell whether a
+        # rule bought one item for one write or twenty.
+        lines.append(
+            f"B1 recovery   {'holds' if bar['B1_recovery']['holds'] else 'FAILS'} "
+            f"({bar['B1_recovery']['recovered']} of {bar['B1_recovery']['against']} later-turn writes recovered, "
+            f"{share(bar['B1_recovery']['recovery'])}, against a bar of {bar['B1_recovery']['bar']:.2f})"
+        )
+        per_write = bar["B2_efficiency"]["perWrite"]
+        lines.append(
+            f"B2 efficiency {'holds' if bar['B2_efficiency']['holds'] else 'FAILS'} "
+            f"({bar['B2_efficiency']['added']} item(s) over the contract for {bar['B2_efficiency']['recovered']} "
+            f"rescued write(s), {'n/a' if per_write is None else f'{per_write:.2f}'} each against a budget of "
+            f"{bar['B2_efficiency']['budget']:.0f})"
+        )
+        lines.append(
+            f"B3 coverage   {'holds' if bar['B3_coverage']['holds'] else 'FAILS'} "
+            f"({share(bar['B3_coverage']['coverage'])} against a bar of {bar['B3_coverage']['bar']:.3f}, request "
+            f"board {share(bar['B3_coverage']['againstRequest'])})"
+        )
+        # The invariant AUDIT 34.324 asked every later rule to state, printed as a count rather than left to prose:
+        # the contract's turn is read whole, so this board's asks contain the contract's.
+        lines.append(
+            f"the contract's turn is read whole in {reading['clauseWholeTurns']} episode(s); the boundary dropped "
+            f"{reading['clauseOffered'] - reading['clauseKept']} of the {reading['clauseOffered']} ask(s) the parser "
+            f"offers across {reading['turns']} user turn(s) — the ones only inheritance reached"
+        )
+    elif "B1_recovery" in bar:
         # R230's bars read over different units — writes rescued, items spent, writes covered — so they are printed
         # with their own denominators rather than through R228's more-covered-than-what shape. `skippedTurns` is on
         # the noise line because the filter's cost is the turns it refused, and a reader who saw only the item count
@@ -977,6 +1177,26 @@ def check_manifest(reading: dict) -> list:
     for name, one in boards.items():
         if one.get("unaccountedBy") and sum(one["unaccountedBy"].values()) != one["unaccounted"]:
             problems.append(f"{name}: the taxonomy does not sum to its unaccounted writes")
+    late = reading.get("lateWrites")
+    if late is not None:
+        # Recovery is a subset count and is written over the same denominator on every board. A board that recovered
+        # more writes than the conversation discloses is a board credited twice, which is the defect the position
+        # pairing was rebuilt to remove (AUDIT 34.320).
+        for name, one in boards.items():
+            if one.get("recoveredFromLate") is not None and one["recoveredFromLate"] > late:
+                problems.append(f"{name}: more writes recovered from later turns than the conversation discloses")
+        admitted = boards.get("admitted") or {}
+        if reading.get("recovered") is not None and admitted.get("recoveredFromLate") is not None:
+            if reading["recovered"] != admitted["recoveredFromLate"]:
+                problems.append("the recovery column is not the admitted board's")
+    if reading.get("clauseOffered") is not None:
+        if reading.get("clauseKept", 0) > reading["clauseOffered"]:
+            problems.append("the boundary kept more asks than the parser offered")
+        clause = boards.get("clause") or {}
+        if clause.get("items") is not None and reading.get("clauseKept", 0) < clause["items"]:
+            # Folding across turns can only remove items, so a board holding more items than the rule kept is a board
+            # that read something the rule did not admit.
+            problems.append("the clause board holds more items than the boundary kept")
     bar = reading.get("bar") or {}
     if bar.get("holds") and any(value.get("holds") is False for value in bar.values() if isinstance(value, dict)):
         problems.append("the bar holds while one of its tests does not")
@@ -1522,6 +1742,103 @@ def self_test() -> int:
         check("and a grid whose later turn is volunteered passes and exits zero",
               quiet(["--document", won_path, "--scope", "admitted", "--bar"]) == 0)
 
+    # R231. The same fixture is the positive control, and it is the sharpest one available: the later turn states its
+    # requirement in a clause that carries its own verb, so a boundary that admits self-naming clauses has to credit
+    # exactly the write the turn filter's 16% could not reach.
+    boundary = clause_asks(volunteered)
+    check("the contract's turn is read whole and reported as such", boundary["wholeTurns"] == [0])
+    check("a volunteered requirement names its own family and is admitted",
+          [item["family"] for item in boundary["asks"]] == ["cancel", "return"])
+    check("and the clause board credits the write the turn filter lost",
+          (len(ask_board(ledger(volunteered), volunteered, "clause")["credited"]),
+           ask_board(ledger(volunteered), volunteered)["unaccounted"]) == (1, [0]))
+    # The negative control the round is built on: an object list continued across a comma is what the boundary drops,
+    # because only inheritance reaches the second object. It is the cost the prereg predicted, measured on a fixture
+    # small enough to check by eye.
+    listed = clause_asks([{"role": "user", "content": "Please cancel my order #W1234567."},
+                          {"role": "user", "content": "I want to return the lamp, the purple one."}])
+    check("an object list continued across a clause is what the boundary drops",
+          (listed["offered"], listed["kept"], listed["refusedInherited"]) == (3, 2, 1))
+    check("and the turn it happened in is named", listed["partialTurns"] == [1])
+    check("the boundary's own arithmetic adds up", boundary["offered"] - boundary["kept"]
+          == boundary["refusedInherited"])
+    check("a conversation that states no ask has no contract turn",
+          clause_asks([{"role": "user", "content": "Hi there!"}])["containsContract"] is False)
+    check("an empty turn is skipped by both admission rules alike",
+          clause_asks(empty)["turns"] == admitted_asks(empty)["turns"] == 2)
+    # The invariant AUDIT 34.324 asked every later rule to state, asserted rather than described: the clause board reads
+    # the contract's turn whole, so it cannot contain fewer asks than the contract and cannot cover fewer writes.
+    kept_grid = compare({"tasks": [lamp_return],
+                         "simulations": [{"id": "s", "task_id": "3", "messages": volunteered}]}, "clause")
+    check("the clause board holds at least the contract's asks",
+          kept_grid["boards"]["clause"]["items"] >= kept_grid["boards"]["request"]["items"])
+    check("and covers at least the contract's writes",
+          kept_grid["boards"]["clause"]["covered"] >= kept_grid["boards"]["request"]["covered"])
+    check("the request board recovers nothing from later turns, by construction",
+          kept_grid["boards"]["request"]["recoveredFromLate"] == 0)
+    check("the clause reading adds up", check_manifest(kept_grid) == [])
+    shown = render(kept_grid, "clause")
+    check("the clause reading prints its efficiency bar", "B2 efficiency" in shown)
+    check("and states the invariant as a count rather than as prose", "read whole in" in shown)
+    check("and does not print the turn filter's diagnosis under its own heading",
+          "refused that very turn" not in render(contract_grid, "clause"))
+
+    # R231's bars at their exact thresholds, and one below. The efficiency budget is `1.5 x recovered`, so the boundary
+    # is a fraction of an item and the two sides are one item apart — which is the only way to test a ratio honestly.
+    def clause_bar_of(recovered: int, late: int, items: int, coverage: float, requestItems: int = 970) -> dict:
+        return clause_bar([1], {
+            "lateWrites": late,
+            "boards": {"clause": {"items": items, "coverage": coverage, "recoveredFromLate": recovered},
+                       "request": {"items": requestItems, "coverage": 0.636}},
+        })
+
+    check("recovery at the bar holds, with an item exactly at the efficiency budget",
+          clause_bar_of(93, 155, 1109, 0.736)["holds"] is True)
+    check("one item over the budget fails", clause_bar_of(93, 155, 1110, 0.736)["B2_efficiency"]["holds"] is False)
+    check("one write under the recovery bar fails", clause_bar_of(92, 155, 1109, 0.736)["B1_recovery"]["holds"] is False)
+    check("coverage a hair under the bar fails", clause_bar_of(93, 155, 1109, 0.7359)["B3_coverage"]["holds"] is False)
+    # The defect a ratio invites, closed before the reading: adding nothing for nothing satisfies `0 <= 1.5 * 0`, which
+    # is the degenerate rule passing the bar written to stop it (AUDIT 34.323, mirrored).
+    empty_rule = clause_bar_of(0, 155, 970, 0.736)
+    check("a rule that rescues nothing cannot pass the efficiency bar by adding nothing",
+          empty_rule["B2_efficiency"]["holds"] is False)
+    check("and the ratio is reported as absent rather than as zero",
+          empty_rule["B2_efficiency"]["perWrite"] is None)
+    check("a grid with no later-turn write is refused rather than passed",
+          "no write was attributed" in clause_bar([1], {
+              "lateWrites": 0,
+              "boards": {"clause": {"items": 10, "coverage": 1.0, "recoveredFromLate": 0},
+                         "request": {"items": 10, "coverage": 1.0}}})["reason"])
+    check("and a grid with nothing graded is refused too",
+          "no bar can be evaluated" in clause_bar([], {"lateWrites": 0, "boards": {}})["reason"])
+    # The manifest checker, on the two claims this round adds: recovery is a subset count, and the boundary cannot keep
+    # more asks than the parser offered.
+    gap = json.loads(json.dumps(kept_grid))
+    gap["boards"]["clause"]["recoveredFromLate"] = gap["lateWrites"] + 1
+    check("a board that recovered more writes than were disclosed is caught", check_manifest(gap) != [])
+    unreachable = json.loads(json.dumps(kept_grid))
+    unreachable["clauseKept"] = unreachable["boards"]["clause"]["items"] + 1
+    check("a boundary that kept fewer asks than its board holds is caught", check_manifest(unreachable) != [])
+    over_offered = json.loads(json.dumps(kept_grid))
+    over_offered["clauseKept"] = over_offered["clauseOffered"] + 1
+    check("a boundary that kept more than the parser offered is caught", check_manifest(over_offered) != [])
+    wrong_board = json.loads(json.dumps(kept_grid))
+    wrong_board["boards"]["clause"]["items"] = wrong_board["clauseKept"] + 1
+    check("a clause board holding more items than the boundary kept is caught", check_manifest(wrong_board) != [])
+    column = json.loads(json.dumps(kept_grid))
+    column["recovered"] = column["boards"]["admitted"]["recoveredFromLate"] + 1
+    check("a recovery column that is not the admitted board's is caught", check_manifest(column) != [])
+    # And the absence a checker must walk past: a reading taken before the column existed is not a reading with a
+    # wrong one, which is why the check is guarded rather than unconditional.
+    older = json.loads(json.dumps(kept_grid))
+    for key in ("lateWrites", "recovered", "clauseOffered", "clauseKept"):
+        older.pop(key, None)
+    check("a reading with no recovery column is not an arithmetic problem", check_manifest(older) == [])
+    half = json.loads(json.dumps(kept_grid))
+    half.pop("recovered")
+    check("and neither is a reading that kept the subset count and lost the summary column",
+          check_manifest(half) == [])
+
     # The saved reading has to add up against itself, because the documents quote its parts (AUDIT 34.311/34.315).
     check("a reading that adds up has no problem", check_manifest(reading) == [])
     check("an empty reading is a problem", len(check_manifest({})) == 1)
@@ -1578,7 +1895,7 @@ def main(argv: list) -> int:
     parser = argparse.ArgumentParser(description="Bind the item to the read, not to the words.")
     parser.add_argument("--document", default="", help="a results document with transcripts and tasks")
     parser.add_argument("--replicate", default="", help="a second document, read the same way")
-    parser.add_argument("--scope", default="strict", choices=("strict", "loose", "ask", "admitted"))
+    parser.add_argument("--scope", default="strict", choices=("strict", "loose", "ask", "admitted", "clause"))
     parser.add_argument("--bar", action="store_true", help="exit non-zero when a registered bar fails")
     parser.add_argument("--save", default="", help="write the reading to this path, for the documents to quote")
     parser.add_argument("--check", default="", help="check that a saved reading adds up, and exit non-zero if not")

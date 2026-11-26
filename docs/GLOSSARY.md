@@ -2906,6 +2906,25 @@ measure of any rule.
 (1,893 of 2,453), and 77.5% on the replication. It is the number that closed the turn-level admission question: a
 feature that fires on three turns in four cannot separate the material from the medium.
 
+**Clause admission** — R231's rule: the contract's turn is read whole, and every later turn contributes only the
+clauses that **name their own action**, so the parser's family inheritance never crosses a turn boundary. It recovers
+**154 of 155** later-turn writes and accounts for **95.4%** of the required writes (624 of 654) at **17.72 items per
+rescued write**, which is why it is measured and not shipped. The number that survives the refusal is the boundary's
+own price: dropping **1,153 of the 5,311** offers costs exactly **one** covered write.
+
+**Inheritance** — the parser's rule that a clause with no action cue of its own takes the family of the clause before
+it **within the same sentence**. It is what makes "the smart thermostat for one compatible with Google Home" an
+exchange rather than a fragment, and it is also what turns an answer's value into a requirement ("yes, the purple
+one"). R231 restricts its reach rather than removing it: 22% of the item inflation and 0.2 points of the coverage.
+
+**Offered asks** — every ask the parser can find in every user turn of an episode, before any admission rule.
+**5,311** across 456 episodes for **654** required writes, or **8.1 asks offered per required write**. It is the
+ceiling on how cheap a block that reads the conversation can be, and the reason R231's efficiency bar was unattainable
+rather than merely unmet.
+
+**Price per covered write** — items a board lists divided by required writes it accounts for. The contract's is
+**2.33**, R231's **5.93**, every-turn's **7.62**. A coverage column without this one always improves by reading more.
+
 **Contract turn** — the turn the contract is read from, which is **not** turn one: `request_of` reads the first turn
 that states an ask and falls back to the first turn only when none does, so an episode that opens with a greeting puts
 the contract in turn three. Measured at **52 of 403** episodes here, and a positional admission rule refused that very

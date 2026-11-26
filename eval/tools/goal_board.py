@@ -220,13 +220,19 @@ def family_of(text: str) -> str:
     return ""
 
 
-def items_of(text: str) -> list[dict]:
+def items_of(text: str, inherit: bool = True) -> list[dict]:
     """The asks in a user message: one item per object phrase, in the order they were stated.
 
     A clause inherits the family of the clause before it **within the same sentence**, which is what makes "the
     smart thermostat for one compatible with Google Home" an exchange rather than a fragment. Inheritance stops at
     the sentence because the next sentence is where this corpus changes the subject ("If not possible, you are
     angry") and an inherited family there manufactures asks nobody made.
+
+    `inherit=False` reads each clause as standing alone, so an item exists only where a clause **names its own
+    family**. It is the same vocabulary and the same sentence split; only the reach of the rule changes. R231 uses it
+    for turns after the contract's, where the clause that inherits is a *value* filling a slot the agent asked for
+    ("yes, the purple one") rather than a requirement — the same mechanism, correct inside a request and wrong
+    inside an answer. The default is `True` for every caller that predates the round, which is all of them.
     """
     if not isinstance(text, str) or not text.strip():
         return []
@@ -242,6 +248,10 @@ def items_of(text: str) -> list[dict]:
             if named and _negated(clause, named):
                 # "do not exchange anything" is not an ask to exchange. Dropping it is the conservative reading:
                 # a board that lists a forbidden action as pending sends the agent to do what the user refused.
+                continue
+            if not named and not inherit:
+                # The boundary. A clause with no cue of its own is not an ask here, whatever precedes it: outside
+                # the turn that states the contract, the family of a neighbour belongs to the neighbour.
                 continue
             if named:
                 family = named
@@ -1410,6 +1420,31 @@ def self_test() -> int:
     check("a family with no cue has no negation", _negated("anything", "nope") is False)
     check("a clause that only modifies the ask before it is not an ask", [item["words"] for item in items_of(
         "I want to exchange the keyboard, with clicky switches.")] == [["keyboard"]])
+
+    # The boundary R231 turns on: the same vocabulary, with inheritance's reach removed. Every assertion below is a
+    # mechanism the round's reading depends on, and the first is the one that makes the option a restriction rather
+    # than a different parser — a clause that names its own family reads identically either way.
+    substitution = "I want to exchange the mechanical keyboard for clicky switches."
+    check("a clause that names its own family reads the same without inheritance",
+          items_of(substitution, inherit=False) == items_of(substitution))
+    check("without inheritance the second object of a substitution is not an ask",
+          [item["words"] for item in items_of(
+              "You received #W2378156 and want to exchange the mechanical keyboard for a clicky one "
+              "and the thermostat for a Google Home one.", inherit=False)] == [["mechanical", "keyboard"]])
+    check("and a comma list collapses to the clause that carries the verb",
+          [item["words"] for item in items_of("I want to return the cleaner, headphone, and smart watch.",
+                                              inherit=False)] == [["cleaner"]])
+    check("a later clause with a cue of its own survives the boundary", [item["family"] for item in items_of(
+        "I want to return the lamp and exchange the keyboard.", inherit=False)] == ["return", "exchange"])
+    check("a negation is read the same way at the boundary", items_of(
+        "Return the lamp but do not exchange the keyboard.", inherit=False) == items_of(
+        "Return the lamp but do not exchange the keyboard."))
+    check("a message with no cue at all has no asks at the boundary",
+          items_of("Yes, the purple one.", inherit=False) == [])
+    check("and the same message is one ask inside a request", [item["words"] for item in items_of(
+        "Return the lamp. Yes, the purple one.")] == [["lamp"]])
+    check("the boundary stops at a sentence boundary too", len(items_of(
+        "Return the lamp. Yes, the purple one.", inherit=False)) == 1)
 
     # The name table, at depth, from a result that carries ids and names.
     order = {"order_id": "#W2378156", "items": [{"item_id": "1151293680", "name": "Mechanical Keyboard", "price": 1.0}]}

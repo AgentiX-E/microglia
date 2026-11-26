@@ -5254,16 +5254,17 @@ continuously is complete and swamped fivefold. That is a property of *when* a co
 anchor it uses, and it is the first thing this lane has measured that explains the block's negative result as a defect
 of its own content rather than as an absence of effect.
 
-**What the tooling guarantees.** `eval/tools/read_anchor.py` builds all four boards from one pass over the transcript,
+**What the tooling guarantees.** `eval/tools/read_anchor.py` builds all seven boards from one pass over the transcript,
 because the question is *when* a record became visible and a board that sorted by kind instead of by time would credit
 a write to a record read after it. Discharge is matched one-to-one on family **and** record, so a second cancel of the
 same order is not a second piece of required work. Every reading is saved with the grid's sha256 and re-checked by
 `--check`, which verifies that the boards agree with their own parts, that each taxonomy sums to the writes it
 explains, and that the bars are the ones the numbers imply.
 
-The same five points are drawn on the plane a working memory is chosen on — coverage against open tax — by
-`scripts/anchors.py`, which reads the two saved readings rather than retyping their numbers:
-![five rules, one grid](docs/benchmarks/anchors.svg).
+The same seven rules are drawn on the plane a working memory is chosen on — coverage against open tax — by
+`scripts/anchors.py`, which reads the four saved readings rather than retyping their numbers, and prices each one in
+items per covered write beside the plane:
+![seven rules, one grid](docs/benchmarks/anchors.svg).
 
 ```bash
 python3 scripts/anchors.py --print --out-svg docs/benchmarks/anchors.svg
@@ -5271,6 +5272,7 @@ python3 eval/tools/read_anchor.py --self-test
 python3 eval/tools/read_anchor.py --document /path/to/control.json --replicate /path/to/front.json --scope strict
 python3 eval/tools/read_anchor.py --document /path/to/control.json --scope ask --bar
 python3 eval/tools/read_anchor.py --check eval/manifests/r228-reading.json
+python3 eval/tools/read_anchor.py --document /path/to/control.json --replicate /path/to/front.json --scope clause
 ```
 
 **The verdict, stated as the registration asked for it.** R228's three bars: settlement holds, accusation holds, open
@@ -5278,7 +5280,7 @@ tax fails at 2.53 against 1.79 — so the round is **REFUTED**, on the same grid
 against 1.81). R229's three bars: settlement fails by one write (415 against 416) on the control grid and holds on the
 replication (+1.7 points) — refused, and the reversal is reported as a property of the grids rather than as a pass. Six
 anchors have now been measured and six have been refused: request (R223), reveal (R225), record (R227), read (R228),
-ask-bound (R229), and turn admission (8.105).
+ask-bound (R229), turn admission (8.105) and clause admission (8.106).
 
 ### 8.105 Turn position is not a discriminator: 77% of user turns are answers
 
@@ -5338,3 +5340,58 @@ python3 eval/tools/read_anchor.py --document control.json --replicate front.json
 The bars are the registration's: recovery of at least 60% of the 155 later-turn writes, at most twice the contract's
 items, coverage at or above 73.6%. Two of the three fail, on both grids, and the successor round restricts the
 parser's family inheritance to the contract's turn instead of gating whole turns (R231).
+
+
+### 8.106 The seventh anchor holds on accuracy and fails on price, and the price is the corpus's
+
+R230 closed the turn-level question by showing that a requirement arrives **inside** a reply, not between replies.
+R231 therefore does not add a rule; it restricts where the parser's own inheritance rule may reach:
+
+    the contract's turn is read as a whole;
+    from every later turn, only the clauses that **name their own family**
+
+Same vocabulary, same sentence split, one scope narrower. Inheritance keeps its job inside the turn that states the
+contract, where it is what makes "the smart thermostat for one compatible with Google Home" an exchange rather than a
+fragment, and loses the job of turning an answer's value into a requirement.
+
+| | request (the contract) | R230 turn admission | **R231 clause admission** | every turn (R229) |
+|---|---|---|---|---|
+| covered writes | 416 of 654 | 410 | **624** | 625 |
+| coverage | 63.6% | 62.7% | **95.4%** | 95.6% |
+| complete episodes | 225 of 403 | 222 | **374** | 375 |
+| writes unaccounted | 232 | 237 | **20** | 19 |
+| items | 970 | 1,110 | **3,699** | 4,761 |
+| items per covered write | 2.33 | 2.71 | **5.93** | 7.62 |
+| open items nobody needs, per episode | 0.69 | 0.76 | **3.10** | 3.90 |
+
+**Two of its three bars hold, and the two that hold are the result.** B1 asked for 60% of the 155 later-turn writes and
+got **154 (99.4%)**. B3 asked for 73.6% coverage and got **95.4%**. B2 — the efficiency bar, restated this round as a
+ratio because R230 had passed a count limit while rescuing a sixth of its target — asked for at most **1.5 items per
+rescued write** and got **17.72**: 2,729 items over the contract for 154 writes, against a budget of 231. On the
+replication: 156 of 156 recovered, 95.0% coverage, 3,506 items, 16.47 each.
+
+**What the failure is, and what it is not.** It is not the rule being wrong about where the requirement is. The
+arithmetic that settles that is one subtraction: the clause board drops **1,153 of the 5,311** asks the parser offers
+across 2,453 user turns, and it costs exactly **one** covered write (625 → 624). So inheritance — the mechanism R229
+priced as the source of a 4.9× item count — accounts for **22% of the inflation and 0.2 points of the coverage**. The
+other 78% is self-naming clauses inside later turns: the user restating, renegotiating and confirming in clauses that
+carry their own verbs, which no admission rule can refuse without refusing the requirement itself.
+
+**The price is the corpus's.** 5,311 asks are offered for 654 required writes — **8.1 asks offered per required
+write**, 13.2 per graded episode — so a block that reads turns ends up with **3,069 of its 3,699 items open** at the
+end of the episode and **1,251** of those needed by nobody. No rule that reads turns can price a rescue at 1.5 items
+when the transcript itself states eight asks per required write. That is a stronger statement than the round's
+refutation, and it relocates the problem from *admission* to *selection*.
+
+**What it means for a product.** The default does not move, and this round says why in a way seven earlier rounds did
+not: the block is rendered as `items[:8]`, so the clause board's 95.4% is coverage of an artefact no agent is shown.
+An ask stated ninth is invisible however correct the board is, and R231's 3,699 items are cut to eight lines. That is
+R232's question, and it is the first round in this lane that measures the artefact rather than the transcript.
+
+The one change this round does argue for is a **parser scope**: family inheritance should not cross a turn boundary.
+That is a restriction of an existing rule, it costs 0.2 points of coverage and 22% of the items, and it is measurable
+on the same grid:
+
+```bash
+python3 eval/tools/read_anchor.py --document control.json --replicate front.json --scope clause
+```

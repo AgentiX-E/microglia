@@ -934,7 +934,7 @@
   {
    "id": "R231",
    "title": "admit the requirement clause, not the turn",
-   "status": "registered",
+   "status": "read",
    "dispatchBy": "2026-12-25T12:00:00Z",
    "prereg": "prereg/R231-the-clause.md",
    "instrument": "python3 eval/tools/read_anchor.py --document <grid>/control.json --replicate <grid>/front.json --scope clause",
@@ -948,7 +948,86 @@
     "R230"
    ],
    "why": "R230 established that the requirement and the answer share a turn: 77.2% of user turns follow an assistant question, so a turn-level filter discards 84% of the requirements disclosed after turn one and lands below the contract it was meant to extend. The material is therefore inside the turn, and the next discriminator has to be the clause - the one that carries a requirement verb and an object - with turn position demoted from gate to tie-break.",
-   "bar": "registered in prereg/R231-the-clause.md before the reading; not yet read"
+   "bar": "registered in prereg/R231-the-clause.md before the reading; not yet read",
+   "readAt": "2026-11-26T12:57:52Z",
+   "outcome": "REFUTED on B2 alone: 154 of the 155 later-turn writes are recovered (99.4% against a bar of 60%) and coverage reaches 95.4% against a bar of 73.6%, but the board pays 2,729 items over the contract for those 154 writes - 17.72 each against a budget of 1.5. The two bars that hold are the round's real result: restricting inheritance to the contract's turn reaches askAll's coverage (624 against 625 of 654) while dropping 1,153 of the 5,311 asks the parser offers, so inheritance is 22% of the item inflation and 0.2pp of the coverage. What cannot be fixed by an admission rule is the price: the corpus offers 5,311 asks across 2,453 user turns for 654 required writes - 8.1 asks offered per required write - so a block that reads turns is dominated by asks no write will ever settle (3,069 of its 3,699 items end open, 1,251 of them needed by nobody). The replication repeats it: 156 of 156 recovered, 95.0%, 3,506 items, 16.47 each.",
+   "reading": {
+    "clause": {
+     "covered": 624,
+     "complete": 374,
+     "unaccounted": 20,
+     "items": 3699,
+     "coverage": 0.9541,
+     "openUnneeded": 1251,
+     "recovered": 154
+    },
+    "request": {
+     "covered": 416,
+     "complete": 225,
+     "unaccounted": 232,
+     "items": 970,
+     "coverage": 0.6361
+    },
+    "askAll": {
+     "covered": 625,
+     "complete": 375,
+     "unaccounted": 19,
+     "items": 4761
+    },
+    "boundary": {
+     "offered": 5311,
+     "kept": 4158,
+     "refused": 1153,
+     "wholeTurns": 401,
+     "partialTurns": 528
+    },
+    "bars": {
+     "B1_recovery": true,
+     "B2_efficiency": false,
+     "B3_coverage": true
+    },
+    "replication": {
+     "clause": {
+      "covered": 611,
+      "items": 3506,
+      "coverage": 0.9502,
+      "recovered": 156
+     },
+     "request": {
+      "covered": 393,
+      "coverage": 0.6112
+     },
+     "boundary": {
+      "offered": 4987,
+      "kept": 3987,
+      "refused": 1000
+     },
+     "bars": {
+      "B1_recovery": true,
+      "B2_efficiency": false,
+      "B3_coverage": true
+     }
+    }
+   }
+  },
+  {
+   "id": "R232",
+   "title": "measure the block the product displays, not the block the instrument builds",
+   "status": "registered",
+   "dispatchBy": "2026-12-27T12:00:00Z",
+   "prereg": "prereg/R232-the-first-eight.md",
+   "instrument": "python3 eval/tools/read_anchor.py --document <grid>/control.json --replicate <grid>/front.json --scope displayed",
+   "arms": [
+    "none"
+   ],
+   "episodes": 0,
+   "estimateUsd": 0.0,
+   "actualUsd": 0.0,
+   "dependsOn": [
+    "R231"
+   ],
+   "why": "R231 settled where to read and priced what reading costs, and both answers point at the one thing this lane has never measured: the block is rendered as `items[:8]`, so an ask stated ninth is never shown to the agent no matter how correct the board is. The clause board's 95.4% coverage is therefore a claim about an artefact nobody sees - its 3,699 items are cut to eight lines - and a rule whose coverage is not displayable cannot ship. The round measures the displayed block instead: at the moment of each graded write, is an open item of that write's family among the first eight the product would render?",
+   "bar": "registered in prereg/R232-the-first-eight.md before the reading; not yet read"
   }
  ]
 }

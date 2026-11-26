@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The boards on the two axes a working memory is actually chosen on, from the saved readings.
 
-R228, R229 and R230 priced six rules for turning a transcript into items and ticks. Reported one at a time, each is a score:
+R228, R229, R230 and R231 priced seven rules for turning a transcript into items and ticks. Reported one at a time, each is a score:
 the read anchor "accounts for 98.5% of the required work", the request rule "misses a third". Reported together they are
 a trade, and the trade is the finding — a rule that cannot miss also cannot tell work from looking.
 
@@ -14,12 +14,14 @@ so the upper left is the region a working memory wants and nothing in this corpu
 for the request rule, both read scopes, the conjunction and the follow-the-conversation arm, and it draws the
 `required writes per episode` line, because an open tax above that line is a block that is more than half noise.
 
-No timestamps, no network, no sampling: the numbers are read from `eval/manifests/r228-reading.json`,
-`eval/manifests/r229-reading.json` and `eval/manifests/r230-reading.json`, which carry the grid's sha256. The raster
-carries a second panel for R230, because that round's point on the plane is not its finding: the finding is the
-composition of the transcript that produced it.
+No timestamps, no network, no sampling: the numbers are read from the four saved readings — `r228`, `r229`, `r230` and
+`r231` — which carry the grid's sha256. The raster carries two panels the plane cannot: R230's, because that round's
+point is not its finding (the finding is the composition of the transcript that produced it), and R231's, because its
+point on the plane says "high coverage, high tax" and the finding is the **price** — items spent per write accounted
+for, which is the column its efficiency bar was written over.
 
-Output: `figures/r228-anchors.png` under the docs repository, and `docs/benchmarks/anchors.svg` under this one.
+Output: `figures/r231-anchors.png` under the docs repository, and `docs/benchmarks/anchors.svg` under this one. The
+R230 figure already published there is the two-panel rendering of the same script before R231 added the third.
 """
 
 from __future__ import annotations
@@ -36,19 +38,20 @@ CEILING = 4.5
 #: One colour per rule, keyed by the label the chart draws. Kept beside `RULES` rather than inside it because the SVG
 #: and the raster both read it, and two palettes are two charts.
 COLOURS = {"request": "#1a73e8", "read-strict": "#188038", "read-loose": "#7cb342", "ask-bound": "#8430ce",
-           "every-turn": "#e8710a", "turn-admission": "#5f6368"}
+           "every-turn": "#e8710a", "turn-admission": "#5f6368", "clause-admission": "#c5221f"}
 
-#: The five rules, in the order they are labelled, and where each one's numbers live in the saved readings.
+#: The seven rules, in the order they are labelled, and where each one's numbers live in the saved readings.
 RULES = (
     # label, board, which reading, and where its label sits relative to the dot. The offsets are hand-placed because
     # two pairs of rules land on the same coordinates — the conjunction and the request rule agree to one write, and the
     # two read scopes differ only in what they list — and a chart whose labels overlap is a chart of four rules.
-    ("request", "request", "r228", (16, -16)),
+    ("request", "request", "r228", (14, -6)),
     ("read-strict", "strict", "r228", (-16, 12)),
     ("read-loose", "loose", "r228", (-16, -14)),
-    ("ask-bound", "ask", "r229", (-16, 4)),
+    ("ask-bound", "ask", "r229", (-14, -6)),
     ("every-turn", "askAll", "r229", (-16, 10)),
     ("turn-admission", "admitted", "r230", (16, 12)),
+    ("clause-admission", "clause", "r231", (16, -14)),
 )
 
 
@@ -57,11 +60,21 @@ def load(manifest_dir: pathlib.Path) -> dict:
     r228 = json.loads((manifest_dir / "r228-reading.json").read_text())
     r229 = json.loads((manifest_dir / "r229-reading.json").read_text())
     r230 = json.loads((manifest_dir / "r230-reading.json").read_text())
-    readings = {"r228": r228["reading"], "r229": r229["reading"], "r230": r230["reading"]}
+    r231 = json.loads((manifest_dir / "r231-reading.json").read_text())
+    readings = {"r228": r228["reading"], "r229": r229["reading"], "r230": r230["reading"], "r231": r231["reading"]}
     if len({one["discharged"] for one in readings.values()}) != 1:
         raise SystemExit("the readings were taken over different denominators")
     third = readings["r230"]
-    return {"readings": readings, "discharged": readings["r228"]["discharged"],
+    fourth = readings["r231"]
+    return {"readings": readings,
+            "price": {
+                "asked": fourth["clauseOffered"],
+                "kept": fourth["clauseKept"],
+                "required": readings["r228"]["discharged"],
+                "turns": fourth["turns"],
+                "perWrite": fourth["bar"]["B2_efficiency"]["perWrite"],
+                "budget": fourth["bar"]["B2_efficiency"]["bar"],
+            }, "discharged": readings["r228"]["discharged"],
             "graded": readings["r228"]["graded"],
             "requiredPerEpisode": readings["r228"]["required"] / readings["r228"]["graded"],
             "mechanism": {
@@ -85,6 +98,8 @@ def points(data: dict) -> list:
             "coverage": one["covered"] / data["discharged"],
             "openTax": one["openUnneeded"] / data["graded"],
             "items": one["items"],
+            "covered": one["covered"],
+            "perWrite": one["items"] / one["covered"] if one["covered"] else None,
             "precision": one["precision"],
             "place": place,
         })
@@ -107,10 +122,10 @@ def svg(rows: list, required: float) -> str:
 
     pieces = [
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" '
-        f'role="img" aria-label="Coverage against open tax for five working-memory rules">',
+        f'role="img" aria-label="Coverage against open tax for seven working-memory rules">',
         '<rect width="100%" height="100%" fill="#ffffff"/>',
         f'<text x="{left}" y="24" font-family="Helvetica,Arial" font-size="15" font-weight="600">'
-        f'Coverage against open tax, six rules on one grid (403 graded episodes, 654 discharged writes)</text>',
+        f'Coverage against open tax, seven rules on one grid (403 graded episodes, 654 discharged writes)</text>',
     ]
     for step in range(0, int(CEILING) + 1):
         y = py(step)
@@ -160,15 +175,16 @@ def main(argv: list) -> int:
         pathlib.Path(arguments.out_svg).parent.mkdir(parents=True, exist_ok=True)
         pathlib.Path(arguments.out_svg).write_text(markup)
     if arguments.out_png:
-        _png(rows, data["requiredPerEpisode"], data["mechanism"], pathlib.Path(arguments.out_png))
+        _png(rows, data["requiredPerEpisode"], data["mechanism"], data["price"],
+             pathlib.Path(arguments.out_png))
     if arguments.show:
         for row in rows:
-            print(f"{row['label']:12s} coverage {row['coverage']:6.1%}  open tax {row['openTax']:5.2f}/ep  "
-                  f"items {row['items']:5d}  precision {row['precision']:.1%}")
+            print(f"{row['label']:16s} coverage {row['coverage']:6.1%}  open tax {row['openTax']:5.2f}/ep  "
+                  f"items {row['items']:5d}  items/write {row['perWrite']:5.2f}  precision {row['precision']:.1%}")
     return 0
 
 
-def _png(rows: list, required: float, mechanism: dict, path: pathlib.Path) -> None:
+def _png(rows: list, required: float, mechanism: dict, price: dict, path: pathlib.Path) -> None:
     """The same chart as a raster, plus the panel R230's point cannot show.
 
     A scatter says where a rule landed. R230 landed where a rule that does almost nothing lands, and the reason is not
@@ -182,7 +198,8 @@ def _png(rows: list, required: float, mechanism: dict, path: pathlib.Path) -> No
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    figure, (axes, side) = plt.subplots(1, 2, figsize=(13.4, 5.2), dpi=170, gridspec_kw={"width_ratios": [1.6, 1]})
+    figure, (axes, side, ladder) = plt.subplots(
+        1, 3, figsize=(18.2, 5.2), dpi=165, gridspec_kw={"width_ratios": [1.5, 1, 1]})
     for row in rows:
         axes.scatter(row["coverage"], row["openTax"], s=90, color=COLOURS[row["label"]], zorder=3,
                      edgecolor="white", linewidth=1.6)
@@ -195,7 +212,7 @@ def _png(rows: list, required: float, mechanism: dict, path: pathlib.Path) -> No
     axes.set_ylim(0, CEILING)
     axes.set_xlabel("share of required, performed writes the rule accounts for", fontsize=10)
     axes.set_ylabel("open items per episode that nobody needs", fontsize=10)
-    axes.set_title("Six rules, one grid: 403 graded episodes, 654 discharged writes", fontsize=11)
+    axes.set_title("Seven rules, one grid: 403 graded episodes, 654 discharged writes", fontsize=11)
     axes.grid(alpha=0.18)
     for spine in ("top", "right"):
         axes.spines[spine].set_visible(False)
@@ -231,6 +248,44 @@ def _png(rows: list, required: float, mechanism: dict, path: pathlib.Path) -> No
     side.grid(axis="x", alpha=0.18)
     for spine in ("top", "right", "left"):
         side.spines[spine].set_visible(False)
+
+    # The price. Coverage saturates and items do not: the three rules above 95% are 3,699, 4,761 and 1,633 items for
+    # 624, 625 and 644 writes, which is the shape R231's efficiency bar was written to catch — and the reason the bar
+    # is a ratio. Drawn in raw units rather than in items-per-write, because the bar's denominator (writes *rescued*)
+    # and this axis's (writes *covered*) are two different counts and putting them on one axis would be the category
+    # error this repository audits documents for.
+    # The ladder holds the admission rules only. The read scopes are a different family — they have no asks, so they
+    # are not rules this axis can price — and `ask-bound` lands within a thousandth of the contract on both axes, so
+    # drawing it here would put two labels on one point and make the panel about them.
+    wanted = ("request", "clause-admission", "every-turn")
+    places = {"request": (0, -22, "center"), "clause-admission": (-12, -16, "right"),
+              "every-turn": (0, 16, "center")}
+    ordered = sorted((row for row in rows if row["label"] in wanted), key=lambda row: row["items"])
+    ladder.plot([row["items"] for row in ordered], [row["coverage"] for row in ordered],
+                color="#9aa0a6", linewidth=1.4, zorder=2)
+    for row in ordered:
+        dx, dy, anchor = places[row["label"]]
+        ladder.scatter(row["items"], row["coverage"], s=90, color=COLOURS[row["label"]], zorder=3,
+                       edgecolor="white", linewidth=1.6)
+        ladder.annotate(f"{row['label']}\n{row['items']:,} items, {row['coverage']:.1%}",
+                        (row["items"], row["coverage"]), textcoords="offset points", xytext=(dx, dy),
+                        fontsize=8.5, color="#222", ha=anchor, va="top" if dy < 0 else "bottom")
+    # The elbow, stated as the arithmetic a reader would otherwise do: the last 1,062 items buy one write.
+    cheapest = next(row for row in ordered if row["label"] == "clause-admission")
+    widest = next(row for row in ordered if row["label"] == "every-turn")
+    ladder.annotate("", xy=(widest["items"], 0.885), xytext=(cheapest["items"], 0.885),
+                    arrowprops={"arrowstyle": "<->", "color": "#b3261e", "linewidth": 1.1})
+    ladder.text((cheapest["items"] + widest["items"]) / 2, 0.865,
+                f"+{widest['items'] - cheapest['items']:,} items for +1 covered write",
+                fontsize=8.5, color="#b3261e", ha="center", va="top")
+    ladder.set_xlim(0, max(row["items"] for row in ordered) * 1.16)
+    ladder.set_ylim(min(row["coverage"] for row in ordered) - 0.20, 1.04)
+    ladder.set_xlabel("items the rule lists", fontsize=10)
+    ladder.set_ylabel("share of required writes accounted for", fontsize=10)
+    ladder.set_title("R231: what the extra items bought", fontsize=11)
+    ladder.grid(alpha=0.18)
+    for spine in ("top", "right"):
+        ladder.spines[spine].set_visible(False)
 
     path.parent.mkdir(parents=True, exist_ok=True)
     figure.tight_layout()

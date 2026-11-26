@@ -42,6 +42,7 @@
     "overCredit": 3,
     "overCreditPerEpisode": 0.007444168734491315,
     "precision": 0.9927360774818402,
+    "recoveredFromLate": 25,
     "unaccounted": 237,
     "unaccountedBy": {
      "consumed": 54,
@@ -64,6 +65,7 @@
     "overCredit": 3,
     "overCreditPerEpisode": 0.007444168734491315,
     "precision": 0.992822966507177,
+    "recoveredFromLate": 0,
     "unaccounted": 232,
     "unaccountedBy": {
      "consumed": 61,
@@ -86,9 +88,33 @@
     "overCredit": 6,
     "overCreditPerEpisode": 0.01488833746898263,
     "precision": 0.9904912836767037,
+    "recoveredFromLate": 155,
     "unaccounted": 19,
     "unaccountedBy": {
      "consumed": 3,
+     "disclosedLater": 0,
+     "neverStated": 16
+    },
+    "unbound": 41
+   },
+   "clause": {
+    "complete": 374,
+    "completeShare": 0.9280397022332506,
+    "coverage": 0.9541284403669725,
+    "covered": 624,
+    "credited": 630,
+    "items": 3699,
+    "open": 3069,
+    "openPerEpisode": 7.615384615384615,
+    "openUnneeded": 1251,
+    "openUnneededPerEpisode": 3.1042183622828783,
+    "overCredit": 6,
+    "overCreditPerEpisode": 0.01488833746898263,
+    "precision": 0.9904761904761905,
+    "recoveredFromLate": 154,
+    "unaccounted": 20,
+    "unaccountedBy": {
+     "consumed": 4,
      "disclosedLater": 0,
      "neverStated": 16
     },
@@ -108,6 +134,7 @@
     "overCredit": 6,
     "overCreditPerEpisode": 0.01488833746898263,
     "precision": 0.9907692307692307,
+    "recoveredFromLate": 155,
     "unaccounted": 0,
     "unaccountedBy": null,
     "unbound": 41
@@ -126,6 +153,7 @@
     "overCredit": 3,
     "overCreditPerEpisode": 0.007444168734491315,
     "precision": 0.9928400954653938,
+    "recoveredFromLate": 0,
     "unaccounted": 232,
     "unaccountedBy": null,
     "unbound": 0
@@ -144,11 +172,16 @@
     "overCredit": 6,
     "overCreditPerEpisode": 0.01488833746898263,
     "precision": 0.9907692307692307,
+    "recoveredFromLate": 155,
     "unaccounted": 0,
     "unaccountedBy": null,
     "unbound": 41
    }
   },
+  "clauseKept": 4158,
+  "clauseOffered": 5311,
+  "clausePartialTurns": 528,
+  "clauseWholeTurns": 401,
   "contractLater": 52,
   "contractLost": 50,
   "discharged": 654,
@@ -204,6 +237,7 @@
      "overCredit": 5,
      "overCreditPerEpisode": 0.01256281407035176,
      "precision": 0.9879807692307693,
+     "recoveredFromLate": 20,
      "unaccounted": 222,
      "unaccountedBy": {
       "consumed": 45,
@@ -226,6 +260,7 @@
      "overCredit": 5,
      "overCreditPerEpisode": 0.01256281407035176,
      "precision": 0.9877750611246944,
+     "recoveredFromLate": 0,
      "unaccounted": 229,
      "unaccountedBy": {
       "consumed": 54,
@@ -248,6 +283,30 @@
      "overCredit": 7,
      "overCreditPerEpisode": 0.017587939698492462,
      "precision": 0.988673139158576,
+     "recoveredFromLate": 156,
+     "unaccounted": 20,
+     "unaccountedBy": {
+      "consumed": 1,
+      "disclosedLater": 0,
+      "neverStated": 19
+     },
+     "unbound": 36
+    },
+    "clause": {
+     "complete": 366,
+     "completeShare": 0.9195979899497487,
+     "coverage": 0.9502332814930016,
+     "covered": 611,
+     "credited": 618,
+     "items": 3506,
+     "open": 2888,
+     "openPerEpisode": 7.256281407035176,
+     "openUnneeded": 1164,
+     "openUnneededPerEpisode": 2.9246231155778895,
+     "overCredit": 7,
+     "overCreditPerEpisode": 0.017587939698492462,
+     "precision": 0.988673139158576,
+     "recoveredFromLate": 156,
      "unaccounted": 20,
      "unaccountedBy": {
       "consumed": 1,
@@ -270,6 +329,7 @@
      "overCredit": 7,
      "overCreditPerEpisode": 0.017587939698492462,
      "precision": 0.9890282131661442,
+     "recoveredFromLate": 156,
      "unaccounted": 0,
      "unaccountedBy": null,
      "unbound": 36
@@ -288,6 +348,7 @@
      "overCredit": 5,
      "overCreditPerEpisode": 0.01256281407035176,
      "precision": 0.9874371859296482,
+     "recoveredFromLate": 0,
      "unaccounted": 240,
      "unaccountedBy": null,
      "unbound": 0
@@ -306,11 +367,16 @@
      "overCredit": 7,
      "overCreditPerEpisode": 0.017587939698492462,
      "precision": 0.9890282131661442,
+     "recoveredFromLate": 156,
      "unaccounted": 0,
      "unaccountedBy": null,
      "unbound": 36
     }
    },
+   "clauseKept": 3987,
+   "clauseOffered": 4987,
+   "clausePartialTurns": 488,
+   "clauseWholeTurns": 398,
    "contractLater": 51,
    "contractLost": 49,
    "discharged": 643,

@@ -7557,3 +7557,54 @@ python3 eval/tools/read_anchor.py --document control.json --replicate front.json
 **The general rule.** Before you gate memory on any structural feature of the conversation — turn index, speaker,
 whether a message is a question or a reply — count the feature's rate on your own corpus. A feature that fires on 77%
 of turns is not a discriminator; it is a description of the medium.
+
+### 32.87 The block can be made nearly complete; it cannot be made cheap — and both halves matter
+
+32.85 and 32.86 left you with a deficit and two failed repairs. This section is the repair that worked, and the
+reason it still did not ship.
+
+**The rule that works.** Do not gate turns. Gate *inheritance*: read the turn that states your contract as a whole,
+and from every later turn take only the clauses that name their own action.
+
+```python
+items_of(turn, inherit=False)     # a clause with no cue of its own is not an ask
+```
+
+On 456 retail episodes that recovers **154 of the 155** writes the contract misses (99.4%) and accounts for **624 of
+654** required writes — **95.4%**, against the contract's 63.6%. It is deterministic, it needs no model call, and it
+adds no word to the lexicon.
+
+**Why it still did not ship.** The block it builds holds **3,699 items** for 403 episodes: 2,729 more than the
+contract's 970, which is **17.72 items per rescued write** against the 1.5 the round registered. Two thirds of those
+items never settle, and a third are needed by nobody:
+
+| | contract | clause admission | every turn |
+|---|---|---|---|
+| coverage | 63.6% | **95.4%** | 95.6% |
+| items | 970 | 3,699 | 4,761 |
+| items per covered write | 2.33 | **5.93** | 7.62 |
+| open items nobody needs, per episode | 0.69 | **3.10** | 3.90 |
+
+**The number to take away is the corpus's, not the rule's.** Across those 456 episodes the parser finds **5,311 asks**
+for **654 required writes** — 8.1 asks offered per required write. A conversation that states eight asks for every one
+it needs will fill any block that reads it, and no admission rule can price a rescue at 1.5 items when the material
+itself is eight times the demand. If your corpus looks like this one, the constraint is not your parser: it is your
+**selection**, and the block is rendered as `items[:8]` anyway.
+
+**What to do, in order.**
+
+1. **Restrict inheritance to the contract's turn.** It costs 0.2 points of coverage and 22% of the items, it is one
+   keyword, and it removes the mechanism that turns an answer's value into a requirement.
+2. **Price the block in items per covered write, not in items.** A coverage number without its price is a number that
+   always improves when you read more.
+3. **Measure the block you actually render.** If your cap is eight lines and your board holds ninety items, the
+   coverage you measured is coverage of a document nobody sees.
+
+```bash
+python3 eval/tools/read_anchor.py --document control.json --replicate front.json --scope clause
+# B1 recovery   holds (154 of 155 later-turn writes recovered, 99.4%, against a bar of 0.60)
+# B2 efficiency FAILS (2729 item(s) over the contract for 154 rescued write(s), 17.72 each against a budget of 231)
+# B3 coverage   holds (95.4% against a bar of 0.736, request board 63.6%)
+# the contract's turn is read whole in 401 episode(s); the boundary dropped 1153 of the 5311 ask(s) the
+# parser offers across 2453 user turn(s) — the ones only inheritance reached
+```

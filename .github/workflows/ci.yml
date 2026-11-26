@@ -217,10 +217,11 @@ jobs:
           python3 eval/tools/round_clock.py
           python3 eval/tools/serving_defaults.py
 
-      - name: The three readings the anchor rounds were judged on, and whether their parts add up
+      - name: The four readings the anchor rounds were judged on, and whether their parts add up
         # R228 asked whether binding an item to the record the episode **read** settles more of the work than binding it
         # to the request's words; R229 asked whether the two can be joined; R230 asked whether a later turn can be
-        # admitted by its position alone. No reading is recomputed here — the grid they were taken over is a 32 MB
+        # admitted by its position alone; R231 asked whether the requirement can be reached inside the turn that
+        # answers a question. No reading is recomputed here — the grid they were taken over is a 32 MB
         # artefact from a paid dispatch and is not in this repository — so what is gated is the arithmetic: every board
         # agrees with its own parts, the taxonomy sums to the writes it explains, and a bar is the one its numbers
         # imply. That is the class of defect this repository has audited three rounds running (AUDIT 34.311, 34.315,
@@ -231,14 +232,16 @@ jobs:
           python3 eval/tools/read_anchor.py --check eval/manifests/r228-reading.json
           python3 eval/tools/read_anchor.py --check eval/manifests/r229-reading.json
           python3 eval/tools/read_anchor.py --check eval/manifests/r230-reading.json
+          python3 eval/tools/read_anchor.py --check eval/manifests/r231-reading.json
           python3 - <<'CHECK'
           import json
 
           r228 = json.load(open("eval/manifests/r228-reading.json"))
           r229 = json.load(open("eval/manifests/r229-reading.json"))
           r230 = json.load(open("eval/manifests/r230-reading.json"))
-          assert (r228["scope"], r229["scope"], r230["scope"]) == ("strict", "ask", "admitted"), (
-              r228["scope"], r229["scope"], r230["scope"])
+          r231 = json.load(open("eval/manifests/r231-reading.json"))
+          assert (r228["scope"], r229["scope"], r230["scope"], r231["scope"]) == (
+              "strict", "ask", "admitted", "clause"), (r228["scope"], r229["scope"], r230["scope"], r231["scope"])
           reading = r228["reading"]
           boards = reading["boards"]
           # The reading R228 was refused on: the read board settles 98.5% of the discharged writes and opens 2.53
@@ -283,10 +286,32 @@ jobs:
           assert third["replication"]["boards"]["admitted"]["covered"] == 411
           assert third["replication"]["bar"]["B1_recovery"]["holds"] is False
           assert (third["replication"]["lateWrites"], third["replication"]["recovered"]) == (156, 20)
+          # R231: the round that reached the accuracy target and was refused on its price. Both halves are pinned,
+          # because the halves are the result — a later round that quotes 95.4% without 17.72 would be quoting the
+          # favourable one, and a round that moves either has to move this line on purpose.
+          fourth = r231["reading"]
+          clause = fourth["boards"]["clause"]
+          assert clause["covered"] == 624, clause["covered"]
+          assert clause["items"] == 3699, clause["items"]
+          assert clause["unaccounted"] == 20, clause["unaccounted"]
+          assert abs(clause["coverage"] - 0.9541) < 1e-3, clause["coverage"]
+          assert fourth["bar"]["B1_recovery"]["holds"] is True
+          assert (fourth["bar"]["B1_recovery"]["recovered"], fourth["bar"]["B1_recovery"]["against"]) == (154, 155)
+          assert fourth["bar"]["B3_coverage"]["holds"] is True
+          assert fourth["bar"]["B2_efficiency"]["holds"] is False, "R231 was refused on its efficiency bar"
+          assert fourth["bar"]["B2_efficiency"]["added"] == 2729
+          assert round(fourth["bar"]["B2_efficiency"]["perWrite"], 2) == 17.72
+          # The boundary's own price: what it dropped, and what it cost. One covered write, against askAll's 625.
+          assert (fourth["clauseOffered"], fourth["clauseKept"]) == (5311, 4158)
+          assert fourth["boards"]["askAll"]["covered"] - clause["covered"] == 1
+          assert fourth["replication"]["boards"]["clause"]["covered"] == 611
+          assert fourth["replication"]["bar"]["B2_efficiency"]["holds"] is False
           print(f"ok  read {boards['strict']['coverage']:.1%} vs request {boards['request']['coverage']:.1%}; "
                 f"ask {second['boards']['ask']['coverage']:.1%} with 155/232 misses disclosed after turn one; "
                 f"admitted {admitted['coverage']:.1%} recovering {third['bar']['B1_recovery']['recovered']}/155 with "
-                f"{third['skippedTurns']}/{third['turns']} turns answered")
+                f"{third['skippedTurns']}/{third['turns']} turns answered; "
+                f"clause {clause['coverage']:.1%} recovering 154/155 at "
+                f"{fourth['bar']['B2_efficiency']['perWrite']:.2f} items a write")
           CHECK
 
       - name: Does the request name the record, which is R227's bar and the reason the grid is still unbought
