@@ -22,6 +22,17 @@ Three numbers come out, and the third is the one that decides what to do next:
 The unit of evidence is the **task**, and the repeated attempts are what make a task's rate meaningful: a single
 attempt a task cannot separate "the treatment hurt here" from "this task fails one time in four".
 
+## This is not the first strata reader in the tree, and the difference is deliberate
+
+`goal_board.strata_of` (its `--strata` mode) decomposes the same pair, as **pass^k on the first k attempts**: at k = 4
+over R218b's two documents it reads 66 solved, 19 regressions, 14 rescues. This reader cuts the covariate at the
+**rate over every attempt**, and the two agree on the set that matters — the 19 damaged tasks are the same 19 — because
+a task at 4/4 that falls to 3/4 is a regression under both cuts. They differ where the definitions differ: `--k 4`
+counts a half-solved task reaching 4/4 as a rescue, this one counts only a task the control never solved. The rate is
+kept here because it is what a per-stratum delta and its sign test are about, and `strata_of` is kept as the reader
+that pools across dispatches without an estimator. A second instrument is a second definition, so the test below holds
+this one against that one on a fixture rather than leaving the agreement to a paragraph.
+
 Usage:
   python3 eval/tools/solve_strata.py --control control.json --treatment front.json --label front
   python3 eval/tools/solve_strata.py --self-test
@@ -279,6 +290,21 @@ def self_test() -> int:
         check("the sentence names the label", sentence.startswith("front against the control"), sentence)
         check("the sentence counts the damage", "came out worse" in sentence)
         check("and says what one attempt would have resolved", "would have resolved none of this" in sentence)
+
+        # The cross-check against the tree's older strata reader: on a k = attempts fixture the damaged set must be the
+        # same set, because both call a task damaged when it passed every attempt and then stopped passing them all.
+        from goal_board import strata_of
+
+        def loaded(path):
+            return json.loads(Path(path).read_text(encoding="utf-8"))
+
+        older = strata_of(loaded(control), loaded(treatment), 4)
+        check("the older reader finds the same solved count as the always stratum",
+              older["solved"] == reading["strata"]["always"]["tasks"], (older["solved"], reading["strata"]["always"]))
+        check("and the same damaged task", older["regressions"] == reading["damagedTasks"],
+              (older["regressions"], reading["damagedTasks"]))
+        check("while the rescues differ by definition",
+              older["rescues"] != reading["rescuedTasks"], (older["rescues"], reading["rescuedTasks"]))
 
         # The cross-dispatch mode: the strata are borrowed and the delta is not, because a borrowed baseline is a
         # covariate rather than a control.
