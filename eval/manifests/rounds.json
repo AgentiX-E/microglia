@@ -360,7 +360,7 @@
     {
       "id": "R220c",
       "title": "the price of a move, measured rather than derived \u2014 what R216b's -4% is made of",
-      "status": "registered",
+      "status": "read",
       "dispatchBy": "2026-11-29T12:00:00Z",
       "prereg": "prereg/R220c-moveprice.md",
       "arms": [
@@ -372,7 +372,27 @@
         "R220b"
       ],
       "why": "R216b read the shipped tail at -4% against the second-system shape and explained it with a number it never measured: a change behind the conversation re-bills the block, a change in front of it re-bills everything behind it. `movePrice` computes that from the provider's own cache counters and the probe has always been able to ask for it with --rewrite-at; no dispatch ever has. A derived explanation of a measured bill is the shape this project refuses.",
-      "instrument": "pnpm eval:cache-probe --rewrite-at 10 (five shapes, nine turns, one changed call each: cents)"
+      "instrument": "pnpm eval:cache-probe --rewrite-at 10 (five shapes, nine turns, one changed call each: cents)",
+      "run": 45749577193,
+      "readAt": "2026-11-26T03:52:00Z",
+      "actualUsd": 0.02,
+      "outcome": "read and REFUTED: a move costs the same 2,010 tokens wherever the block sits, so the tail is not the cheap placement the derivation assumed",
+      "reading": {
+        "move_tokens": {
+          "control": -111,
+          "system-second": 2010.5,
+          "system-merged": 2010.5,
+          "tail": 2010.5,
+          "first-turn": 1882.5
+        },
+        "block_tokens_measured": 1497,
+        "state": "placement-is-free",
+        "calls": 55,
+        "cache_field_reported_calls": 45,
+        "prediction": "tail < system-second < system-merged < first-turn, with the tail within one block of zero",
+        "verdict": "the ordering is refuted: the three conversation-adjacent shapes price identically at 2,010.5 tokens, 1.34 blocks, and the first-turn shape is the cheapest at 1,882.5 \u2014 the tail is not cheaper than a front placement, and R216b's -4% therefore keeps no derivation",
+        "steadyState": "a second system message is re-billed 17 tokens a call over the control, inside the 128-token tolerance, so the steady-state premium is not where the -4% lives either"
+      }
     },
     {
       "id": "R223",
