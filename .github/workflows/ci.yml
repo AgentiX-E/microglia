@@ -94,8 +94,14 @@ jobs:
       # on lines and branches together, and the checker refuses a report that measured almost nothing — a
       # coverage run that discovers no tests reports 100% of nothing.
       - name: The lane's python drivers, measured
+        # The step's output is only readable from the job log, and the log is served through a storage redirect that a
+        # restricted client cannot authenticate against — which is how a red build sat here with the word "exit code 1"
+        # as its whole diagnosis. `::error::` annotations are readable through the API, so the last lines of this step's
+        # output are republished as annotations when it fails: the gate's own sentence, where the gate is.
         run: |
           set -euo pipefail
+          exec > >(tee /tmp/python-gates.log) 2>&1
+          trap 'code=$?; if [ "$code" -ne 0 ]; then tail -n 15 /tmp/python-gates.log | while IFS= read -r line; do echo "::error title=python gate::$line"; done; fi; exit "$code"' EXIT
           python3 -m coverage run --branch --source=eval/drivers/alfworld -m unittest discover \
             -s eval/drivers/alfworld -p "test_*.py"
           # Each suite puts its own directory on `sys.path` rather than relying on the interpreter to do it, and
