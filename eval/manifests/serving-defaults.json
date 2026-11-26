@@ -1,54 +1,55 @@
 {
- "schema": "microglia.serving-defaults/1",
- "note": "The configuration this project measured as best, as data, because it was living in three places at once — a Python constant, a workflow input, and a reader's memory of the last round — and a product that ships a different placement from the one the number was measured at is a product whose number does not apply to it. `packages/core/src/memory/serving.ts` exports this file's values as `SERVING_DEFAULTS`, and a test in each repository reads the file: change `placement` here and exactly one test fails on each side, which is the only version of 'the product uses the measured configuration' that a build can check.",
- "status": "confirmed",
- "confirmedBy": "R216b (run 45630594988, 2026-11-25): front 93/114 (81.6%) against board 96/114 (84.2%), +2.6 pp [-7.2, +12.5], McNemar p = 0.6776; bill per episode $0.00583 against $0.00558 (-4%); attribution 65.7% of writing episodes. The placement is confirmed: it is cheaper and it does not cost accuracy.",
- "defaults": {
-  "placement": "tail",
-  "askSource": "request",
-  "settlementGrades": [
-   "name",
-   "overlap"
-  ],
-  "blockCeilingChars": 500,
-  "openAskCeiling": 3,
-  "trials": 1
- },
- "provenance": {
-  "placement": {
-   "value": "tail",
-   "measuredIn": "R216",
-   "evidence": "a block in the system message re-bills every token after it, and R216b measured the price at the same 114 tasks and seed: $0.00583 an episode in front against $0.00558 behind the conversation (-4%), with the accuracy contrast +2.6 pp [-7.2, +12.5] - no movement the grid can resolve, which is the outcome a placement should have. The -4% is smaller than R216-1's +37% front-versus-control gap implies because the block only moved on 23% of turns: the prefix is re-bought on a change, not on a turn."
+  "schema": "microglia.serving-defaults/1",
+  "note": "The configuration this project measured as best, as data, because it was living in three places at once \u2014 a Python constant, a workflow input, and a reader's memory of the last round \u2014 and a product that ships a different placement from the one the number was measured at is a product whose number does not apply to it. `packages/core/src/memory/serving.ts` exports this file's values as `SERVING_DEFAULTS`, and a test in each repository reads the file: change `placement` here and exactly one test fails on each side, which is the only version of 'the product uses the measured configuration' that a build can check.",
+  "status": "confirmed",
+  "confirmedBy": "R216b (run 45630594988, 2026-11-25): front 93/114 (81.6%) against board 96/114 (84.2%), +2.6 pp [-7.2, +12.5], McNemar p = 0.6776; bill per episode $0.00583 against $0.00558 (-4%); attribution 65.7% of writing episodes. The placement is confirmed: it is cheaper and it does not cost accuracy.",
+  "defaults": {
+    "placement": "tail",
+    "askSource": "request",
+    "settlementGrades": [
+      "name",
+      "overlap"
+    ],
+    "blockCeilingChars": 500,
+    "openAskCeiling": 3,
+    "trials": 1
   },
-  "askSource": {
-   "value": "request",
-   "measuredIn": "R215",
-   "evidence": "asks taken from the request rather than every tool result took the list from 10.6 a turn to 1.96, and moved the arm from -5.3 pp to +4.4 pp."
+  "provenance": {
+    "placement": {
+      "value": "tail",
+      "measuredIn": "R216",
+      "evidence": "a block in the system message re-bills every token after it, and R216b measured the price at the same 114 tasks and seed: $0.00583 an episode in front against $0.00558 behind the conversation (-4%), with the accuracy contrast +2.6 pp [-7.2, +12.5] - no movement the grid can resolve, which is the outcome a placement should have. The -4% is smaller than R216-1's +37% front-versus-control gap implies because the block only moved on 23% of turns: the prefix is re-bought on a change, not on a turn."
+    },
+    "askSource": {
+      "value": "request",
+      "measuredIn": "R215",
+      "evidence": "asks taken from the request rather than every tool result took the list from 10.6 a turn to 1.96, and moved the arm from -5.3 pp to +4.4 pp."
+    },
+    "settlementGrades": {
+      "value": [
+        "name",
+        "overlap"
+      ],
+      "measuredIn": "R216",
+      "evidence": "a name-only grade settled 2 of 107 episodes for a set-shaped ask; the overlap grade (at least one shared content word and half the shorter side) is what made attribution 75.5%. `loose` is counted rather than assumed away."
+    },
+    "blockCeilingChars": {
+      "value": 500,
+      "measuredIn": "R215",
+      "evidence": "asserted in the mechanism gate: a block above 500 characters is a list of everything rather than a contract."
+    },
+    "openAskCeiling": {
+      "value": 3,
+      "measuredIn": "R216",
+      "evidence": "asserted in the mechanism gate. Above three open asks a turn the block stops being a contract and becomes a transcript."
+    }
   },
-  "settlementGrades": {
-   "value": [
-    "name",
-    "overlap"
-   ],
-   "measuredIn": "R216",
-   "evidence": "a name-only grade settled 2 of 107 episodes for a set-shaped ask; the overlap grade (at least one shared content word and half the shorter side) is what made attribution 75.5%. `loose` is counted rather than assumed away."
+  "notYet": {
+    "admissionPolicy": "R219 \u2014 the invocation policy, read twice. The rule admits the block's state lines and refuses its two judgment lines, which name a family the task requires a write in on 1,808 of 1,965 entries (92.0%) over R218b's 456 episodes. Two identical dispatches read +10.5 pp (p = 0.029) and -0.9 pp (p = 1.0); pooled +4.8 pp [-1.2, +10.8], p = 0.152. The mechanism replicated exactly both times (admission all/state, 8% shorter block, 19% fewer changes, 4% and 7% cheaper), so the null is about the effect and not about the treatment. NOT promoted: a product default is a measured configuration, and this measurement returns no effect at 114 tasks. It stays a correctness repair with a measured cost saving; R222 prices the 1,600-episode reading that could support an accuracy claim.",
+    "servingDecision": "R223 - the serving decision, screened and refused on artefacts already on disk. 385 prefix cuts over R218b's 228 paired episodes yielded one admissible policy, which did not replicate on the held-out half (+13.8 pp at p = 0.0074 on the screen half, +3.2 pp at p = 0.66 on the confirm half); at that many cuts noise alone yields about 9.6, so the family carries no signal. No default moves, and that is the round's product consequence: the shipped configuration is unchanged because nothing was promoted. What the round licenses is the next proxy - the material would have to be served from what the episode reveals after the identity gate, because every observable available before that point is constant within a task on 100% of tasks."
   },
-  "blockCeilingChars": {
-   "value": 500,
-   "measuredIn": "R215",
-   "evidence": "asserted in the mechanism gate: a block above 500 characters is a list of everything rather than a contract."
-  },
-  "openAskCeiling": {
-   "value": 3,
-   "measuredIn": "R216",
-   "evidence": "asserted in the mechanism gate. Above three open asks a turn the block stops being a contract and becomes a transcript."
+  "carrier": {
+    "arm": "board",
+    "why": "The arm whose `--note-source` is the manifest's placement. Without this name the check is satisfied by any arm that happens to serve the same placement, so changing `placement` in the manifest would leave both readers green while the dispatch kept the old one. With it, changing `placement` fails the Python reader too, because `board` still carries the old placement."
   }
- },
- "notYet": {
-  "admissionPolicy": "R219 — the invocation policy, read twice. The rule admits the block's state lines and refuses its two judgment lines, which name a family the task requires a write in on 1,808 of 1,965 entries (92.0%) over R218b's 456 episodes. Two identical dispatches read +10.5 pp (p = 0.029) and -0.9 pp (p = 1.0); pooled +4.8 pp [-1.2, +10.8], p = 0.152. The mechanism replicated exactly both times (admission all/state, 8% shorter block, 19% fewer changes, 4% and 7% cheaper), so the null is about the effect and not about the treatment. NOT promoted: a product default is a measured configuration, and this measurement returns no effect at 114 tasks. It stays a correctness repair with a measured cost saving; R222 prices the 1,600-episode reading that could support an accuracy claim."
- },
- "carrier": {
-  "arm": "board",
-  "why": "The arm whose `--note-source` is the manifest's placement. Without this name the check is satisfied by any arm that happens to serve the same placement, so changing `placement` in the manifest would leave both readers green while the dispatch kept the old one. With it, changing `placement` fails the Python reader too, because `board` still carries the old placement."
- }
 }
