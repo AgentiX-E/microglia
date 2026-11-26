@@ -5395,3 +5395,80 @@ on the same grid:
 ```bash
 python3 eval/tools/read_anchor.py --document control.json --replicate front.json --scope clause
 ```
+
+### 8.107 The block an agent reads is eight lines built before the call, and it is not the block the instrument built
+
+R231 measured a board of 3,699 items and the product renders `items[:MAX_ITEMS]` — eight lines, in the order the asks
+were stated. The two are not the same object, and no earlier round in this lane could see the difference, because every
+board this project has measured was built from the **finished** transcript, which is the artefact an evaluator reads.
+R232 builds the other one:
+
+    at the moment of each graded write, take the messages **before** the message that carries the call,
+    build the board the product would serve from them, keep the first eight items,
+    and ask whether an open item of the write's family is among them
+
+Two cuts, and both matter. The **messages** end before the call's own turn, because a block is rendered before the turn
+that reads it; including that turn would let a call see its own settlement. The **events** end where that message
+begins — found by `bisect` on the per-event message index rather than by counting calls — so two calls in one assistant
+message read one block. Slicing at a call's own event would settle the first ask before the second call looked at it,
+and the second call would then be credited against a line it never saw.
+
+| | contract (`request`) | **R231's clause board** |
+|---|---|---|
+| required writes graded | 654 | 654 |
+| reached: family open **somewhere** on the moment board | 463 (70.8%) | **636 (97.2%)** |
+| shown: family open **within the first eight** | 463 (70.8%) | **622 (95.1%)** |
+| hidden: reached but not shown | 0 (0.0%) | **14 (2.2%)** |
+| items on the moment board, per call | 2.41 | **8.10** |
+| items on the finished board | 2.41 | 9.18 |
+
+**The cap was never the problem, and the size was never what the lane thought.** The clause board holds **8.10 items at
+the moment of a call**, not 3,699: the finished board is the accumulation of every ask in the episode, and at any moment
+an episode has stated only the asks it has stated. The eight-line window therefore covers **95.1%** of the writes the
+evaluator grades and hides **2.2%**, which refutes R232's own prediction that the cut would kill the rule. R231's
+efficiency objection — 17.72 items per rescued write — prices an artefact that is **never rendered**: the rendering cost
+of the clause rule is bounded by the cap at eight lines a call, and the measured cost is 8.10.
+
+**The fourteen that remain are an ordering fact.** The block lists asks in the order they were stated, so a settled ask
+from the contract outranks an open one stated later. The case inspected by hand is the whole mechanism:
+
+```
+1. cancel   open      5. return  settled    9. modify  open   <- the ask this write needs
+2. cancel   open      6. return  open
+3. return   settled   7. return  open
+4. return   settled   8. return  open
+```
+
+Five of the first eight lines are one family and three of them are settled, while the ask the write needs is open on
+line nine. `open before settled, statement order within each group` lifts it to line six, and that is R233 — registered
+before its own reading, priced at ¥0, and content-free: its only input is the `settled` flag the board already computes.
+
+**The round is refused on its third bar, and the refusal is the instrument's.** B1 holds on the clause board (95.1%
+against 73.6%) and B2 holds (2.2% against 20%). B3 asked that the contract's displayed coverage stay within four writes
+of its full coverage — 416 — and got **463**, a difference of **+47**. A cut can only remove items, so a *gain* cannot
+be the cut's: the round's own attribution column shows the contract's board reaches **463 with the cut and 463
+without**, and the +47 is therefore a difference between two settlement rules, not a display tax.
+
+| the contract, three levels | writes |
+|---|---|
+| covered by the **finished** board (one tick per call, receipts matched one to one) | 416 |
+| reached on the **moment** board (a call may settle any open ask of its family) | 463 |
+| shown through the eight-line cut | 463 |
+
+416 of the 463 are writes the finished board also credits; **47** are graded writes whose obligation was **on the block
+when the agent acted** and which the board cannot account for afterwards. That is a new quantity in this lane, and it
+is the first measurement of the gap between *what the block told the agent to do* and *what the block can explain
+afterwards*. It is not a defect in either rule — the moment board asks whether the requirement was visible, the finished
+board asks whether the work was attributable — and B3's reference was written as if they were one quantity.
+
+**What a product should take from it.** Three things, none of which moves the shipped default on its own. The rendering
+is not the bottleneck: at the cap, the clause rule shows 95.1% of the graded work, so its accuracy advantage is
+deliverable and no longer hostage to a price that belongs to the finished board. The block's size is a property of the
+moment, which means every per-episode item count in this repository's earlier rounds is a cost of *accumulation* and not
+of *serving*. And the residual 2.2% is fixable without a model, which makes the ordering the cheapest open question the
+lane has.
+
+```bash
+python3 eval/tools/read_anchor.py --document control.json --replicate front.json --scope displayed
+python3 scripts/display.py --out-svg docs/benchmarks/display.svg
+```

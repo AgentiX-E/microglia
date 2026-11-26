@@ -2929,3 +2929,26 @@ rather than merely unmet.
 that states an ask and falls back to the first turn only when none does, so an episode that opens with a greeting puts
 the contract in turn three. Measured at **52 of 403** episodes here, and a positional admission rule refused that very
 turn in 50 of them — which is how a rule that reads more turns can cover fewer writes.
+
+**Moment board** — the block rebuilt from the messages **before** the call that reads it, with the events cut where that
+message begins. It is the artefact a model is shown, as opposed to the finished board an evaluator reads, and the two
+differ by a factor of **456** on the retail grid (**8.10 items** a call against 3,699 an episode). Two calls
+in one assistant message share one moment board, because the block is rendered once, before the turn.
+
+**Displayed coverage** — the share of the required writes whose family had an **open** item among the first
+`MAX_ITEMS` lines of the moment board, over the writes the evaluator grades. **95.1%** for the clause board (622 of
+654) and **70.8%** for the contract's (463 of 654), measured at a cap of eight. The complement of *hidden* within
+*reached*: 2.2% and 0.0%.
+
+**Reached** — the required writes whose family had an open item **somewhere** on the moment board, at any line. It is
+the ceiling displayed coverage can reach at a given cap, and the denominator of the hidden share: **636** and **463** on
+the retail grid.
+
+**Hidden share** — of the writes a board reaches on the moment board, the share the cap does not display. **14 of 636
+(2.2%)** for the clause board. It is the column that separates a rule whose coverage is real from a rule whose coverage
+is computed: a board can reach every write and show none of them.
+
+**Display tax** — the difference between a board's displayed coverage and its full coverage, in writes. R232 registered
+it at four writes on the contract and measured **+47**, which is impossible for a cut to cause; the round's attribution
+column shows the same board reaching 463 with and without the cap. A tax is only a tax when both sides are the same
+settlement rule.

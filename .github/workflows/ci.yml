@@ -217,7 +217,7 @@ jobs:
           python3 eval/tools/round_clock.py
           python3 eval/tools/serving_defaults.py
 
-      - name: The four readings the anchor rounds were judged on, and whether their parts add up
+      - name: The five readings the anchor rounds were judged on, and whether their parts add up
         # R228 asked whether binding an item to the record the episode **read** settles more of the work than binding it
         # to the request's words; R229 asked whether the two can be joined; R230 asked whether a later turn can be
         # admitted by its position alone; R231 asked whether the requirement can be reached inside the turn that
@@ -233,6 +233,10 @@ jobs:
           python3 eval/tools/read_anchor.py --check eval/manifests/r229-reading.json
           python3 eval/tools/read_anchor.py --check eval/manifests/r230-reading.json
           python3 eval/tools/read_anchor.py --check eval/manifests/r231-reading.json
+          python3 eval/tools/read_anchor.py --check eval/manifests/r232-reading.json
+          # The figure's own loader, over the same file: a rendering of a reading that does not add up is a figure
+          # nobody should publish, and this is the only place the two are read together.
+          python3 scripts/display.py --self-test
           python3 - <<'CHECK'
           import json
 
@@ -240,8 +244,10 @@ jobs:
           r229 = json.load(open("eval/manifests/r229-reading.json"))
           r230 = json.load(open("eval/manifests/r230-reading.json"))
           r231 = json.load(open("eval/manifests/r231-reading.json"))
-          assert (r228["scope"], r229["scope"], r230["scope"], r231["scope"]) == (
-              "strict", "ask", "admitted", "clause"), (r228["scope"], r229["scope"], r230["scope"], r231["scope"])
+          r232 = json.load(open("eval/manifests/r232-reading.json"))
+          assert (r228["scope"], r229["scope"], r230["scope"], r231["scope"], r232["scope"]) == (
+              "strict", "ask", "admitted", "clause", "displayed"), (
+                  r228["scope"], r229["scope"], r230["scope"], r231["scope"], r232["scope"])
           reading = r228["reading"]
           boards = reading["boards"]
           # The reading R228 was refused on: the read board settles 98.5% of the discharged writes and opens 2.53
@@ -306,12 +312,40 @@ jobs:
           assert fourth["boards"]["askAll"]["covered"] - clause["covered"] == 1
           assert fourth["replication"]["boards"]["clause"]["covered"] == 611
           assert fourth["replication"]["bar"]["B2_efficiency"]["holds"] is False
+          # R232: the rendered block. Two bars hold and the third fails on its reference quantity, and all three
+          # numbers are pinned because the round's finding is the *difference* between them: 622 shown, 636 reached,
+          # 463 shown against 416 covered uncut. A later round that quotes 95.1% without the 14 hidden, or the +47
+          # without the 463 reached beside it, would be quoting the favourable half of a trade.
+          fifth = r232["reading"]
+          shown_clause = fifth["display"]["clause"]
+          assert shown_clause["required"] == 654, shown_clause["required"]
+          assert (shown_clause["reached"], shown_clause["displayed"], shown_clause["hidden"]) == (636, 622, 14)
+          assert abs(shown_clause["hiddenShare"] - 14 / 636) < 1e-9
+          shown_request = fifth["display"]["request"]
+          assert (shown_request["reached"], shown_request["displayed"]) == (463, 463), shown_request
+          assert fifth["bar"]["B1_displayed"]["holds"] is True
+          assert fifth["bar"]["B1_displayed"]["passers"] == ["clause"]
+          assert fifth["bar"]["B2_hidden"]["holds"] is True
+          assert fifth["bar"]["B2_hidden"]["scope"] == "clause"
+          assert fifth["bar"]["B3_displayTax"]["holds"] is False, "R232 was refused on its display tax"
+          assert fifth["bar"]["B3_displayTax"]["tax"] == 47
+          assert fifth["bar"]["B3_displayTax"]["against"] == 416
+          # The attribution that makes the refusal readable: the cap costs the contract nothing, so the +47 is a
+          # settlement-rule difference and not a display tax.
+          assert fifth["bar"]["B3_displayTax"]["moment"] == shown_request["displayed"]
+          assert fifth["replication"]["display"]["clause"]["displayed"] == 602
+          assert fifth["replication"]["display"]["clause"]["hidden"] == 19
+          assert fifth["replication"]["bar"]["B3_displayTax"]["holds"] is False
           print(f"ok  read {boards['strict']['coverage']:.1%} vs request {boards['request']['coverage']:.1%}; "
                 f"ask {second['boards']['ask']['coverage']:.1%} with 155/232 misses disclosed after turn one; "
                 f"admitted {admitted['coverage']:.1%} recovering {third['bar']['B1_recovery']['recovered']}/155 with "
                 f"{third['skippedTurns']}/{third['turns']} turns answered; "
                 f"clause {clause['coverage']:.1%} recovering 154/155 at "
-                f"{fourth['bar']['B2_efficiency']['perWrite']:.2f} items a write")
+                f"{fourth['bar']['B2_efficiency']['perWrite']:.2f} items a write; "
+                f"displayed {shown_clause['displayed']}/{shown_clause['required']} "
+                f"({shown_clause['displayed'] / shown_clause['required']:.1%}) with "
+                f"{shown_clause['hidden']} hidden of {shown_clause['reached']} reached, "
+                f"contract tax {fifth['bar']['B3_displayTax']['tax']:+d}")
           CHECK
 
       - name: Does the request name the record, which is R227's bar and the reason the grid is still unbought

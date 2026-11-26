@@ -7608,3 +7608,67 @@ python3 eval/tools/read_anchor.py --document control.json --replicate front.json
 # the contract's turn is read whole in 401 episode(s); the boundary dropped 1153 of the 5311 ask(s) the
 # parser offers across 2453 user turn(s) — the ones only inheritance reached
 ```
+
+### 32.88 Measure the block you render, at the moment you render it — the two numbers are not the same number
+
+32.87 ended with an instruction that is easy to read past: *measure the block you actually render*. This section is
+what happens when you do, and it changes the verdict of the section before it.
+
+**The measurement.** At the moment of each graded write, rebuild the block from the messages **before** the call, keep
+the number of lines your product shows, and ask whether an open item of the write's family is among them.
+
+```python
+items = build_board(messages[:call_message])[:MAX_ITEMS]      # the block the model was shown
+```
+
+Do it for both of your candidate boards over the same writes. On the 456-episode retail grid:
+
+| | your contract board | the clause board 32.87 refused |
+|---|---|---|
+| required writes graded | 654 | 654 |
+| family open somewhere on the block | 463 (70.8%) | 636 (97.2%) |
+| family open **within the eight lines** | 463 (70.8%) | **622 (95.1%)** |
+| reached but not shown | 0 | **14 (2.2%)** |
+| items on the block, per call | 2.41 | **8.10** |
+
+**Two things you probably believe are false.** First, the block is not large. The clause board holds **8.10 items when
+the agent is deciding**, not 3,699 — that number was the accumulated board at the end of the episode, which is what an
+evaluator reads and never what a model sees. Second, the cap is therefore not the constraint: eight lines cover 95.1%
+of the graded work, and the 2,729 extra items 32.87 priced are an artefact of accumulation. If you refused a rule
+because of its per-episode item count, price it again per call before you refuse it twice.
+
+**The residue is an ordering problem, and it is free to fix.** The fourteen hidden writes are hidden because the block
+lists asks in the order they were stated, so a settled ask from the opening turn outranks an open one stated later.
+One case, in full: the ask the write needed was on line 9 of a 12-line block, behind five asks of one family of which
+three were already settled. `open items first, settled items after, statement order inside each group` moves it to line
+six, needs no model, and reads nothing the board does not already compute.
+
+**The trap this round fell into, so that you do not.** The round registered "the cap must not cost the contract more
+than four writes against its full coverage" — 416 — and measured **463**, a gain of 47. A cut can only remove items, so
+the gain could not be the cut's: the same board reached 463 **with and without** the cap. The 47 were writes whose
+obligation was visible when the agent acted and which the finished board cannot account for afterwards, because the two
+boards settle by different rules. Before you write a tolerance around a difference, make sure both sides are the same
+quantity — and print the uncut level beside the cut one, which is the column that made the mistake legible.
+
+**What to do, in order.**
+
+1. **Build the block from the prefix, not the transcript.** Cut the events at the message boundary and the messages
+   before the call; two calls in one assistant message read one block.
+2. **Report three numbers, never one**: reached, shown, hidden. A coverage figure without the window it was measured
+   in is a claim about a document.
+3. **Price a rule per call before you price it per episode.** Accumulation is a cost of the transcript, not of the
+   serving decision.
+4. **Order open before settled.** It is the cheapest improvement available to a block with a cap, and it needs no
+   vocabulary.
+5. **Compare like with like.** Two boards that settle by different rules produce a difference that belongs to neither
+   of them.
+
+```bash
+python3 eval/tools/read_anchor.py --document control.json --replicate front.json --scope displayed
+# display   required reached shown hidden hidden% items/call
+# request        654     463   463      0    0.0%       2.41
+# clause         654     636   622     14    2.2%       8.10
+# B1 displayed  holds (request 70.8%, clause 95.1% of 654 required write(s) shown, against a bar of 0.736)
+# B2 hidden     holds (14 of 636 reached write(s) hidden on clause, 2.2%, against a bar of 0.20)
+# B3 display tax FAILS (+47 write(s) on the contract: 463 shown against 416 covered uncut, 463 reached without the cut)
+```

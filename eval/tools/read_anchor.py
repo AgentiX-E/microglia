@@ -56,6 +56,7 @@ Run: `python3 eval/tools/read_anchor.py --self-test`
 from __future__ import annotations
 
 import argparse
+import bisect
 import collections
 import json
 import os
@@ -121,6 +122,23 @@ CLAUSE_RECOVERY = 0.60
 CLAUSE_EFFICIENCY = 1.5
 CLAUSE_COVERAGE = 0.736
 
+#: R232's cap, registered in `prereg/R232-the-first-eight.md` before the reading. The product renders the block as
+#: `items[:MAX_ITEMS]` — eight lines, in the order the asks were stated — so a board of 3,699 items reaches the agent as
+#: its first eight. The number is the product's, not a parameter of this instrument, which is why it is a constant here.
+CAP = 8
+
+#: R232's three bars. **Coverage** is R231's B3 unchanged, because the round asks whether the coverage that round
+#: measured survives being displayed; **hidden share** is new and priced at a fifth, so a rule four fifths invisible
+#: cannot pass by coverage alone; **the display tax** on the contract is four writes, registered rather than fitted.
+DISPLAY_COVERAGE = 0.736
+DISPLAY_HIDDEN = 0.20
+DISPLAY_TAX = 4
+
+#: The two boards R232 renders side by side. The contract's, because it is the shipped default; R231's, because it is
+#: the rule whose 95.4% is the claim under test. Both under one cap, so the difference between the two columns is the
+#: admission rule and not the rendering.
+DISPLAY_SCOPES = ("request", "clause")
+
 
 def _siblings() -> str:
     """Put this file's own directory on `sys.path`, and answer it.
@@ -174,11 +192,21 @@ def ledger(messages) -> dict:
     board = _board()
     receipts = board.receipts_of(messages)
     events: list = []
+    #: The message each event was read from, so that "the board at the moment of the call" is a slice rather than a
+    #: reconstruction. R232 asks what the agent **saw** when it decided to write, and a board built from the finished
+    #: conversation answers a different question: it is the board after the write, which is the one an evaluator reads.
+    at: list = []
     pending: collections.deque = collections.deque()
     writes = 0
     dropped = 0
     unknown: set = set()
-    for message in messages:
+
+    def emit(kind, payload) -> None:
+        """One event, stamped with the index of the message it came from."""
+        at.append(index)
+        events.append((kind, payload))
+
+    for index, message in enumerate(messages):
         role = board.role_of(message)
         if role in ("assistant", "agent"):
             for call in board._field(message, "tool_calls") or []:  # noqa: SLF001 - the board's own accessor
@@ -186,7 +214,7 @@ def ledger(messages) -> dict:
                 if not isinstance(name, str) or not name:
                     continue
                 if name in board.FAMILIES:
-                    events.append(("write", writes))
+                    emit("write", writes)
                     pending.append(("write", writes))
                     writes += 1
                 elif name in OPENS:
@@ -194,18 +222,18 @@ def ledger(messages) -> dict:
                     arguments = board._field(call, "arguments")  # noqa: SLF001
                     value = arguments.get(key) if isinstance(arguments, dict) else None
                     record = (kind, value) if isinstance(value, str) and value else None
-                    events.append(("open", record))
+                    emit("open", record)
                     pending.append(("open", record))
                 elif name in LOOKUPS:
                     kind = LOOKUPS[name]
-                    events.append(("lookup", kind))
+                    emit("lookup", kind)
                     pending.append(("lookup", kind))
                 elif name in OPENS_NOTHING:
-                    events.append(("nothing", name))
+                    emit("nothing", name)
                     pending.append(("nothing", name))
                 else:
                     unknown.add(name)
-                    events.append(("unknown", name))
+                    emit("unknown", name)
                     pending.append(("unknown", name))
         elif role == "tool":
             text = board._field(message, "content")  # noqa: SLF001
@@ -220,11 +248,11 @@ def ledger(messages) -> dict:
                 # record twice, and the second copy is the one a reader would have to explain.
                 listed = [record for record in listed if record != payload]
             for record in listed:
-                events.append(("listed", record))
+                emit("listed", record)
             if kind == "lookup":
                 candidate = text.strip().strip("\"'")
                 if USER.match(candidate):
-                    events.append(("open", (payload, candidate)))
+                    emit("open", (payload, candidate))
             elif kind == "open":
                 # A read that was asked for one record can also *name* another: `get_order_details` returns the user
                 # the order belongs to. That is a listing rather than an opening — the episode holds the order's
@@ -232,11 +260,12 @@ def ledger(messages) -> dict:
                 # list from opening five orders.
                 user = _user_in(text)
                 if user:
-                    events.append(("listed", ("user", user)))
+                    emit("listed", ("user", user))
     if len(receipts) != writes:  # pragma: no cover - a defensive check, never reached by this corpus
         raise SystemExit(f"receipt positions drifted: {len(receipts)} from goal_board, {writes} counted here")
     return {
         "events": events,
+        "at": at,
         "writes": receipts,
         "unknown": sorted(unknown),
         "dropped": dropped,
@@ -451,7 +480,7 @@ def board(entry: dict, scope: str = "strict") -> dict:
     }
 
 
-def ask_board(entry: dict, messages, scope: str = "request") -> dict:
+def ask_board(entry: dict, messages, scope: str = "request", cap=None, later: bool = True) -> dict:
     """R229's rule: an item is an **ask**, and the read supplies only the binding.
 
     R228 measured the two anchors' failures as a trade rather than as a deficit: the request board attributes 63.6% of
@@ -495,7 +524,9 @@ def ask_board(entry: dict, messages, scope: str = "request") -> dict:
     # R230's seed, taken here because it costs one more parse and decides what the next round is about: an ask the
     # board never read is not the same deficit as an ask it read and spent. `CONVERSATION` scope is the board's own
     # parser run over **every** user turn, so the difference between the two is disclosure order and nothing else.
-    later = module.board_of(messages, module.CONVERSATION).get("items") or []
+    # R232's displayed board declines the seed: it is built from the messages *before* the call, and a parse of "later
+    # turns" would be a parse of a future the agent had not seen — the one thing the moment board must not contain.
+    later = (module.board_of(messages, module.CONVERSATION).get("items") or []) if later else []
     later_families = {item["family"] for item in later}
     unaccounted_by = collections.Counter()
     open_asks: dict = collections.defaultdict(list)
@@ -548,9 +579,16 @@ def ask_board(entry: dict, messages, scope: str = "request") -> dict:
         }
         for ask, position in zip(asks, [settled.get(index) for index in range(len(asks))])
     ]
+    # R232: the block is rendered as `items[:CAP]`. The cut is applied last and to the **items only** — a settled ask
+    # below the fold is still settled, so the credited, unaccounted and unbound columns are properties of the rule and
+    # not of the window. `itemsAll` keeps the uncut count so that a reading can say how much of the board the cut hid.
+    offered = len(items)
+    if cap is not None:
+        items = items[:cap]
     return {
         "scope": f"ask-{scope}",
         "items": items,
+        "itemsAll": offered,
         "credited": credited,
         "unaccounted": unaccounted,
         "unbound": unbound,
@@ -609,12 +647,75 @@ def discharge(writes: list, required: list) -> dict:
     return {"byPosition": matched, "discharged": len(matched), "unmatched": len(required) - len(matched)}
 
 
-def episode(document_task, simulation: dict) -> dict:
+def moment(entry: dict, messages, upto: int, scope: str) -> dict:
+    """The block as the product served it **before the assistant message at `upto`**, uncut.
+
+    Two cuts, and both are the point. The **messages** end before the message that carries the call, because a block is
+    rendered before the turn that reads it; including that turn would let a call see its own settlement, the one leak
+    that makes every displayed write covered by construction. The **events** end where that message begins, and the
+    boundary is found by `bisect` rather than by counting calls: two calls in one message read one block, so the second
+    call must not see the first one's write. Slicing at the call's own event would settle an ask the agent was still
+    looking at, and the block would be a different object for two calls that saw the same eight lines.
+
+    `later=False` for the first reason in its sharpest form: the `disclosedLater` taxonomy parses turns the agent had
+    not read yet, and a moment board that consults them is not a measurement of the moment.
+    """
+    stop = bisect.bisect_left(entry["at"], upto)
+    return ask_board({**entry, "events": entry["events"][:stop]}, messages[:upto], scope, later=False)
+
+
+def visibility(entry: dict, messages, done: dict, scope: str, cap: int = CAP) -> dict:
+    """Of the writes the evaluator requires, how many had an open ask of their family **on the rendered block**.
+
+    Every board this lane has measured so far is a property of the finished transcript. This one is a property of the
+    eight lines an agent saw, and the two differ in exactly the way R232 was registered to price: `reached` counts the
+    graded writes whose family was open somewhere on the moment board, and `displayed` counts the ones that were inside
+    the first `cap` items. `hidden` is the difference — coverage that exists in the instrument and not in the product.
+
+    A graded write the ledger never saw is counted in neither, which is why `required` is returned beside them: the
+    denominator is the evaluator's, not the instrumentation's.
+    """
+    stop_of = {payload: index for index, (kind, payload) in enumerate(entry["events"]) if kind == "write"}
+    cache: dict = {}
+    reached = 0
+    displayed = 0
+    for position in done["byPosition"]:
+        stop = stop_of.get(position)
+        if stop is None:
+            continue
+        upto = entry["at"][stop]
+        board = cache.get(upto)
+        if board is None:
+            # Cached by message rather than by call, because the cache is a consequence of the measurement and not an
+            # economy: two calls in one message are answered by one block, and a recomputation could only disagree.
+            board = cache[upto] = moment(entry, messages, upto, scope)
+        family = entry["writes"][position].get("family")
+        if not any(item["family"] == family and not item["settled"] for item in board["items"]):
+            continue
+        reached += 1
+        if any(item["family"] == family and not item["settled"] for item in board["items"][:cap]):
+            displayed += 1
+    hidden = reached - displayed
+    return {
+        "required": len(done["byPosition"]),
+        "reached": reached,
+        "displayed": displayed,
+        "hidden": hidden,
+        "shownShare": (displayed / len(done["byPosition"])) if done["byPosition"] else None,
+        "hiddenShare": (hidden / reached) if reached else None,
+        "itemsPerCall": (sum(one["itemsAll"] for one in cache.values()) / len(cache)) if cache else None,
+    }
+
+
+def episode(document_task, simulation: dict, display: bool = False) -> dict:
     """One episode, read three ways: the read board at both scopes and the request board.
 
     Returned as raw counts rather than rates so that the aggregation can pair episodes and report an interval over the
     same units the bar is written over; a rate computed here and averaged later would weight a one-write episode the
     same as a four-write one.
+
+    `display` is off by default because R232's measurement costs one board per graded write and every earlier reading is
+    saved: a round that is not being re-read must not pay for a column it does not quote.
     """
     messages = simulation.get("messages") or []
     module = _board()
@@ -724,6 +825,11 @@ def episode(document_task, simulation: dict) -> dict:
     out["clausePartialTurns"] = len(clause.get("partialTurns") or [])
     out["clauseOffered"] = clause.get("offered", 0)
     out["clauseKept"] = clause.get("kept", 0)
+    if display:
+        # R232: the two boards the round compares, each measured at the moment of every graded write. Keyed by the
+        # admission rule rather than by the cap, because the cap is a property of the rendering and the round compares
+        # two rules under one rendering.
+        out["display"] = {scope: visibility(entry, messages, done, scope) for scope in DISPLAY_SCOPES}
     return out
 
 
@@ -742,7 +848,7 @@ def compare(document: dict, scope: str = "strict") -> dict:
         if not (simulation.get("messages") or []):
             skipped += 1
             continue
-        row = episode(tasks.get(str(simulation.get("task_id"))), simulation)
+        row = episode(tasks.get(str(simulation.get("task_id"))), simulation, display=scope == "displayed")
         rows.append(row)
     graded = [row for row in rows if row["discharged"]]
     summary: dict = {
@@ -802,7 +908,11 @@ def compare(document: dict, scope: str = "strict") -> dict:
             # graded write is the harm channel: the block saying done about work nobody asked for.
             "precision": (covered / sum(one["credited"] for one in block)) if sum(one["credited"] for one in block) else None,
         }
-    chosen = summary["boards"][scope]
+    # R232 reads a rendering, not a rule: the round's comparison is `request` against `clause` under one cap, so the
+    # paired columns are taken against the rule whose coverage the round is asking about — R231's — and the displayed
+    # columns carry the rendering. Taking `request` against itself would report a delta of zero and call it a reading.
+    measured = "clause" if scope == "displayed" else scope
+    chosen = summary["boards"][measured]
     requested = summary["boards"]["request"]
     summary["paired"] = {
         "coverageDelta": _delta(chosen["coverage"], requested["coverage"]),
@@ -812,17 +922,33 @@ def compare(document: dict, scope: str = "strict") -> dict:
         "episodesCompleteGained": sum(
             1
             for row in graded
-            if row["boards"][scope]["covered"] == row["discharged"]
+            if row["boards"][measured]["covered"] == row["discharged"]
             and row["boards"]["request"]["covered"] != row["discharged"]
         ),
         "episodesCompleteLost": sum(
             1
             for row in graded
-            if row["boards"][scope]["covered"] != row["discharged"]
+            if row["boards"][measured]["covered"] != row["discharged"]
             and row["boards"]["request"]["covered"] == row["discharged"]
         ),
     }
-    if scope == "admitted":
+    if scope == "displayed":
+        graded_display = [row for row in graded if row.get("display")]
+        summary["display"] = {
+            name: {
+                key: sum(row["display"][name][key] for row in graded_display)
+                for key in ("required", "reached", "displayed", "hidden")
+            }
+            for name in DISPLAY_SCOPES
+        }
+        for name, one in summary["display"].items():
+            one["shownShare"] = (one["displayed"] / one["required"]) if one["required"] else None
+            one["hiddenShare"] = (one["hidden"] / one["reached"]) if one["reached"] else None
+            one["itemsPerCall"] = (
+                sum(row["display"][name]["itemsPerCall"] or 0.0 for row in graded_display) / len(graded_display)
+            ) if graded_display else None
+        summary["bar"] = display_bar(summary)
+    elif scope == "admitted":
         summary["bar"] = admit_bar(summary)
     elif scope == "clause":
         summary["bar"] = clause_bar(graded, summary)
@@ -998,6 +1124,71 @@ def clause_bar(graded: list, summary: dict) -> dict:
     }
 
 
+def display_bar(summary: dict) -> dict:
+    """R232's three bars, evaluated where the registration wrote them.
+
+    The round has no new rule, so none of these can be satisfied by a rule being itself. They are written over one
+    quantity the lane has never measured — a graded write whose family was **on the eight lines the agent read** — and
+    the three of them price its three failure modes:
+
+    * **B1** is coverage against the evaluator's denominator, so a board that shows nothing cannot pass by reaching
+      nothing. It is R231's B3 number, unchanged, because the round asks whether *that* coverage survives the cut.
+    * **B2** is the share of a board's reach that the cut hides. It exists because coverage and visibility can diverge
+      without bound in one direction: a rule can reach every write on a board 3,699 items long and display none of them.
+      One fifth is registered rather than fitted.
+    * **B3** is the cut's cost to the **contract**, which is the board the product ships. It is an absolute number of
+      writes and not a share, and it is the only bar in this lane that can be failed by a `MAX_ITEMS` change rather
+      than by a rule — which is why it is registered on a round that changes neither.
+
+    B2 is evaluated on the scope B1 selected, and the selection is by **displayed writes** rather than by the hidden
+    share: the rule the round would ship is the one that survives the cut with more of the evaluator's writes, and a
+    scope cannot qualify for the visibility test by showing fewer of them.
+    """
+    display = summary.get("display") or {}
+    if not display:
+        return {"holds": False, "reason": "no episode carried a displayed measurement"}
+    required = summary["discharged"]
+    if not required or not summary["graded"]:
+        return {"holds": False, "reason": "no episode discharged a required write, so no bar can be evaluated"}
+    rates = {name: display[name]["displayed"] / required for name in DISPLAY_SCOPES}
+    passers = [name for name in DISPLAY_SCOPES if rates[name] >= DISPLAY_COVERAGE]
+    b1 = bool(passers)
+    chosen = max(passers, key=lambda name: (display[name]["displayed"], -display[name]["hidden"])) if passers else None
+    b2 = chosen is not None and (display[chosen]["hiddenShare"] or 0.0) <= DISPLAY_HIDDEN
+    full = summary["boards"]["request"]["covered"]
+    tax = display["request"]["displayed"] - full
+    b3 = abs(tax) <= DISPLAY_TAX
+    return {
+        "B1_displayed": {
+            "holds": b1,
+            "rates": rates,
+            "bar": DISPLAY_COVERAGE,
+            "required": required,
+            "passers": passers,
+        },
+        "B2_hidden": {
+            "holds": b2,
+            "scope": chosen,
+            "hidden": display[chosen]["hidden"] if chosen else None,
+            "reached": display[chosen]["reached"] if chosen else None,
+            "hiddenShare": display[chosen]["hiddenShare"] if chosen else None,
+            "bar": DISPLAY_HIDDEN,
+        },
+        "B3_displayTax": {
+            "holds": b3,
+            "displayed": display["request"]["displayed"],
+            "against": full,
+            "tax": tax,
+            "bar": DISPLAY_TAX,
+            # The attribution column, and the reason B3 can be read at all: `reached` is the same board **without** the
+            # cut, so a tax that is entirely `reached - displayed` is the cap, and a gap between `reached` and `full`
+            # is the moment the board was built rather than the window it was rendered in.
+            "moment": display["request"]["reached"],
+        },
+        "holds": b1 and b2 and b3,
+    }
+
+
 def render(reading: dict, scope: str = "strict") -> str:
     """The reading as sentences, in the order the bars are written.
 
@@ -1011,7 +1202,10 @@ def render(reading: dict, scope: str = "strict") -> str:
         return "n/a" if value is None else f"{value:+.1%}"
 
     boards = reading["boards"]
-    chosen = boards[scope]
+    # R232 reads a rendering: its chosen board is R231's, because the round's claim is about *that* rule's coverage and
+    # the displayed columns carry the cut. `boards["displayed"]` does not exist and never will — a rendering is not a
+    # board, and pretending otherwise would put a column in the table that no transcript can produce.
+    chosen = boards["clause" if scope == "displayed" else scope]
     requested = boards["request"]
     paired = reading["paired"]
     bar = reading["bar"]
@@ -1033,6 +1227,21 @@ def render(reading: dict, scope: str = "strict") -> str:
         f"coverage delta {signed(paired['coverageDelta'])} against the request board; "
         f"episodes complete gained {paired['episodesCompleteGained']}, lost {paired['episodesCompleteLost']}"
     )
+    if reading.get("display"):
+        # R232's two tables: what each board reached at the moment of the write, and what survived the cut. Printed
+        # before the bars because the bars are sentences about these four numbers, and a reader who saw the verdict
+        # first would take it for a level rather than for the difference between two windows on one board.
+        lines.append(
+            f"{'display':9s} {'required':>8s} {'reached':>7s} {'shown':>5s} {'hidden':>6s} {'hidden%':>7s} "
+            f"{'items/call':>10s}"
+        )
+        for name in DISPLAY_SCOPES:
+            one = reading["display"][name]
+            per_call = "n/a" if one["itemsPerCall"] is None else f"{one['itemsPerCall']:.2f}"
+            lines.append(
+                f"{name:9s} {one['required']:8d} {one['reached']:7d} {one['displayed']:5d} {one['hidden']:6d} "
+                f"{share(one['hiddenShare']):>7s} {per_call:>10s}"
+            )
     if scope == "admitted" and reading.get("contractLost"):
         # R230's diagnosis, printed by the scope rather than by the bar: a reading whose bar has no tests is still a
         # reading, and the sentence explains a *loss* the bars cannot see. Kept off a clause reading on purpose —
@@ -1041,7 +1250,29 @@ def render(reading: dict, scope: str = "strict") -> str:
             f"the contract's turn is not turn one in {reading['contractLater']} episode(s) — the first turn stated no "
             f"ask — and the filter refused that very turn in {reading['contractLost']} of them"
         )
-    if "B2_efficiency" in bar:
+    if "B1_displayed" in bar:
+        # R232's bars. B1 prints both scopes because the round was registered as a comparison; B3 prints the uncut
+        # moment beside the cut so that a tax can be attributed to the window rather than to the clock.
+        lines.append(
+            f"B1 displayed  {'holds' if bar['B1_displayed']['holds'] else 'FAILS'} "
+            f"({', '.join(f'{name} {share(rate)}' for name, rate in bar['B1_displayed']['rates'].items())} of "
+            f"{bar['B1_displayed']['required']} required write(s) shown, against a bar of "
+            f"{bar['B1_displayed']['bar']:.3f})"
+        )
+        chosen_scope = bar["B2_hidden"]["scope"]
+        lines.append(
+            f"B2 hidden     {'holds' if bar['B2_hidden']['holds'] else 'FAILS'} "
+            f"({bar['B2_hidden']['hidden']} of {bar['B2_hidden']['reached']} reached write(s) hidden on "
+            f"{chosen_scope or 'no scope that passed B1'}, "
+            f"{share(bar['B2_hidden']['hiddenShare'])}, against a bar of {bar['B2_hidden']['bar']:.2f})"
+        )
+        lines.append(
+            f"B3 display tax {'holds' if bar['B3_displayTax']['holds'] else 'FAILS'} "
+            f"({bar['B3_displayTax']['tax']:+d} write(s) on the contract: {bar['B3_displayTax']['displayed']} shown "
+            f"against {bar['B3_displayTax']['against']} covered uncut, {bar['B3_displayTax']['moment']} reached "
+            f"without the cut, within {bar['B3_displayTax']['bar']})"
+        )
+    elif "B2_efficiency" in bar:
         # R231's bars, printed with their own denominators. The efficiency line is the one the round was built around,
         # so it is printed as a ratio and a budget together: a reader who saw only the ratio could not tell whether a
         # rule bought one item for one write or twenty.
@@ -1197,9 +1428,43 @@ def check_manifest(reading: dict) -> list:
             # Folding across turns can only remove items, so a board holding more items than the rule kept is a board
             # that read something the rule did not admit.
             problems.append("the clause board holds more items than the boundary kept")
+    display = reading.get("display")
+    if display is not None:
+        # R232's block is three counts and two ratios over one denominator, and every one of them is a number a
+        # document will quote. Checked as arithmetic rather than trusted, for the reason this function exists.
+        for name, one in display.items():
+            if one["displayed"] > one["reached"]:
+                problems.append(f"display/{name}: more writes shown than reached")
+            if one["reached"] > one["required"]:
+                problems.append(f"display/{name}: more writes reached than required")
+            if one["hidden"] != one["reached"] - one["displayed"]:
+                problems.append(f"display/{name}: hidden is not reached less shown")
+            if one["reached"] and abs((one["hiddenShare"] or 0.0) - one["hidden"] / one["reached"]) > 1e-9:
+                problems.append(f"display/{name}: hidden share is not hidden over reached")
+            if one["required"] and abs((one["shownShare"] or 0.0) - one["displayed"] / one["required"]) > 1e-9:
+                problems.append(f"display/{name}: shown share is not shown over required")
+        if reading.get("discharged") and any(one["required"] != reading["discharged"] for one in display.values()):
+            # Both scopes are measured over the same graded writes, so a scope that reports a different denominator is
+            # a scope that lost a write — the pairing defect this lane rebuilt R230's columns to remove.
+            problems.append("display: the two scopes disagree on the number of graded writes")
     bar = reading.get("bar") or {}
     if bar.get("holds") and any(value.get("holds") is False for value in bar.values() if isinstance(value, dict)):
         problems.append("the bar holds while one of its tests does not")
+    if "B1_displayed" in bar and display:
+        required = reading.get("discharged")
+        for name, rate in bar["B1_displayed"]["rates"].items():
+            if required and abs(rate - display[name]["displayed"] / required) > 1e-9:
+                problems.append(f"B1 displayed: the rate for {name} is not its shown writes over discharged")
+        passers = [name for name in bar["B1_displayed"]["rates"] if bar["B1_displayed"]["rates"][name] >= bar["B1_displayed"]["bar"]]
+        if sorted(passers) != sorted(bar["B1_displayed"]["passers"]):
+            problems.append("B1 displayed: the passing scopes are not the ones over the bar")
+        if bar["B1_displayed"]["holds"] != bool(bar["B1_displayed"]["passers"]):
+            problems.append("B1 displayed: holds disagrees with whether any scope passed")
+        tax = display["request"]["displayed"] - (reading.get("boards", {}).get("request", {}).get("covered") or 0)
+        if bar["B3_displayTax"]["tax"] != tax:
+            problems.append("B3 display tax: the tax is not the contract's shown writes less its full coverage")
+        if bar["B3_displayTax"]["holds"] != (abs(tax) <= bar["B3_displayTax"]["bar"]):
+            problems.append("B3 display tax: holds disagrees with the absolute difference")
     return problems
 
 
@@ -1886,6 +2151,177 @@ def self_test() -> int:
         no_taxonomy["boards"][name]["unaccountedBy"] = {}
     check("a board with no taxonomy has nothing to sum", check_manifest(no_taxonomy) == [])
 
+    # R232. The block is `items[:CAP]`, so the fixture has to be one where the instrument and the product disagree by
+    # construction: an ask on the board, and a cap small enough to hide it. `volunteered` is that fixture — the contract
+    # states `cancel`, a later volunteered clause states `return`, and the return is the second item.
+    lamp_return = {"id": "3", "evaluation_criteria": {"actions": [
+        {"name": "return_delivered_order_items", "arguments": {"order_id": "#W1234567", "item_ids": ["1"]}},
+    ]}}
+    moment_entry = ledger(volunteered)
+    moment_done = discharge(moment_entry["writes"], required_writes(lamp_return))
+    check("the block before the first message is empty",
+          moment(moment_entry, volunteered, 0, "clause")["items"] == [])
+    wide = visibility(moment_entry, volunteered, moment_done, "clause")
+    check("a write whose ask is on the moment board is shown", (wide["reached"], wide["displayed"]) == (1, 1))
+    tight = visibility(moment_entry, volunteered, moment_done, "clause", cap=1)
+    check("and one whose ask sits past the cap is reached but not shown",
+          (tight["reached"], tight["displayed"], tight["hidden"]) == (1, 0, 1))
+    check("the hidden share is the reach it is not shown over", tight["hiddenShare"] == 1.0)
+    contract_view = visibility(moment_entry, volunteered, moment_done, "request")
+    check("the contract's board at the same moment does not reach the later clause",
+          (contract_view["reached"], contract_view["displayed"]) == (0, 0))
+    check("and a scope that reaches nothing reports no hidden share rather than zero",
+          contract_view["hiddenShare"] is None)
+    # A graded write the ledger never saw. It cannot happen through `discharge`, which reads the same receipt list, and
+    # the column is defined for it anyway: the denominator is the evaluator's, so an unwitnessed write is a denominator
+    # with no numerator rather than a write quietly dropped from both.
+    unseen = visibility(moment_entry, volunteered, {"byPosition": {9: 0}}, "clause")
+    check("a graded write the ledger never saw is counted in neither reach nor shown",
+          (unseen["required"], unseen["reached"], unseen["displayed"], unseen["hiddenShare"]) == (1, 0, 0, None))
+    # The cap cuts the window and nothing else: a settled ask below the fold is still settled, so the credited column is
+    # a property of the rule. Read on the finished board, where both asks are on it.
+    whole = ask_board(moment_entry, volunteered, "clause")
+    cut = ask_board(moment_entry, volunteered, "clause", cap=1)
+    check("the cap cuts the items and reports how many there were",
+          (len(cut["items"]), cut["itemsAll"]) == (1, 2))
+    check("and leaves the settled column alone", cut["credited"] == whole["credited"] == [0])
+    # The moment board must not consult the future, and there are two ways to see that it does not. The board before
+    # the call does not hold the ask stated after it at all; and the same entry read with the future parse switched off
+    # files the resulting miss as `neverStated` rather than as `disclosedLater`, which is the only observable
+    # difference between the two modes — so a leak would be caught by the taxonomy even where the items agree.
+    check("an ask stated after the call is not on the block that preceded it",
+          [item["family"] for item in moment(moment_entry, volunteered, 5, "request")["items"]] == ["cancel"])
+    check("a board that declines the future calls the missing ask never stated",
+          ask_board(moment_entry, volunteered, "request", later=False)["unaccountedBy"] == {"neverStated": 1})
+    check("while the finished board, which may parse it, calls the same miss disclosed later",
+          ask_board(moment_entry, volunteered, "request")["unaccountedBy"] == {"disclosedLater": 1})
+    # Two calls in one assistant message read one block. Slicing at a call's own event instead would settle the first
+    # ask before the second call looked at it, and the second call would be credited against a line it never saw.
+    paired_calls = [
+        {"role": "user", "content": "Please cancel my orders #W1234567 and #W7654321."},
+        {"role": "assistant", "content": "", "tool_calls": [
+            {"name": "get_order_details", "arguments": {"order_id": "#W1234567"}},
+            {"name": "get_order_details", "arguments": {"order_id": "#W7654321"}}]},
+        _result(order), _result('{"order_id": "#W7654321", "user_id": "mia_garcia_4516", "items": []}'),
+        {"role": "assistant", "content": "", "tool_calls": [
+            {"name": "cancel_pending_order", "arguments": {"order_id": "#W1234567", "reason": "x"}},
+            {"name": "cancel_pending_order", "arguments": {"order_id": "#W7654321", "reason": "x"}}]},
+        _result("{}"), _result("{}"),
+    ]
+    twin_entry = ledger(paired_calls)
+    twins = moment(twin_entry, paired_calls, 4, "request")
+    check("two calls in one message are answered by one block", twins["credited"] == [])
+    check("and both asks are still open on it", [item["settled"] for item in twins["items"]] == [False, False])
+    twin_task = {"id": "1", "evaluation_criteria": {"actions": [
+        {"name": "cancel_pending_order", "arguments": {"order_id": "#W1234567"}},
+        {"name": "cancel_pending_order", "arguments": {"order_id": "#W7654321"}}]}}
+    twin_done = discharge(twin_entry["writes"], required_writes(twin_task))
+    check("so both graded writes are shown, each against the block it was served",
+          visibility(twin_entry, paired_calls, twin_done, "request")["displayed"] == 2)
+
+    # R232's bars at their exact thresholds. The summary is built the way `compare` builds it, from four counts per
+    # scope, so that the bar is tested as arithmetic rather than through a corpus.
+    def display_summary(required: int, request: tuple, clause: tuple, full: int) -> dict:
+        def one(pair) -> dict:
+            reached, shown = pair
+            return {"required": required, "reached": reached, "displayed": shown, "hidden": reached - shown,
+                    "shownShare": (shown / required) if required else None,
+                    "hiddenShare": ((reached - shown) / reached) if reached else None, "itemsPerCall": CAP}
+        return {"graded": 1 if required else 0, "discharged": required,
+                "display": {"request": one(request), "clause": one(clause)},
+                "boards": {"request": {"covered": full}}}
+
+    check("a scope exactly at the display bar holds",
+          display_bar(display_summary(100, (74, 74), (74, 74), 70))["B1_displayed"]["holds"] is True)
+    check("a scope one write under it fails",
+          display_bar(display_summary(100, (73, 73), (73, 73), 70))["B1_displayed"]["holds"] is False)
+    check("and a grid where no scope passes is refused rather than half-passed",
+          display_bar(display_summary(100, (0, 0), (0, 0), 0))["holds"] is False)
+    # Both scopes can pass B1, and the one the visibility test is applied to is the one that survived the cut with
+    # more writes — not the one with the better ratio. Here the clause board reaches all 100 and shows 80, the contract
+    # reaches 74 and shows 74; the clause board is chosen by writes shown and then judged on what it hid.
+    both_pass = display_bar(display_summary(100, (74, 74), (100, 80), 70))
+    check("the passing scope is the one that survived the cut with more writes", both_pass["B2_hidden"]["scope"] == "clause")
+    check("and it is judged on its own hidden share", both_pass["B2_hidden"]["hiddenShare"] == 0.2)
+    check("a fifth hidden holds exactly at the bar",
+          display_bar(display_summary(100, (74, 74), (100, 80), 70))["B2_hidden"]["holds"] is True)
+    check("one write more than a fifth fails",
+          display_bar(display_summary(100, (74, 74), (100, 79), 70))["B2_hidden"]["holds"] is False)
+    check("a display tax of four writes holds",
+          display_bar(display_summary(100, (74, 74), (74, 74), 70))["B3_displayTax"]["holds"] is True)
+    check("five writes over the contract's full coverage fails",
+          display_bar(display_summary(100, (74, 79), (74, 74), 70))["B3_displayTax"]["holds"] is False)
+    check("and the tax is signed, so an undershoot is caught too",
+          display_bar(display_summary(100, (74, 61), (74, 74), 70))["B3_displayTax"]["holds"] is False)
+    check("a summary with no displayed measurement is refused",
+          "displayed measurement" in display_bar({})["reason"])
+    check("and a grid with nothing graded is refused rather than passed",
+          "no bar can be evaluated" in display_bar(display_summary(0, (0, 0), (0, 0), 0))["reason"])
+
+    # End to end, in both directions. The grid is one episode and the arithmetic is by hand: the return's ask is the
+    # second item on the clause board, so a cap of eight shows it and the contract's board never had it.
+    shown_grid = compare({"tasks": [lamp_return],
+                          "simulations": [{"id": "s", "task_id": "3", "messages": volunteered}]}, "displayed")
+    check("the displayed reading reports both scopes over one denominator",
+          (shown_grid["display"]["request"]["required"], shown_grid["display"]["clause"]["required"]) == (1, 1))
+    check("the contract reaches nothing at the moment and the clause rule reaches one",
+          (shown_grid["display"]["request"]["reached"], shown_grid["display"]["clause"]["displayed"]) == (0, 1))
+    check("the displayed reading adds up", check_manifest(shown_grid) == [])
+    shown_text = render(shown_grid, "displayed")
+    check("the displayed reading prints the block table", "display" in shown_text and "items/call" in shown_text)
+    for name in ("B1 displayed", "B2 hidden", "B3 display tax"):
+        check(f"and its bar line ({name})", name in shown_text)
+    check("the displayed reading is judged against the clause board rather than against the request",
+          "coverage delta" in shown_text and shown_grid["paired"]["coverageDelta"] is not None)
+    # The checker's own tests, one per claim the block makes.
+    for label, mutate in (
+        ("more shown than reached", lambda one: one.__setitem__("displayed", one["reached"] + 1)),
+        ("hidden that is not the difference", lambda one: one.__setitem__("hidden", one["hidden"] + 1)),
+        ("a hidden share that is not hidden over reached", lambda one: one.__setitem__("hiddenShare", 0.5)),
+        ("a shown share that is not shown over required", lambda one: one.__setitem__("shownShare", 0.5)),
+    ):
+        doctored = json.loads(json.dumps(shown_grid))
+        mutate(doctored["display"]["clause"])
+        check(f"a display block with {label} is caught", check_manifest(doctored) != [])
+    over_reached = json.loads(json.dumps(shown_grid))
+    over_reached["display"]["clause"]["reached"] = over_reached["display"]["clause"]["required"] + 1
+    check("a scope that reached more writes than it was graded on is caught", check_manifest(over_reached) != [])
+    disagreeing = json.loads(json.dumps(shown_grid))
+    disagreeing["display"]["clause"]["required"] = 2
+    check("two scopes that disagree on the denominator are caught", check_manifest(disagreeing) != [])
+    rate_off = json.loads(json.dumps(shown_grid))
+    rate_off["bar"]["B1_displayed"]["rates"]["clause"] = 0.5
+    check("a B1 rate that is not shown over discharged is caught", check_manifest(rate_off) != [])
+    passers_off = json.loads(json.dumps(shown_grid))
+    passers_off["bar"]["B1_displayed"]["passers"] = []
+    check("a passing list that is not the one the rates imply is caught", check_manifest(passers_off) != [])
+    tax_off = json.loads(json.dumps(shown_grid))
+    tax_off["bar"]["B3_displayTax"]["tax"] = 9
+    check("a tax that is not the difference it names is caught", check_manifest(tax_off) != [])
+    holds_off = json.loads(json.dumps(shown_grid))
+    holds_off["bar"]["B3_displayTax"]["holds"] = False
+    check("and a hold that the difference contradicts is caught", check_manifest(holds_off) != [])
+    with tempfile.TemporaryDirectory() as temporary:
+        # The scope has to survive the command line: a measurement that only exists in Python is a measurement the
+        # gate cannot quote, and every reading this lane has saved went through `--save` and `--check`.
+        shown_path = os.path.join(temporary, "shown.json")
+        with open(shown_path, "w", encoding="utf-8") as handle:
+            json.dump({"tasks": [lamp_return],
+                       "simulations": [{"id": "s", "task_id": "3", "messages": volunteered}]}, handle)
+        saved_path = os.path.join(temporary, "saved.json")
+        check("the displayed scope runs from the command line",
+              quiet(["--document", shown_path, "--scope", "displayed", "--save", saved_path]) == 0)
+        check("and the reading it saves adds up", quiet(["--check", saved_path]) == 0)
+        # The refusal has to survive the command line too. A grid where nothing is graded has no dispatch to render a
+        # block for, so the displayed bar has no subject — which is a failure and not a pass.
+        empty_path = os.path.join(temporary, "empty.json")
+        with open(empty_path, "w", encoding="utf-8") as handle:
+            json.dump({"tasks": [lamp_return],
+                       "simulations": [{"id": "s", "task_id": "3", "messages": [
+                           {"role": "user", "content": "hello"}]}]}, handle)
+        check("a grid with nothing graded fails the displayed bar and exits one",
+              quiet(["--document", empty_path, "--scope", "displayed", "--bar"]) == 1)
+
     check("the reporter on an empty list exits zero", quiet_report([]) == 0)
     check("the reporter on a failure exits one", quiet_report(["negative control (must fail)"]) == 1)
     return _report(failed)
@@ -1895,7 +2331,12 @@ def main(argv: list) -> int:
     parser = argparse.ArgumentParser(description="Bind the item to the read, not to the words.")
     parser.add_argument("--document", default="", help="a results document with transcripts and tasks")
     parser.add_argument("--replicate", default="", help="a second document, read the same way")
-    parser.add_argument("--scope", default="strict", choices=("strict", "loose", "ask", "admitted", "clause"))
+    parser.add_argument(
+        "--scope",
+        default="strict",
+        choices=("strict", "loose", "ask", "admitted", "clause", "displayed"),
+        help="which board the bars are evaluated over; `displayed` measures the rendered block instead",
+    )
     parser.add_argument("--bar", action="store_true", help="exit non-zero when a registered bar fails")
     parser.add_argument("--save", default="", help="write the reading to this path, for the documents to quote")
     parser.add_argument("--check", default="", help="check that a saved reading adds up, and exit non-zero if not")
