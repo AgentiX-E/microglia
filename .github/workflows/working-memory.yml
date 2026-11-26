@@ -825,7 +825,23 @@ jobs:
           assert reading["closeTurnPairs"] <= reading["pairs"], (reading["closeTurnPairs"], reading["pairs"])
           assert reading["tiedTurnPairs"] <= reading["closeTurnPairs"], (reading["tiedTurnPairs"],
                                                                          reading["closeTurnPairs"])
-          print(f"::notice title=R218e dose::{reading['state']}, {reading['episodesWithDose']} of "
+          # The sign test's unit. An attempt inside a task is not an independent draw, so the test reads tasks and
+          # the three task-level counters must therefore partition the pairs exactly — a reading whose parts do not
+          # add up to its whole is a reading whose p-value was computed over a sample the grid does not have, which
+          # is what this round's first read did with 180 passing attempts standing in for 114 tasks (AUDIT 34.313).
+          assert reading["taskWins"] + reading["taskLosses"] + reading["taskTies"] == reading["pairs"], (
+              reading["taskWins"], reading["taskLosses"], reading["taskTies"], reading["pairs"])
+          assert (reading["closeTaskWins"] + reading["closeTaskLosses"] + reading["closeTaskTies"]
+                  == reading["closeTurnPairs"]), (reading["closeTaskWins"], reading["closeTaskLosses"],
+                                                  reading["closeTaskTies"], reading["closeTurnPairs"])
+          # Five discordant tasks is under the six a unanimous sign test needs to clear 0.05, so a decided subset
+          # that small is a bound whatever its p-value says, and the gate says which one it produced.
+          if reading["closeTaskWins"] + reading["closeTaskLosses"] < 6:
+              print(f"::warning title=R218e::the decided subset holds only "
+                    f"{reading['closeTaskWins'] + reading['closeTaskLosses']} discordant task(s), under the six a "
+                    "unanimous sign test needs to clear 0.05 — the reading is a bound and not a verdict")
+          print(f"::notice title=R218e dose::{reading['state']}, {reading['taskWins']} for the higher side and "
+                f"{reading['taskLosses']} against at the task level, {reading['episodesWithDose']} of "
                 f"{reading['episodes']} episode(s) carried a block, {reading['doseCharsMean']:.0f} characters an "
                 f"episode, {reading.get('pairs', 0)} task(s) split into a higher and a lower dose, "
                 f"{reading['closeTurnPairs']} of them within {reading['closeTurnTolerance']:g} turn(s)")

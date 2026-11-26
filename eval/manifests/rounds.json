@@ -178,7 +178,7 @@
     {
       "id": "R218e",
       "title": "the dose, recorded where it is known \u2014 one line an episode, written by the arm",
-      "status": "dispatched",
+      "status": "read",
       "dispatchBy": "2026-12-02T12:00:00Z",
       "arms": [
         "board"
@@ -191,28 +191,50 @@
       "why": "R218d could not read a treated arm's material because the material was never written down: the block is in the request and the transcript is the conversation. One JSONL line an episode \u2014 turns, block characters, renders, the final verdict \u2014 turns the question the lane keeps asking into one it can answer per episode. The recording is the only route: the transcript holds no prompt.",
       "amended": "Registered 25 November with 114 episodes and a transcript check. Amended 26 November, before dispatch, on three measurements that cost nothing: (1) tau2 stores no `system` message at either placement, so the transcript check is impossible and is replaced by an identity against the phase census; (2) one attempt a task cannot produce a within-task pair, so the grid is 114 x 2 rounds; (3) the trial index is the round, not a turn count.",
       "build": "agent records one dict an episode (turns/renders/chars/written/changes/stable) at the single boundary site; runner resolves text->task and partitions by round; eval/drivers/tau2/dose.py joins and refuses three states; board_dose.py --sidecar reads it, and answers NO_SYSTEM on a transcript",
-      "run": 45725844697,
+      "run": 45752387029,
       "dispatchedAt": "2026-11-26T08:03:10+08:00",
       "actualUsd": 1.2217,
-      "outcome": "the grid ran and the join refused itself: 236 records over 228 episodes (8 retries, 11 boundary texts that resolved to no task), so the sidecar was never written and the recording survived only as three aggregates. What those buy: carried/served = 31.9% (321,295 served, 102,333 carried, 2,176 renders, 514 writes), which is the tail's price as a ratio. The join now attributes retries and unresolved texts, dumps the raw recording before joining, and the gate bounds the loss; re-dispatch pending the 04:00-06:00 UTC window.",
+      "outcome": "DOSE_READ, and the dose is null at both scales: over the 114 tasks whose two rounds received different amounts the higher-dose side read above on 14 and below on 14 with 86 level (p = 1.0000), and on the 17 tasks whose sides averaged within one turn of each other it read 2 against 3 with 12 level (p = 1.0000). The recorded block averages 1,421 characters an episode and 222 of 228 episodes carried one, so the material was present and its size varied by a median of 820 characters \u2014 and more of it changed nothing.",
       "reading": {
-        "run": 45725844697,
+        "run": 45752387029,
+        "state": "DOSE_READ",
+        "source": "sidecar",
         "episodes": 228,
-        "usd": 1.2217,
-        "refused": true,
-        "records": 236,
-        "resolved": 225,
-        "unresolved": 11,
-        "retried": 8,
-        "renders": 2176,
-        "chars": 321295,
-        "writes": 514,
-        "written": 102333,
-        "writtenOfServed": 0.319,
-        "charsPerRender": 147.7,
-        "carriedPerWrite": 199.1,
-        "heldShare": 0.764
-      }
+        "tasks": 114,
+        "coverage": {
+          "matched": 228,
+          "unordered": 0,
+          "unscored": 0,
+          "retries": 0
+        },
+        "episodesWithDose": 222,
+        "doseCharsMean": 1421.4,
+        "doseCharsMedian": 1202,
+        "doseGapMedianChars": 820.5,
+        "turnGapMedian": 7.0,
+        "full": {
+          "pairs": 114,
+          "higherWins": 14,
+          "lowerWins": 14,
+          "level": 86,
+          "higherPassed": 90,
+          "lowerPassed": 90,
+          "p": 1.0
+        },
+        "decided": {
+          "tolerance": 1,
+          "closeTurnPairs": 17,
+          "higherWins": 2,
+          "lowerWins": 3,
+          "level": 12,
+          "tiedTurnPairs": 6,
+          "closeDoseGapMedianChars": 108,
+          "p": 1.0
+        },
+        "verdict": "the full grid is a sign test with power and no direction (28 discordant tasks, 14-14, p = 1.0); the length-matched subset is a direction with no power (5 discordant tasks, 2-3, p = 1.0, and five is under the six a unanimous test needs). Neither supports the premise, and the pre-registered rule returns a bound rather than a verdict because the decided subset is one task short of six.",
+        "unit": "the sign test reads tasks and not attempts. An attempt inside a task is not an independent draw, and the first read of this grid counted passing attempts instead \u2014 180 of them standing in for 114 pairs, reported as '90 against 90 attempt-pairs' (AUDIT 34.313). The correction changed no verdict and changed every number in the sentence."
+      },
+      "readAt": "2026-11-26T04:40:00Z"
     },
     {
       "id": "R219",

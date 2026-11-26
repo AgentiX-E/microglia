@@ -240,3 +240,34 @@ pairs it has 0.80 against 80%. So the round can return a **verdict** only on a l
   workflow prints it as a warning rather than failing, because a grid whose attempts happened to differ in length is a
   fact about the population and not a defect in the build.
 - **`NO_PAIRS`** still refutes the premise rather than the recording, unchanged from the first amendment.
+
+## Amendment 3 — the floor on the subset is not the floor on the test (26 November, after the read)
+
+The rule above names `closeTurnPairs ≥ 10` as the gate that makes a verdict admissible, and the grid passed it with
+**17**. The verdict was still unavailable, for a reason the rule did not anticipate: of those 17 tasks, **12 were
+level** — both sides' pass rates equal — leaving **5 discordant tasks**. A sign test over five discordant pairs cannot
+reach `p < 0.05` under any split, unanimous included, because `2·2⁻⁵ = 0.0625`. The gate that binds was six, and it was
+not in the rule.
+
+The two numbers are not interchangeable and their ratio is not fixed: it is set by how often the two rounds of a task
+agree, which is a property of the arms and is unknown when the rule is written. A floor on the subset size therefore
+cannot stand in for a floor on the test's own n.
+
+**Amended decision rule, and it governs any re-dispatch:**
+
+- **Verdict** requires `closeTurnPairs ≥ 10` **and** `closeTaskWins + closeTaskLosses ≥ 6` **and** `closeP < 0.05`
+  **and** the same sign over all pairs.
+- **Bound** is the outcome whenever the discordant floor is missed, and the sentence carries the discordant count
+  beside the subset size, because the pair count the pre-registration promised to report is not the count the test
+  used.
+- **Sign unit, stated because it was silently wrong once** (AUDIT 34.313): the sign test reads **tasks**, not passing
+  attempts. `taskWins + taskLosses + taskTies` must equal `pairs`, and the decided subset's three counters must equal
+  `closeTurnPairs`. An attempt inside a task is not an independent draw, so a test that counts attempts inflates its
+  own n by the attempts a task.
+
+**The read this amendment is written against**, so a later reader can see the numbers and not only the rule:
+
+| scale | pairs | wins | losses | level | discordant | p | outcome |
+|---|---|---|---|---|---|---|---|
+| whole grid | 114 | 14 | 14 | 86 | 28 | 1.0000 | **null, with a 7-turn confound** |
+| length-matched (±1 turn) | 17 | 2 | 3 | 12 | 5 | 1.0000 | **bound, one task short of six** |

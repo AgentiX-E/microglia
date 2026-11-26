@@ -295,9 +295,16 @@ def within_task(grouped: dict, tolerance: float = CLOSE_TURN_TOLERANCE) -> dict:
     hold almost no exact ties.
     """
     pairs = high_pass = low_pass = 0
+    # The sign test's unit is the **task**, not the episode. A task contributes one comparison — its higher-dose
+    # side's pass rate against its lower-dose side's — and an attempt is a measurement inside that comparison, so
+    # counting passing attempts as if each were an independent sign inflates the test's n by the attempts a task and
+    # reports a p-value for a sample the grid does not have. `high_pass`/`low_pass` stay as description; these two
+    # counters are what the test reads.
+    wins = losses = rate_ties = 0
     turn_gap = []
     dose_gap = []
     close_pairs = close_high = close_low = tied_pairs = 0
+    close_wins = close_losses = close_rate_ties = 0
     close_turn_gap = []
     close_dose_gap = []
     for task in sorted(grouped):
@@ -310,8 +317,18 @@ def within_task(grouped: dict, tolerance: float = CLOSE_TURN_TOLERANCE) -> dict:
         if not higher or not lower:
             continue
         pairs += 1
-        high_pass += sum(1 for _, reward, _ in higher if reward >= 1.0)
-        low_pass += sum(1 for _, reward, _ in lower if reward >= 1.0)
+        high_here = sum(1 for _, reward, _ in higher if reward >= 1.0)
+        low_here = sum(1 for _, reward, _ in lower if reward >= 1.0)
+        high_pass += high_here
+        low_pass += low_here
+        high_rate = high_here / len(higher)
+        low_rate = low_here / len(lower)
+        if high_rate > low_rate:
+            wins += 1
+        elif high_rate < low_rate:
+            losses += 1
+        else:
+            rate_ties += 1
         dose_gap.append(statistics.mean([dose for dose, _, _ in higher]) - statistics.mean(
             [dose for dose, _, _ in lower]))
         task_turn_gap = statistics.mean([turns for _, _, turns in higher]) - statistics.mean(
@@ -321,8 +338,14 @@ def within_task(grouped: dict, tolerance: float = CLOSE_TURN_TOLERANCE) -> dict:
         # cannot disagree about which attempt was the treated one.
         if abs(task_turn_gap) <= tolerance:
             close_pairs += 1
-            close_high += sum(1 for _, reward, _ in higher if reward >= 1.0)
-            close_low += sum(1 for _, reward, _ in lower if reward >= 1.0)
+            close_high += high_here
+            close_low += low_here
+            if high_rate > low_rate:
+                close_wins += 1
+            elif high_rate < low_rate:
+                close_losses += 1
+            else:
+                close_rate_ties += 1
             close_turn_gap.append(task_turn_gap)
             close_dose_gap.append(statistics.mean([dose for dose, _, _ in higher]) - statistics.mean(
                 [dose for dose, _, _ in lower]))
@@ -338,7 +361,10 @@ def within_task(grouped: dict, tolerance: float = CLOSE_TURN_TOLERANCE) -> dict:
         # The confound, quantified rather than named: if the higher-dose attempts also ran longer by the same order
         # of magnitude, the pair is "the longer attempt" as much as it is "the more material".
         "turnGapMedian": round(statistics.median(turn_gap), 1) if turn_gap else None,
-        "p": _sign_test(high_pass, low_pass),
+        "taskWins": wins,
+        "taskLosses": losses,
+        "taskTies": rate_ties,
+        "p": _sign_test(wins, losses),
         # The decided subset: close on length, and therefore the only pairs on which "more material" is not also
         # "a longer conversation".
         "closeTurnTolerance": tolerance,
@@ -348,7 +374,10 @@ def within_task(grouped: dict, tolerance: float = CLOSE_TURN_TOLERANCE) -> dict:
         "closeHigherDoseRate": (close_high / (close_high + close_low)) if (close_high + close_low) else None,
         "closeTurnGapMedian": round(statistics.median(close_turn_gap), 1) if close_turn_gap else None,
         "closeDoseGapMedianChars": round(statistics.median(close_dose_gap), 1) if close_dose_gap else None,
-        "closeP": _sign_test(close_high, close_low),
+        "closeTaskWins": close_wins,
+        "closeTaskLosses": close_losses,
+        "closeTaskTies": close_rate_ties,
+        "closeP": _sign_test(close_wins, close_losses),
         "tiedTurnPairs": tied_pairs,
     }
 
@@ -432,12 +461,11 @@ def render(reading: dict) -> str:
     if reading["closeTurnPairs"]:
         close = (
             f" On the subset that decides it — the {reading['closeTurnPairs']} task(s) whose two sides averaged "
-            f"within {reading['closeTurnTolerance']:g} turn(s) of each other — the higher-dose side passed "
-            f"{reading['closeHigherDoseRate']:.1%} of "
-            f"{reading['closeHigherDosePassed'] + reading['closeLowerDosePassed']} attempt-pairs "
-            f"({reading['closeHigherDosePassed']} against {reading['closeLowerDosePassed']}), sign test p = "
+            f"within {reading['closeTurnTolerance']:g} turn(s) of each other — the higher-dose side read above the "
+            f"lower on {reading['closeTaskWins']} task(s) and below on {reading['closeTaskLosses']} "
+            f"({reading['closeTaskTies']} level at the task level), sign test p = "
             f"{reading['closeP'] if reading['closeP'] is None else format(reading['closeP'], '.4f')}, "
-            f"{reading['tiedTurnPairs']} of them tied exactly."
+            f"{reading['tiedTurnPairs']} of them tied exactly on turn count."
         )
     else:
         close = (
@@ -447,9 +475,9 @@ def render(reading: dict) -> str:
     return (
         f"DOSE_READ: {reading['episodesWithDose']} of {reading['episodes']} episode(s) carried a block, "
         f"{reading['doseCharsMean']:.0f} characters an episode ({driven}); of the {reading['pairs']} task(s) whose "
-        f"attempts received different amounts, the higher-dose side passed {rate:.1%} of "
-        f"{reading['higherDosePassed'] + reading['lowerDosePassed']} attempt-pairs "
-        f"({reading['higherDosePassed']} against {reading['lowerDosePassed']}), sign test p = "
+        f"attempts received different amounts, the higher-dose side read above the lower on "
+        f"{reading['taskWins']} task(s) and below on {reading['taskLosses']} "
+        f"({reading['taskTies']} level, {rate:.1%} of the passing attempts on each side), sign test p = "
         f"{reading['p'] if reading['p'] is None else format(reading['p'], '.4f')}, the higher-dose side running "
         f"{reading['turnGapMedian']:+} turns longer on the median task and receiving "
         f"{reading['doseGapMedianChars']:.0f} more characters — and because dose and turn count move together, "
@@ -515,6 +543,28 @@ def self_test() -> int:
         episode("a", 1.0, 1), episode("a", 1.0, 2), episode("a", 0.0, 3), episode("a", 0.0, 4),
     ]}))["pairs"] == 1)
 
+    # The sign test's unit, which is the defect this check exists for. Three tasks, four attempts each: two where the
+    # higher-dose half passes everything the lower half does not, one the other way round. Counting passing attempts
+    # gives 4 against 2 and p = 0.69; counting tasks gives 2 against 1 and p = 1. The two answers disagree, and only
+    # the second one is a statement about a sample the grid actually has — the attempts inside a task are not
+    # independent draws, which is the same reason every other reader in this lane takes the task as its unit.
+    unit = within_task(by_task({"simulations": [
+        episode("a", 1.0, 3), episode("a", 1.0, 4), episode("a", 0.0, 1), episode("a", 0.0, 2),
+        episode("b", 1.0, 3), episode("b", 1.0, 4), episode("b", 0.0, 1), episode("b", 0.0, 2),
+        episode("c", 0.0, 3), episode("c", 0.0, 4), episode("c", 1.0, 1), episode("c", 1.0, 2),
+    ]}))
+    check("the passing attempts are still reported", unit["higherDosePassed"] == 4 and unit["lowerDosePassed"] == 2,
+          (unit["higherDosePassed"], unit["lowerDosePassed"]))
+    check("but the sign test counts tasks, not attempts", unit["taskWins"] == 2 and unit["taskLosses"] == 1,
+          (unit["taskWins"], unit["taskLosses"]))
+    check("and no task is level when every rate differs", unit["taskTies"] == 0, unit["taskTies"])
+    check("so p is the task-level one, not the attempt-level one", unit["p"] == 1.0, unit["p"])
+    level = within_task(by_task({"simulations": [
+        episode("a", 1.0, 3), episode("a", 0.0, 4), episode("a", 1.0, 1), episode("a", 0.0, 2),
+    ]}))
+    check("a task whose two sides read alike is level rather than a win", level["taskTies"] == 1, level["taskTies"])
+    check("and a level task is not a pair for the test", level["p"] is None, level["p"])
+
     # --- the subset that decides the reading, which nothing computed before R218e's second amendment ---------------
     # Every fixture below is one task with one attempt each side, so the split is unambiguous and the only thing that
     # varies between them is the gap in length.
@@ -530,6 +580,14 @@ def self_test() -> int:
     check("and its decided sign test has no p", far["closeP"] is None)
     check("the confound is still reported over the full set", far["turnGapMedian"] == 8.0, far["turnGapMedian"])
     one = within_task(pair_of(6, 5, high_pass=1.0, low_pass=0.0))
+    check("the decided subset counts tasks too", one["closeTaskWins"] == 1 and one["closeTaskLosses"] == 0,
+          (one["closeTaskWins"], one["closeTaskLosses"]))
+    # A decided subset where nothing passed has no rate to report: zero over zero is not a pass rate, and printing
+    # one would put a number where the grid produced no evidence.
+    blank = within_task(pair_of(6, 6, high_pass=0.0, low_pass=0.0))
+    check("a decided subset with no pass has no rate", blank["closeHigherDoseRate"] is None,
+          blank["closeHigherDoseRate"])
+    check("and its two sides are level", blank["closeTaskTies"] == 1, blank["closeTaskTies"])
     check("a one-turn gap is inside the tolerance", one["closeTurnPairs"] == 1, one)
     check("and it carries its own sign", one["closeHigherDosePassed"] == 1 and one["closeLowerDosePassed"] == 0)
     check("and its own p, which is one on a single discordant pair", one["closeP"] == 1.0, one["closeP"])
