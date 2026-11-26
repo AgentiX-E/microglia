@@ -3,7 +3,7 @@ id: R226-airline-admission
 step: R226
 opened: 2026-11-26
 arms: none
-sample: 0
+sample: 50
 gates: V0
 recallFloor: 0
 ---
