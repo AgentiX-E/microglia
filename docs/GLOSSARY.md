@@ -2935,6 +2935,10 @@ message begins. It is the artefact a model is shown, as opposed to the finished 
 differ by a factor of **456** on the retail grid (**8.10 items** a call against 3,699 an episode). Two calls
 in one assistant message share one moment board, because the block is rendered once, before the turn.
 
+**The cap** — eight items, and it is the product's number rather than the instrument's: `options.limit ?? query.limit ??
+8` in the pack builder, `CAP = 8` here. The two are compared by nothing, which is a gap an audit entry names (34.330);
+`MAX_ITEMS = 99_999` in `render.ts` is the width of the wrapper's item-count placeholder and not a display budget.
+
 **Displayed coverage** — the share of the required writes whose family had an **open** item among the first
 `MAX_ITEMS` lines of the moment board, over the writes the evaluator grades. **95.1%** for the clause board (622 of
 654) and **70.8%** for the contract's (463 of 654), measured at a cap of eight. The complement of *hidden* within

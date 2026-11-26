@@ -5461,6 +5461,15 @@ is the first measurement of the gap between *what the block told the agent to do
 afterwards*. It is not a defect in either rule — the moment board asks whether the requirement was visible, the finished
 board asks whether the work was attributable — and B3's reference was written as if they were one quantity.
 
+**The instrument models two of the product's three rendering decisions.** The cap is the product's own — `limit ??
+query.limit ?? 8` in `packages/core/src/apply/pack.ts`, eight items by default — and `items[:8]` is that constant rather
+than a stand-in for it (`MAX_ITEMS = 99_999` in `render.ts` is the width of a five-character placeholder in the wrapper,
+not a display budget). The ask source is the product's too. What is **not** modelled is the third decision: the shipped
+block is the top eight of a recall query (`anchoring: lexical`), and the instrument's block is a deterministic list in
+statement order. The gap is bounded by the round's own numbers — 2.41 items a call on the contract board against a limit
+of 8 leaves a ranker nothing to choose, 8.10 on the clause board leaves it something — so these readings are exact for
+the shipped configuration and a **lower bound** for the clause rule (AUDIT 34.330).
+
 **What a product should take from it.** Three things, none of which moves the shipped default on its own. The rendering
 is not the bottleneck: at the cap, the clause rule shows 95.1% of the graded work, so its accuracy advantage is
 deliverable and no longer hostage to a price that belongs to the finished board. The block's size is a property of the
