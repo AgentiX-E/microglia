@@ -753,23 +753,41 @@ jobs:
           dose = (phase.get("diagnostics") or {}).get("dose")
           board = ((phase.get("diagnostics") or {}).get("memory") or {}).get("board") or {}
           assert dose is not None, "no dose block: the arm served no board, or the recording was not written"
-          # The join, before the numbers it produces. A refusal means the recording could not be attributed, and an
-          # accuracy-shaped reading taken over a refused join is the defect this step exists to make impossible.
+          counts = dose.get("counts") or {}
+          # The **raw recording first**, because it is the thing that must survive a refusal: R218e's first dispatch
+          # lost 236 per-episode records to a join that refused on harness facts, and the ¥8.7 grid could only be
+          # read as three aggregates (AUDIT 34.266). A missing dump is therefore a failure before any join is judged.
+          raw = Path(dose["rawPath"])
+          assert raw.is_file(), f"no raw recording at {raw}"
+          rows_written = len([line for line in raw.read_text(errors="replace").splitlines() if line.strip()])
+          assert rows_written == dose["episodes"], (rows_written, dose["episodes"])
+          assert rows_written >= 200, rows_written
+          print(f"ok  the raw recording holds {rows_written} episode(s), {counts.get('unresolved')} with a boundary "
+                f"text that resolved to no task, {counts.get('retried')} retried, {counts.get('missing')} with no "
+                f"record at all")
+          # The join, after the dump. A refusal here now costs the attribution and not the grid, so it still fails the
+          # build — a sidecar that could not be attributed is a reading nobody should quote.
           assert dose["refused"] is None, f"the join refused: {dose['refused']}"
           assert dose["identity"] == "round", f"the attempts were {dose['identity']!r}, not one a round"
-          # 114 tasks twice: a short grid is a different experiment and its floor is a function of the count.
-          assert dose["rows"] == dose["episodes"], (dose["rows"], dose["episodes"])
-          assert dose["rows"] >= 220, dose["rows"]
+          assert dose["rows"] == counts.get("joined"), (dose["rows"], counts)
+          # 114 tasks twice, minus whatever the harness cost: a short grid is a different experiment and its floor is
+          # a function of the count.
+          assert dose["rows"] >= 220, (dose["rows"], counts)
           # The recording against the counters that were produced independently of it. These three are the reason
           # the sidecar is worth a round: a recording that disagrees with the census describes an episode that is not
           # the one it says it describes, and every per-episode attribution downstream would inherit the error.
           assert dose["agreesRenders"], (dose["totals"]["renders"], board.get("renders"))
           assert dose["agreesChars"], (dose["totals"]["chars"], board.get("charsTotal"))
           assert dose["agreesChanges"], (dose["totals"]["changes"], board.get("changes"))
-          # A block held rather than re-written cannot be carried twice, so carried <= served on any placement, and
-          # the two are equal only on the front one.
-          assert dose["totals"]["written"] <= dose["totals"]["chars"], dose["totals"]
+          # The placement **first**, because the inequality below is a statement about the tail and about nothing
+          # else. Behind the conversation an unchanged block is held rather than re-written, so the material carried
+          # is less than the material served. At the front every render is written and each write adds the 37-
+          # character element, so `written` is *above* `chars` there — an invariant of "carried <= served" would be
+          # false on the placement this project ran for eleven rounds before R216, and it is stated per placement
+          # rather than globally for that reason (AUDIT 34.265).
           assert board.get("placement") == "tail", board.get("placement")
+          assert dose["totals"]["written"] <= dose["totals"]["chars"], dose["totals"]
+          assert dose["totals"]["written"] > 0, "the block was rendered and never written: the placement did nothing"
           print(f"ok  {dose['rows']} row(s) over {phase['tasks']} task(s) in {phase['trials']} round(s), "
                 f"{dose['totals']['chars']} characters served, {dose['totals']['written']} carried "
                 f"({dose['writtenOfServed']:.0%}), {dose['totals']['changes']} change(s) over "

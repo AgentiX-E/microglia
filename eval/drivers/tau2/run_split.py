@@ -1152,22 +1152,37 @@ def _dose_block(memory, marks, rounds_simulations, out: str) -> "dict | None":
         return None
     tasks = memory.get("boundaryTasks") or []
     joined = dose_sidecar.rows(records, tasks, marks, rounds_simulations)
-    path = out[:-5] + ".dose.jsonl" if out.endswith(".json") else out + ".dose.jsonl"
+    stem = out[:-5] if out.endswith(".json") else out
+    # R218e's first dispatch: the join refused on facts the harness produces by design, nothing was written, and a
+    # complete recording survived as three aggregates — a refusal that cost the money it was protecting. The raw dump
+    # is now written **first and always**, so a refused join costs a reader and never the grid (AUDIT 34.266).
+    raw_path = stem + ".dose.raw.jsonl"
+    written_raw = dose_sidecar.write_raw(raw_path, records, tasks)
     written = 0
+    path = stem + ".dose.jsonl"
     if joined["refused"] is None:
         written = dose_sidecar.write(path, joined["rows"])
     totals = joined["totals"]
+    counts = dict(joined["counts"])
+    counts["raw"] = written_raw
     return {
-        "path": path,
+        "path": path if written else None,
+        "rawPath": raw_path,
         "episodes": len(records),
         "rows": written,
         "refused": joined["refused"],
         "identity": joined["identity"],
         "totals": totals,
+        "counts": counts,
+        # The marks, so a refused join can be diagnosed from the census alone instead of from a re-run: they are the
+        # partition, and a partition is the only thing between a flat recording and a per-episode attribution.
+        "marks": list(marks),
+        "rounds": [len(round_simulations or []) for round_simulations in rounds_simulations],
         # The two identities the census can be checked against, and they are different claims: `renders` and
         # `chars` are the sum over the row set, `written` is the sum over the messages this agent put into a prompt.
-        # The first must equal the counter exactly; the second must be at most the first, and their ratio is the
-        # placement's price expressed as a share rather than as a bill.
+        # The first must equal the counter exactly. The second is a *share* and its size is the placement: below one
+        # on the tail, where an unchanged block is held rather than re-written, and above one at the front, where
+        # every render is written and each write adds the 37-character element (AUDIT 34.265).
         "agreesRenders": totals["renders"] == (board.get("renders") or 0),
         "agreesChars": totals["chars"] == (board.get("charsTotal") or 0),
         "agreesChanges": totals["changes"] == (board.get("changes") or 0),

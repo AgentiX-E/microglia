@@ -27,17 +27,28 @@ task appears exactly once**, and the round *is* the attempt index: `merge_rounds
 snapshot of the recording's length after each round **partitions** it into rounds. That partition is the join:
 round `i`'s slice of records is matched to round `i`'s simulations by task, one each.
 
-Refused rather than guessed at:
+Refused rather than guessed at — **only** the runner's own bookkeeping, never an episode:
 
-  * a slice whose length differs from its round's simulations — a retry or an episode that never called the model,
-    after which the join would attribute one episode's dose to another's reward;
-  * a task that appears twice in one round with no way to tell the attempts apart;
-  * a task in a round that holds no record at all.
+  * the recording and the task list are different lengths;
+  * the per-round snapshots do not match the rounds, go backwards, or stop short of the recording.
 
-Reported rather than refused: `--trials k` with one round runs the k attempts **concurrently**, so the order inside
-a task is completion order and the trial index is not recoverable. Rows are still written, with `trial: None` and
-`identity: "unordered"`, because the counts remain exact even where the pairing does not — a reader can use the
-counts and must refuse the pairs.
+Attributed rather than refused — and this is the repair of the first dispatch, which lost a ¥8.7 grid to a refusal
+about facts the harness produces by design:
+
+| state | how often, R218e's first dispatch | what it means | what the join does |
+|---|---|---|---|
+| a task opens **two** records in one round | 8 of 228 | τ² retried the simulation | takes the **last** record, which is the attempt the document scores, and counts a `retry` |
+| a boundary text resolves to **no** task | 11 of 236 | the retry's opening message differed from the one that was scored | keeps the record in the raw dump, counts it `unresolved` |
+| a task has **no** record in a round | 3 of 228 | its episode never called the model | drops the episode, counts it `missing` |
+
+The first version refused all three, so the join returned nothing, the sidecar was never written, and the only trace of
+236 records was three aggregates in the census — a refusal that costs the money it was protecting. A join may refuse to
+*attribute*; it may not refuse to *record* (AUDIT 34.266).
+
+Reported rather than refused: `--trials k` with one round runs the k attempts **concurrently**, so the order inside a
+task is completion order and the trial index is not recoverable. Rows are still written, with `trial: None` and
+`identity: "unordered"`, because the counts remain exact even where the pairing does not — a reader can use the counts
+and must refuse the pairs.
 
 ## Usage
 
@@ -53,7 +64,7 @@ from pathlib import Path
 #: The fields a row carries into the sidecar. `chars` is the material served, `written` the material carried, and
 #: `turns` the confound the reading has to hold. The opening text is kept out on purpose: it is the join key, it is
 #: a whole user message, and a sidecar that repeated 114 of them would be a second copy of the document.
-FIELDS = ("task", "trial", "turns", "renders", "chars", "written", "changes", "stable")
+FIELDS = ("task", "trial", "retries", "turns", "renders", "chars", "written", "changes", "stable")
 
 
 def _field(entry, name: str, default=None):
@@ -74,20 +85,21 @@ def rows(records, tasks, marks, rounds) -> dict:
     `records` is the agent's dose list, `tasks` the task each boundary opened for (same length, same order, resolved
     by the runner from the boundary text), `marks` the recording's length after each round, and `rounds` the
     simulations each round produced. Returns the rows, the totals a reader checks the recording against the phase's
-    own counters with, and a `refused` sentence when the join could not be made.
+    own counters with, the counts that say what could not be attributed, and a `refused` sentence when the runner's
+    own bookkeeping does not add up.
 
-    A refusal is a return value and not an exception: a phase that spent money has already bought the counters it
-    printed, and taking the process down at the join would throw away the document that explains why. The sidecar is
-    simply not written, and the census carries the reason.
+    Three states are **attributed rather than refused**, because all three are things the harness does: a retry that
+    opens a second record for one task in one round (the last record is the attempt the document scores), a boundary
+    text that resolves to no task (the retry's opening message differed), and a task whose episode never called the
+    model. The first dispatch refused all three and wrote nothing, which is how a complete recording became three
+    aggregates (AUDIT 34.266).
     """
     if len(records) != len(tasks):
         return _refused(f"lengths-differ:{len(records)}/{len(tasks)}")
     if len(marks) != len(rounds):
         return _refused(f"marks-differ:{len(marks)}/{len(rounds)}")
     # Checked before the final-mark rule, because a snapshot that went *backwards* is a different defect from one
-    # that stopped short, and the sentence a reader gets should name the one that happened. A backwards mark is a
-    # negative slice at the next round, and a negative slice is an empty one — a round that joins no episode and
-    # reports it as a round that ran none.
+    # that stopped short, and the sentence a reader gets should name the one that happened.
     if any(later < earlier for earlier, later in zip([0] + list(marks), marks)):
         return _refused("marks-not-increasing")
     if not marks or marks[-1] != len(records):
@@ -95,7 +107,7 @@ def rows(records, tasks, marks, rounds) -> dict:
         return _refused(f"recording-grew-after-the-last-round:{marks[-1] if marks else 0}/{len(records)}")
 
     built: list = []
-    problems: list = []
+    counts = {"records": len(records), "joined": 0, "missing": 0, "retried": 0, "unresolved": 0, "unordered": 0}
     lower = 0
     for index, upper in enumerate(marks):
         slice_records = records[lower:upper]
@@ -106,65 +118,89 @@ def rows(records, tasks, marks, rounds) -> dict:
         for offset, task in enumerate(slice_tasks):
             if isinstance(task, str) and task != "":
                 by_task.setdefault(task, []).append(offset)
-        unordered = any(len(offsets) > 1 for offsets in by_task.values())
-        claimed: set = set()
-        for simulation in simulations:
-            task = str(_field(simulation, "task_id", "") or "")
+            else:
+                counts["unresolved"] += 1
+        ordered = [str(_field(simulation, "task_id", "") or "") for simulation in simulations]
+        wanted: "dict[str, int]" = {}
+        for task in ordered:
             if task == "":
-                problems.append(f"round-{index}:simulation-without-a-task")
+                counts["missing"] += 1
                 continue
+            wanted[task] = wanted.get(task, 0) + 1
+        # Attempts that ran together inside one round cannot be told apart by position, so their trial is withheld.
+        unordered = any(count > 1 for count in wanted.values())
+        for task, attempts in wanted.items():
             offsets = by_task.get(task) or []
             if not offsets:
-                problems.append(f"round-{index}:{task}:no-record")
+                counts["missing"] += attempts
                 continue
-            if len(offsets) > 1:
-                # Concurrent attempts: the record exists but which attempt made it is not recoverable. The first
-                # unclaimed record is taken so the counts stay exact, and `trial` is withheld below.
-                free = [offset for offset in offsets if offset not in claimed]
-                if not free:
-                    problems.append(f"round-{index}:{task}:records-exhausted")
-                    continue
-                offset = free[0]
-            else:
-                offset = offsets[0]
-            claimed.add(offset)
-            record = slice_records[offset]
-            built.append(
-                {
-                    "task": task,
-                    "trial": None if unordered else index,
-                    "turns": int(record.get("turns") or 0),
-                    "renders": int(record.get("renders") or 0),
-                    "chars": int(record.get("chars") or 0),
-                    "written": int(record.get("written") or 0),
-                    "changes": int(record.get("changes") or 0),
-                    "stable": int(record.get("stable") or 0),
-                }
-            )
-        # Every record in the slice must be claimed by an episode, and "every" is counted over the slice rather
-        # than over the task index: a record whose boundary text resolved to no task is not in the index and would
-        # otherwise vanish from the check — the way an unattributable row vanishes from a share.
-        left = [offset for offset in range(len(slice_records)) if offset not in claimed]
-        if left:
-            # A record whose task was not in this round's simulations: an episode the runner scored under a task the
-            # agent's text resolved to something else. Refused, because the failure it would otherwise hide is a
-            # text colliding between two tasks.
-            problems.append(f"round-{index}:{len(left)}-record(s)-with-no-episode")
-    if problems:
-        return _refused(";".join(problems[:3]))
+            # One episode a task: it is the one the document scores, and a retry means the **last** record describes
+            # it — the earlier attempt's conversation was thrown away and so was its record's claim on the episode.
+            # Several attempts a task: they ran concurrently, so the pairing is positional within the task and the
+            # trial is withheld; every record is still used, in order, and a short supply falls back to the last.
+            picks = [offsets[-1]] if attempts == 1 else [
+                offsets[index] if index < len(offsets) else offsets[-1] for index in range(attempts)
+            ]
+            counts["retried"] += max(0, len(offsets) - attempts)
+            for record_offset in picks:
+                record = slice_records[record_offset]
+                built.append(
+                    {
+                        "task": task,
+                        "trial": None if unordered else index,
+                        "retries": max(0, len(offsets) - attempts),
+                        "turns": int(record.get("turns") or 0),
+                        "renders": int(record.get("renders") or 0),
+                        "chars": int(record.get("chars") or 0),
+                        "written": int(record.get("written") or 0),
+                        "changes": int(record.get("changes") or 0),
+                        "stable": int(record.get("stable") or 0),
+                    }
+                )
+        counts["joined"] = len(built)
+    counts["unordered"] = sum(1 for row in built if row["trial"] is None)
     return {"rows": built, "refused": None,
-            "identity": "unordered" if any(row["trial"] is None for row in built) else "round",
-            "totals": _totals(built)}
+            "identity": "unordered" if counts["unordered"] else "round",
+            "totals": _totals(built), "counts": counts}
 
 
 def _refused(reason: str) -> dict:
-    return {"rows": [], "refused": reason, "identity": None, "totals": _totals([])}
+    return {"rows": [], "refused": reason, "identity": None, "totals": _totals([]),
+            "counts": {"records": 0, "joined": 0, "missing": 0, "retried": 0, "unresolved": 0, "unordered": 0}}
 
 
 def _totals(built: list) -> dict:
     """The sums a phase can be checked against, over the rows that were actually joined."""
     keys = ("turns", "renders", "chars", "written", "changes", "stable")
     return {key: sum(row[key] for row in built) for key in keys}
+
+
+def write_raw(path, records, tasks) -> int:
+    """Write every record exactly as the agent made it, whatever the join made of it.
+
+    This exists because the first dispatch's join refused and wrote nothing, so a complete recording of 236 episodes
+    survived only as three aggregates in a census and a ¥8.7 grid could not be read per episode at all (AUDIT 34.266).
+    A join may refuse to *attribute*; it may not refuse to *record*. The raw dump keeps the opening text, which is the
+    join key and therefore the only way to diagnose why a boundary resolved to no task, and a `task` column that is
+    empty exactly where the resolution failed.
+    """
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with open(target, "w", encoding="utf-8") as stream:
+        for index, record in enumerate(records):
+            row = {
+                "index": index,
+                "task": tasks[index] if index < len(tasks) else None,
+                "text": record.get("text") or "",
+                "turns": int(record.get("turns") or 0),
+                "renders": int(record.get("renders") or 0),
+                "chars": int(record.get("chars") or 0),
+                "written": int(record.get("written") or 0),
+                "changes": int(record.get("changes") or 0),
+                "stable": int(record.get("stable") or 0),
+            }
+            stream.write(json.dumps(row) + "\n")
+    return len(records)
 
 
 def write(path, built: "list[dict]") -> int:
@@ -241,13 +277,7 @@ def self_test() -> int:
           rows([record(chars=11), record(chars=22)], ["b", "a"], [2],
                [[simulation("a"), simulation("b")]])["rows"][0]["chars"] == 22)
 
-    # --- the refusals ----------------------------------------------------------------------------------
-    short = rows([record()], ["a"], [1], [[simulation("a"), simulation("b")]])
-    check("a round with more episodes than records is refused", short["refused"] is not None, short)
-    check("and the refusal names the missing task", "no-record" in (short["refused"] or ""), short["refused"])
-    check("a refused join writes no rows", short["rows"] == [])
-    check("a refused join still counts nothing", short["totals"]["chars"] == 0)
-    check("a refused join has no identity", short["identity"] is None)
+    # --- the refusals, which are the runner's bookkeeping and nothing else ---------------------------------
     check("records and tasks of different lengths are refused",
           rows([record()], ["a", "b"], [1], [[simulation("a")]])["refused"].startswith("lengths-differ"))
     check("a recording that grew after the last round is refused",
@@ -257,23 +287,48 @@ def self_test() -> int:
     check("marks that are not increasing are refused",
           rows([record(), record()], ["a", "b"], [2, 1], [[simulation("a")], [simulation("b")]])
           ["refused"] == "marks-not-increasing")
-    check("an unresolved boundary is a record with no episode",
-          "with-no-episode" in (rows([record(), record()], ["a", None], [2],
-                                     [[simulation("a")]])["refused"] or ""))
-    check("a simulation with no task is refused",
-          "without-a-task" in (rows([record()], ["a"], [1], [[{"task_id": ""}]])["refused"] or ""))
-    check("a task with two records and two episodes keeps its counts",
-          len(rows([record(), record(renders=9)], ["a", "a"], [2],
-                   [[simulation("a"), simulation("a", 1)]])["rows"]) == 2)
-    three = rows([record(), record()], ["a", "a"], [2],
-                 [[simulation("a"), simulation("a", 1), simulation("a", 2)]])
-    check("a third attempt with no free record is refused", "records-exhausted" in (three["refused"] or ""), three)
+    check("a refused join writes no rows", rows([], [], [0], [[], []])["rows"] == [])
+    check("a refused join counts nothing", rows([], [], [0], [[], []])["totals"]["chars"] == 0)
+    check("a refused join has no identity", rows([], [], [0], [[], []])["identity"] is None)
+
+    # --- the three states that are attributed rather than refused, and the first dispatch is why ----------
+    # 114 tasks, two rounds, 236 records: every task opened one record a round, eight episodes opened a second one
+    # because τ² retried them, and eleven boundary texts resolved to no task. The first version of this join refused
+    # all three and the ¥8.7 grid it was reading produced no sidecar at all (AUDIT 34.266). The fixture reproduces
+    # that shape at a readable scale: two tasks, two rounds, one retry, one unresolved text, one episode missing.
+    retry_records = [record(chars=500), record(chars=50), record(), record(chars=999),
+                     record(chars=70), record(chars=80)]
+    retry_tasks = ["a", "a", "b", None, "a", "b"]
+    retry = rows(retry_records, retry_tasks, [4, 6],
+                 [[simulation("a"), simulation("b")], [simulation("a", 1), simulation("b", 1)]])
+    check("a retry is attributed to the attempt the document scores", retry["refused"] is None, retry["refused"])
+    check("and the last record is the one used", retry["rows"][0]["chars"] == 50, retry["rows"][0])
+    check("the retry is counted", retry["counts"]["retried"] == 1, retry["counts"])
+    check("an unresolved boundary text is counted, not refused", retry["counts"]["unresolved"] == 1,
+          retry["counts"])
+    check("and it costs its own episode only", retry["counts"]["joined"] == 4, retry["counts"])
+    check("the second round still joins both tasks", [row["trial"] for row in retry["rows"]] == [0, 0, 1, 1],
+          [row["trial"] for row in retry["rows"]])
+    check("the unresolved record is not attributed to anybody", 999 not in [row["chars"] for row in retry["rows"]],
+          [row["chars"] for row in retry["rows"]])
+    short = rows([record()], ["a"], [1], [[simulation("a"), simulation("b")]])
+    check("an episode with no record is counted missing", short["counts"]["missing"] == 1, short["counts"])
+    check("and the rest still joins", len(short["rows"]) == 1, short)
+    notask = rows([record()], ["a"], [1], [[{"task_id": ""}]])
+    check("a simulation with no task is counted missing", notask["counts"]["missing"] == 1, notask["counts"])
+    check("an unresolved boundary alone is not a refusal", notask["refused"] is None)
 
     # --- the state that is reported rather than refused -------------------------------------------------
     concurrent = rows([record(), record(renders=9)], ["a", "a"], [2], [[simulation("a"), simulation("a")]])
     check("attempts that ran together join by count", len(concurrent["rows"]) == 2, concurrent)
+    check("each takes its own record", [row["renders"] for row in concurrent["rows"]] == [3, 9], concurrent["rows"])
     check("but their trial is withheld", all(row["trial"] is None for row in concurrent["rows"]), concurrent)
     check("and the identity says why", concurrent["identity"] == "unordered", concurrent["identity"])
+    three = rows([record(), record()], ["a", "a"], [2],
+                 [[simulation("a"), simulation("a", 1), simulation("a", 2)]])
+    check("a third attempt with two records falls back to the last", three["rows"][-1]["renders"] == 3, three["rows"])
+    check("and the shortfall is not silent", three["counts"]["retried"] == 0 and len(three["rows"]) == 3,
+          three["counts"])
 
     # --- the file ---------------------------------------------------------------------------------------
     import tempfile
@@ -281,14 +336,28 @@ def self_test() -> int:
     with tempfile.TemporaryDirectory() as temporary:
         root = Path(temporary)
         path = root / "arm.dose.jsonl"
-        check("one row is written", write(path, [{"task": "a", "trial": 0, "turns": 1, "renders": 1, "chars": 10,
-                                                  "written": 10, "changes": 1, "stable": 0, "text": "dropped"}]) == 1)
+        check("one row is written", write(path, [{"task": "a", "trial": 0, "retries": 0, "turns": 1, "renders": 1,
+                                                  "chars": 10, "written": 10, "changes": 1, "stable": 0,
+                                                  "text": "dropped"}]) == 1)
         loaded = load(path)
-        check("and read back without the join key", loaded == [{"task": "a", "trial": 0, "turns": 1, "renders": 1,
-                                                               "chars": 10, "written": 10, "changes": 1,
+        check("and read back without the join key", loaded == [{"task": "a", "trial": 0, "retries": 0, "turns": 1,
+                                                               "renders": 1, "chars": 10, "written": 10, "changes": 1,
                                                                "stable": 0}], loaded)
         write(path, [])
         check("an empty recording writes an empty file", load(path) == [] and path.stat().st_size == 0)
+        # The raw dump: every record, whatever the join decided, with the join key kept because it is the only thing
+        # that can explain a resolution failure after the fact.
+        raw_path = root / "arm.dose.raw.jsonl"
+        check("every record is dumped", write_raw(raw_path, [record(text="a"), record(text="b")], ["a", None]) == 2)
+        raw = [json.loads(line) for line in raw_path.read_text(encoding="utf-8").splitlines()]
+        check("the dump keeps the join key", raw[0]["text"] == "a")
+        check("and the task where the resolution worked", raw[0]["task"] == "a")
+        check("and nothing where it did not", raw[1]["task"] is None)
+        check("the index is positional", [row["index"] for row in raw] == [0, 1])
+        check("a dump of no records is empty", write_raw(raw_path, [], []) == 0 and raw_path.stat().st_size == 0)
+        check("a dump shorter than the task list does not invent one",
+              write_raw(raw_path, [record(text="a")], []) == 1 and
+              json.loads(raw_path.read_text(encoding="utf-8").splitlines()[0])["task"] is None)
         path.write_text('{"task": "a"}\n\n{"task": "b"}\n', encoding="utf-8")
         check("blank lines are skipped", len(load(path)) == 2)
         path.write_text("{oops\n", encoding="utf-8")
