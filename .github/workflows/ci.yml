@@ -145,9 +145,16 @@ jobs:
           # has to be under a gate rather than in a paragraph.
           python3 -m coverage run --append --branch --include="*/eval/verifiers/board_dose.py" \
             eval/verifiers/board_dose.py --self-test
+          # R218e. The join that turns the agent's recording into one row an episode. It is the only place in this
+          # lane where a dose is attached to a *reward*, and its failure mode is silent: a join off by one episode
+          # produces a table that looks complete and pairs each dose with somebody else's verdict. So it is measured
+          # on every push, not on the days a dispatch is armed — a reader that only runs for money is a reader whose
+          # refusals nobody has seen.
+          python3 -m coverage run --append --branch --include="*/eval/drivers/tau2/dose.py" \
+            eval/drivers/tau2/dose.py --self-test
           python3 -m coverage json -o coverage-python.json
           python3 scripts/check-python-coverage.py --self-test
-          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 17
+          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 18
 
       - name: The rounds this project owes, and the date each one was registered for
         # The failure this prevents is not a wrong number, it is a round that quietly stops being planned: R216b's

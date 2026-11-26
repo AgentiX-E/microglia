@@ -169,6 +169,24 @@ _recall_repeats = 0
 # already normalised to `MAX_QUERY_CHARS`, so two boundaries of one task carry equal strings and a
 # retry is *named* by comparison rather than inferred from a count.
 _boundary_tasks: list = []
+# R218e. The dose, recorded where it is known: one dict an episode, opened at the same boundary that opens the
+# entry in `_episode_starts`, `_episode_injected` and `_boundary_tasks` and mutated in place at the only two sites
+# that can see the material — the renderer, which knows how many characters the block was, and the writer, which
+# knows how many of them reached the prompt.
+#
+# The recording exists because the *transcript* cannot be the instrument. R218d tried to read the dose out of
+# `results.json` and answered `NO_DOSE` on both arms of a 912-episode grid; R218e's amendment measured why, for free,
+# on the four documents this lane already paid for: **τ² stores no `system` message at all** — `board.json`,
+# `policy.json`, `front.json` and R216's tail arm carry 0 occurrences of `<microglia-board>` over 30 MB, and the only
+# roles they hold are `assistant`, `user` and `tool`. So the block is absent from the transcript at *either*
+# placement, and a reader built on the transcript could only ever have said `NO_DOSE`. A dose that is not written
+# down where it is made is a dose nobody can read (PROGRESS 249.12).
+#
+# `chars` is the material as *served* — the sum over renders, which is what the model saw on every turn, including
+# the turns that left an unchanged block where it was. `written` is the material as *carried* — the sum over the
+# messages this agent actually put into the prompt, which is the quantity a transcript would show if it kept one.
+# The two differ by the held turns, and that difference is the placement's whole price, so they travel apart.
+_board_doses: list = []
 # R205. Whether each episode's prompt carried a body, positional against `_episode_starts`.
 #
 # R204's fold reported 50 renders over 40 episodes of which six carried a sentence, and every gate that asked
@@ -180,19 +198,31 @@ _boundary_tasks: list = []
 _episode_injected: list = []
 
 
-def _open_episode() -> None:
-    """Record a boundary and its flag together, because the join between them is positional.
+def _open_episode(text: str = "") -> None:
+    """Record a boundary, its two flags and its dose slot together, because the join between them is positional.
 
     Two parallel lists are one list when they are appended at one site and a silent shift when they are
     appended at two: an episode count and a flag count that drift apart hand every flag after the drift to
     the wrong episode, and the share that comes out is over a population nobody chose. One function, one
     append order, and a length the reader can assert (`injectedEpisodes` and `episodeStarts` are equal in
     length on every artefact this module writes).
+
+    R218e folded the boundary *text* into this function for the same reason, and the fold removed a real
+    drift: the text used to be appended by each of the two callers, so `_boundary_tasks` was aligned with
+    `_episode_starts` only as long as both callers remembered to append. The dose slot joins them here, which
+    is what makes `len(doses) == len(boundaryTexts) == len(episodeStarts)` a property of one site rather than a
+    convention four sites have to keep.
     """
     _episode_starts.append(_recalls)
     # Opened as unserved: the boundary is recorded before the pack exists, and the flag is raised at the one
     # place the prompt is actually built.
     _episode_injected.append(False)
+    _boundary_tasks.append((text or "")[:MAX_QUERY_CHARS])
+    if board_mode():
+        _board_doses.append(
+            {"text": (text or "")[:MAX_QUERY_CHARS], "turns": 0, "renders": 0, "chars": 0, "written": 0,
+             "changes": 0, "stable": 0}
+        )
 # Characters of the message this agent actually injects, and of the pack the facade served. R135 measured
 # 559 tokens of system growth per call against a 725-character pack and could not say whether the other
 # ~400 tokens were the pack's carriage or material no field had ever named: the census counts every system
@@ -281,6 +311,28 @@ _UNSET = object()
 def board_mode() -> bool:
     """Whether this arm serves the goal board instead of a note."""
     return os.environ.get(BOARD_ENV, "").strip().lower() in ("1", "true", "yes", "front", "tail", "policy")
+
+
+def _dose_here() -> "dict | None":
+    """This episode's dose record, or `None` on an arm that serves no board.
+
+    `None` rather than an empty dict: an arm that is not the board arm has no dose, and a record of zeroes would
+    make it indistinguishable from an arm whose block was empty on every turn — which is a finding about the
+    parser, and one this lane has already had to tell apart from a finding about the wiring.
+    """
+    return _board_doses[-1] if _board_doses else None
+
+
+def _dose_wrote(chars: int) -> None:
+    """Record that `chars` of block were written into the prompt on this turn.
+
+    Called from the one place the injected message is built, in both placements, so the number is taken from the
+    message object rather than from the body: the wrapper's own `<microglia-board>` element is part of what the
+    prompt carried and therefore part of the bill.
+    """
+    dose = _dose_here()
+    if dose is not None:
+        dose["written"] += chars
 
 
 def board_admission() -> str:
@@ -751,14 +803,19 @@ class MicrogliaAgent(LLMAgent):
         global _board_renders, _board_items, _board_settled, _board_chars
         global _board_changes, _board_stable, _board_open, _board_unrequested, _board_unattributed
         if self.__dict__.get("_turn") is None:
-            _open_episode()
-            _boundary_tasks.append((text or "")[:MAX_QUERY_CHARS])
+            _open_episode(text or "")
         self._turn = len(state.messages)
         messages = list(state.messages)
         if isinstance(text, str) and text.strip() and role in ("", "user", "human"):
             messages = messages + [{"role": "user", "content": text}]
         board = goal_board_of(messages)
         body = render_goal_board(board, state_only=board_admission() == "state")
+        # R218e. The turn is counted before the early return, because a turn the block had nothing to say on is
+        # still a model call the episode made: `turns` is the confound the dose reading has to hold, and a
+        # population that silently dropped its empty turns would make the dose look steadier than it is.
+        dose = _dose_here()
+        if dose is not None:
+            dose["turns"] += 1
         if body == "":
             return ""
         items = board.get("items") or []
@@ -769,10 +826,18 @@ class MicrogliaAgent(LLMAgent):
         _board_chars += len(body)
         _board_unrequested += len(board.get("unrequested") or ())
         _board_unattributed += len(board.get("unattributed") or ())
-        if self.__dict__.get("_body", None) == body:
+        same = self.__dict__.get("_body", None) == body
+        if same:
             _board_stable += 1
         else:
             _board_changes += 1
+        if dose is not None:
+            dose["renders"] += 1
+            dose["chars"] += len(body)
+            if same:
+                dose["stable"] += 1
+            else:
+                dose["changes"] += 1
         self._body = body
         return body
 
@@ -791,10 +856,9 @@ class MicrogliaAgent(LLMAgent):
             # inside the episode that already has a boundary. Appending on both made the list one entry per
             # request (R123: `[0..161]` over 160 episodes), which is a position, not a boundary.
             if held is _UNSET:
-                _open_episode()
-                # The same moment as the index, from the same string the recall will send. A boundary
-                # that named its index and not its task is what made R135's 41-versus-40 a refusal.
-                _boundary_tasks.append((text or "")[:MAX_QUERY_CHARS])
+                # R218e: the text travels with the boundary from one site, because a caller that appends the text
+                # itself is a caller that can forget — and one of them had (PROGRESS 249.13).
+                _open_episode(text or "")
             else:
                 global _recall_repeats
                 _recall_repeats += 1
@@ -850,6 +914,10 @@ class MicrogliaAgent(LLMAgent):
             injected = injected_message(pack, BOARD_TAG)
             _injected_chars += len(injected.content)
             _injected_lengths.append(len(injected.content))
+            # R218e. The dose as *carried*: this message, at this length, is what the prompt now holds. A held
+            # turn returns above and adds nothing, which is the difference between the material served and the
+            # material transported — the placement's price, recorded rather than inferred (PROGRESS 249.12).
+            _dose_wrote(len(injected.content))
             if _episode_injected:
                 _episode_injected[-1] = True
             at = tail_index(kept)
@@ -895,6 +963,11 @@ class MicrogliaAgent(LLMAgent):
                 # bill, and a census that only knows the pack's length cannot see it.
                 _injected_chars += len(injected.content)
                 _injected_lengths.append(len(injected.content))
+                # R218e, the front placement's half of the same record: here the block is replaced rather than
+                # held, so `written` grows on every turn and the served and carried sums coincide. A placement
+                # whose two numbers are equal is a placement that pays for its block on every turn — which is
+                # exactly the bill R215 measured and R216 moved the block to avoid.
+                _dose_wrote(len(injected.content))
                 # R205: the episode this request belongs to carried a body. Guarded on the list being non-empty
                 # because an agent constructed and driven without a recall has no boundary to raise, and a
                 # `[-1]` on an empty list would take the episode down for the instrument's convenience.
@@ -903,6 +976,23 @@ class MicrogliaAgent(LLMAgent):
                 kept = kept + [injected]
             state.system_messages = kept
         return super().generate_next_message(message, state)
+
+
+def board_doses() -> list:
+    """The dose records so far, in the order their boundaries opened.
+
+    The runner needs them **between** rounds and not only at the end: `--rounds` runs each attempt as its own
+    `run_tasks` call, and the round index is the only thing that tells two attempts at one task apart. A record
+    carries the episode's opening text and not its task, because τ² never tells an agent which task it is in
+    (R136), so the identity is resolved where the runner holds both sides — and the *round* is resolved here,
+    by length, which is why this accessor returns the live list's contents rather than a counter.
+
+    A copy of each record, not only of the list: `list(...)` protects the recording from an `append` and from nothing
+    else, and a reader that edited `records[0]["turns"]` would be editing the phase's own total. The records are
+    small and there are as many as there are episodes, so the copy is cheap and the alternative is a census nobody
+    can trust.
+    """
+    return [dict(record) for record in _board_doses]
 
 
 def memory_stats() -> dict:
@@ -935,11 +1025,22 @@ def memory_stats() -> dict:
                     "unattributed": _board_unattributed,
                     "charsTotal": _board_chars,
                     "charsMean": round(_board_chars / _board_renders, 1) if _board_renders else None,
+                    # R218e. How many episodes the recording holds, so a phase whose sidecar is short is visible in
+                    # the census rather than only in the file: `len(doses)` at the end must equal the boundaries the
+                    # same phase opened, and the writer's sum must equal the counters above.
+                    "doseEpisodes": len(_board_doses),
+                    "doseWritten": sum(record["written"] for record in _board_doses),
+                    "doseChars": sum(record["chars"] for record in _board_doses),
                 }
             }
             if board_mode()
             else {}
         ),
+        # R218e. The dose records, one an episode. Carried beside the counters rather than inside them because the
+        # runner *pops* this key: the records are joined to the task and the attempt, written as a sidecar, and the
+        # log keeps the census rather than 114 dictionaries. A phase whose records are missing here is a phase whose
+        # sidecar was never written, which is a different state from a phase whose join refused.
+        **({"boardDoses": [dict(record) for record in _board_doses]} if board_mode() else {}),
         "recall_failures": _failures,
         "recalls": _recalls,
         # The population behind a treatment that withholds packs: `recalls - recall_empty` is what was

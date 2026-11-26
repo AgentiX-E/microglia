@@ -21,16 +21,21 @@ between-arm design cannot make.
 
 Run against R218b's own documents — 456 episodes an arm, four attempts at each of 114 tasks — this reader answers
 `NO_DOSE` for **both** arms, including the treated one whose log counts 4,341 renders and 146.3 characters a render.
-The reason is not the reader: **a front-placement arm's material is not in its own transcript.** The block goes into
-`state.system_messages`, which is composed into the request, and τ² saves the conversation; `grep -c microglia-board`
-over 32 MB of `front.json` is **0**.
+R218d wrote that down as a fact about the *placement*: a front-placement block goes into `state.system_messages`,
+which is composed into the request, while τ² saves the conversation.
+
+**R218e's amendment measured the rest of it, for free, on the four documents this lane had already paid for, and the
+placement was not the reason.** `board.json` and `policy.json` from R219b, `front.json` from R215 and R216's tail arm
+carry **0 occurrences of `<microglia-board>` over 30 MB**, and the roles they hold are exactly `assistant`, `user` and
+`tool` — **no `system` message at all**, at either placement. τ²'s saved transcript is the *conversation*: the system
+prompt is not in it either. So this reader could never have answered anything but `NO_DOSE`, on any arm, and the
+state it now reports for that is `NO_SYSTEM` — a fact about the document rather than about the material.
 
 Two repairs were tried against that, and both are reported rather than hidden because the second is the one that
 would have produced a plausible number:
 
-  * read the tag — exact, and it works on a **tail** arm, where the design appends the block into `state.messages`
-    and the transcript therefore carries it. That is the placement this product ships, so the instrument has an
-    arm to read: the first one is R219's.
+  * read the tag — exact where a transcript carries one, and it carries none. Kept, because a future harness may
+    save the prompt, and because the check is how the claim above was made.
   * **reconstruct** the block from each turn's messages (`render(board_of(messages[:i]))`) — the τ² document has no
     tag to read, so this was the tempting path. It disagrees with the arm's own counter: 7,813 turn boundaries
     against 4,341 renders, and 121.0 characters a boundary against 146.3 a render. The disagreement is structural —
@@ -40,8 +45,9 @@ would have produced a plausible number:
     memory's name. It is not implemented.
 
 So the round this instrument needed is a **recording** one, not an analysis one: the dose has to be written down at
-the source, per episode, where it is known. That is registered as R218e, and until it lands this reader's honest
-answer on every arm whose transcript carries no block is `NO_DOSE`.
+the source, per episode, where it is known. That is R218e, and its recording arrives here through `--sidecar`: one
+JSONL line an episode, written by the arm, joined to the task and the attempt by the runner. `--document` alone
+still answers `NO_SYSTEM` on every artefact this lane produces, and that answer is now the correct one.
 
 ## What this is not
 
@@ -94,6 +100,38 @@ _tools_on_path()
 from goal_board import BOARD_TAG, messages_of, role_of  # noqa: E402  — the tag and the walker, not copies of them
 
 
+def _drivers_on_path() -> None:
+    """Put `eval/drivers/tau2` on the path once, so the sidecar is parsed by the module that writes it.
+
+    A second JSONL parser here would be a second answer to "what does a recording look like", and the two would
+    agree until the day one of them learned about a blank line. The import is lazy inside `read_sidecar` for the
+    same reason `run_split`'s is: this reader must run on a checkout where the drivers are not installed.
+    """
+    drivers = HERE.parent / "drivers" / "tau2"
+    if str(drivers) not in sys.path:
+        sys.path.insert(0, str(drivers))
+
+
+def read_sidecar(path) -> "list[dict]":
+    """The rows an arm's recording holds, parsed by the writer's own reader."""
+    _drivers_on_path()
+    from dose import load as load_rows
+
+    return load_rows(path)
+
+
+def _capture(argv) -> str:
+    """What `main` prints, for a self-check that asserts on the sentence rather than on the return code."""
+    buffer = io.StringIO()
+    saved = sys.stdout
+    sys.stdout = buffer
+    try:
+        main(argv)
+    finally:
+        sys.stdout = saved
+    return buffer.getvalue()
+
+
 def _text(message) -> str:
     """One message's text, in whichever of the shapes a document carries it."""
     content = message.get("content") if isinstance(message, dict) else getattr(message, "content", None)
@@ -128,6 +166,17 @@ def dose_of(simulation) -> int:
     return total
 
 
+def system_messages_of(simulation) -> int:
+    """How many `system` messages the episode's transcript holds.
+
+    The count exists to make one diagnosis possible and another impossible. `NO_DOSE` says an arm served no material;
+    `NO_SYSTEM` says the document could not have carried it — τ² stores the conversation, and the system prompt, the
+    pack and the board are all composed into a request it never saves. Without this count the two are the same
+    sentence, and R218d published the first when the second was true (PROGRESS 249.12).
+    """
+    return sum(1 for message in messages_of(simulation) if role_of(message) == "system")
+
+
 def reward_of(simulation) -> "float | None":
     """The evaluator's verdict, or `None` when the episode was never scored.
 
@@ -159,6 +208,48 @@ def by_task(document) -> dict:
         task = str(simulation.get("task_id"))
         grouped.setdefault(task, []).append((dose_of(simulation), reward, len(messages_of(simulation))))
     return grouped
+
+
+def by_task_sidecar(document, rows) -> "tuple[dict, dict]":
+    """Every episode the **recording** describes, keyed by task, as `(dose, reward, turns)`.
+
+    The join is `(task, trial)` and it is one-way: a row the document does not score is dropped rather than given a
+    reward of zero, and a scored episode the recording does not hold is counted so the reader can say how much of the
+    grid its dose covers. `trial: null` — the state `dose.py` writes when the attempts ran concurrently — is dropped
+    too, because a dose that cannot be attached to one attempt would be a comparison of a number with a number from
+    another episode.
+    """
+    rewards: dict = {}
+    episodes = 0
+    simulations = document.get("simulations") if isinstance(document, dict) else document
+    for simulation in simulations or []:
+        if not isinstance(simulation, dict):
+            continue
+        episodes += 1
+        reward = reward_of(simulation)
+        task = str(simulation.get("task_id"))
+        trial = simulation.get("trial")
+        if reward is not None and isinstance(trial, int) and not isinstance(trial, bool):
+            rewards[(task, trial)] = reward
+    grouped: "dict[str, list]" = {}
+    matched = unordered = unscored = 0
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        trial = row.get("trial")
+        if not isinstance(trial, int) or isinstance(trial, bool):
+            unordered += 1
+            continue
+        key = (str(row.get("task")), trial)
+        if key not in rewards:
+            unscored += 1
+            continue
+        matched += 1
+        grouped.setdefault(key[0], []).append(
+            (int(row.get("chars") or 0), rewards[key], int(row.get("turns") or 0))
+        )
+    return grouped, {"episodes": episodes, "rows": len(rows), "matched": matched, "unordered": unordered,
+                     "unscored": unscored}
 
 
 def _sign_test(positive: int, negative: int) -> "float | None":
@@ -215,18 +306,39 @@ def within_task(grouped: dict) -> dict:
     }
 
 
-def read(document) -> dict:
-    """The whole reading: how much material the arm served, and what the pairs say about it."""
-    grouped = by_task(document)
+def read(document, rows=None) -> dict:
+    """The whole reading: how much material the arm served, and what the pairs say about it.
+
+    `rows` is R218e's recording, already joined to `(task, trial)` by the runner. Without it the reader is reading
+    the transcript, which on this harness holds no system message and therefore no block — the state that says so is
+    `NO_SYSTEM`, and it is a finding about the document rather than about the arm.
+    """
+    simulations = document.get("simulations") if isinstance(document, dict) else document
+    system_messages = sum(system_messages_of(simulation) for simulation in simulations or []
+                          if isinstance(simulation, dict))
+    if rows is None:
+        grouped = by_task(document)
+        coverage = {}
+    else:
+        grouped, coverage = by_task_sidecar(document, rows)
     doses = [dose for attempts in grouped.values() for dose, _, _ in attempts]
     rewards = [reward for attempts in grouped.values() for _, reward, _ in attempts]
     served = [dose for dose in doses if dose > 0]
     pairs = within_task(grouped)
-    state = "NO_DOSE" if not served else ("NO_PAIRS" if not pairs["pairs"] else "DOSE_READ")
-    return {
+    if served:
+        state = "DOSE_READ" if pairs["pairs"] else "NO_PAIRS"
+    elif rows is not None:
+        # A recording that arrived and carried no characters: the arm rendered nothing, which is a finding about the
+        # parser or about the population — and not the document's inability to hold a block.
+        state = "NO_DOSE"
+    else:
+        state = "NO_SYSTEM" if system_messages == 0 else "NO_DOSE"
+    reading = {
         "state": state,
+        "source": "sidecar" if rows is not None else "transcript",
         "episodes": len(doses),
         "tasks": len(grouped),
+        "systemMessages": system_messages,
         "passRate": (sum(1 for reward in rewards if reward >= 1.0) / len(rewards)) if rewards else None,
         "episodesWithDose": len(served),
         "doseCharsMean": round(statistics.mean(served), 1) if served else 0.0,
@@ -237,11 +349,27 @@ def read(document) -> dict:
         "doseCharsTotal": sum(served),
         **pairs,
     }
+    if coverage:
+        reading["coverage"] = coverage
+    return reading
 
 
 def render(reading: dict) -> str:
     """One sentence, and the state that decides whether it is a sentence about the material at all."""
+    if reading["state"] == "NO_SYSTEM":
+        return (
+            f"NO_SYSTEM: {reading['episodes']} scored episode(s) over {reading['tasks']} task(s), and the document "
+            f"holds {reading['systemMessages']} system message(s) in total — τ² saves the conversation, not the "
+            "prompt, so no transcript can carry a block and this is a fact about the document rather than about the "
+            "arm; the dose has to be recorded where it is made (R218e)"
+        )
     if reading["state"] == "NO_DOSE":
+        if reading["source"] == "sidecar":
+            return (
+                f"NO_DOSE: {reading['episodes']} episode(s) over {reading['tasks']} task(s) came back from the "
+                "recording with not one character of block — the arm rendered nothing, which is the parser or the "
+                "population and not the placement"
+            )
         return (
             f"NO_DOSE: {reading['episodes']} episode(s) over {reading['tasks']} task(s), and not one carried a "
             "block — this arm served no material, so there is no dose to read"
@@ -253,11 +381,13 @@ def render(reading: dict) -> str:
             "dose — every attempt at a task received the same amount, so the task cannot be held fixed"
         )
     rate = reading["higherDoseRate"]
+    driven = "read from the recording" if reading["source"] == "sidecar" else "read from the transcript"
     return (
         f"DOSE_READ: {reading['episodesWithDose']} of {reading['episodes']} episode(s) carried a block, "
-        f"{reading['doseCharsMean']:.0f} characters an episode; of the {reading['pairs']} task(s) whose attempts "
-        f"received different amounts, the higher-dose side passed {rate:.1%} of {reading['higherDosePassed'] + reading['lowerDosePassed']} "
-        f"attempt-pairs ({reading['higherDosePassed']} against {reading['lowerDosePassed']}), sign test p = "
+        f"{reading['doseCharsMean']:.0f} characters an episode ({driven}); of the {reading['pairs']} task(s) whose "
+        f"attempts received different amounts, the higher-dose side passed {rate:.1%} of "
+        f"{reading['higherDosePassed'] + reading['lowerDosePassed']} attempt-pairs "
+        f"({reading['higherDosePassed']} against {reading['lowerDosePassed']}), sign test p = "
         f"{reading['p'] if reading['p'] is None else format(reading['p'], '.4f')}, the higher-dose side running "
         f"{reading['turnGapMedian']:+} turns longer on the median task and receiving "
         f"{reading['doseGapMedianChars']:.0f} more characters — and because dose and turn count move together, "
@@ -322,11 +452,22 @@ def self_test() -> int:
         episode("a", 1.0, 1), episode("a", 1.0, 2), episode("a", 0.0, 3), episode("a", 0.0, 4),
     ]}))["pairs"] == 1)
 
-    # --- the three states ------------------------------------------------------------------------------
-    no_dose = read({"simulations": [episode("a", 1.0, 0), episode("b", 0.0, 0)]})
-    check("an arm with no board is no dose", no_dose["state"] == "NO_DOSE", no_dose["state"])
+    # --- the four states --------------------------------------------------------------------------------
+    # `NO_SYSTEM` is the state R218d should have published and did not: the fixture is a document that holds no
+    # system message at all, which is what a τ² transcript is, and the sentence it produces is about the document.
+    no_system = read({"simulations": [episode("a", 1.0, 0), episode("b", 0.0, 0)]})
+    check("a document with no system message cannot carry a block", no_system["state"] == "NO_SYSTEM",
+          no_system["state"])
+    check("and it says the document is the reason", "τ² saves the conversation" in render(no_system))
+    check("it counts the system messages it found", no_system["systemMessages"] == 0)
+    # An arm that carries a *different* channel's block has system messages and no board: that is `NO_DOSE`, and the
+    # difference between the two states is the whole point of counting them.
+    no_dose = read({"simulations": [episode("a", 1.0, 1, tag="microglia-knowledge"),
+                                    episode("b", 0.0, 1, tag="microglia-knowledge")]})
+    check("an arm with another channel's block is no dose", no_dose["state"] == "NO_DOSE", no_dose["state"])
     check("its mean is zero rather than absent", no_dose["doseCharsMean"] == 0.0)
     check("and it says so", render(no_dose).startswith("NO_DOSE:"))
+    check("and it counted the system messages that were there", no_dose["systemMessages"] == 2)
     served = read({"simulations": [episode("a", 1.0, 2), episode("a", 0.0, 2)]})
     check("a uniform dose has no pairs", served["state"] == "NO_PAIRS", served["state"])
     check("and it says so", "cannot be held fixed" in render(served))
@@ -334,12 +475,61 @@ def self_test() -> int:
                                      episode("b", 1.0, 6)]})
     check("a split dose is read", measured["state"] == "DOSE_READ", measured["state"])
     check("the sentence carries the confound", "not a randomised contrast" in render(measured))
-    check("an empty document is no dose", read({"simulations": []})["state"] == "NO_DOSE")
+    check("a transcript reading says where it came from", measured["source"] == "transcript")
+    check("an empty document is no dose", read({"simulations": []})["state"] == "NO_SYSTEM")
     check("no episodes is no rate", read({"simulations": []})["passRate"] is None)
     check("a simulation without a reward leaves the count", read({"simulations": [
         {"task_id": "a", "messages": []}]})["episodes"] == 0)
     check("a document that is a bare list works", read([episode("a", 1.0, 1)])["episodes"] == 1)
     check("a junk simulation is skipped", by_task({"simulations": ["junk"]}) == {})
+
+    # --- the recording, which is the round ---------------------------------------------------------------
+    # The sidecar's rows are the dose; the document supplies the reward. The fixture is two attempts at each of two
+    # tasks, high dose passing on one and failing on the other, so the split is one each way and p = 1.
+    board = {"simulations": [
+        {"task_id": "a", "trial": 0, "reward_info": {"reward": 1.0}},
+        {"task_id": "a", "trial": 1, "reward_info": {"reward": 0.0}},
+        {"task_id": "b", "trial": 0, "reward_info": {"reward": 0.0}},
+        {"task_id": "b", "trial": 1, "reward_info": {"reward": 1.0}},
+    ]}
+    rows = [
+        {"task": "a", "trial": 0, "turns": 6, "renders": 6, "chars": 600, "written": 200, "changes": 2, "stable": 4},
+        {"task": "a", "trial": 1, "turns": 4, "renders": 4, "chars": 400, "written": 150, "changes": 1, "stable": 3},
+        {"task": "b", "trial": 0, "turns": 6, "renders": 6, "chars": 600, "written": 200, "changes": 2, "stable": 4},
+        {"task": "b", "trial": 1, "turns": 4, "renders": 4, "chars": 400, "written": 150, "changes": 1, "stable": 3},
+    ]
+    recorded = read(board, rows)
+    check("a recording is read even though the document holds no block", recorded["state"] == "DOSE_READ",
+          recorded["state"])
+    check("and the reading says it came from the recording", recorded["source"] == "sidecar")
+    check("two tasks, two pairs", recorded["pairs"] == 2, recorded)
+    check("the dose is the recording's, not the transcript's", recorded["doseCharsMean"] == 500.0, recorded)
+    check("the pairs split one each way", recorded["higherDosePassed"] == 1 and recorded["lowerDosePassed"] == 1)
+    check("every row met its episode", recorded["coverage"]["matched"] == 4, recorded["coverage"])
+    check("and nothing was dropped", recorded["coverage"]["unordered"] == 0 and recorded["coverage"]["unscored"] == 0)
+    check("the sentence says where the dose came from", "read from the recording" in render(recorded))
+
+    # A recording with no characters is the parser's finding, not the document's: `NO_DOSE` and not `NO_SYSTEM`.
+    empty = read(board, [dict(row, chars=0) for row in rows])
+    check("a recording of empty blocks is no dose", empty["state"] == "NO_DOSE", empty["state"])
+    check("and it blames the renderer rather than the document", "the arm rendered nothing" in render(empty))
+    # A row whose trial the join withheld cannot be attached to an attempt, and is counted rather than paired.
+    withheld = read(board, [dict(row, trial=None) for row in rows])
+    check("a row with no trial is counted", withheld["coverage"]["unordered"] == 4, withheld["coverage"])
+    check("and it pairs nothing", withheld["state"] == "NO_DOSE", withheld["state"])
+    # A row the document does not score is dropped, and the drop is visible.
+    unscored = read(board, rows + [{"task": "c", "trial": 0, "turns": 1, "renders": 1, "chars": 100,
+                                    "written": 40, "changes": 1, "stable": 0}])
+    check("a row with no episode is counted as unscored", unscored["coverage"]["unscored"] == 1, unscored["coverage"])
+    check("a row that is not a dict is skipped", read(board, rows + ["junk"])["coverage"]["rows"] == 5)
+    check("a trial that is a bool is not a trial", read(board, [dict(rows[0], trial=True)])["episodes"] == 0)
+    check("a junk simulation is skipped when a recording is read",
+          read({"simulations": ["junk", {"task_id": "a", "trial": 0, "reward_info": {"reward": 1.0}}]},
+               rows)["coverage"]["episodes"] == 1)
+    # A document whose episodes carry no trial number cannot be joined to a recording at all: every row is then
+    # unscored, and the reader says so rather than pairing the first attempt with the second.
+    check("an episode with no trial number leaves every row unscored",
+          read({"simulations": [{"task_id": "a", "reward_info": {"reward": 1.0}}]}, rows)["coverage"]["unscored"] == 4)
 
     # --- the command line --------------------------------------------------------------------------------
     # The paths the fixture helpers leave untaken, and the reader's own refusal, exercised directly.
@@ -367,6 +557,22 @@ def self_test() -> int:
             refused == f"board-dose-no-document:{root / 'missing.json'}",
             refused,
         )
+        # R218e's two arguments, and the refusals that keep a sidecar from being read against the wrong document.
+        sidecar = root / "arm.dose.jsonl"
+        sidecar.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
+        document = root / "board.json"
+        document.write_text(json.dumps(board), encoding="utf-8")
+        check("the reader answers zero on a recording", main(["--document", str(document),
+                                                             "--sidecar", str(sidecar), "--json"]) == 0)
+        check("the printed reading is the recording's", '"source": "sidecar"' in
+              _capture(["--document", str(document), "--sidecar", str(sidecar), "--json"]))
+        refused = None
+        try:
+            main(["--document", str(document), "--sidecar", str(root / "missing.jsonl")])
+        except SystemExit as error:
+            refused = str(error)
+        check("a missing sidecar is refused by name",
+              refused == f"board-dose-no-sidecar:{root / 'missing.jsonl'}", refused)
 
         # The suite's own failure paths and the report's two answers, diverted into a buffer: a check whose failing
         # branch has never run is a check that cannot fail visibly.
@@ -404,6 +610,9 @@ def _report(failures: "list[str]", cases: int, stream=None) -> int:
 def main(argv: "list[str]") -> int:
     parser = argparse.ArgumentParser(description="the dose inside the task: does more material help the attempt that got it")
     parser.add_argument("--document", default="", help="one `results.json`")
+    # R218e. The arm's own recording. One JSONL line an episode, joined to `(task, trial)` by the runner, whose
+    # sidecar it is. Without this the reader is reading a document that holds no prompt — see `NO_SYSTEM`.
+    parser.add_argument("--sidecar", default="", help="the arm's `*.dose.jsonl`")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--self-test", action="store_true")
     arguments = parser.parse_args(argv)
@@ -414,7 +623,13 @@ def main(argv: "list[str]") -> int:
         raise SystemExit(f"board-dose-no-document:{path}")
     with open(path, encoding="utf-8") as stream:
         document = json.load(stream)
-    reading = read(document)
+    rows = None
+    if arguments.sidecar:
+        sidecar = Path(arguments.sidecar)
+        if not sidecar.is_file():
+            raise SystemExit(f"board-dose-no-sidecar:{sidecar}")
+        rows = read_sidecar(sidecar)
+    reading = read(document, rows)
     print(json.dumps(reading, indent=1) if arguments.json else render(reading))
     return 0
 

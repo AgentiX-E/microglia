@@ -2036,6 +2036,145 @@ def a_placement_with_nothing_to_say_writes_nothing(checks):
 
 
 @case
+def the_dose_is_recorded_where_it_is_made(checks):
+    """R218e. The recording, asserted at the two sites that can see the material.
+
+    The transcript cannot be the instrument: τ² saves the conversation, and the four documents this lane already paid
+    for hold **no system message at all** — so no placement and no reader could recover how much block an episode
+    received (PROGRESS 249.12). The dose is therefore written where it is made, and what this case pins down is the
+    difference the reader depends on:
+
+      * `chars` counts every rendered block, including the turns that left an unchanged one where it was;
+      * `written` counts only the messages actually put into the prompt, so a held turn adds to the first and not to
+        the second — that gap is the placement's price, and a fixture that conflated the two would report a tail arm
+        as having paid what a front arm pays;
+      * `turns` counts model calls, including the ones the block had nothing to say on, because it is the confound
+        and not a property of the material;
+      * one record an episode, and the census sums to the records.
+
+    The last two checks are the shape of the thing: `board_doses()` hands back a copy, and the copy's mutation must
+    not reach the recording — a counter that a reader can edit is a counter whose phase total means nothing.
+    """
+    saved = os.environ.get(subject.BOARD_ENV)
+    records_before = len(subject.board_doses())
+    try:
+        os.environ[subject.BOARD_ENV] = "tail"
+        # Read *inside* the arm: the census carries a board block only on an arm that serves one, and reading it
+        # before the switch is set is how this case first failed — a KeyError that was the fixture's own defect.
+        before_stats = subject.memory_stats().get("board") or {}
+        agent, _, original = fresh(pack="")
+        try:
+            state = LLMAgentState()
+            state = episode_step(agent, state, "I want to exchange the mechanical keyboard.")
+            first = dict(subject.board_doses()[-1])
+            first_block = [m for m in state.messages if subject.is_pack_message(m)][0].content
+            # A clarification is a new user turn and not a new ask, so the block is byte-identical and the placement
+            # holds it: served again, written never.
+            state = episode_step(agent, state, "yes, the clicky ones")
+            held = dict(subject.board_doses()[-1])
+            order = {"order_id": "#W2378156", "items": [{"item_id": "1151293680", "name": "Mechanical Keyboard"}]}
+            state.messages.append({"role": "assistant", "content": "", "tool_calls": [
+                {"name": "get_order_details", "arguments": {"order_id": "#W2378156"}},
+                {"name": "exchange_delivered_order_items", "arguments": {"item_ids": ["1151293680"]}},
+            ]})
+            state.messages.append({"role": "tool", "content": json.dumps(order)})
+            state.messages.append({"role": "tool", "content": json.dumps({"ok": True})})
+            state = episode_step(agent, state, "thanks")
+            changed = dict(subject.board_doses()[-1])
+        finally:
+            subject.recall = original
+        # R218e's other two shapes, each on a fresh agent because τ² constructs one per simulation: a second episode
+        # opens a second record, and a turn the block has nothing to say on is still a turn.
+        silent, _, original = fresh(pack="")
+        try:
+            episode_step(silent, LLMAgentState(), "hello there")
+            silent_record = dict(subject.board_doses()[-1])
+        finally:
+            subject.recall = original
+        busy, _, original = fresh(pack="")
+        try:
+            episode_step(busy, LLMAgentState(), "I want to return the lamp.")
+            second_record = dict(subject.board_doses()[-1])
+        finally:
+            subject.recall = original
+        count = len(subject.board_doses())
+        after = subject.memory_stats().get("board") or {}
+        copied = subject.board_doses()
+        copied[0]["turns"] = 999
+        survived = subject.board_doses()[0]["turns"]
+    finally:
+        if saved is None:
+            os.environ.pop(subject.BOARD_ENV, None)
+        else:
+            os.environ[subject.BOARD_ENV] = saved
+    checks.equal(first["turns"], 1, "one turn, one model call")
+    checks.equal(first["renders"], 1, "and one render")
+    checks.equal(first["written"], len(first_block), "what was carried is the message the prompt holds")
+    checks.equal(first["written"] > first["chars"], True, "which is the body plus the element around it")
+    checks.equal(held["turns"], 2, "the held turn is still a turn")
+    checks.equal(held["renders"], 2, "and the block was served again")
+    checks.equal(held["chars"] > first["chars"], True, "so the material served grew")
+    checks.equal(held["written"], first["written"], "while nothing was written: the placement held the block")
+    checks.equal(held["stable"], 1, "and the cadence counts it as unchanged")
+    checks.equal(changed["changes"], 2, "the first render and the one a receipt moved")
+    checks.equal(changed["written"] > held["written"], True, "a change writes the block again")
+    checks.equal(count - records_before, 3, "one record an episode, not one a turn")
+    checks.equal(silent_record["turns"], 1, "a turn with nothing to say is still a turn")
+    checks.equal(silent_record["chars"], 0, "and renders nothing")
+    checks.equal(silent_record["written"], 0, "so it writes nothing")
+    checks.equal(second_record["turns"], 1, "and each episode starts its own record")
+    checks.equal(after["doseEpisodes"] - before_stats["doseEpisodes"], 3, "the census counts the records")
+    checks.equal(after["doseWritten"] - before_stats["doseWritten"],
+                 changed["written"] + silent_record["written"] + second_record["written"],
+                 "and their writes")
+    checks.equal(after["doseChars"] - before_stats["doseChars"], after["charsTotal"] - before_stats["charsTotal"],
+                 "the records' characters are the phase's characters")
+    checks.equal(survived != 999, True, "the accessor hands back a copy, not the recording")
+
+
+@case
+def an_arm_without_the_channel_records_no_dose(checks):
+    """R218e. The other side of the switch: a controlled arm must not fill a recording nobody reads.
+
+    A record of zeroes on a pack arm would be indistinguishable from a board arm whose block was empty on every turn,
+    and that is the finding this lane has had to tell apart from a wiring defect five times. The arm records nothing
+    at all, which the census states as an absent block rather than as a block of zeroes.
+    """
+    saved = os.environ.pop(subject.BOARD_ENV, None)
+    before = len(subject.board_doses())
+    before_stats = subject.memory_stats()
+    try:
+        agent, _, original = fresh(pack="RULE")
+        try:
+            state = LLMAgentState()
+            state = episode_step(agent, state, "where is my order 1234")
+        finally:
+            subject.recall = original
+        after = len(subject.board_doses())
+        after_stats = subject.memory_stats()
+        front = None
+        os.environ[subject.BOARD_ENV] = "front"
+        front_agent, _, original = fresh(pack="")
+        try:
+            front = episode_step(front_agent, LLMAgentState(), "return the lamp")
+            front_record = dict(subject.board_doses()[-1])
+        finally:
+            subject.recall = original
+    finally:
+        if saved is None:
+            os.environ.pop(subject.BOARD_ENV, None)
+        else:
+            os.environ[subject.BOARD_ENV] = saved
+    checks.equal(after - before, 0, "a pack arm opens a boundary and records no dose")
+    checks.equal("boardDoses" in before_stats, False, "and records no dose")
+    checks.equal("boardDoses" in after_stats, False, "not even after a turn")
+    checks.equal(front is not None, True, "the front placement writes its block too")
+    # The front placement replaces the block every turn, so what it served and what it carried are the same number.
+    checks.equal(front_record["written"] > 0, True, "the front placement records what it wrote")
+    checks.equal(front_record["changes"], 1, "one render, one change")
+
+
+@case
 def an_arm_with_no_sidecar_reads_no_file(checks):
     """R215. The three early returns that make "no sidecar" a state rather than a fault.
 

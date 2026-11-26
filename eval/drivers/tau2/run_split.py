@@ -60,6 +60,11 @@ from notes import (  # noqa: E402
     trajectories_path,
 )
 
+# R218e's join, in its own module for the same reason: it imports nothing third-party, so the grid it refuses and
+# the grid it joins are both checkable without a provider. The dose is written by the arm and resolved here, and a
+# join that only runs inside a paid dispatch is a join nobody has ever seen work.
+import dose as dose_sidecar  # noqa: E402
+
 # Which τ² this is, decided by what the package exports rather than by a version string.
 #
 # v0.2.0 has `tau2.run.get_tasks(domain, task_ids)` and one flat `run_tasks(**kwargs)`.
@@ -751,6 +756,10 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     # output path for a two-second import check is the kind of flag that teaches a reader to pass
     # `--out /dev/null` rather than to ask what the phase needs.
     parser.add_argument("--out", default="")
+    # R218e. Where the dose sidecar goes. Defaulted beside the document rather than required: the arm that serves a
+    # board always records a dose, and a flag a dispatch has to remember is a flag a dispatch will forget exactly
+    # once — on the run that mattered.
+    parser.add_argument("--dose-out", default="")
     parser.add_argument("--tasks", default="")
     parser.add_argument("--memory-url", default="")
     parser.add_argument("--max-steps", type=int, default=100)
@@ -1108,6 +1117,64 @@ def _memory_stats(simulations=None) -> dict:
     return block
 
 
+def _board_doses() -> list:
+    """The agent's dose records so far, or an empty list on a phase that is not the board arm.
+
+    Imported here rather than at module scope for the reason `_memory_stats` states: this driver is imported by
+    readers that have no `microglia_agent` beside them, and a module-level import would make the join's contract
+    depend on the agent being importable. The empty list is the honest answer for a phase that serves no board —
+    the census then carries no `dose` block at all, which is a different state from a block that refused.
+    """
+    try:
+        from microglia_agent import board_doses
+    except ImportError:  # pragma: no cover — the driver runs beside the agent in every dispatch this lane makes
+        return []
+    return board_doses()
+
+
+def _dose_block(memory, marks, rounds_simulations, out: str) -> "dict | None":
+    """Write the dose sidecar and answer what the census records about it.
+
+    `None` on every arm that serves no board: a phase without the channel has no dose, and a block of zeroes would
+    read as a channel that served nothing — the distinction this driver has had to make five times.
+
+    The check that the recording is complete is made **here**, where both halves are in hand: the rows the join
+    produced carry their own sums, and the phase's counters are the same quantities counted by the module that
+    produced them. A recording that disagrees with the census is the one failure that would make every later
+    per-episode attribution a story about the wrong episode, so the comparison is a field of the census rather than
+    a sentence in a log (PROGRESS 249.12).
+    """
+    if not isinstance(memory, dict):
+        return None
+    records = memory.pop("boardDoses", None)
+    board = memory.get("board")
+    if records is None or not isinstance(board, dict):
+        return None
+    tasks = memory.get("boundaryTasks") or []
+    joined = dose_sidecar.rows(records, tasks, marks, rounds_simulations)
+    path = out[:-5] + ".dose.jsonl" if out.endswith(".json") else out + ".dose.jsonl"
+    written = 0
+    if joined["refused"] is None:
+        written = dose_sidecar.write(path, joined["rows"])
+    totals = joined["totals"]
+    return {
+        "path": path,
+        "episodes": len(records),
+        "rows": written,
+        "refused": joined["refused"],
+        "identity": joined["identity"],
+        "totals": totals,
+        # The two identities the census can be checked against, and they are different claims: `renders` and
+        # `chars` are the sum over the row set, `written` is the sum over the messages this agent put into a prompt.
+        # The first must equal the counter exactly; the second must be at most the first, and their ratio is the
+        # placement's price expressed as a share rather than as a bill.
+        "agreesRenders": totals["renders"] == (board.get("renders") or 0),
+        "agreesChars": totals["chars"] == (board.get("charsTotal") or 0),
+        "agreesChanges": totals["changes"] == (board.get("changes") or 0),
+        "writtenOfServed": round(totals["written"] / totals["chars"], 4) if totals["chars"] else None,
+    }
+
+
 def _first_user_texts(simulations) -> list:
     """`(task id, first user message)` for every simulation this phase ran, in the runner's order.
 
@@ -1322,6 +1389,13 @@ def main(argv: list[str]) -> int:
     round_paths = []
     note_rounds = []
     trajectories: dict = {}
+    # R218e. The recording's length after each round, and the simulations that round ran. The pair is the join:
+    # `--rounds` makes each attempt its own `run_tasks` call, so the round *is* the trial index, and the snapshot
+    # partitions the agent's recording — which is a flat list, appended in boundary order — into rounds. A `--trials`
+    # grid runs its attempts concurrently inside one round, and the join then reports `unordered` rather than
+    # inventing an order (AUDIT 34.262).
+    dose_marks: list = []
+    dose_rounds: list = []
     # The material, chosen by dispatch: a paraphrase costs one call per failure and can drift from the
     # requirement; the verdict costs nothing and cannot. `--note-source verdict` implies `--note-verdict`,
     # because the verdict arm reads the verdict even when the flag was not repeated.
@@ -1357,6 +1431,10 @@ def main(argv: list[str]) -> int:
         )
         round_simulations = getattr(results, "simulations", None) or []
         simulations.extend(round_simulations)
+        # R218e: taken after the round and before the next one starts, which is the only moment the recording's
+        # length is a description of exactly one round.
+        dose_marks.append(len(_board_doses()))
+        dose_rounds.append(round_simulations)
         if rounds > 1:
             round_paths.append(out_path)
         if summarize is not None and index + 1 < rounds:
@@ -1385,6 +1463,10 @@ def main(argv: list[str]) -> int:
     # and the artefact needs the agent's own counters, and two calls to a counter reader is two places for
     # a denominator to disagree with itself.
     memory = _memory_stats(simulations) if args.agent == "microglia_agent" else None
+    # R218e: after `_memory_stats`, because that call is what resolves the boundary texts into task ids and pops the
+    # raw records out of the block. The sidecar is written before the census is printed, so a phase that fails to
+    # write it says so in the artefact rather than in a traceback after the printing.
+    dose_block = _dose_block(memory, dose_marks, dose_rounds, args.dose_out or args.out)
     print(
         json.dumps(
             {
@@ -1436,6 +1518,10 @@ def main(argv: list[str]) -> int:
                 "diagnostics": {
                     **diagnostics_of(simulations),
                     "usage": usage_stats(memory),
+                    # R218e: the dose, joined and checked. Absent on every arm without the channel, present on the
+                    # one arm that serves it, so a reader can tell "this arm has no material" from "this arm's
+                    # material was not recorded".
+                    **({"dose": dose_block} if dose_block is not None else {}),
                     # R123: only the phase that consulted a sidecar reports on one. A phase without the
                     # agent would otherwise carry `recalls: 0`, which reads as a memory that was never
                     # asked rather than one that was never wired -- the distinction this driver's own

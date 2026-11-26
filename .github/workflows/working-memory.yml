@@ -277,7 +277,11 @@ jobs:
           # as one arm would arm the window guard with half the run it is guarding.
           arms = {'three': 3, 'both': 2, 'pair': 2, 'interleave': 2, 'admission': 2}.get('${BOARD_ARMS}', 1)
           concurrency = max(1, int('${BOARD_CONCURRENCY}'))
-          print(int((arms * tasks * trials * 26) / concurrency / 60) + 9 + 1)
+          # R218e. `dose` is one arm run **twice**: `--rounds 2` is what makes the attempt index recoverable, so the
+          # grid is two passes and an estimate that read the dispatch's name as one arm would arm the window guard
+          # with half the run it is guarding.
+          passes = 2 if '${BOARD_ARMS}' == 'dose' else 1
+          print(int((arms * passes * tasks * trials * 26) / concurrency / 60) + 9 + 1)
           ")"
           echo "estimated ${MINUTES} min for this grid" >> "$GITHUB_STEP_SUMMARY"
           python3 eval/drivers/tau2/note_pilot.py --window-minutes "${MINUTES}"
@@ -486,6 +490,17 @@ jobs:
               ;;
             board) run_arm board --note-source board ;;
             policy) run_arm policy --note-source board-policy ;;
+            dose)
+              # R218e. **One arm, two rounds, and the rounds are the treatment.** The question is inside one task:
+              # did the attempt that received more material pass more often than the sibling that received less? A
+              # single round answers it with `NO_PAIRS` by construction — one attempt a task leaves nothing to
+              # compare — so the grid is 114 tasks × 2 rounds, and `--rounds` is not an economy: it is what makes
+              # the attempt index recoverable (`merge_rounds` writes the round as `trial`, and the agent's recording
+              # is partitioned by the runner's snapshot after each round). `--trials 2` would have run both attempts
+              # concurrently in one `run_tasks` call, and the join would then have had to guess which of two
+              # simultaneous episodes made which record (AUDIT 34.262).
+              run_arm board --note-source board --rounds 2
+              ;;
             *)     run_arm control ;;
           esac
 
@@ -658,7 +673,8 @@ jobs:
       - name: The paired reading
         # R218c's grid is two arms of the same code: it has no board, no parser arm and no contrast to take, and
         # the placebo's own step reads it. Gated on the dispatch rather than on a filename that would not exist.
-        if: env.BOARD_ARMS != 'interleave'
+        # R218e's `dose` dispatch has one arm and no contrast either: its reading is the recording, below.
+        if: env.BOARD_ARMS != 'interleave' && env.BOARD_ARMS != 'dose'
         # Three contrasts, one change each. `tail − control` is the round's registered endpoint; `front − control` is
         # what the three parser repairs are worth under R215's placement; `tail − front` is what the placement buys.
         # A two-arm grid could only have reported the sum, and the sum is the number that cannot be acted on.
@@ -711,6 +727,80 @@ jobs:
           assert reading["tasks"] >= 100, reading["tasks"]
           assert reading["unpaired"] == 0, reading["unpaired"]
           print(f"ok  paired over {reading['tasks']} task(s)")
+          PY
+
+      - name: The dose, which is the whole round
+        # R218e. Three claims, and they are ordered by what they are about: the **recording** exists and covers the
+        # grid, the **recording agrees with the phase's own counters**, and only then what the pairs say. The first
+        # two are invariants and gate the build; the third is a prediction and is printed, because R216's one-sided
+        # cost bar taught this lane what a red job for a refuted prediction costs — an operator who reruns until the
+        # grid is green. `NO_PAIRS` here is a refutation of the premise (a dose that does not vary inside a task) and
+        # it is reported as a warning with the number that would have been hidden by a pass.
+        if: env.BOARD_ARMS == 'dose'
+        run: |
+          set -euo pipefail
+          TARGET="${BOARD_DIR}/board.json"
+          SIDECAR="${BOARD_DIR}/board.dose.jsonl"
+          python3 - "${BOARD_DIR}" <<'PY'
+          import json, sys
+          from pathlib import Path
+
+          root = Path(sys.argv[1])
+          lines = [line for line in (root / "board.log").read_text(errors="replace").splitlines()
+                   if line.startswith('{"phase"')]
+          assert lines, "the phase wrote no census: the run did not finish"
+          phase = json.loads(lines[-1])
+          dose = (phase.get("diagnostics") or {}).get("dose")
+          board = ((phase.get("diagnostics") or {}).get("memory") or {}).get("board") or {}
+          assert dose is not None, "no dose block: the arm served no board, or the recording was not written"
+          # The join, before the numbers it produces. A refusal means the recording could not be attributed, and an
+          # accuracy-shaped reading taken over a refused join is the defect this step exists to make impossible.
+          assert dose["refused"] is None, f"the join refused: {dose['refused']}"
+          assert dose["identity"] == "round", f"the attempts were {dose['identity']!r}, not one a round"
+          # 114 tasks twice: a short grid is a different experiment and its floor is a function of the count.
+          assert dose["rows"] == dose["episodes"], (dose["rows"], dose["episodes"])
+          assert dose["rows"] >= 220, dose["rows"]
+          # The recording against the counters that were produced independently of it. These three are the reason
+          # the sidecar is worth a round: a recording that disagrees with the census describes an episode that is not
+          # the one it says it describes, and every per-episode attribution downstream would inherit the error.
+          assert dose["agreesRenders"], (dose["totals"]["renders"], board.get("renders"))
+          assert dose["agreesChars"], (dose["totals"]["chars"], board.get("charsTotal"))
+          assert dose["agreesChanges"], (dose["totals"]["changes"], board.get("changes"))
+          # A block held rather than re-written cannot be carried twice, so carried <= served on any placement, and
+          # the two are equal only on the front one.
+          assert dose["totals"]["written"] <= dose["totals"]["chars"], dose["totals"]
+          assert board.get("placement") == "tail", board.get("placement")
+          print(f"ok  {dose['rows']} row(s) over {phase['tasks']} task(s) in {phase['trials']} round(s), "
+                f"{dose['totals']['chars']} characters served, {dose['totals']['written']} carried "
+                f"({dose['writtenOfServed']:.0%}), {dose['totals']['changes']} change(s) over "
+                f"{dose['totals']['renders']} render(s)")
+          PY
+          python3 eval/verifiers/board_dose.py --document "${TARGET}" --sidecar "${SIDECAR}" \
+            | tee "${RUNNER_TEMP}/dose.txt"
+          python3 eval/verifiers/board_dose.py --document "${TARGET}" --sidecar "${SIDECAR}" --json \
+            > "${RUNNER_TEMP}/dose.json"
+          python3 - "${RUNNER_TEMP}/dose.json" <<'PY'
+          import json, sys
+
+          reading = json.load(open(sys.argv[1]))
+          # The recording arrived: this is the state R218d could not reach on any artefact, because a τ² transcript
+          # holds no system message for a block to be in.
+          assert reading["state"] != "NO_SYSTEM", reading["state"]
+          assert reading["source"] == "sidecar", reading["source"]
+          coverage = reading.get("coverage") or {}
+          assert coverage.get("rows", 0) >= 220, coverage
+          # Every row met its episode: a row the document does not score, or a trial the join withheld, is a row
+          # that cannot be paired and the reading would be over a population nobody chose.
+          assert coverage.get("unscored") == 0, coverage
+          assert coverage.get("unordered") == 0, coverage
+          print(f"::notice title=R218e dose::{reading['state']}, {reading['episodesWithDose']} of "
+                f"{reading['episodes']} episode(s) carried a block, {reading['doseCharsMean']:.0f} characters an "
+                f"episode, {reading.get('pairs', 0)} task(s) split into a higher and a lower dose")
+          if reading["state"] != "DOSE_READ":
+              # A finding, not a build failure: the material does not vary inside a task, or it varies and no task
+              # produced an attempt on each side. Both refute the premise rather than the recording.
+              print(f"::warning title=R218e::the recording is complete and agrees with the census, and it reads "
+                    f"{reading['state']} — there is no within-task comparison to make")
           PY
 
       - name: The placebo reading
@@ -770,6 +860,7 @@ jobs:
           name: working-memory
           path: |
             eval/results/working-memory/*.json
+            eval/results/working-memory/*.jsonl
             eval/results/working-memory/*.log
             eval/results/working-memory/parts/*.json
             eval/results/working-memory/parts/*.log

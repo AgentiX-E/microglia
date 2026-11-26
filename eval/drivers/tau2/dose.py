@@ -1,0 +1,365 @@
+#!/usr/bin/env python3
+"""R218e — the dose, joined to the task and the attempt it was served in.
+
+The agent records one dict an episode: how many turns the episode took, how many times the block was rendered,
+how many characters it carried, how many of those reached the prompt, and how many renders changed it. That
+recording is the dose. What it does not carry is the **identity** of the episode, and the reason is a property of
+the harness rather than a choice: τ² constructs an agent per simulation and never tells it which task or attempt it
+is in (R136). The runner holds both sides, so the join lives here — beside the runner, in its own module, because a
+join is a thing whose failure mode is silent.
+
+The agent records the episode's **opening text**; the runner resolves text to task with `boundary_task_ids`, the
+same reader R136 built for the census. This module therefore receives tasks, not texts: a second text matcher
+beside the first is a second answer to "which task is this", and the two would agree until the day one of them
+learned about whitespace.
+
+## How the attempt is established, and why not by turn count
+
+The obvious key for the attempt is the turn count: the record says how many model calls the episode made, and the
+document says how many assistant messages it holds. It was rejected on a measurement, for free, before any
+dispatch: on R219b's `board.json` the phase counted **1,171** agent calls and the transcript holds **1,274**
+assistant messages — a gap of 103 over 114 episodes, so the two are not the same quantity, and a join on them
+would be off by one episode somewhere in the middle of the grid while looking correct everywhere else.
+
+`--rounds` gives an exact key instead. A round is one `run_tasks` call with `trials=1`, so **inside a round every
+task appears exactly once**, and the round *is* the attempt index: `merge_rounds` writes it as the document's
+`trial`. Records are appended in boundary order and a round completes before the next one starts, so the runner's
+snapshot of the recording's length after each round **partitions** it into rounds. That partition is the join:
+round `i`'s slice of records is matched to round `i`'s simulations by task, one each.
+
+Refused rather than guessed at:
+
+  * a slice whose length differs from its round's simulations — a retry or an episode that never called the model,
+    after which the join would attribute one episode's dose to another's reward;
+  * a task that appears twice in one round with no way to tell the attempts apart;
+  * a task in a round that holds no record at all.
+
+Reported rather than refused: `--trials k` with one round runs the k attempts **concurrently**, so the order inside
+a task is completion order and the trial index is not recoverable. Rows are still written, with `trial: None` and
+`identity: "unordered"`, because the counts remain exact even where the pairing does not — a reader can use the
+counts and must refuse the pairs.
+
+## Usage
+
+  python3 eval/drivers/tau2/dose.py --self-test
+"""
+
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+#: The fields a row carries into the sidecar. `chars` is the material served, `written` the material carried, and
+#: `turns` the confound the reading has to hold. The opening text is kept out on purpose: it is the join key, it is
+#: a whole user message, and a sidecar that repeated 114 of them would be a second copy of the document.
+FIELDS = ("task", "trial", "turns", "renders", "chars", "written", "changes", "stable")
+
+
+def _field(entry, name: str, default=None):
+    """One field of a simulation, from a pydantic model or from a dict.
+
+    The runner reads `results.simulations` before the document is written and `merge_rounds` reads it back as a
+    dict, so both shapes reach this module on the same run.
+    """
+    value = getattr(entry, name, None)
+    if value is None and isinstance(entry, dict):
+        value = entry.get(name)
+    return default if value is None else value
+
+
+def rows(records, tasks, marks, rounds) -> dict:
+    """The recording, cut into rounds and joined to the episodes each round ran.
+
+    `records` is the agent's dose list, `tasks` the task each boundary opened for (same length, same order, resolved
+    by the runner from the boundary text), `marks` the recording's length after each round, and `rounds` the
+    simulations each round produced. Returns the rows, the totals a reader checks the recording against the phase's
+    own counters with, and a `refused` sentence when the join could not be made.
+
+    A refusal is a return value and not an exception: a phase that spent money has already bought the counters it
+    printed, and taking the process down at the join would throw away the document that explains why. The sidecar is
+    simply not written, and the census carries the reason.
+    """
+    if len(records) != len(tasks):
+        return _refused(f"lengths-differ:{len(records)}/{len(tasks)}")
+    if len(marks) != len(rounds):
+        return _refused(f"marks-differ:{len(marks)}/{len(rounds)}")
+    # Checked before the final-mark rule, because a snapshot that went *backwards* is a different defect from one
+    # that stopped short, and the sentence a reader gets should name the one that happened. A backwards mark is a
+    # negative slice at the next round, and a negative slice is an empty one — a round that joins no episode and
+    # reports it as a round that ran none.
+    if any(later < earlier for earlier, later in zip([0] + list(marks), marks)):
+        return _refused("marks-not-increasing")
+    if not marks or marks[-1] != len(records):
+        # The last snapshot is taken after the last round, so a recording that grew afterwards belongs to no round.
+        return _refused(f"recording-grew-after-the-last-round:{marks[-1] if marks else 0}/{len(records)}")
+
+    built: list = []
+    problems: list = []
+    lower = 0
+    for index, upper in enumerate(marks):
+        slice_records = records[lower:upper]
+        slice_tasks = tasks[lower:upper]
+        lower = upper
+        simulations = rounds[index] or []
+        by_task: "dict[str, list]" = {}
+        for offset, task in enumerate(slice_tasks):
+            if isinstance(task, str) and task != "":
+                by_task.setdefault(task, []).append(offset)
+        unordered = any(len(offsets) > 1 for offsets in by_task.values())
+        claimed: set = set()
+        for simulation in simulations:
+            task = str(_field(simulation, "task_id", "") or "")
+            if task == "":
+                problems.append(f"round-{index}:simulation-without-a-task")
+                continue
+            offsets = by_task.get(task) or []
+            if not offsets:
+                problems.append(f"round-{index}:{task}:no-record")
+                continue
+            if len(offsets) > 1:
+                # Concurrent attempts: the record exists but which attempt made it is not recoverable. The first
+                # unclaimed record is taken so the counts stay exact, and `trial` is withheld below.
+                free = [offset for offset in offsets if offset not in claimed]
+                if not free:
+                    problems.append(f"round-{index}:{task}:records-exhausted")
+                    continue
+                offset = free[0]
+            else:
+                offset = offsets[0]
+            claimed.add(offset)
+            record = slice_records[offset]
+            built.append(
+                {
+                    "task": task,
+                    "trial": None if unordered else index,
+                    "turns": int(record.get("turns") or 0),
+                    "renders": int(record.get("renders") or 0),
+                    "chars": int(record.get("chars") or 0),
+                    "written": int(record.get("written") or 0),
+                    "changes": int(record.get("changes") or 0),
+                    "stable": int(record.get("stable") or 0),
+                }
+            )
+        # Every record in the slice must be claimed by an episode, and "every" is counted over the slice rather
+        # than over the task index: a record whose boundary text resolved to no task is not in the index and would
+        # otherwise vanish from the check — the way an unattributable row vanishes from a share.
+        left = [offset for offset in range(len(slice_records)) if offset not in claimed]
+        if left:
+            # A record whose task was not in this round's simulations: an episode the runner scored under a task the
+            # agent's text resolved to something else. Refused, because the failure it would otherwise hide is a
+            # text colliding between two tasks.
+            problems.append(f"round-{index}:{len(left)}-record(s)-with-no-episode")
+    if problems:
+        return _refused(";".join(problems[:3]))
+    return {"rows": built, "refused": None,
+            "identity": "unordered" if any(row["trial"] is None for row in built) else "round",
+            "totals": _totals(built)}
+
+
+def _refused(reason: str) -> dict:
+    return {"rows": [], "refused": reason, "identity": None, "totals": _totals([])}
+
+
+def _totals(built: list) -> dict:
+    """The sums a phase can be checked against, over the rows that were actually joined."""
+    keys = ("turns", "renders", "chars", "written", "changes", "stable")
+    return {key: sum(row[key] for row in built) for key in keys}
+
+
+def write(path, built: "list[dict]") -> int:
+    """Write the rows as JSONL, one an episode, and answer how many were written.
+
+    JSONL rather than a JSON array: the sidecar is one line an episode, in the order the episodes ran, and a reader
+    can stream it without holding the grid in memory. The file is written even when it holds no rows, so "the
+    recording was empty" and "no sidecar was produced" stay different states.
+    """
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with open(target, "w", encoding="utf-8") as stream:
+        for row in built:
+            stream.write(json.dumps({key: row[key] for key in FIELDS}) + "\n")
+    return len(built)
+
+
+def load(path) -> "list[dict]":
+    """The rows a sidecar holds, with a line that will not parse refused by its number."""
+    loaded = []
+    with open(path, encoding="utf-8") as stream:
+        for number, line in enumerate(stream, start=1):
+            text = line.strip()
+            if text == "":
+                continue
+            try:
+                entry = json.loads(text)
+            except json.JSONDecodeError as error:
+                raise SystemExit(f"dose-sidecar-line-{number}:{error.msg}")
+            if not isinstance(entry, dict):
+                raise SystemExit(f"dose-sidecar-line-{number}:not-an-object")
+            loaded.append(entry)
+    return loaded
+
+
+def self_test() -> int:
+    """The join on grids whose answer is known, including the states it must refuse."""
+    failures = []
+    cases = 0
+
+    def check(name, condition, detail=""):
+        nonlocal cases
+        cases += 1
+        if not condition:
+            failures.append(f"{name}{': ' + str(detail) if detail else ''}")
+
+    def record(**over):
+        base = {"turns": 4, "renders": 3, "chars": 300, "written": 120, "changes": 1, "stable": 2}
+        base.update(over)
+        return base
+
+    def simulation(task, trial=0):
+        return {"task_id": task, "trial": trial}
+
+    # --- the happy path: one round, one record a task -------------------------------------------------
+    reading = rows([record(), record()], ["a", "b"], [2], [[simulation("a"), simulation("b")]])
+    check("two records join two episodes", len(reading["rows"]) == 2, reading)
+    check("nothing is refused", reading["refused"] is None, reading["refused"])
+    check("the identity is the round", reading["identity"] == "round", reading["identity"])
+    check("the trial is the round index", [row["trial"] for row in reading["rows"]] == [0, 0])
+    check("the totals are the rows", reading["totals"]["chars"] == 600, reading["totals"])
+    check("a row carries every field", set(reading["rows"][0]) == set(FIELDS), set(reading["rows"][0]))
+
+    # --- two rounds: the snapshot partitions the recording, and the trial is the round -----------------
+    records = [record(), record(), record(chars=90), record(chars=90)]
+    reading = rows(records, ["a", "b", "a", "b"], [2, 4],
+                   [[simulation("a"), simulation("b")], [simulation("a", 1), simulation("b", 1)]])
+    check("four records join four episodes", len(reading["rows"]) == 4, reading)
+    by_key = {(row["task"], row["trial"]): row["chars"] for row in reading["rows"]}
+    check("the second round's rows carry the second attempt", by_key[("a", 1)] == 90, by_key)
+    check("and the first round's carry the first", by_key[("a", 0)] == 300, by_key)
+    check("the totals span both rounds", reading["totals"]["chars"] == 780, reading["totals"])
+    check("the join is by task, not by position",
+          rows([record(chars=11), record(chars=22)], ["b", "a"], [2],
+               [[simulation("a"), simulation("b")]])["rows"][0]["chars"] == 22)
+
+    # --- the refusals ----------------------------------------------------------------------------------
+    short = rows([record()], ["a"], [1], [[simulation("a"), simulation("b")]])
+    check("a round with more episodes than records is refused", short["refused"] is not None, short)
+    check("and the refusal names the missing task", "no-record" in (short["refused"] or ""), short["refused"])
+    check("a refused join writes no rows", short["rows"] == [])
+    check("a refused join still counts nothing", short["totals"]["chars"] == 0)
+    check("a refused join has no identity", short["identity"] is None)
+    check("records and tasks of different lengths are refused",
+          rows([record()], ["a", "b"], [1], [[simulation("a")]])["refused"].startswith("lengths-differ"))
+    check("a recording that grew after the last round is refused",
+          rows([record(), record()], ["a", "b"], [1], [[simulation("a")]])["refused"].startswith("recording-grew"))
+    check("marks that do not match the rounds are refused",
+          rows([], [], [0], [[], []])["refused"].startswith("marks-differ"))
+    check("marks that are not increasing are refused",
+          rows([record(), record()], ["a", "b"], [2, 1], [[simulation("a")], [simulation("b")]])
+          ["refused"] == "marks-not-increasing")
+    check("an unresolved boundary is a record with no episode",
+          "with-no-episode" in (rows([record(), record()], ["a", None], [2],
+                                     [[simulation("a")]])["refused"] or ""))
+    check("a simulation with no task is refused",
+          "without-a-task" in (rows([record()], ["a"], [1], [[{"task_id": ""}]])["refused"] or ""))
+    check("a task with two records and two episodes keeps its counts",
+          len(rows([record(), record(renders=9)], ["a", "a"], [2],
+                   [[simulation("a"), simulation("a", 1)]])["rows"]) == 2)
+    three = rows([record(), record()], ["a", "a"], [2],
+                 [[simulation("a"), simulation("a", 1), simulation("a", 2)]])
+    check("a third attempt with no free record is refused", "records-exhausted" in (three["refused"] or ""), three)
+
+    # --- the state that is reported rather than refused -------------------------------------------------
+    concurrent = rows([record(), record(renders=9)], ["a", "a"], [2], [[simulation("a"), simulation("a")]])
+    check("attempts that ran together join by count", len(concurrent["rows"]) == 2, concurrent)
+    check("but their trial is withheld", all(row["trial"] is None for row in concurrent["rows"]), concurrent)
+    check("and the identity says why", concurrent["identity"] == "unordered", concurrent["identity"])
+
+    # --- the file ---------------------------------------------------------------------------------------
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        path = root / "arm.dose.jsonl"
+        check("one row is written", write(path, [{"task": "a", "trial": 0, "turns": 1, "renders": 1, "chars": 10,
+                                                  "written": 10, "changes": 1, "stable": 0, "text": "dropped"}]) == 1)
+        loaded = load(path)
+        check("and read back without the join key", loaded == [{"task": "a", "trial": 0, "turns": 1, "renders": 1,
+                                                               "chars": 10, "written": 10, "changes": 1,
+                                                               "stable": 0}], loaded)
+        write(path, [])
+        check("an empty recording writes an empty file", load(path) == [] and path.stat().st_size == 0)
+        path.write_text('{"task": "a"}\n\n{"task": "b"}\n', encoding="utf-8")
+        check("blank lines are skipped", len(load(path)) == 2)
+        path.write_text("{oops\n", encoding="utf-8")
+        refused = None
+        try:
+            load(path)
+        except SystemExit as error:
+            refused = str(error)
+        check("a line that will not parse is refused by its number",
+              (refused or "").startswith("dose-sidecar-line-1"), refused)
+        path.write_text("[1, 2]\n", encoding="utf-8")
+        refused = None
+        try:
+            load(path)
+        except SystemExit as error:
+            refused = str(error)
+        check("a line that is not an object is refused", (refused or "").endswith("not-an-object"), refused)
+        check("a sidecar in a directory that does not exist is created", write(root / "x" / "y.jsonl", []) == 0)
+
+    # --- the suite's own failure path, diverted into the list rather than into the log ------------------
+    planted_at = len(failures)
+    check("a check that must fail", False, "deliberate")
+    check("a check that must fail without a detail", False)
+    planted = failures[planted_at:]
+    del failures[planted_at:]
+    cases -= 2
+    check("the suite can say no", len(planted) == 2, planted)
+    check("a model-shaped simulation is read", _field(type("S", (), {"task_id": "x"})(), "task_id") == "x")
+    check("a missing field answers its default", _field({}, "task_id", "") == "")
+
+    # The report's two answers and the command line's refusal, into a buffer: a branch whose failing half has never
+    # run is a branch that cannot fail visibly, and this suite's whole job is to be able to say no.
+    import io
+
+    buffer = io.StringIO()
+    check("the report answers one for a failure",
+          _report(["planted"], 2, buffer) == 1 and "planted" in buffer.getvalue(), buffer.getvalue())
+    buffer = io.StringIO()
+    check("the report answers zero for none",
+          _report([], 2, buffer) == 0 and "2 check(s) passed" in buffer.getvalue(), buffer.getvalue())
+    refused = None
+    try:
+        main([])
+    except SystemExit as error:
+        refused = error.code
+    check("the command line refuses to do nothing", refused == 2, refused)
+    return _report(failures, cases)
+
+
+def _report(failures: "list[str]", cases: int, stream=None) -> int:
+    """Print the failures and the count, and answer with the exit code the workflow reads."""
+    out = stream or sys.stderr
+    if failures:
+        for failure in failures:
+            print(f"[dose] FAIL {failure}", file=out)
+        print(f"[dose] {len(failures)} of {cases} check(s) failed", file=out)
+        return 1
+    print(f"[dose] {cases} check(s) passed", file=out)
+    return 0
+
+
+def main(argv: "list[str]") -> int:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="the dose, joined to the task and the attempt it was served in")
+    parser.add_argument("--self-test", action="store_true")
+    arguments = parser.parse_args(argv)
+    if arguments.self_test:
+        return self_test()
+    parser.error("nothing to do: pass --self-test")
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))
