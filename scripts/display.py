@@ -37,6 +37,11 @@ SCOPES = ("request", "clause")
 #: One colour per scope, reused by both renderers so the two charts agree on what blue means.
 COLOURS = {"request": "#1a73e8", "clause": "#c5221f"}
 
+#: R234's hidden bar, restated rather than imported because this file has no import of the instrument: `read_anchor.py`
+#: owns the number and the self-test below compares this line to the value the saved reading was judged against, so the
+#: drawing cannot advertise a bar the round did not register.
+GROUP_HIDDEN = 0.005
+
 
 def load(path: pathlib.Path) -> dict:
     """The saved reading, checked against the four counts it is made of."""
@@ -194,6 +199,90 @@ def _png(reading: dict, path: pathlib.Path) -> None:
     plt.close(figure)
 
 
+def chain_rows(paths: list) -> tuple:
+    """The three rendering rounds as one chain: what each showed, and what the cut still hid.
+
+    One reading per round, and the only thing they are allowed to disagree about is the columns. A row is read from
+    `display.clause` because that is the board the three rounds were about, and the denominator must be the same on
+    every row: a chain that mixed two grids would be a line drawn through two populations, which is the defect the
+    lane's own replication column exists to refuse. So the mismatch raises rather than plots.
+    """
+    required = None
+    rows: list = []
+    for label, path in paths:
+        reading = load(path)
+        one = reading["display"]["clause"]
+        if required is None:
+            required = one["required"]
+        elif one["required"] != required:
+            raise SystemExit(f"{label}: the chain mixes grids ({one['required']} against {required})")
+        rows.append({"label": label, "shown": one["displayed"], "hidden": one["hidden"], "reached": one["reached"],
+                     "itemsPerCall": one["itemsPerCall"]})
+    return required, rows
+
+
+def chain_png(required: int, rows: list, out: pathlib.Path) -> None:
+    """The chain as a raster: coverage rising to the reachable set, and the hidden column going to zero.
+
+    Two panels because the round is two claims. On the left, each round's block against the evaluator's denominator —
+    the solid part is what a model read, the pale part is what the cut took. On the right, the hidden column alone, on
+    its own scale, with the bar R234 registered: a bar that reads as a straight line at this scale is the point, since
+    three writes of 636 and zero are both noise-sized and only the second is a closure.
+    """
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    figure, (left, right) = plt.subplots(1, 2, figsize=(14.0, 4.6), dpi=165, gridspec_kw={"width_ratios": [1.5, 1]})
+    labels = [row["label"] for row in rows]
+    for index, row in enumerate(rows):
+        left.barh(index, row["shown"], color="#c5221f", height=0.44, zorder=3)
+        left.barh(index, row["hidden"], left=row["shown"], color="#f6c7c3", height=0.44, zorder=3)
+        left.text(row["shown"] / 2, index, f'{row["shown"]} shown', ha="center", va="center", color="white",
+                  fontsize=10)
+        note = f'{row["hidden"]} hidden of {row["reached"]} reached' if row["hidden"] else \
+            f'nothing hidden of {row["reached"]} reached'
+        left.text(required * 1.005, index, note, va="center", fontsize=9.5, color="#3c4043")
+    left.set_yticks(range(len(rows)))
+    left.set_yticklabels([f'{row["label"]}\n{row["itemsPerCall"]:.2f} items a call' for row in rows], fontsize=9.5)
+    left.set_xlim(0, required * 1.02)
+    left.set_ylim(-0.6, len(rows) - 0.4)
+    left.invert_yaxis()
+    left.set_xlabel(f"of {required} required writes the evaluator grades", fontsize=10)
+    left.set_title("The rendering axis, three rounds, one board, no model", fontsize=11)
+    left.grid(axis="x", alpha=0.18)
+    for spine in ("top", "right", "left"):
+        left.spines[spine].set_visible(False)
+
+    hidden = [row["hidden"] for row in rows]
+    right.bar(range(len(rows)), hidden, color="#c5221f", width=0.5, zorder=3)
+    for index, value in enumerate(hidden):
+        right.text(index, value + 0.12, str(value), ha="center", fontsize=11, color="#202124")
+    # The bar is 0.5% of what the block **reaches**, not of what the evaluator grades — the registration writes it as
+    # three of 636, and a share of 654 would be a different bar by a fifth of a write.
+    reached = rows[-1]["reached"]
+    bar = GROUP_HIDDEN * reached
+    right.axhline(bar, color="#b3261e", linestyle="--", linewidth=1.2)
+    # The bar's own label lives in the panel's free corner rather than beside the line: at three writes it is a few
+    # pixels above the axis, and a label there would sit on top of the columns it is supposed to be read against.
+    right.text(0.02, 0.94, f"dashed: R234's bar, {bar:.1f} writes (0.5% of {reached})",
+               transform=right.transAxes, fontsize=9, color="#b3261e")
+    right.set_xticks(range(len(rows)))
+    right.set_xticklabels([label.replace(" ", "\n", 1) for label in labels], fontsize=9)
+    right.set_ylabel("writes the cut hid", fontsize=10)
+    right.set_ylim(0, max(max(hidden), bar) * 1.45)
+    right.set_title("what the window still took", fontsize=11)
+    right.grid(axis="y", alpha=0.18)
+    for spine in ("top", "right"):
+        right.spines[spine].set_visible(False)
+
+    figure.tight_layout()
+    out.parent.mkdir(parents=True, exist_ok=True)
+    figure.savefig(out, facecolor="white")
+    plt.close(figure)
+
+
 def self_test() -> int:
     """The loader's refusals, and the markup's two panels, over the reading that is on disk.
 
@@ -236,6 +325,30 @@ def self_test() -> int:
             check("and a block that shows more than it reached is refused", False)
         except SystemExit:
             check("and a block that shows more than it reached is refused", True)
+    # R234's chain. Three readings, one board, and the two invariances the figure relies on: the denominator is the
+    # same on every row, and the bar this file draws is the one the last round was judged against.
+    chain = [("R232 statement order", here / "eval" / "manifests" / "r232-reading.json"),
+             ("R233 open before settled", here / "eval" / "manifests" / "r233-reading.json"),
+             ("R234 one line per family", here / "eval" / "manifests" / "r234-reading.json")]
+    required, rows = chain_rows(chain)
+    check("the chain reads one denominator", required == 654 and all(row["reached"] <= required for row in rows))
+    check("and the hidden column falls monotonically to zero",
+          [row["hidden"] for row in rows] == [14, 4, 0])
+    check("and the coverage rises to the reachable set",
+          [row["shown"] for row in rows] == [622, 632, 636])
+    check("the bar this figure draws is the one the round was judged against",
+          json.loads(chain[2][1].read_text())["reading"]["bar"]["B3_hidden"]["bar"] == GROUP_HIDDEN)
+    with tempfile.TemporaryDirectory() as temporary:
+        # The refusal that stops a chain being drawn through two populations: a row from another grid raises.
+        mixed = json.loads(chain[2][1].read_text())
+        mixed["reading"]["display"]["clause"]["required"] = 643
+        path = pathlib.Path(temporary) / "mixed.json"
+        path.write_text(json.dumps(mixed))
+        try:
+            chain_rows([chain[0], ("R234 on the other grid", path)])
+            check("a chain that mixes two grids is refused", False)
+        except SystemExit:
+            check("a chain that mixes two grids is refused", True)
     if failed:
         print("FAILED:")
         for name in failed:
@@ -250,6 +363,9 @@ def main(argv: list) -> int:
     parser.add_argument("--reading", default="eval/manifests/r232-reading.json")
     parser.add_argument("--out-svg", default="docs/benchmarks/display.svg")
     parser.add_argument("--out-png", default="")
+    parser.add_argument("--chain", action="append", default=[], metavar="LABEL=PATH",
+                        help="a rendering round for the chain figure, in order; repeatable")
+    parser.add_argument("--out-chain", default="")
     parser.add_argument("--print", action="store_true", dest="show")
     parser.add_argument("--self-test", action="store_true")
     arguments = parser.parse_args(argv)
@@ -262,6 +378,19 @@ def main(argv: list) -> int:
         target.write_text(svg(reading))
     if arguments.out_png:
         _png(reading, pathlib.Path(arguments.out_png))
+    if arguments.chain:
+        pairs = []
+        for item in arguments.chain:
+            label, _, path = item.partition("=")
+            if not path:
+                raise SystemExit(f"--chain {item!r} is not LABEL=PATH")
+            pairs.append((label, pathlib.Path(path)))
+        required, rows = chain_rows(pairs)
+        if arguments.out_chain:
+            chain_png(required, rows, pathlib.Path(arguments.out_chain))
+        for row in rows:
+            print(f"{row['label']:26s} shown {row['shown']:3d}  hidden {row['hidden']:2d}  "
+                  f"items/call {row['itemsPerCall']:5.2f}")
     if arguments.show:
         for name in SCOPES:
             one = reading["display"][name]

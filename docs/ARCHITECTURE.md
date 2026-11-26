@@ -5530,3 +5530,57 @@ python3 eval/tools/read_anchor.py --document control.json --scope ordered
 # B2 contract   holds (463 shown against a floor of 463, tax +47, 463 reached without the cut)
 # B3 hidden     holds (4 of 636 reached write(s) hidden on clause, 0.6%, against a bar of 0.01)
 ```
+
+### 8.109 The fold shows every write the board reaches — and the eighteen it cannot are not on the board
+
+R234 renders the block one line per family: of the items the ordering produced, keep the first of each family and let
+the repetition follow. It is a stable two-bucket partition of the same list, so it removes nothing, settles nothing, and
+changes no count on the board. What changes is which eight lines a model reads.
+
+| | statement order (R232) | open before settled (R233) | **one line per family (R234)** |
+|---|---|---|---|
+| reached (family open anywhere) | 636 | 636 | 636 |
+| shown within eight lines | 622 (95.1%) | 632 (96.6%) | **636 (97.2%)** |
+| hidden | 14 (2.2%) | 4 (0.6%) | **0 (0.0%)** |
+| items a call | 8.10 | 8.10 | **8.10** |
+| contract's own level | 463 | 463 | 463 |
+
+**It holds two of its three bars and misses the third by nine writes, and the miss is the finding.** B2 holds exactly —
+the contract's grouped level is 463 against the 463 its own statement order measured *without* the fold. B3 holds at
+zero hidden of 636, replicated at zero of 621. B1 asked for 645 of 654 and got 636, and 636 is not a shortfall: it is
+the **reachable set**, the writes whose family the moment board holds at all. No ordering, fold or cap can display a
+write whose family the block never carried, so B1's 645 was registered above a ceiling its own predecessor had already
+measured. The fold's column is therefore at its maximum: **636 of 636**.
+
+**What the eighteen are, named by family.** They are the writes with no open ask of their family on the block at any
+position: 15 `modify`, 2 `transfer`, 1 `exchange`. Three of them sit on a block with no item on it at all, and none on
+a block holding more than three open families — so this is not breadth, the residue the prereg feared, and it is not
+repetition either. It is **absence**, and absence belongs to the parser and the admission rule rather than to the
+window.
+
+| episodes | family the write needed | open families on the block | items on the block |
+|---|---|---|---|
+| 3ff28626 (×2), 4e217e6f | `modify` | none | 0 |
+| 4ee30edd | `modify` | cancel, payment, return | 5 |
+| 8fdc7215 | `exchange` | return | 1 |
+| c0f899cd, 07c2e99c | `transfer` | cancel (and exchange, return) | 4, 7 |
+
+**The three rounds are one chain, at zero cost.** 622 → 632 → 636 shown, 14 → 4 → 0 hidden, 8.10 items a call
+throughout, and no model called in any of the three. The problem migrated three times — admission (R231) → selection
+(R232) → duplication (R233) — and closed. If a model's behaviour is the question, the next round is the clause rule's
+accuracy dispatch; if the block's *content* is, the next round reads the parser.
+
+```
+python3 eval/tools/read_anchor.py --document control.json --scope grouped
+# display   required reached shown hidden hidden% items/call
+# request        654     463   463      0    0.0%       2.41
+# clause         654     636   636      0    0.0%       8.10
+# B1 displayed  FAILS (request 70.8%, clause 97.2% of 654 required write(s) shown, against a bar of 0.986)
+# B2 contract   holds (463 shown against a floor of 463, tax +47, 463 reached without the cut)
+# B3 hidden     holds (0 of 636 reached write(s) hidden on clause, 0.0%, against a bar of 0.005)
+```
+
+**Where the rule lives.** In the instrument, not in the product, and the distinction is not a delay. The fold is a
+property of a board with repetition on it; the shipped contract board is 2.41 items a call and holds one line per
+obligation already, so folding it changes nothing. The rules of R233 and R234 become live on the day the clause board is
+served, which is the dispatch that would also tell whether any of it changes what a model does.

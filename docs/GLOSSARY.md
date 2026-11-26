@@ -2940,17 +2940,21 @@ in one assistant message share one moment board, because the block is rendered o
 `MAX_ITEMS = 99_999` in `render.ts` is the width of the wrapper's item-count placeholder and not a display budget.
 
 **Displayed coverage** — the share of the required writes whose family had an **open** item among the first
-`MAX_ITEMS` lines of the moment board, over the writes the evaluator grades. **95.1%** for the clause board (622 of
-654) and **70.8%** for the contract's (463 of 654), measured at a cap of eight. The complement of *hidden* within
-*reached*: 2.2% and 0.0%.
+`MAX_ITEMS` lines of the moment board, over the writes the evaluator grades. **70.8%** for the contract's board (463 of
+654, and there the cut costs nothing) and **97.2%** for the clause board (636 of 654) once the block is rendered one line
+per family. The clause column moved 95.1% → 96.6% → 97.2% across R232, R233 and R234, which is the sequence
+622 → 632 → 636 shown, all at 8.10 items a call.
 
 **Reached** — the required writes whose family had an open item **somewhere** on the moment board, at any line. It is
 the ceiling displayed coverage can reach at a given cap, and the denominator of the hidden share: **636** and **463** on
 the retail grid.
 
-**Hidden share** — of the writes a board reaches on the moment board, the share the cap does not display. **14 of 636
-(2.2%)** for the clause board. It is the column that separates a rule whose coverage is real from a rule whose coverage
-is computed: a board can reach every write and show none of them.
+**Hidden share** — of the writes a board reaches on the moment board, the share the window does not display. It is the
+column that separates a rule whose coverage is real from a rule whose coverage is computed: a board can reach every
+write and show none of them. **14 of 636 (2.2%)** under the product's renderer, **4 (0.6%)** once open asks are put
+first, and **0 (0.0%)** once the block is also folded to one line per family. Zero is the end of the axis rather than a
+good score: a rendering rule can only choose among the lines the board holds, so the hidden column is the only one it
+can move.
 
 **Display tax** — the difference between a board's displayed coverage and its full coverage, in writes. R232 registered
 it at four writes on the contract and measured **+47**, which is impossible for a cut to cause; the round's attribution
@@ -2967,7 +2971,19 @@ hidden instead of 14.
 carries it (`other`), so a product's shipped level and a candidate's are two numbers from one board rather than two
 measurements: 463 against 463 for the contract, 622 against 632 for the clause board.
 
-**Fold (one line per family)** — the rendering rule R234 registers: of the open items, keep the first of each family.
-It targets repetition rather than breadth — one retail block holds nine `address` asks because the user restated an
-obligation across nine turns — and it is the successor to the ordering because the four writes the ordering could not
-lift sit behind nine to thirty-nine open asks of *other* families, not behind settled ones.
+**Fold (one line per family)** — the rendering rule R234 measures: keep the first item of each family in the order the
+board already has, and let the repetition follow. A stable two-bucket partition of the item list, applied **after** the
+order and **before** the cut, so it removes nothing and settles nothing. It targets repetition rather than breadth — one
+retail block holds nine `address` asks because the user restated an obligation across nine turns — and it closed the
+rendering axis: **636 of 636 reached writes shown, 0 hidden, 8.10 items a call**, replicated at 621 of 621.
+
+**Reachable set** — the required writes whose family the moment board holds at any line, whatever the cap. It is the
+**ceiling** of every content-free rendering rule, because a rule can reorder or fold the lines it is given and cannot
+invent one: **636** of 654 on the retail grid, so **97.2%** is the highest displayed coverage any renderer can reach
+there, and a bar above it is unsatisfiable by construction (R234's B1 registered 645, AUDIT 34.331). The complement is
+what the parser never produced: 15 `modify`, 2 `transfer`, 1 `exchange`, three of them on a block with no item at all.
+
+**Unfolded level** — the contract board's displayed coverage measured **without** the round's rendering rule. It is the
+floor a fold must not cost the shipped board, and it is measured rather than derived: taking the floor from the folded
+board itself would be the treatment supplying its own baseline, which is the defect AUDIT 34.329 caught with a constant
+from another grid. **463** on the retail control grid, **443** on the replication.

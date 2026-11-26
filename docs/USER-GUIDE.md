@@ -7718,3 +7718,45 @@ python3 eval/tools/read_anchor.py --document control.json --replicate front.json
 # B2 contract   holds (463 shown against a floor of 463, tax +47, 463 reached without the cut)
 # B3 hidden     holds (4 of 636 reached write(s) hidden on clause, 0.6%, against a bar of 0.01)
 ```
+
+### 32.90 If your block keeps saying the same thing, fold it — and then check whether the rest was ever stated
+
+The symptom is not a wrong item, it is a **long block with one item in it**. A user restates an obligation across
+several turns ("cancel #W1… and #W2… as well, and #W3 too"), your parser records each statement, and your renderer
+spends its eight lines on one family while a second obligation waits at line nine. You can see it before you measure
+anything: sort your block by family and count.
+
+The rule:
+
+    one line per family — the first item of each family, in the order the block already has them, then the repetition
+
+It is a two-bucket stable partition of a list you have already built. It removes nothing, settles nothing, and does not
+change how many items your board holds; it only decides which of them the first `limit` lines spend themselves on. On
+this project's retail corpus it moved the block from 632 of 654 graded writes shown to **636**, and from 4 hidden to
+**0**, at the same 8.10 items a call.
+
+Three things to know before you rely on it.
+
+**1. Fold after the order, before the cut.** If you fold first you change which items the order partitions; if you fold
+after the cut you change nothing, because the eight lines have already been chosen. The pipeline is *order → fold →
+cut*, and each step is a pure function of the item list, so you can hold two of the three fixed and attribute the
+difference to the third.
+
+**2. A fold cannot show what your board never held.** This is the part that looks like a bug and is not. Of the 654
+writes this corpus grades, 636 had a family on the block at the call and 18 did not: 15 `modify`, 2 `transfer`, 1
+`exchange`. Three of the eighteen sat on a block with no item at all. The fold shows all 636 and none of the 18, and the
+correct reading of that is **not** "the fold failed" — it is "your parser never produced those asks". If you set a
+display target above your own board's reach you will fail a rule that is already perfect, which is exactly what this
+project's R234 registration did (645 against a ceiling of 636).
+
+**3. Measure the ceiling and the floor separately, and take the floor from outside the change.** The number a fold must
+not cost is the shipped board's level *measured without the fold* — 463 here. If you take it from the folded board you
+are asking the treatment to supply its own baseline, and it will always agree with itself. The instrument carries the
+three columns for this reason: `reached` (the ceiling), `displayed` (what survived the cut) and `unfolded` (the contract
+without the round's rule).
+
+**What the fold is worth in a product.** Nothing yet, and that is not a hedge. The shipped contract board holds 2.41
+items a call — one line per obligation already — so there is nothing to fold. The rule matters on the day a board with
+repetition on it is served, which is a different decision (an accuracy dispatch, not a rendering one). Folding a board
+that does not repeat is free and invisible; that is why it can be adopted on the rendering alone and why adopting it is
+not the same as shipping it.

@@ -1055,7 +1055,7 @@
   {
    "id": "R234",
    "title": "one line per family: the block that fills its window with repetition",
-   "status": "registered",
+   "status": "read",
    "dispatchBy": "2026-12-29T12:00:00Z",
    "prereg": "prereg/R234-one-line.md",
    "instrument": "python3 eval/tools/read_anchor.py --document <grid>/control.json --replicate <grid>/front.json --scope grouped",
@@ -1069,7 +1069,28 @@
     "R233"
    ],
    "why": "R233 removed ten of the fourteen hidden writes and left four, and all four are the same shape: a `modify` ask behind nine to thirty-nine **open** asks of other families, in one case nine of them `address`. The cap is binding on openness rather than on settlement, and the material filling it is repetition - one family stated six times because the user restated it. A block that shows one line per family is the same block with the duplicates folded, which is a rendering rule like R233's and costs nothing to price.",
-   "bar": "registered in prereg/R234-one-line.md before the reading; not yet read"
+   "bar": "registered in prereg/R234-one-line.md before the reading: the clause board shows an open ask for at least 645 of 654 required writes (98.6%), the contract's grouped level is at least its own statement-order level measured without the fold (463 on the control grid), and at most 3 of the 636 writes the clause board reaches may be hidden (0.5%)",
+   "readAt": "2026-11-27T01:20:00Z",
+   "outcome": "TWO OF THREE, AND THE FAILURE IS THE RESULT. `one line per family` shows an open ask for 636 of 654 required writes - every write the board reaches - and hides none, against R233's 632 shown and 4 hidden; it adds no item (8.10 a call, unchanged) and costs the shipped board nothing (463 shown against the 463 its own statement order measured without the fold). B2 and B3 hold; B1 fails by nine writes (636/654 = 97.2% against a bar of 98.6%) for a reason the registration could not have anticipated and should have: B1's 645 was registered ABOVE the 636 the predecessor had already measured as the reachable set, and a rendering rule cannot display a write whose family the moment board never held. The fold's own column is therefore at its ceiling - 636 of 636 reached, 0.0% hidden, replicated at 621 of 621 - and the residual 18 writes (2.75%) are 15 `modify`, 2 `transfer` and 1 `exchange` whose families are simply absent from the block, four of them on a block with no open ask at all and none on a block with more than three open families. So the rendering axis closes here, by a sharper argument than the one registered: no ordering, fold or cap can show an ask the board does not hold, and the material that is left belongs to admission - which is the dispatch R235 prices at ¥34. The three rendering rounds cost ¥0 between them and moved 622 to 636 shown and 14 to 0 hidden."
+  },
+  {
+   "id": "R235",
+   "title": "the clause rule's accuracy dispatch: does 31.8 more points of covered writes buy a task",
+   "status": "registered",
+   "dispatchBy": "2026-12-05T12:00:00Z",
+   "prereg": "prereg/R235-clause-accuracy.md",
+   "instrument": "the tau2 retail grid, two arms over 114 tasks at four attempts each; read with eval/tools/resolution.py for its MDE and with eval/tools/read_anchor.py --scope grouped on the dispatched transcripts for its mechanism",
+   "arms": [
+    "board",
+    "clause"
+   ],
+   "episodes": 912,
+   "estimateUsd": 5.02,
+   "dependsOn": [
+    "R234"
+   ],
+   "why": "Four rounds were read on a board no model was shown. R231 established where the requirement lives (95.4% coverage against the contract's 63.6%), R232 measured the block the product renders, R233 and R234 closed the rendering axis at zero hidden writes - all for ¥0 and none with a token spent. What no round has measured is whether an agent that reads a live ask for 31.8 more points of the graded writes succeeds more often. The grid's own resolution, computed for ¥0, says a pair of 456-episode arms can see 6.72pp and that the domain's floor is 3.21pp at unlimited attempts, so the round is armed at four attempts for ¥36 and cannot resolve anything smaller than the floor at any price on 114 tasks.",
+   "bar": "registered in prereg/R235-clause-accuracy.md before any dispatch: B1 the clause arm is not below the contract arm by more than 3.21pp (the domain's floor); B2 a positive delta must reach 6.72pp, the grid's MDE at four attempts, or it is reported UNRESOLVED rather than as a win; B3 on at least 95% of served blocks the clause arm carries an open ask of the family the episode later writes, measured on the dispatched transcripts"
   }
  ]
 }

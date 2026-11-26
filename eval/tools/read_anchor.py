@@ -153,6 +153,17 @@ ORDER_HIDDEN = 0.01
 #: pure functions of the item list, so the difference between two readings is the order and nothing else.
 ORDERS = ("statement", "open")
 
+#: R234's three bars, registered in `prereg/R234-one-line.md` before the reading. The coverage bar is written there as
+#: **645 of 654** — the 97.0% bar plus the four residual writes plus three more — and 645/654 = 0.98624, so the rate
+#: below is the same sentence with the corpus's denominator baked in. The hidden bar is a twentieth of R233's, because a
+#: fold that still hides four writes has not folded the thing the round was registered about. The third bar is the one
+#: that is not a number of this round at all: **463**, R233's measured statement-order level for the contract on the
+#: control grid, pinned here as an absolute because the round after a floor-at-its-own-level can only be judged against
+#: the level the previous round measured, not against a second measurement of the same board under the new rule.
+GROUP_COVERAGE = 0.986
+GROUP_HIDDEN = 0.005
+GROUP_FLOOR = 463
+
 
 def _siblings() -> str:
     """Put this file's own directory on `sys.path`, and answer it.
@@ -494,8 +505,34 @@ def board(entry: dict, scope: str = "strict") -> dict:
     }
 
 
+def _fold(items: list) -> list:
+    """R234's rendering rule: one line per family, in the order the families were first stated.
+
+    A stable two-bucket partition of the item list and nothing else. The first bucket is the first item of each
+    family, the second is every other item, both in the order they arrived — so the rule's only input is a field every
+    ask board already carries, and its only effect on the board is which of two positions an item occupies. Nothing is
+    removed, nothing is settled, and `itemsAll` is untouched: the block the agent reads has the same lines in it, it
+    spends its first eight on distinct obligations instead of on nine restatements of one.
+
+    The rule is applied **after** the order and **before** the cut, which is the only place it can be applied without
+    becoming a different rule. Before the order it would decide which items the partition sees; after the cut it would
+    decide nothing at all, because the eight lines would already have been chosen.
+    """
+    firsts: list = []
+    repetition: list = []
+    seen: set = set()
+    for item in items:
+        family = item.get("family")
+        if family in seen:
+            repetition.append(item)
+        else:
+            seen.add(family)
+            firsts.append(item)
+    return firsts + repetition
+
+
 def ask_board(entry: dict, messages, scope: str = "request", cap=None, later: bool = True,
-              order: str = "statement") -> dict:
+              order: str = "statement", fold: bool = False) -> dict:
     """R229's rule: an item is an **ask**, and the read supplies only the binding.
 
     R228 measured the two anchors' failures as a trade rather than as a deficit: the request board attributes 63.6% of
@@ -603,6 +640,10 @@ def ask_board(entry: dict, messages, scope: str = "request", cap=None, later: bo
     # arrangement — which is what makes the round's difference attributable to the order alone.
     if order == "open":
         items = [item for item in items if not item["settled"]] + [item for item in items if item["settled"]]
+    # R234: the fold, between the order and the cut, and last for the reason it is documented in `_fold` — the rule
+    # chooses among positions, so it must see the arrangement the product would ship and must not see the window.
+    if fold:
+        items = _fold(items)
     # R232: the block is rendered as `items[:CAP]`. The cut is applied last and to the **items only** — a settled ask
     # below the fold is still settled, so the credited, unaccounted and unbound columns are properties of the rule and
     # not of the window. `itemsAll` keeps the uncut count so that a reading can say how much of the board the cut hid.
@@ -671,7 +712,8 @@ def discharge(writes: list, required: list) -> dict:
     return {"byPosition": matched, "discharged": len(matched), "unmatched": len(required) - len(matched)}
 
 
-def moment(entry: dict, messages, upto: int, scope: str, order: str = "statement") -> dict:
+def moment(entry: dict, messages, upto: int, scope: str, order: str = "statement",
+           fold: bool = False) -> dict:
     """The block as the product served it **before the assistant message at `upto`**, uncut.
 
     Two cuts, and both are the point. The **messages** end before the message that carries the call, because a block is
@@ -685,10 +727,12 @@ def moment(entry: dict, messages, upto: int, scope: str, order: str = "statement
     not read yet, and a moment board that consults them is not a measurement of the moment.
     """
     stop = bisect.bisect_left(entry["at"], upto)
-    return ask_board({**entry, "events": entry["events"][:stop]}, messages[:upto], scope, later=False, order=order)
+    return ask_board({**entry, "events": entry["events"][:stop]}, messages[:upto], scope, later=False, order=order,
+                     fold=fold)
 
 
-def visibility(entry: dict, messages, done: dict, scope: str, cap: int = CAP, order: str = "statement") -> dict:
+def visibility(entry: dict, messages, done: dict, scope: str, cap: int = CAP, order: str = "statement",
+               fold: bool = False) -> dict:
     """Of the writes the evaluator requires, how many had an open ask of their family **on the rendered block**.
 
     Every board this lane has measured so far is a property of the finished transcript. This one is a property of the
@@ -715,7 +759,7 @@ def visibility(entry: dict, messages, done: dict, scope: str, cap: int = CAP, or
             # economy: two calls in one message are answered by one block, and a recomputation could only disagree.
             # Built once and read in both orders, because the order is a partition of the same list: R233's comparison
             # is two windows on one board, and a second board would be a second measurement of something else.
-            board = cache[upto] = moment(entry, messages, upto, scope)
+            board = cache[upto] = moment(entry, messages, upto, scope, fold=fold)
         family = entry["writes"][position].get("family")
         open_items = [item for item in board["items"] if not item["settled"]]
         if not any(item["family"] == family for item in open_items):
@@ -746,7 +790,8 @@ def visibility(entry: dict, messages, done: dict, scope: str, cap: int = CAP, or
     }
 
 
-def episode(document_task, simulation: dict, display: bool = False, order: str = "statement") -> dict:
+def episode(document_task, simulation: dict, display: bool = False, order: str = "statement",
+            fold: bool = False) -> dict:
     """One episode, read three ways: the read board at both scopes and the request board.
 
     Returned as raw counts rather than rates so that the aggregation can pair episodes and report an interval over the
@@ -868,7 +913,15 @@ def episode(document_task, simulation: dict, display: bool = False, order: str =
         # R232: the two boards the round compares, each measured at the moment of every graded write. Keyed by the
         # admission rule rather than by the cap, because the cap is a property of the rendering and the round compares
         # two rules under one rendering. The order travels the same way, so R233's reading is R232's with one argument.
-        out["display"] = {scope: visibility(entry, messages, done, scope, order=order) for scope in DISPLAY_SCOPES}
+        out["display"] = {scope: visibility(entry, messages, done, scope, order=order, fold=fold)
+                          for scope in DISPLAY_SCOPES}
+        if fold:
+            # R234's third number: the contract board **as R232 measured it**, before this round's rule. A fold can
+            # only be asked whether it cost the shipped board if the shipped board's level was taken by something
+            # other than the fold, so it is measured here, uncut by the round, and it is the only extra board a
+            # grouped reading builds. Without it the floor would be the folded board's own other window, which is the
+            # treatment judging itself — AUDIT 34.329's defect with a different constant.
+            out["unfolded"] = visibility(entry, messages, done, "request")["displayed"]
     return out
 
 
@@ -888,7 +941,9 @@ def compare(document: dict, scope: str = "strict") -> dict:
             skipped += 1
             continue
         row = episode(tasks.get(str(simulation.get("task_id"))), simulation,
-                      display=scope in ("displayed", "ordered"), order="open" if scope == "ordered" else "statement")
+                      display=scope in ("displayed", "ordered", "grouped"),
+                      order="open" if scope in ("ordered", "grouped") else "statement",
+                      fold=scope == "grouped")
         rows.append(row)
     graded = [row for row in rows if row["discharged"]]
     summary: dict = {
@@ -951,7 +1006,7 @@ def compare(document: dict, scope: str = "strict") -> dict:
     # R232 reads a rendering, not a rule: the round's comparison is `request` against `clause` under one cap, so the
     # paired columns are taken against the rule whose coverage the round is asking about — R231's — and the displayed
     # columns carry the rendering. Taking `request` against itself would report a delta of zero and call it a reading.
-    measured = "clause" if scope in ("displayed", "ordered") else scope
+    measured = "clause" if scope in ("displayed", "ordered", "grouped") else scope
     chosen = summary["boards"][measured]
     requested = summary["boards"]["request"]
     summary["paired"] = {
@@ -972,7 +1027,7 @@ def compare(document: dict, scope: str = "strict") -> dict:
             and row["boards"]["request"]["covered"] == row["discharged"]
         ),
     }
-    if scope in ("displayed", "ordered"):
+    if scope in ("displayed", "ordered", "grouped"):
         graded_display = [row for row in graded if row.get("display")]
         summary["display"] = {
             name: {
@@ -987,8 +1042,15 @@ def compare(document: dict, scope: str = "strict") -> dict:
             one["itemsPerCall"] = (
                 sum(row["display"][name]["itemsPerCall"] or 0.0 for row in graded_display) / len(graded_display)
             ) if graded_display else None
+        if scope == "grouped":
+            # The floor is the contract's statement-order level **without** the round's rule, summed over the same
+            # episodes. It is a per-grid number rather than the constant 463 because the replication grid's contract
+            # board is 443 — the registered 463 is what that sentence means on the control grid, and pinning it as a
+            # constant would fail a correct fold on the second grid for being a different grid.
+            summary["unfolded"] = sum(row["unfolded"] for row in graded_display)
         summary["bar"] = (
-            display_bar(summary, ORDER_COVERAGE, ORDER_HIDDEN, floor=True) if scope == "ordered"
+            display_bar(summary, GROUP_COVERAGE, GROUP_HIDDEN, floor=summary["unfolded"]) if scope == "grouped"
+            else display_bar(summary, ORDER_COVERAGE, ORDER_HIDDEN, floor=True) if scope == "ordered"
             else display_bar(summary)
         )
     elif scope == "admitted":
@@ -1187,6 +1249,11 @@ def display_bar(summary: dict, coverage: float = DISPLAY_COVERAGE, hidden: float
     B2 is evaluated on the scope B1 selected, and the selection is by **displayed writes** rather than by the hidden
     share: the rule the round would ship is the one that survives the cut with more of the evaluator's writes, and a
     scope cannot qualify for the visibility test by showing fewer of them.
+
+    `floor` selects the third bar's shape. `None` is R232's tolerance around the contract's difference; `True` is
+    R233's floor at the contract board's own other window on the same measurement; a number is R234's floor at a level
+    measured by a previous round, which is the only way a rendering rule can be asked whether it cost the board it
+    renders.
     """
     display = summary.get("display") or {}
     if not display:
@@ -1209,8 +1276,11 @@ def display_bar(summary: dict, coverage: float = DISPLAY_COVERAGE, hidden: float
     # moved the contract, and a tolerance around a difference is the right shape for that — it was the reference, not
     # the shape, that was wrong. R233 asks whether an *ordering* cost the contract anything, and the right shape for
     # that is a floor at the level the previous reading measured: an ordering can only be judged against the board it
-    # reorders, and a tolerance around zero would let it lose three writes without a finding.
-    base = display["request"]["other"]
+    # reorders, and a tolerance around zero would let it lose three writes without a finding. R234 asks the same
+    # question of a *fold*, but the floor is a number rather than `True`: the level a fold must not fall below was
+    # measured **before the fold existed** (R233's 463), so re-deriving it from the folded board would be measuring the
+    # treatment's own baseline — the defect AUDIT 34.329 caught when a floor was taken from another grid's constant.
+    base = display["request"]["other"] if floor is True else floor
     b3 = (display["request"]["displayed"] >= base) if floor is not None else (abs(difference) <= tax)
     hiddenTest = {
         "holds": b2,
@@ -1273,7 +1343,7 @@ def render(reading: dict, scope: str = "strict") -> str:
     # R232 reads a rendering: its chosen board is R231's, because the round's claim is about *that* rule's coverage and
     # the displayed columns carry the cut. `boards["displayed"]` does not exist and never will — a rendering is not a
     # board, and pretending otherwise would put a column in the table that no transcript can produce.
-    chosen = boards["clause" if scope in ("displayed", "ordered") else scope]
+    chosen = boards["clause" if scope in ("displayed", "ordered", "grouped") else scope]
     requested = boards["request"]
     paired = reading["paired"]
     bar = reading["bar"]
@@ -1332,7 +1402,7 @@ def render(reading: dict, scope: str = "strict") -> str:
             return (
                 f"{letter} hidden     {'holds' if one['holds'] else 'FAILS'} "
                 f"({one['hidden']} of {one['reached']} reached write(s) hidden on {scope_name}, "
-                f"{share(one['hiddenShare'])}, against a bar of {one['bar']:.2f}"
+                f"{share(one['hiddenShare'])}, against a bar of {one['bar']:g}"
                 f"{'' if one['passed'] else '; no scope cleared the coverage bar, so this is the best one'})"
             )
 
@@ -1556,6 +1626,11 @@ def check_manifest(reading: dict) -> list:
                 problems.append("B2 contract: the tax is not the contract's shown writes less its full coverage")
             if contract["holds"] != (display["request"]["displayed"] >= contract["floor"]):
                 problems.append("B2 contract: holds disagrees with the floor")
+            if reading.get("unfolded") is not None and contract["floor"] != reading["unfolded"]:
+                # A floor pinned as a number is the one bar in this lane a reader cannot re-derive from the board it
+                # is printed beside, so it is checked against the column it was measured from. R234's floor is the
+                # contract's level **before** the fold; a reading whose floor is not that measurement is a hand edit.
+                problems.append("B2 contract: the floor is not the contract's unfolded level")
         # Indexed rather than guarded: both registrations carry one, under one name or the other, so a bar without a
         # hidden test would be a bar this checker has never been given — and the KeyError says so where a silent
         # `if` would have reported a reading that adds up.
@@ -2530,6 +2605,102 @@ def self_test() -> int:
               quiet(["--document", path, "--scope", "ordered", "--save", saved_path]) == 0)
         check("and its reading adds up", quiet(["--check", saved_path]) == 0)
 
+    # R234. The fold, on a fixture where repetition starves a window by construction: three asks of one family and a
+    # fourth of another, inside a two-line block. The clause board holds them in the order they were stated, so the
+    # second line is another `cancel` and the `address` ask — the one the graded write needs — is third.
+    restated_address = [
+        {"role": "user", "content": "Please cancel my order #W1234567."},
+        _call("get_order_details", order_id="#W1234567"),
+        _result(order),
+        _call("cancel_pending_order", order_id="#W1234567", reason="customer asked"),
+        _result("{}"),
+        {"role": "assistant", "content": "Cancelled. Anything else?"},
+        {"role": "user", "content": "Please cancel order #W2222222 as well, and change my address to 1 Main St, "
+                                    "Chicago 60614."},
+        _call("get_user_details", user_id="mia_garcia_4516"),
+        _result(f'{{"user_id": "mia_garcia_4516", "orders": ["#W7654321", "#W2222222", "#W3333333"]}}'),
+        _call("modify_user_address", user_id="mia_garcia_4516", address1="1 Main St", city="Chicago", zip="60614"),
+        _result("{}"),
+    ]
+    restated_entry = ledger(restated_address)
+    restated_board = moment(restated_entry, restated_address, 9, "clause")
+    folded_board = moment(restated_entry, restated_address, 9, "clause", fold=True)
+    check("the restated block holds the same families in statement order",
+          [item["family"] for item in restated_board["items"]] == ["cancel", "cancel", "address"])
+    check("and the fold moves the second family's first line ahead of the repetition",
+          [item["family"] for item in folded_board["items"]] == ["cancel", "address", "cancel"])
+    check("the fold removes nothing and settles nothing",
+          (folded_board["itemsAll"], folded_board["credited"], folded_board["unaccounted"])
+          == (restated_board["itemsAll"], restated_board["credited"], restated_board["unaccounted"]))
+    check("a family the block never held is not invented by the fold",
+          _fold([]) == [] and _fold([{"family": "cancel"}]) == [{"family": "cancel"}])
+    restated_task = {"id": "9", "evaluation_criteria": {"actions": [
+        {"name": "modify_user_address", "arguments": {"user_id": "mia_garcia_4516"}}]}}
+    restated_done = discharge(restated_entry["writes"], required_writes(restated_task))
+    tight_statement = visibility(restated_entry, restated_address, restated_done, "clause", cap=2)
+    tight_folded = visibility(restated_entry, restated_address, restated_done, "clause", cap=2, fold=True)
+    check("under the shipped order two lines go to one obligation and the other is hidden",
+          (tight_statement["reached"], tight_statement["displayed"], tight_statement["hidden"]) == (1, 0, 1))
+    check("under the fold one line is enough for the family stated twice, and the write is shown",
+          (tight_folded["reached"], tight_folded["displayed"], tight_folded["hidden"]) == (1, 1, 0))
+    check("and the reach is unchanged, because the fold moves lines rather than adding them",
+          tight_folded["reached"] == tight_statement["reached"])
+    # The grouped reading, end to end, and the one number that makes its third bar a bar: the floor is the contract's
+    # statement-order level measured **without** the fold. On this fixture the contract board never held the address
+    # family, so its own level is zero and the floor is zero — a pass that says the fold cost a board it never touched.
+    grouped_grid = compare({"tasks": [restated_task],
+                            "simulations": [{"id": "s", "task_id": "9", "messages": restated_address}]}, "grouped")
+    check("the grouped reading adds up", check_manifest(grouped_grid) == [])
+    check("the floor is the unfolded contract level, not the folded one",
+          grouped_grid["unfolded"] == grouped_grid["display"]["request"]["displayed"] == 0)
+    check("and the contract bar is evaluated against it",
+          grouped_grid["bar"]["B2_contract"]["floor"] == 0
+          and grouped_grid["bar"]["B2_contract"]["holds"] is True)
+    grouped_text = render(grouped_grid, "grouped")
+    for name in ("B1 displayed", "B2 contract", "B3 hidden"):
+        check(f"the grouped reading prints its bar line ({name})", name in grouped_text)
+    # The bars at their registered thresholds, on summaries built the way `compare` builds them. The coverage bar is
+    # 645 of 654 and the hidden bar 3 of 636: both are written as counts in the registration, so both are tested at the
+    # write either side of the line rather than at a rate that happens to divide evenly.
+    check("a folded scope at 645 of 654 holds the coverage bar",
+          display_bar(display_summary(654, (463, 463), (636, 645), 416), GROUP_COVERAGE, GROUP_HIDDEN,
+                      floor=463)["B1_displayed"]["holds"] is True)
+    check("and one write under it fails",
+          display_bar(display_summary(654, (463, 463), (636, 644), 416), GROUP_COVERAGE, GROUP_HIDDEN,
+                      floor=463)["B1_displayed"]["holds"] is False)
+    check("three hidden writes of 636 hold the hidden bar",
+          display_bar(display_summary(654, (463, 463), (636, 633), 416), GROUP_COVERAGE, GROUP_HIDDEN,
+                      floor=463)["B3_hidden"]["holds"] is True)
+    check("and four fail it",
+          display_bar(display_summary(654, (463, 463), (636, 632), 416), GROUP_COVERAGE, GROUP_HIDDEN,
+                      floor=463)["B3_hidden"]["holds"] is False)
+    check("a contract exactly at the pinned floor holds",
+          display_bar(display_summary(654, (463, 463), (636, 636), 416), GROUP_COVERAGE, GROUP_HIDDEN,
+                      floor=463)["B2_contract"]["holds"] is True)
+    check("and one write under it fails, which is the only way this bar can fail",
+          display_bar(display_summary(654, (463, 462), (636, 636), 416), GROUP_COVERAGE, GROUP_HIDDEN,
+                      floor=463)["B2_contract"]["holds"] is False)
+    # A floor pinned as a number is checked as a number: the checker has to read `floor` rather than re-derive it from
+    # a window on the same board, or a saved reading could claim a floor its own displayed column contradicts.
+    doctored = json.loads(json.dumps(grouped_grid))
+    doctored["bar"]["B2_contract"]["floor"] = 5
+    check("a grouped reading whose floor its own column contradicts is caught", check_manifest(doctored) != [])
+    # …and the subtler edit: a floor under the column, where `holds` is still truthful about the comparison it reports
+    # but the number is no longer the measurement. Only the equality against `unfolded` can see that one.
+    lowered = json.loads(json.dumps(grouped_grid))
+    lowered["bar"]["B2_contract"]["floor"] = -1
+    check("a grouped reading whose floor is not the unfolded level is caught even when it holds",
+          check_manifest(lowered) != [])
+    with tempfile.TemporaryDirectory() as temporary:
+        path = os.path.join(temporary, "grouped-doc.json")
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump({"tasks": [restated_task],
+                       "simulations": [{"id": "s", "task_id": "9", "messages": restated_address}]}, handle)
+        saved_path = os.path.join(temporary, "grouped.json")
+        check("the grouped scope runs from the command line",
+              quiet(["--document", path, "--scope", "grouped", "--save", saved_path]) == 0)
+        check("and its reading adds up", quiet(["--check", saved_path]) == 0)
+
     check("the reporter on an empty list exits zero", quiet_report([]) == 0)
     check("the reporter on a failure exits one", quiet_report(["negative control (must fail)"]) == 1)
     return _report(failed)
@@ -2542,8 +2713,9 @@ def main(argv: list) -> int:
     parser.add_argument(
         "--scope",
         default="strict",
-        choices=("strict", "loose", "ask", "admitted", "clause", "displayed", "ordered"),
-        help="which board the bars are evaluated over; `displayed` measures the rendered block, `ordered` reorders it",
+        choices=("strict", "loose", "ask", "admitted", "clause", "displayed", "ordered", "grouped"),
+        help="which board the bars are evaluated over; `displayed` measures the rendered block, `ordered` reorders it, "
+             "`grouped` folds it to one line per family",
     )
     parser.add_argument("--bar", action="store_true", help="exit non-zero when a registered bar fails")
     parser.add_argument("--save", default="", help="write the reading to this path, for the documents to quote")
