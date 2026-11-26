@@ -95,6 +95,22 @@ SOUNDNESS = 0.90
 #: method and is also a lower-case word with digits after it.
 USER = re.compile(r"^[a-z][a-z_]*_\d{4}$")
 
+#: R230's admission test, and it is one character. A turn that answers a question is a value filling a slot the agent
+#: asked for; a turn that follows a statement or a tool call is the user volunteering. Nothing about the domain, no cue
+#: list, no model call — which is the point: the round asks whether **turn structure** carries the distinction, so the
+#: test must not be able to smuggle in a second discriminator.
+QUESTION = "?"
+
+#: R230's three bars, registered in `prereg/R230-not-an-answer.md` before the reading and constants here for the reason
+#: `SOUNDNESS` is one: the number a reading was judged against is not a local in a function.
+#: **Recovery** — of the writes R229 attributed to later-turn asks, how many the admitted turns still account for.
+ADMIT_RECOVERY = 0.60
+#: **Noise** — the admitted asks may not exceed twice the turn-one contract's items.
+ADMIT_NOISE = 2.0
+#: **Coverage** — ten points over the request board's 63.6%, registered as the absolute number so a later round that
+#: moves the request board does not move this bar with it.
+ADMIT_COVERAGE = 0.736
+
 
 def _siblings() -> str:
     """Put this file's own directory on `sys.path`, and answer it.
@@ -228,6 +244,79 @@ def _user_in(text: str) -> str:
     return match.group(1) if match else ""
 
 
+def admitted_asks(messages) -> dict:
+    """R230's reading of the conversation: every user turn, less the ones a question asked for.
+
+    R229 measured the cost of following every user turn at 4,761 items for 625 credited writes — 3.90 unneeded open
+    items per episode — and named the mechanism: the simulator's *answers* carry cue words ("the mechanical keyboard",
+    "box", "manuals") and the parser reads them as asks. The refinement it could not make is lexical. This one is not:
+    a turn is read when the assistant turn before it did not ask the user a question.
+
+    Three edges, and each is a decision rather than an accident:
+
+    * **The first user turn is always read.** Not because the contract is always there — `request_of` reads the first
+      turn that states an ask, which is turn three or later on 52 of 403 episodes (AUDIT 34.324) — but because a rule
+      that can drop the opening turn can return an empty board, and an empty board is a rule with nothing to measure.
+      The contract's own turn is reported separately, as `contract`, precisely so this bullet cannot be read as a claim
+      that the two coincide.
+    * **A user turn with no assistant turn between it and the previous user turn is read.** There was no question to
+      answer, and `last` is reset on every user turn so a question asked three turns ago cannot gate the fourth.
+    * **An assistant turn carrying only tool calls carries no content**, so it asks nothing and the turn after it is
+      read. τ² writes the closing text as its own message, so this is the common shape and not a corner.
+
+    What it can get wrong is stated here because the round is decided by it: a **courtesy** question ("is there
+    anything else I can help you with?") is a question by this test, and if τ²'s simulator closes most turns that way
+    the filter removes volunteered turns along with answers. `skipped` is returned so that cost is visible as a count
+    rather than as a shortfall somebody has to infer.
+    """
+    module = _board()
+    asks: list = []
+    admitted: list = []
+    skipped: list = []
+    contract = None
+    seen = 0
+    last = ""
+    for message in messages:
+        role = module.role_of(message)
+        if role in ("assistant", "agent"):
+            content = module._field(message, "content")  # noqa: SLF001 - the board's own accessor
+            last = content if isinstance(content, str) else ""
+            continue
+        if role not in ("user", "human"):
+            continue
+        content = module._field(message, "content")  # noqa: SLF001
+        text = content if isinstance(content, str) else ""
+        position = seen
+        seen += 1
+        question = QUESTION in last
+        # Reset before the branch, not after it: the *next* turn's previous turn is this one, whatever this one was.
+        last = ""
+        if not text.strip():
+            # Nothing to read. Not a skip either — a turn that stated nothing is not a turn the filter refused, and
+            # counting it as one would inflate the cost of the rule with turns that had no content to lose.
+            continue
+        found = module.items_of(text)
+        if contract is None and found:
+            # R230's second mechanism, recorded because it is the one that explains a *loss*: `request_of` does not
+            # read turn one, it reads the first turn that **states anything** and falls back to the first turn only
+            # when none does. So the contract's turn can be turn three, and a filter that refuses turn three is a
+            # filter that refuses the contract itself — which is how admitting more turns can cover fewer writes.
+            contract = position
+        if position == 0 or not question:
+            admitted.append(position)
+            asks.extend(found)
+        else:
+            skipped.append(position)
+    return {
+        "asks": module._folded(asks),
+        "turns": seen,
+        "admitted": admitted,
+        "skipped": skipped,
+        "contract": contract,
+        "contractAdmitted": contract is None or contract in admitted,
+    }
+
+
 def board(entry: dict, scope: str = "strict") -> dict:
     """The read-anchored board: items are records opened, ticks are writes that touch them.
 
@@ -303,7 +392,18 @@ def ask_board(entry: dict, messages, scope: str = "request") -> dict:
     and it is the bar's third test.
     """
     module = _board()
-    asks = module.board_of(messages, module.CONVERSATION if scope == "conversation" else module.REQUEST)["items"]
+    if scope not in ("request", "conversation", "admitted"):
+        # Named rather than defaulted: an unknown scope used to fall through to the request board, which would make a
+        # typo on the command line a quiet re-run of the previous round.
+        raise ValueError(f"unknown ask scope {scope!r}")
+    admission = admitted_asks(messages) if scope == "admitted" else None
+    if admission is not None:
+        # R230. The asks come from the turns a question did not ask for; the binding is unchanged, so the difference
+        # between this board and `askAll` is exactly the admission rule and nothing else. The diagnostics travel with
+        # the board because the round's finding is the composition of the transcript, not the point it lands on.
+        asks = admission["asks"]
+    else:
+        asks = module.board_of(messages, module.CONVERSATION if scope == "conversation" else module.REQUEST)["items"]
     asks = [{"family": item["family"], "words": item["words"]} for item in asks]
     # R230's seed, taken here because it costs one more parse and decides what the next round is about: an ask the
     # board never read is not the same deficit as an ask it read and spent. `CONVERSATION` scope is the board's own
@@ -318,6 +418,7 @@ def ask_board(entry: dict, messages, scope: str = "request") -> dict:
     credited: list = []
     unaccounted: list = []
     unbound: list = []
+    by_position: dict = {}
     seen: set = set()
     for kind, payload in entry["events"]:
         if kind == "open" and payload:
@@ -342,11 +443,15 @@ def ask_board(entry: dict, messages, scope: str = "request") -> dict:
                 # in a later turn, which the board does not read; or it was stated and the episode wrote more than it
                 # asked for.
                 if family not in open_asks and family in later_families:
-                    unaccounted_by["disclosedLater"] += 1
+                    cause = "disclosedLater"
                 elif family in open_asks:
-                    unaccounted_by["consumed"] += 1
+                    cause = "consumed"
                 else:
-                    unaccounted_by["neverStated"] += 1
+                    cause = "neverStated"
+                unaccounted_by[cause] += 1
+                # …and which write it was, because R230's bar is recovery **of the writes** a later turn names: a
+                # counter can say how many there were and only a position can say whether this board now credits them.
+                by_position[payload] = cause
     items = [
         {
             "family": ask["family"],
@@ -364,6 +469,8 @@ def ask_board(entry: dict, messages, scope: str = "request") -> dict:
         "unbound": unbound,
         "open": [{"family": item["family"], "words": item["words"]} for item in items if not item["settled"]],
         "unaccountedBy": dict(unaccounted_by),
+        "unaccountedByPosition": by_position,
+        "admission": admission,
     }
 
 
@@ -440,16 +547,27 @@ def episode(document_task, simulation: dict) -> dict:
         "boards": {},
     }
     required_families = {want["family"] for want in required}
-    for scope in ("strict", "loose", "ask", "askAll"):
+    # Hoisted rather than read inside the loop: R230's recovery needs the ask board's per-write causes and the admitted
+    # board's credits, and reading them out of whichever loop entry happened to run first would make the measurement
+    # depend on the order of a tuple.
+    ask_found = ask_board(entry, messages)
+    late = ask_found.get("unaccountedByPosition") or {}
+    admitted_credit: set = set()
+    admission: dict = {}
+    for scope in ("strict", "loose", "ask", "askAll", "admitted"):
         if scope == "askAll":
             found = ask_board(entry, messages, "conversation")
+        elif scope == "admitted":
+            found = ask_board(entry, messages, "admitted")
+            admitted_credit = set(found["credited"])
+            admission = found["admission"] or {}
         elif scope == "ask":
-            found = ask_board(entry, messages)
+            found = ask_found
         else:
             found = board(entry, scope)
         covered = [position for position in found["credited"] if position in done["byPosition"]]
         opening = [item for item in found["items"] if not item["settled"]]
-        if scope in ("ask", "askAll"):
+        if scope in ("ask", "askAll", "admitted"):
             # An open ask is unneeded when no required write is of its family. Its *record* is whatever the episode
             # happened to bind, so the record test the two read boards use would say nothing here.
             unneeded = sum(1 for item in opening if item["family"] not in required_families)
@@ -491,6 +609,18 @@ def episode(document_task, simulation: dict) -> dict:
         "unattributedNamed": len(requested.get("unattributed") or []),
     }
     out["recordCarrying"] = len(record_carrying)
+    # R230. Recovery is measured per episode and on positions, so it is the same write on both sides of the
+    # comparison: the writes the turn-one contract could not account for *because a later turn states their family*,
+    # and how many of them the admitted board now credits. A rate aggregated here would pair a two-write episode with
+    # a nine-write one; the counts are summed in `compare` for the reason every other column is.
+    disclosed = [position for position, cause in late.items() if cause == "disclosedLater"]
+    out["lateWrites"] = len(disclosed)
+    out["recovered"] = sum(1 for position in disclosed if position in admitted_credit)
+    out["turns"] = admission.get("turns", 0)
+    out["admittedTurns"] = len(admission.get("admitted") or [])
+    out["skippedTurns"] = len(admission.get("skipped") or [])
+    out["contractLater"] = 1 if admission.get("contract") not in (None, 0) else 0
+    out["contractLost"] = 1 if admission and not admission.get("contractAdmitted") else 0
     return out
 
 
@@ -521,9 +651,16 @@ def compare(document: dict, scope: str = "strict") -> dict:
         "discharged": sum(row["discharged"] for row in rows),
         "dropped": sum(row["dropped"] for row in rows),
         "unknownTools": sorted({name for row in rows for name in row["unknown"]}),
+        "turns": sum(row["turns"] for row in graded),
+        "admittedTurns": sum(row["admittedTurns"] for row in graded),
+        "skippedTurns": sum(row["skippedTurns"] for row in graded),
+        "contractLater": sum(row["contractLater"] for row in graded),
+        "contractLost": sum(row["contractLost"] for row in graded),
+        "lateWrites": sum(row["lateWrites"] for row in graded),
+        "recovered": sum(row["recovered"] for row in graded),
         "boards": {},
     }
-    for name in ("strict", "loose", "ask", "askAll", "request"):
+    for name in ("strict", "loose", "ask", "askAll", "admitted", "request"):
         block = [row["boards"][name] for row in graded]
         covered = sum(one["covered"] for one in block)
         summary["boards"][name] = {
@@ -550,7 +687,7 @@ def compare(document: dict, scope: str = "strict") -> dict:
             "unaccountedBy": dict(sorted(collections.Counter(
                 {key: sum((one.get("unaccountedBy") or {}).get(key, 0) for one in block)
                  for key in ("disclosedLater", "consumed", "neverStated")}
-            ).items())) if name in ("ask", "askAll") else None,
+            ).items())) if name in ("ask", "askAll", "admitted") else None,
             # Of the calls this board ticked, the share the evaluator also requires. A tick that is not backed by a
             # graded write is the harm channel: the block saying done about work nobody asked for.
             "precision": (covered / sum(one["credited"] for one in block)) if sum(one["credited"] for one in block) else None,
@@ -575,7 +712,7 @@ def compare(document: dict, scope: str = "strict") -> dict:
             and row["boards"]["request"]["covered"] == row["discharged"]
         ),
     }
-    summary["bar"] = _bar(graded, summary, scope)
+    summary["bar"] = admit_bar(summary) if scope == "admitted" else _bar(graded, summary, scope)
     summary["tasksJudged"] = sum(1 for task in tasks.values() if required_writes(task))
     return summary
 
@@ -646,6 +783,52 @@ def _bar(graded: list, summary: dict, scope: str) -> dict:
     }
 
 
+def admit_bar(summary: dict) -> dict:
+    """R230's three bars, evaluated where the registration wrote them.
+
+    They are not R228's bars and cannot be: **B1 cannot be "at least the request board"**, because admitting a later
+    turn can only add asks, and adding asks can only add ticks — a bar the rule passes by being itself is the exact
+    defect AUDIT 34.321 refused last round. So B1 is written over the *writes the filter is supposed to rescue*: of the
+    calls R229 attributed to a later-turn ask, the share this board now accounts for. B2 prices the rescue in items.
+    B3 says the rescue has to be worth having, which is the one bar a filter that keeps only what it already had cannot
+    satisfy.
+
+    A summary with no later-turn write is refused rather than passed: a grid where the question never arises is a grid
+    the bar was not tested on, and this lane has read absence-as-zero six times.
+    """
+    chosen = summary["boards"]["admitted"]
+    requested = summary["boards"]["request"]
+    if not summary["lateWrites"]:
+        return {"holds": False, "reason": "no write was attributed to a later turn, so recovery cannot be evaluated"}
+    recovery = summary["recovered"] / summary["lateWrites"]
+    noise = ADMIT_NOISE * requested["items"]
+    b1 = recovery >= ADMIT_RECOVERY
+    b2 = chosen["items"] <= noise
+    b3 = (chosen["coverage"] or 0.0) >= ADMIT_COVERAGE
+    return {
+        "B1_recovery": {
+            "holds": b1,
+            "recovered": summary["recovered"],
+            "against": summary["lateWrites"],
+            "recovery": recovery,
+            "bar": ADMIT_RECOVERY,
+        },
+        "B2_noise": {
+            "holds": b2,
+            "items": chosen["items"],
+            "against": noise,
+            "requestItems": requested["items"],
+        },
+        "B3_coverage": {
+            "holds": b3,
+            "coverage": chosen["coverage"],
+            "bar": ADMIT_COVERAGE,
+            "againstRequest": requested["coverage"],
+        },
+        "holds": b1 and b2 and b3,
+    }
+
+
 def render(reading: dict, scope: str = "strict") -> str:
     """The reading as sentences, in the order the bars are written.
 
@@ -654,6 +837,9 @@ def render(reading: dict, scope: str = "strict") -> str:
     """
     def share(value) -> str:
         return "n/a" if value is None else f"{value:.1%}"
+
+    def signed(value) -> str:
+        return "n/a" if value is None else f"{value:+.1%}"
 
     boards = reading["boards"]
     chosen = boards[scope]
@@ -667,7 +853,7 @@ def render(reading: dict, scope: str = "strict") -> str:
         f"{'board':9s} {'covered':>7s} {'coverage':>8s} {'complete':>8s} {'unacc':>6s} {'over':>5s} "
         f"{'items':>6s} {'open':>5s} {'unneeded':>8s} {'precision':>9s}",
     ]
-    for name in ("strict", "loose", "ask", "askAll", "request"):
+    for name in ("strict", "loose", "ask", "askAll", "admitted", "request"):
         one = boards[name]
         lines.append(
             f"{name:9s} {one['covered']:7d} {share(one['coverage']):>8s} {one['complete']:8d} "
@@ -675,30 +861,59 @@ def render(reading: dict, scope: str = "strict") -> str:
             f"{one['openUnneeded']:8d} {share(one['precision']):>9s}"
         )
     lines.append(
-        f"coverage delta {paired['coverageDelta']:+.1%} against the request board; "
+        f"coverage delta {signed(paired['coverageDelta'])} against the request board; "
         f"episodes complete gained {paired['episodesCompleteGained']}, lost {paired['episodesCompleteLost']}"
     )
-    lines.append(
-        f"B1 settlement  {'holds' if bar['B1_settlement']['holds'] else 'FAILS'} "
-        f"({chosen['covered']} vs {requested['covered']} covered, {chosen['complete']} vs {requested['complete']} "
-        f"episodes complete)"
-    )
-    lines.append(
-        f"B2 accusation  {'holds' if bar['B2_accusation']['holds'] else 'FAILS'} "
-        f"({chosen['unaccounted']} unaccounted vs {requested['unaccounted']})"
-    )
-    if "B3_openTax" in bar:
+    if reading.get("contractLost"):
         lines.append(
-            f"B3 open tax    {'holds' if bar['B3_openTax']['holds'] else 'FAILS'} "
-            f"({chosen['openUnneededPerEpisode']:.2f} unneeded open item(s) per episode vs "
-            f"{bar['B3_openTax']['requiredPerEpisode']:.2f} required write(s) per episode)"
+            f"the contract's turn is not turn one in {reading['contractLater']} episode(s) — the first turn stated no "
+            f"ask — and the filter refused that very turn in {reading['contractLost']} of them"
         )
+    if "B1_recovery" in bar:
+        # R230's bars read over different units — writes rescued, items spent, writes covered — so they are printed
+        # with their own denominators rather than through R228's more-covered-than-what shape. `skippedTurns` is on
+        # the noise line because the filter's cost is the turns it refused, and a reader who saw only the item count
+        # would be pricing the rule by its output rather than by its decisions.
+        lines.append(
+            f"B1 recovery   {'holds' if bar['B1_recovery']['holds'] else 'FAILS'} "
+            f"({bar['B1_recovery']['recovered']} of {bar['B1_recovery']['against']} later-turn writes recovered, "
+            f"{share(bar['B1_recovery']['recovery'])}, against a bar of {bar['B1_recovery']['bar']:.2f})"
+        )
+        lines.append(
+            f"B2 noise      {'holds' if bar['B2_noise']['holds'] else 'FAILS'} "
+            f"({bar['B2_noise']['items']} items against {bar['B2_noise']['against']:.0f}, twice the request board's "
+            f"{bar['B2_noise']['requestItems']}; {reading['skippedTurns']} of {reading['turns']} turn(s) were answers)"
+        )
+        lines.append(
+            f"B3 coverage   {'holds' if bar['B3_coverage']['holds'] else 'FAILS'} "
+            f"({share(bar['B3_coverage']['coverage'])} against a bar of {bar['B3_coverage']['bar']:.3f}, request "
+            f"board {share(bar['B3_coverage']['againstRequest'])})"
+        )
+    elif "B1_settlement" in bar:
+        lines.append(
+            f"B1 settlement  {'holds' if bar['B1_settlement']['holds'] else 'FAILS'} "
+            f"({chosen['covered']} vs {requested['covered']} covered, {chosen['complete']} vs "
+            f"{requested['complete']} episodes complete)"
+        )
+        lines.append(
+            f"B2 accusation  {'holds' if bar['B2_accusation']['holds'] else 'FAILS'} "
+            f"({chosen['unaccounted']} unaccounted vs {requested['unaccounted']})"
+        )
+        if "B3_openTax" in bar:
+            lines.append(
+                f"B3 open tax    {'holds' if bar['B3_openTax']['holds'] else 'FAILS'} "
+                f"({chosen['openUnneededPerEpisode']:.2f} unneeded open item(s) per episode vs "
+                f"{bar['B3_openTax']['requiredPerEpisode']:.2f} required write(s) per episode)"
+            )
+        else:
+            lines.append(
+                f"B3 soundness   {'holds' if bar['B3_soundness']['holds'] else 'FAILS'} "
+                f"({share(chosen['precision'])} of ticks backed by a graded write against a bar of "
+                f"{bar['B3_soundness']['bar']:.2f})"
+            )
     else:
-        lines.append(
-            f"B3 soundness   {'holds' if bar['B3_soundness']['holds'] else 'FAILS'} "
-            f"({share(chosen['precision'])} of ticks backed by a graded write against a bar of "
-            f"{bar['B3_soundness']['bar']:.2f})"
-        )
+        # A bar that was never evaluated has no tests to print, and printing nothing would read as a pass.
+        lines.append(f"bars          not evaluated — {bar.get('reason', 'no bar is reported')}")
     if reading["unknownTools"]:
         lines.append(f"tools no rule classifies: {', '.join(reading['unknownTools'])}")
     if reading["dropped"]:
@@ -799,6 +1014,15 @@ def self_test() -> int:
     # Every retail tool this module has ever seen is classified. The corpus's own list is the check, because a tool
     # nobody classified is a tool the rule silently treated as a non-read.
     board_module = _board()
+    # The sibling import repairs `sys.path` for the reason its docstring gives, and under `-m coverage run` the path is
+    # already repaired by the interpreter — so the repair is tested by taking it away rather than by trusting it.
+    here = os.path.dirname(os.path.abspath(__file__))
+    saved = list(sys.path)
+    sys.path[:] = [entry for entry in sys.path if entry != here]
+    try:
+        check("the sibling import repairs the path it needs", _board().__name__ == "goal_board")
+    finally:
+        sys.path[:] = saved
     toolset = set(board_module.FAMILIES) | set(OPENS) | set(LOOKUPS) | set(OPENS_NOTHING)
     check("every retail tool is classified", {
         "get_order_details", "get_product_details", "get_user_details", "find_user_id_by_name_zip",
@@ -1049,6 +1273,11 @@ def self_test() -> int:
             json.dump(listed_grid, handle)
         check("a bar that fails exits one", quiet(["--document", failing, "--scope", "loose", "--bar"]) == 1)
         check("the ask scope runs end to end", quiet(["--document", path, "--scope", "ask"]) == 0)
+        check("the admitted scope runs end to end", quiet(["--document", path, "--scope", "admitted"]) == 0)
+        # A grid whose episodes never state anything after the first turn cannot evidence the recovery bar, and the
+        # absence is a refusal rather than a pass — the fifth time this lane has had to say so, so it is a test.
+        check("a grid with no later turn refuses the recovery bar",
+              quiet(["--document", path, "--scope", "admitted", "--bar"]) == 1)
         check("and a replication that fails exits one too",
               quiet(["--document", path, "--replicate", failing, "--scope", "loose", "--bar"]) == 1)
         saved = os.path.join(temporary, "reading.json")
@@ -1137,6 +1366,162 @@ def self_test() -> int:
     check("a second cancel of the same record finds the ask spent",
           ask_board(ledger(consumed), consumed)["unaccountedBy"] == {"consumed": 1})
 
+    # R230. The admission rule is one character, so the tests are about the shapes it has to tell apart: a turn that
+    # **answers** a question, a turn that follows a statement, and a turn that follows nothing.
+    answered = [
+        {"role": "user", "content": "Please cancel my order #W1234567."},
+        _call("get_order_details", order_id="#W1234567"),
+        _result(order),
+        {"role": "assistant", "content": "I found #W1234567. Would you like me to cancel it?"},
+        {"role": "user", "content": "Yes please, cancel the desk lamp order."},
+        _call("cancel_pending_order", order_id="#W1234567", reason="customer asked"),
+        _result("{}"),
+    ]
+    read = admitted_asks(answered)
+    check("a turn that answers a question is not read", read["admitted"] == [0] and read["skipped"] == [1])
+    check("and every user turn is counted, read or not", read["turns"] == 2)
+    check("only the first turn's asks survive the filter", [item["family"] for item in read["asks"]] == ["cancel"])
+
+    volunteered = [
+        {"role": "user", "content": "Please cancel my order #W1234567."},
+        _call("get_order_details", order_id="#W1234567"),
+        _result(order),
+        {"role": "assistant", "content": "The order is pending; I have not changed anything yet."},
+        {"role": "user", "content": "Actually, also return the lamp I bought."},
+        _call("return_delivered_order_items", order_id="#W1234567", item_ids=["1"], payment_method_id="c"),
+        _result("{}"),
+    ]
+    check("a turn that follows a statement is read", admitted_asks(volunteered)["admitted"] == [0, 1])
+    check("the admitted board credits the write that turn states",
+          len(ask_board(ledger(volunteered), volunteered, "admitted")["credited"]) == 1)
+    # …and the board this round is compared against cannot, which is the deficit the round exists to close.
+    check("the request board leaves the same write unaccounted",
+          ask_board(ledger(volunteered), volunteered)["unaccounted"] == [0])
+    check("and R229's taxonomy names the cause",
+          ask_board(ledger(volunteered), volunteered)["unaccountedBy"] == {"disclosedLater": 1})
+    check("the taxonomy names the write, not only the count",
+          ask_board(ledger(volunteered), volunteered)["unaccountedByPosition"] == {0: "disclosedLater"})
+
+    # The three edges, each of which a plausible implementation gets wrong.
+    check("a user turn with no assistant turn before it is read",
+          admitted_asks([{"role": "user", "content": "cancel the lamp"},
+                         {"role": "user", "content": "and the desk"}])["admitted"] == [0, 1])
+    check("a question two turns back does not gate this turn, because the turn before it was a user turn",
+          admitted_asks([{"role": "assistant", "content": "Which one?"},
+                         {"role": "user", "content": "the lamp"},
+                         {"role": "user", "content": "and the desk"}])["admitted"] == [0, 1])
+    check("an assistant turn carrying only a tool call asks nothing",
+          admitted_asks([{"role": "user", "content": "cancel it"},
+                         {"role": "assistant", "tool_calls": [{"name": "get_order_details",
+                                                               "arguments": {"order_id": "#W1234567"}}]},
+                         {"role": "user", "content": "and return the desk"}])["admitted"] == [0, 1])
+    empty = [{"role": "user", "content": "cancel"},
+             {"role": "assistant", "content": "Which order?"},
+             {"role": "user", "content": "   "}]
+    check("an empty user turn is neither read nor counted as refused",
+          admitted_asks(empty)["skipped"] == [] and admitted_asks(empty)["turns"] == 2)
+    check("a first turn is read even when an assistant spoke before it",
+          admitted_asks([{"role": "assistant", "content": "Hello! How can I help?"},
+                         {"role": "user", "content": "cancel my order"}])["admitted"] == [0])
+    # The second mechanism the reading found: the contract is not "turn one", it is "the first turn that states an
+    # ask", and the two differ whenever an episode opens with a greeting. A filter that refuses that turn refuses the
+    # contract — which is how a board that reads *more* turns can cover *fewer* writes.
+    greeting = [
+        {"role": "user", "content": "Hi!"},
+        {"role": "assistant", "content": "Hello! Which order would you like to cancel?"},
+        {"role": "user", "content": "Please cancel my order #W1234567."},
+        _call("cancel_pending_order", order_id="#W1234567", reason="x"),
+        _result("{}"),
+    ]
+    greeter = admitted_asks(greeting)
+    check("a greeting states no ask", greeter["contract"] == 1)
+    check("the contract's turn can be a turn the filter refuses", greeter["contractAdmitted"] is False)
+    check("and the contract's own turn is still counted as a turn", greeter["turns"] == 2)
+    contract_grid = compare({"tasks": [task],
+                             "simulations": [{"id": "s", "task_id": "1", "messages": greeting}]}, "admitted")
+    check("a grid whose contract turn was refused says so in the reading",
+          "refused that very turn in 1 of them" in render(contract_grid, "admitted"))
+    # …and the reason it has nothing to recover is that `request_of` had already fallen back to that turn: the write is
+    # in the request board's contract, so it is not a later turn's deficit. It is a **loss**, and it is the whole of
+    # the difference between the admitted board's 410 covered writes and the request board's 416.
+    check("that grid is refused for having no later-turn write to recover",
+          "no write was attributed" in contract_grid["bar"]["reason"])
+
+    # The bar, end to end and in both directions. The negative control is the registration's own worry: a later turn
+    # that is an answer states a requirement, and the filter that is supposed to rescue later turns must not rescue
+    # this one — otherwise the "recovery" is the `askAll` board wearing a filter's name.
+    late_answer = [
+        {"role": "user", "content": "Please cancel my order #W1234567."},
+        _call("get_order_details", order_id="#W1234567"),
+        _result(order),
+        {"role": "assistant", "content": "Anything else you would like me to look at?"},
+        {"role": "user", "content": "I also want to return the lamp, on #W7654321."},
+        _call("return_delivered_order_items", order_id="#W7654321", item_ids=["1"], payment_method_id="c"),
+        _result("{}"),
+    ]
+    returns = {"id": "2", "evaluation_criteria": {"actions": [
+        {"name": "return_delivered_order_items", "arguments": {"order_id": "#W7654321"}},
+    ]}}
+    refused_grid = compare({"tasks": [returns],
+                            "simulations": [{"id": "s", "task_id": "2", "messages": late_answer}]}, "admitted")
+    check("a later-turn write the filter refuses is counted as a loss",
+          (refused_grid["lateWrites"], refused_grid["recovered"]) == (1, 0))
+    check("and the recovery bar fails on it", refused_grid["bar"]["B1_recovery"]["holds"] is False)
+    check("the grid is refused", refused_grid["bar"]["holds"] is False)
+    lamp_return = {"id": "3", "evaluation_criteria": {"actions": [
+        {"name": "return_delivered_order_items", "arguments": {"order_id": "#W1234567"}},
+    ]}}
+    won_grid = compare({"tasks": [lamp_return],
+                        "simulations": [{"id": "s", "task_id": "3", "messages": volunteered}]}, "admitted")
+    check("a later-turn write the filter admits is recovered",
+          (won_grid["lateWrites"], won_grid["recovered"]) == (1, 1))
+    check("and all three bars hold on it", won_grid["bar"]["holds"] is True)
+    check("the admitted reading adds up", check_manifest(won_grid) == [])
+    check("the admitted reading prints its own three bars", "B3 coverage" in render(won_grid, "admitted"))
+    check("and names the cost of the filter", "turn(s) were answers" in render(won_grid, "admitted"))
+
+    # The bars at their exact thresholds. A bar tested only far from its boundary is a bar whose boundary is unknown,
+    # and this round's numbers are the boundary: 93 of 155, 1,940 items, 73.6%.
+    def bar_of(recovered: int, late: int, items: int, coverage: float, requestItems: int = 970) -> dict:
+        return admit_bar({
+            "lateWrites": late,
+            "recovered": recovered,
+            "boards": {"admitted": {"items": items, "coverage": coverage},
+                       "request": {"items": requestItems, "coverage": 0.636}},
+        })
+
+    check("recovery at exactly the bar holds", bar_of(93, 155, 1940, 0.736)["holds"] is True)
+    check("one write below the recovery bar fails", bar_of(92, 155, 1940, 0.736)["B1_recovery"]["holds"] is False)
+    check("one item above the noise bar fails", bar_of(93, 155, 1941, 0.736)["B2_noise"]["holds"] is False)
+    check("coverage a hair under the bar fails", bar_of(93, 155, 1940, 0.7359)["B3_coverage"]["holds"] is False)
+    blank = bar_of(0, 0, 10, 1.0)
+    check("a grid with no later-turn write is refused rather than passed", blank["holds"] is False)
+    check("and the refusal says why", "no write was attributed" in blank["reason"])
+    ask_scope_refused = False
+    try:
+        ask_board(ledger(answered), answered, "wide")
+    except ValueError:
+        ask_scope_refused = True
+    check("an unknown ask scope is refused rather than defaulted to the request", ask_scope_refused)
+    # A printer that raises on the refusal is a printer that cannot report it, and the refusal is a result.
+    check("a reading with nothing graded prints its refusal rather than raising",
+          "not evaluated" in render(nothing_graded) and "n/a" in render(nothing_graded))
+    with tempfile.TemporaryDirectory() as temporary:
+        # The refusal has to survive the command line, not only the function: a bar that fails in Python and exits
+        # zero from the shell is a gate nobody's CI can use.
+        answered_path = os.path.join(temporary, "answered.json")
+        with open(answered_path, "w", encoding="utf-8") as handle:
+            json.dump({"tasks": [returns],
+                       "simulations": [{"id": "s", "task_id": "2", "messages": late_answer}]}, handle)
+        check("a grid whose later turn is an answer fails the bar and exits one",
+              quiet(["--document", answered_path, "--scope", "admitted", "--bar"]) == 1)
+        won_path = os.path.join(temporary, "won.json")
+        with open(won_path, "w", encoding="utf-8") as handle:
+            json.dump({"tasks": [lamp_return],
+                       "simulations": [{"id": "s", "task_id": "3", "messages": volunteered}]}, handle)
+        check("and a grid whose later turn is volunteered passes and exits zero",
+              quiet(["--document", won_path, "--scope", "admitted", "--bar"]) == 0)
+
     # The saved reading has to add up against itself, because the documents quote its parts (AUDIT 34.311/34.315).
     check("a reading that adds up has no problem", check_manifest(reading) == [])
     check("an empty reading is a problem", len(check_manifest({})) == 1)
@@ -1171,6 +1556,18 @@ def self_test() -> int:
     over_complete = json.loads(json.dumps(reading))
     over_complete["boards"]["request"]["complete"] = over_complete["graded"] + 1
     check("more complete episodes than graded ones is caught", check_manifest(over_complete) != [])
+    # …and the two absences the checker has to walk past rather than accuse: a board with no coverage to compare and a
+    # board whose misses were never classified. Both are legal readings, and a checker that failed them would make the
+    # absence of a number look like a wrong one.
+    unread = json.loads(json.dumps(reading))
+    unread["discharged"] = 0
+    for name in ("strict", "loose", "ask", "askAll", "admitted", "request"):
+        unread["boards"][name]["coverage"] = None
+    check("a board with no coverage is not a coverage problem", check_manifest(unread) == [])
+    no_taxonomy = json.loads(json.dumps(reading))
+    for name in ("ask", "askAll", "admitted"):
+        no_taxonomy["boards"][name]["unaccountedBy"] = {}
+    check("a board with no taxonomy has nothing to sum", check_manifest(no_taxonomy) == [])
 
     check("the reporter on an empty list exits zero", quiet_report([]) == 0)
     check("the reporter on a failure exits one", quiet_report(["negative control (must fail)"]) == 1)
@@ -1181,7 +1578,7 @@ def main(argv: list) -> int:
     parser = argparse.ArgumentParser(description="Bind the item to the read, not to the words.")
     parser.add_argument("--document", default="", help="a results document with transcripts and tasks")
     parser.add_argument("--replicate", default="", help="a second document, read the same way")
-    parser.add_argument("--scope", default="strict", choices=("strict", "loose", "ask"))
+    parser.add_argument("--scope", default="strict", choices=("strict", "loose", "ask", "admitted"))
     parser.add_argument("--bar", action="store_true", help="exit non-zero when a registered bar fails")
     parser.add_argument("--save", default="", help="write the reading to this path, for the documents to quote")
     parser.add_argument("--check", default="", help="check that a saved reading adds up, and exit non-zero if not")

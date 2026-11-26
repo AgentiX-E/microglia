@@ -5276,6 +5276,65 @@ python3 eval/tools/read_anchor.py --check eval/manifests/r228-reading.json
 **The verdict, stated as the registration asked for it.** R228's three bars: settlement holds, accusation holds, open
 tax fails at 2.53 against 1.79 — so the round is **REFUTED**, on the same grid and again on the replication (2.54
 against 1.81). R229's three bars: settlement fails by one write (415 against 416) on the control grid and holds on the
-replication (+1.7 points) — refused, and the reversal is reported as a property of the grids rather than as a pass. Five
-anchors have now been measured and five have been refused: request (R223), reveal (R225), record (R227), read (R228),
-ask-bound (R229).
+replication (+1.7 points) — refused, and the reversal is reported as a property of the grids rather than as a pass. Six
+anchors have now been measured and six have been refused: request (R223), reveal (R225), record (R227), read (R228),
+ask-bound (R229), and turn admission (8.105).
+
+### 8.105 Turn position is not a discriminator: 77% of user turns are answers
+
+R229 left one deficit named and unpriced. Of the 232 writes the turn-one contract could not account for, 155 are asks
+the conversation states **after** the first turn, and following every turn reaches 95.6% at 4,761 items because the
+user's *answers* carry cue words. The obvious repair is structural rather than lexical — admit a later turn only when
+the agent's previous turn did not ask the user a question — and it needs one character to test:
+
+    an ask is admitted from a user turn after the first only when the assistant turn before it contains no "?"
+
+A reply to a question is a value filling a slot the agent asked for; a turn that follows a statement or a tool call is
+the user volunteering. That is the theory, and it is wrong about this corpus in a way that is worth stating precisely,
+because the numbers are not ambiguous:
+
+| | control grid | replication |
+|---|---|---|
+| user turns read | 2,453 | 2,422 |
+| turns **refused** as answers | 1,893 (**77.2%**) | 1,876 (77.5%) |
+| of R229's 155 later-turn writes, recovered | 25 (**16.1%**) | 20 (12.8%) |
+| items the board opens | 1,110 | 1,043 |
+| coverage of the 654 required writes | **62.7%** | 63.9% |
+| the request board on the same grid | 63.6% | 61.1% |
+
+The filter is **worse than doing nothing**: it opens 1,110 items (still 1.14× the contract) and covers *fewer* writes
+than the turn-one contract it was meant to extend. Its noise bar holds — 1,110 against the 1,940 the registration
+allowed — and the two reasons it fails are two different mechanisms.
+
+**The first is the user model.** τ²'s simulator is built to ask and to answer; on this grid 77% of user turns follow a
+question from the agent, and a turn that answers *and* adds a requirement is a single turn. "Yes, the purple one — and
+can you also check the other order?" is 100% an answer by this test and 50% a requirement, and the test can only see
+the whole turn.
+
+**The second is the contract's own address.** `request_of` does not read turn one; it reads the **first turn that states
+an ask**, falling back to the first turn only when none does. On 52 of the 403 graded episodes the contract is read from
+turn three or later, and the filter refused *that very turn* in 50 of them — because the turn that states the contract
+is, in this corpus, usually a reply to the agent's opening question. That is how a board that reads more turns covers
+fewer writes, and it is visible in the reading as a line rather than inferred:
+
+```
+the contract's turn is not turn one in 52 episode(s) — the first turn stated no ask — and the filter
+refused that very turn in 50 of them
+```
+
+**What it means for a product.** Do not gate memory writes on turn structure, and do not treat a reply as
+non-informative. In this corpus the requirement arrives *inside* the answer about 77% of the time, so a heuristic that
+"only records what the user volunteers" discards most of what the user ever says about what they want. The measured
+default stays `askSource: request` — the contract, read from the turn that states it — and this round is the third
+independent measurement that leaves it there.
+
+**What the tool prints.** `--scope admitted` builds the board from admitted turns only and reports the composition of
+the transcript beside the bars:
+
+```bash
+python3 eval/tools/read_anchor.py --document control.json --replicate front.json --scope admitted
+```
+
+The bars are the registration's: recovery of at least 60% of the 155 later-turn writes, at most twice the contract's
+items, coverage at or above 73.6%. Two of the three fail, on both grids, and the successor round restricts the
+parser's family inheritance to the contract's turn instead of gating whole turns (R231).

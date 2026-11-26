@@ -7516,3 +7516,44 @@ python3 eval/tools/read_anchor.py --document results.json --scope ask --json | j
 The second command prints the three causes. If `disclosedLater` dominates, the defect is your snapshot, not your
 vocabulary — and the repair is an admission rule for new asks, which is a different round from the one a cue list
 would start.
+
+### 32.86 Do not gate your memory on turn structure: most user turns are answers
+
+If you have read 32.85 you know the deficit: two thirds of what an episode is graded on is stated *after* the first
+user turn. The natural repair, and the one this project built first, is positional — read a later turn only when the
+assistant did not ask a question in the turn before it. One character, no cue list, no model call:
+
+```python
+reads = previous_assistant_turn.count("?") == 0     # the whole rule
+```
+
+**It made things worse, and the reason is the thing to take away.** On 456 retail episodes the filter refused 1,893 of
+2,453 user turns — **77.2%** — and recovered only 25 of the 155 later-turn writes (16.1%), producing a block with
+**more** items (1,110) that covered **fewer** required writes (410 of 654, 62.7%) than the turn-one contract it was
+built to extend (416, 63.6%). The replication says the same: 20 of 156, 63.9% against 61.1%.
+
+Two mechanisms, and both will be present in your corpus too:
+
+1. **A turn can be an answer and a requirement at once.** "Yes, the purple one — and can you also check my other
+   order?" is entirely an answer by any positional test and half a requirement in fact. In a simulated conversation
+   where the assistant asks constantly, the requirement almost always rides in on a reply.
+2. **Your "turn one" is probably not turn one.** A contract read from the first turn *that states something* falls back
+   past a greeting, a clarification, or an opening answer — on 52 of 403 episodes here — and a positional filter then
+   refuses the very turn your contract came from. That is how a rule that reads more turns can cover fewer writes.
+
+**What to do instead.** Keep the contract anchored where it is stated (the measured default, `askSource: request`),
+and if you need to admit later material, admit it by **clause** rather than by turn: a clause that carries its own
+requirement verb and its own object is an ask; a clause that only inherits the verb from a neighbour is a value. That is
+R231, and it changes one scope in your parser rather than adding a word to it.
+
+```bash
+# the composition of the transcript, beside the bars
+python3 eval/tools/read_anchor.py --document control.json --replicate front.json --scope admitted
+
+# what it prints when the filter refuses the turn your contract was read from
+# the contract's turn is not turn one in 52 episode(s) ... refused that very turn in 50 of them
+```
+
+**The general rule.** Before you gate memory on any structural feature of the conversation — turn index, speaker,
+whether a message is a question or a reply — count the feature's rate on your own corpus. A feature that fires on 77%
+of turns is not a discriminator; it is a description of the medium.

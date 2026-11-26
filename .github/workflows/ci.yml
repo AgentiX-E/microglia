@@ -217,23 +217,28 @@ jobs:
           python3 eval/tools/round_clock.py
           python3 eval/tools/serving_defaults.py
 
-      - name: The two readings the anchor rounds were judged on, and whether their parts add up
+      - name: The three readings the anchor rounds were judged on, and whether their parts add up
         # R228 asked whether binding an item to the record the episode **read** settles more of the work than binding it
-        # to the request's words; R229 asked whether the two can be joined. Neither reading is recomputed here — the
-        # grid they were taken over is a 32 MB artefact from a paid dispatch and is not in this repository — so what is
-        # gated is the arithmetic: every board agrees with its own parts, the taxonomy sums to the writes it explains,
-        # and a bar is the one its numbers imply. That is the class of defect this repository has audited three rounds
-        # running (AUDIT 34.311, 34.315, 34.317), and it is the one a document can introduce without touching code.
+        # to the request's words; R229 asked whether the two can be joined; R230 asked whether a later turn can be
+        # admitted by its position alone. No reading is recomputed here — the grid they were taken over is a 32 MB
+        # artefact from a paid dispatch and is not in this repository — so what is gated is the arithmetic: every board
+        # agrees with its own parts, the taxonomy sums to the writes it explains, and a bar is the one its numbers
+        # imply. That is the class of defect this repository has audited three rounds running (AUDIT 34.311, 34.315,
+        # 34.317), and it is the one a document can introduce without touching code. The numbers are pinned as well,
+        # because R230's refusal is a result: a later round that moves 16.1% recovery has to move a line on purpose.
         run: |
           set -euo pipefail
           python3 eval/tools/read_anchor.py --check eval/manifests/r228-reading.json
           python3 eval/tools/read_anchor.py --check eval/manifests/r229-reading.json
+          python3 eval/tools/read_anchor.py --check eval/manifests/r230-reading.json
           python3 - <<'CHECK'
           import json
 
           r228 = json.load(open("eval/manifests/r228-reading.json"))
           r229 = json.load(open("eval/manifests/r229-reading.json"))
-          assert r228["scope"] == "strict" and r229["scope"] == "ask", (r228["scope"], r229["scope"])
+          r230 = json.load(open("eval/manifests/r230-reading.json"))
+          assert (r228["scope"], r229["scope"], r230["scope"]) == ("strict", "ask", "admitted"), (
+              r228["scope"], r229["scope"], r230["scope"])
           reading = r228["reading"]
           boards = reading["boards"]
           # The reading R228 was refused on: the read board settles 98.5% of the discharged writes and opens 2.53
@@ -260,8 +265,28 @@ jobs:
           assert second["boards"]["ask"]["unaccountedBy"]["disclosedLater"] == 155
           assert second["boards"]["ask"]["unaccountedBy"]["consumed"] == 61
           assert second["boards"]["ask"]["unaccountedBy"]["neverStated"] == 16
+          # R230: the turn-level filter. It passes the noise bar and fails the other two, and the failure is the
+          # finding — 77.2% of user turns follow a question, so the answer and the requirement share a turn.
+          third = r230["reading"]
+          admitted = third["boards"]["admitted"]
+          assert admitted["covered"] == 410, admitted["covered"]
+          assert admitted["items"] == 1110, admitted["items"]
+          assert admitted["unaccounted"] == 237, admitted["unaccounted"]
+          assert third["bar"]["B1_recovery"]["holds"] is False
+          assert (third["bar"]["B1_recovery"]["recovered"], third["bar"]["B1_recovery"]["against"]) == (25, 155)
+          assert third["bar"]["B2_noise"]["holds"] is True
+          assert third["bar"]["B3_coverage"]["holds"] is False, "R230 was refused on coverage as well as recovery"
+          assert (third["turns"], third["skippedTurns"]) == (2453, 1893)
+          assert (third["contractLater"], third["contractLost"]) == (52, 50)
+          # The replication has to repeat the refusal, because a bar that fails on one grid and holds on the other is
+          # a finding about the grids. R230 fails all three ways on both.
+          assert third["replication"]["boards"]["admitted"]["covered"] == 411
+          assert third["replication"]["bar"]["B1_recovery"]["holds"] is False
+          assert (third["replication"]["lateWrites"], third["replication"]["recovered"]) == (156, 20)
           print(f"ok  read {boards['strict']['coverage']:.1%} vs request {boards['request']['coverage']:.1%}; "
-                f"ask {second['boards']['ask']['coverage']:.1%} with 155/232 misses disclosed after turn one")
+                f"ask {second['boards']['ask']['coverage']:.1%} with 155/232 misses disclosed after turn one; "
+                f"admitted {admitted['coverage']:.1%} recovering {third['bar']['B1_recovery']['recovered']}/155 with "
+                f"{third['skippedTurns']}/{third['turns']} turns answered")
           CHECK
 
       - name: Does the request name the record, which is R227's bar and the reason the grid is still unbought

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""The four boards on the two axes a working memory is actually chosen on, from the saved reading.
+"""The boards on the two axes a working memory is actually chosen on, from the saved readings.
 
-R228 and R229 priced five rules for turning a transcript into items and ticks. Reported one at a time, each is a score:
+R228, R229 and R230 priced six rules for turning a transcript into items and ticks. Reported one at a time, each is a score:
 the read anchor "accounts for 98.5% of the required work", the request rule "misses a third". Reported together they are
 a trade, and the trade is the finding — a rule that cannot miss also cannot tell work from looking.
 
@@ -14,8 +14,10 @@ so the upper left is the region a working memory wants and nothing in this corpu
 for the request rule, both read scopes, the conjunction and the follow-the-conversation arm, and it draws the
 `required writes per episode` line, because an open tax above that line is a block that is more than half noise.
 
-No timestamps, no network, no sampling: the numbers are read from `eval/manifests/r228-reading.json` and
-`eval/manifests/r229-reading.json`, which carry the grid's sha256.
+No timestamps, no network, no sampling: the numbers are read from `eval/manifests/r228-reading.json`,
+`eval/manifests/r229-reading.json` and `eval/manifests/r230-reading.json`, which carry the grid's sha256. The raster
+carries a second panel for R230, because that round's point on the plane is not its finding: the finding is the
+composition of the transcript that produced it.
 
 Output: `figures/r228-anchors.png` under the docs repository, and `docs/benchmarks/anchors.svg` under this one.
 """
@@ -31,16 +33,22 @@ import pathlib
 #: chart that hides the finding.
 CEILING = 4.5
 
+#: One colour per rule, keyed by the label the chart draws. Kept beside `RULES` rather than inside it because the SVG
+#: and the raster both read it, and two palettes are two charts.
+COLOURS = {"request": "#1a73e8", "read-strict": "#188038", "read-loose": "#7cb342", "ask-bound": "#8430ce",
+           "every-turn": "#e8710a", "turn-admission": "#5f6368"}
+
 #: The five rules, in the order they are labelled, and where each one's numbers live in the saved readings.
 RULES = (
     # label, board, which reading, and where its label sits relative to the dot. The offsets are hand-placed because
     # two pairs of rules land on the same coordinates — the conjunction and the request rule agree to one write, and the
     # two read scopes differ only in what they list — and a chart whose labels overlap is a chart of four rules.
-    ("request", "request", "r228", (14, -18)),
+    ("request", "request", "r228", (16, -16)),
     ("read-strict", "strict", "r228", (-16, 12)),
     ("read-loose", "loose", "r228", (-16, -14)),
-    ("ask-bound", "ask", "r229", (14, 16)),
+    ("ask-bound", "ask", "r229", (-16, 4)),
     ("every-turn", "askAll", "r229", (-16, 10)),
+    ("turn-admission", "admitted", "r230", (16, 12)),
 )
 
 
@@ -48,11 +56,23 @@ def load(manifest_dir: pathlib.Path) -> dict:
     """Both saved readings, and the two denominators they must agree on."""
     r228 = json.loads((manifest_dir / "r228-reading.json").read_text())
     r229 = json.loads((manifest_dir / "r229-reading.json").read_text())
-    first, second = r228["reading"], r229["reading"]
-    if first["discharged"] != second["discharged"]:
-        raise SystemExit("the two readings were taken over different denominators")
-    return {"readings": {"r228": first, "r229": second}, "discharged": first["discharged"],
-            "graded": first["graded"], "requiredPerEpisode": first["required"] / first["graded"]}
+    r230 = json.loads((manifest_dir / "r230-reading.json").read_text())
+    readings = {"r228": r228["reading"], "r229": r229["reading"], "r230": r230["reading"]}
+    if len({one["discharged"] for one in readings.values()}) != 1:
+        raise SystemExit("the readings were taken over different denominators")
+    third = readings["r230"]
+    return {"readings": readings, "discharged": readings["r228"]["discharged"],
+            "graded": readings["r228"]["graded"],
+            "requiredPerEpisode": readings["r228"]["required"] / readings["r228"]["graded"],
+            "mechanism": {
+                "turns": third["turns"],
+                "refused": third["skippedTurns"],
+                "admitted": third["admittedTurns"],
+                "late": third["lateWrites"],
+                "recovered": third["recovered"],
+                "bar": third["bar"]["B1_recovery"]["against"] and
+                       round(third["bar"]["B1_recovery"]["bar"] * third["bar"]["B1_recovery"]["against"]),
+            }}
 
 
 def points(data: dict) -> list:
@@ -90,7 +110,7 @@ def svg(rows: list, required: float) -> str:
         f'role="img" aria-label="Coverage against open tax for five working-memory rules">',
         '<rect width="100%" height="100%" fill="#ffffff"/>',
         f'<text x="{left}" y="24" font-family="Helvetica,Arial" font-size="15" font-weight="600">'
-        f'Coverage against open tax, five rules on one grid (403 graded episodes, 654 discharged writes)</text>',
+        f'Coverage against open tax, six rules on one grid (403 graded episodes, 654 discharged writes)</text>',
     ]
     for step in range(0, int(CEILING) + 1):
         y = py(step)
@@ -108,11 +128,9 @@ def svg(rows: list, required: float) -> str:
                   f'stroke-dasharray="5 4"/>')
     pieces.append(f'<text x="{width - right - 4}" y="{y - 8:.1f}" text-anchor="end" font-family="Helvetica,Arial" '
                   f'font-size="11" fill="#b3261e">{required:.2f} required write(s) per episode</text>')
-    colours = {"request": "#1a73e8", "read-strict": "#188038", "read-loose": "#7cb342", "ask-bound": "#8430ce",
-               "every-turn": "#e8710a"}
     for row in rows:
         x, y = px(row["coverage"]), py(row["openTax"])
-        pieces.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="6" fill="{colours[row["label"]]}" '
+        pieces.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="6" fill="{COLOURS[row["label"]]}" '
                       f'stroke="#ffffff" stroke-width="1.5"/>')
         dx, dy = row["place"]
         anchor = "end" if dx < 0 else "start"
@@ -142,7 +160,7 @@ def main(argv: list) -> int:
         pathlib.Path(arguments.out_svg).parent.mkdir(parents=True, exist_ok=True)
         pathlib.Path(arguments.out_svg).write_text(markup)
     if arguments.out_png:
-        _png(rows, data["requiredPerEpisode"], pathlib.Path(arguments.out_png))
+        _png(rows, data["requiredPerEpisode"], data["mechanism"], pathlib.Path(arguments.out_png))
     if arguments.show:
         for row in rows:
             print(f"{row['label']:12s} coverage {row['coverage']:6.1%}  open tax {row['openTax']:5.2f}/ep  "
@@ -150,18 +168,23 @@ def main(argv: list) -> int:
     return 0
 
 
-def _png(rows: list, required: float, path: pathlib.Path) -> None:
-    """The same chart as a raster, for the internal documents and for a reader who cannot open an SVG."""
+def _png(rows: list, required: float, mechanism: dict, path: pathlib.Path) -> None:
+    """The same chart as a raster, plus the panel R230's point cannot show.
+
+    A scatter says where a rule landed. R230 landed where a rule that does almost nothing lands, and the reason is not
+    visible on the plane: the transcript it filtered was already 77% answers, and the writes it was meant to rescue
+    were mostly *inside* the turns it refused. So the raster carries the composition beside the plane, in the same
+    units the round was registered in — turns on one bar, later-turn writes on the other, and the 60% bar drawn where
+    the registration put it.
+    """
     import matplotlib
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    figure, axes = plt.subplots(figsize=(8.2, 5.2), dpi=170)
-    colours = {"request": "#1a73e8", "read-strict": "#188038", "read-loose": "#7cb342", "ask-bound": "#8430ce",
-               "every-turn": "#e8710a"}
+    figure, (axes, side) = plt.subplots(1, 2, figsize=(13.4, 5.2), dpi=170, gridspec_kw={"width_ratios": [1.6, 1]})
     for row in rows:
-        axes.scatter(row["coverage"], row["openTax"], s=90, color=colours[row["label"]], zorder=3,
+        axes.scatter(row["coverage"], row["openTax"], s=90, color=COLOURS[row["label"]], zorder=3,
                      edgecolor="white", linewidth=1.6)
         dx, dy = row["place"]
         axes.annotate(row["label"], (row["coverage"], row["openTax"]), textcoords="offset points",
@@ -172,10 +195,43 @@ def _png(rows: list, required: float, path: pathlib.Path) -> None:
     axes.set_ylim(0, CEILING)
     axes.set_xlabel("share of required, performed writes the rule accounts for", fontsize=10)
     axes.set_ylabel("open items per episode that nobody needs", fontsize=10)
-    axes.set_title("Five rules, one grid: 403 graded episodes, 654 discharged writes", fontsize=11)
+    axes.set_title("Six rules, one grid: 403 graded episodes, 654 discharged writes", fontsize=11)
     axes.grid(alpha=0.18)
-    for side in ("top", "right"):
-        axes.spines[side].set_visible(False)
+    for spine in ("top", "right"):
+        axes.spines[spine].set_visible(False)
+
+    # The mechanism. Both bars are drawn as **shares of their own denominator**, because the two denominators differ by
+    # an order of magnitude (2,453 turns, 155 writes) and a shared count axis would render the second bar invisible —
+    # which is the chart that would have hidden the round's finding. The counts stay in the labels.
+    kept, refused = mechanism["admitted"], mechanism["refused"]
+    recovered, late = mechanism["recovered"], mechanism["late"]
+    total = kept + refused
+    side.barh([1, 0], [kept / total, recovered / late], color=["#1a73e8", "#188038"], height=0.34, zorder=3)
+    side.barh([1, 0], [refused / total, (late - recovered) / late], left=[kept / total, recovered / late],
+              color=["#dadce0", "#f6c7c3"], height=0.34, zorder=3)
+    side.set_yticks([1, 0])
+    side.set_yticklabels(["user turns", "later-turn writes"], fontsize=10)
+    side.set_xlim(0, 1.0)
+    side.set_xticks([0, 0.25, 0.5, 0.75, 1.0])
+    side.set_xticklabels(["0%", "25%", "50%", "75%", "100%"], fontsize=9)
+    side.set_xlabel("share of its own denominator", fontsize=10)
+    side.set_title("R230: what the turn filter was looking at", fontsize=11)
+    side.text(kept / total / 2, 1, f"{kept:,} read", fontsize=9, ha="center", va="center", color="#ffffff")
+    side.text(kept / total + refused / total / 2, 1 + 0.26,
+              f"{refused:,} refused as answers ({refused / total:.1%})", fontsize=9.5, ha="center", va="bottom",
+              color="#3c4043")
+    side.text(recovered / late / 2, 0 - 0.28, f"{recovered} recovered ({recovered / late:.1%})", fontsize=9.5,
+              ha="center", va="top", color="#137333")
+    side.text(recovered / late + (late - recovered) / late / 2, 0, f"{late - recovered} lost", fontsize=9,
+              ha="center", va="center", color="#5f1b16")
+    side.axvline(mechanism["bar"] / late, color="#b3261e", linestyle="--", linewidth=1.2, zorder=4)
+    side.text(mechanism["bar"] / late, -0.72, f"bar: {mechanism['bar']} of {late}", color="#b3261e", fontsize=9,
+              ha="center", va="top")
+    side.set_ylim(-0.95, 1.62)
+    side.grid(axis="x", alpha=0.18)
+    for spine in ("top", "right", "left"):
+        side.spines[spine].set_visible(False)
+
     path.parent.mkdir(parents=True, exist_ok=True)
     figure.tight_layout()
     figure.savefig(path)

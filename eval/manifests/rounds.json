@@ -1,867 +1,954 @@
 {
-  "schema": "microglia.rounds/1",
-  "note": "The rounds this project owes, as data. A date in a roadmap table is a date nobody can assert on; this file is read by eval/tools/round_clock.py on every push, so a registered round that passes its date turns CI red instead of being discovered the next time somebody reads the plan. `status` moves registered -> dispatched -> read, or to `cancelled`, which is a decision rather than a debt. Nothing here fires on a clock: two dispatches in this lane were armed on a `schedule:` trigger and neither fired (AUDIT 34.232, 34.241), so a funded action is a `workflow_dispatch` and the cron is left to the free contract job.",
-  "rounds": [
-    {
-      "id": "R216b",
-      "title": "the placement's price \u2014 front against tail, one dispatch",
-      "status": "read",
-      "dispatchedAt": "2026-11-25T13:45:00Z",
-      "dispatchBy": "2026-11-25T12:00:00Z",
-      "run": 45626715004,
-      "arms": [
-        "front",
-        "board"
-      ],
-      "episodes": 228,
-      "estimateUsd": 1.2,
-      "artefacts": [
-        "eval/results/working-memory/front.json",
-        "eval/results/working-memory/board.json"
-      ],
-      "readAt": "2026-11-25T14:45:00Z",
-      "actualUsd": 1.3007,
-      "reading": {
-        "front": "93/114 (81.6%)",
-        "board": "96/114 (84.2%)",
-        "delta": "+2.6 pp [-7.2, +12.5], McNemar p = 0.6776",
-        "billPerEpisode": {
-          "front": 0.00583,
-          "board": 0.00558,
-          "change": "-4%"
-        },
-        "attribution": "65.7% of 108 writing episodes",
-        "strata": {
-          "easy": "-10.8 pp (83 of 93)",
-          "hard": "+61.9 pp (13 of 21)",
-          "moved": 13,
-          "broke": 10
-        }
-      }
+ "schema": "microglia.rounds/1",
+ "note": "The rounds this project owes, as data. A date in a roadmap table is a date nobody can assert on; this file is read by eval/tools/round_clock.py on every push, so a registered round that passes its date turns CI red instead of being discovered the next time somebody reads the plan. `status` moves registered -> dispatched -> read, or to `cancelled`, which is a decision rather than a debt. Nothing here fires on a clock: two dispatches in this lane were armed on a `schedule:` trigger and neither fired (AUDIT 34.232, 34.241), so a funded action is a `workflow_dispatch` and the cron is left to the free contract job.",
+ "rounds": [
+  {
+   "id": "R216b",
+   "title": "the placement's price \u2014 front against tail, one dispatch",
+   "status": "read",
+   "dispatchedAt": "2026-11-25T13:45:00Z",
+   "dispatchBy": "2026-11-25T12:00:00Z",
+   "run": 45626715004,
+   "arms": [
+    "front",
+    "board"
+   ],
+   "episodes": 228,
+   "estimateUsd": 1.2,
+   "artefacts": [
+    "eval/results/working-memory/front.json",
+    "eval/results/working-memory/board.json"
+   ],
+   "readAt": "2026-11-25T14:45:00Z",
+   "actualUsd": 1.3007,
+   "reading": {
+    "front": "93/114 (81.6%)",
+    "board": "96/114 (84.2%)",
+    "delta": "+2.6 pp [-7.2, +12.5], McNemar p = 0.6776",
+    "billPerEpisode": {
+     "front": 0.00583,
+     "board": 0.00558,
+     "change": "-4%"
     },
-    {
-      "id": "R218b",
-      "title": "the reliability column \u2014 four attempts, control against front",
-      "status": "read",
-      "dispatchBy": "2026-11-27T12:00:00Z",
-      "prereg": "prereg/R218b-pass4.md",
-      "arms": [
-        "control",
-        "front"
-      ],
-      "trials": 4,
-      "episodes": 912,
-      "estimateUsd": 4.75,
-      "dependsOn": [
-        "R216b"
-      ],
-      "dispatchedAt": "2026-11-25T15:32:00Z",
-      "run": 45646309827,
-      "readAt": "2026-11-25T16:45:00Z",
-      "actualUsd": 4.677,
-      "outcome": "refuted on two of five bars",
-      "reading": {
-        "control": "pass^1 96/114 (84.2%), pass^4 66/114 (57.9%), $0.00442 an episode",
-        "front": "pass^1 89/114 (78.1%), pass^4 61/114 (53.5%), $0.00584 an episode",
-        "deltaPass1": "-6.1 pp [-16.2, +4.1], McNemar p = 0.2295",
-        "deltaPass4": "-4.4 pp [-17.0, +8.4], McNemar p = 0.4869",
-        "attribution": "71.7% of 417 writing episodes",
-        "dependence": {
-          "icc": {
-            "control": 0.773,
-            "front": 0.745
-          },
-          "ratio": {
-            "control": 0.6875,
-            "front": 0.6854
-          },
-          "independentAttempts": 1.2
-        },
-        "drift": {
-          "front": [
-            86.84,
-            81.6,
-            78.07
-          ],
-          "control": [
-            78.95,
-            84.21
-          ]
-        },
-        "placement": {
-          "1x": "7th of 17",
-          "2xTextVerbatim": "2nd of 9"
-        }
-      }
-    },
-    {
-      "id": "R218c",
-      "title": "the placebo, interleaved \u2014 two identical arms, task by task, registered delta of zero",
-      "status": "read",
-      "dispatchBy": "2026-11-26T18:00:00Z",
-      "prereg": "prereg/R218c-interleave.md",
-      "arms": [
-        "control",
-        "control"
-      ],
-      "trials": 1,
-      "episodes": 228,
-      "estimateUsd": 1.3,
-      "dependsOn": [
-        "R218b"
-      ],
-      "why": "R218b found the same treatment arm reading 86.84, 81.60 and 78.07 in one afternoon, and the arms in its grid ran 35 minutes apart. Two identical arms interleaved task by task must read zero; if they do not, no contrast on this grid is measurable and the repair is the grid.",
-      "dispatchedAt": "2026-11-25T17:33:52Z",
-      "run": 45666085846,
-      "readAt": "2026-11-25T18:20:00Z",
-      "actualUsd": 1.0295,
-      "outcome": "the grid is usable and the asymmetry bar was mis-specified: 4 of 5 endpoints hold, the fifth by one task",
-      "reading": {
-        "controlA": "92/114 (80.70%), $0.004575 an episode",
-        "controlB": "95/114 (83.33%), $0.004455 an episode",
-        "deltaPp": 2.63,
-        "moved": 16,
-        "broke": 13,
-        "held": 79,
-        "neither": 6,
-        "unpaired": 0,
-        "p": 0.7111,
-        "billRatio": 0.9736,
-        "gapSeconds": {
-          "separationMedian": 70.9,
-          "separationMax": 100.3,
-          "handoverMedian": 0.0,
-          "blocks": 15
-        },
-        "turnover": {
-          "tasks": 29,
-          "rate": 0.254,
-          "r218bCrossDispatch": 0.22
-        },
-        "resolution": {
-          "detectablePp": 13.2,
-          "tasksFor5pp": 799,
-          "tasksFor10pp": 200,
-          "tasksInTau2": 300
-        },
-        "verdict": "ORDER_ASYMMETRIC: 16 against 13 is three tasks past a two-task window on 29 discordant pairs, which is p = 0.71",
-        "finding": "turnover does not shrink when the gap shrinks 30x: 25.4% at 71 s against R218b's 22% at 35 min, so the drift is sampling noise rather than a time confound, and no schedule repairs it"
-      }
-    },
-    {
-      "id": "R218d",
-      "title": "the dose inside the task \u2014 does an attempt that received more material pass more often",
-      "status": "read",
-      "dispatchBy": "2026-11-26T12:00:00Z",
-      "estimateUsd": 0.0,
-      "readAt": "2026-11-25T17:50:00Z",
-      "actualUsd": 0.0,
-      "dependsOn": [
-        "R218b"
-      ],
-      "outcome": "built and read on R218b's documents: NO_DOSE on both arms, because a front-placement block never enters the transcript",
-      "why": "Every flat reading this lane has is a between-arm mean. Within one task, the four attempts of R218b received different amounts of material, and comparing them holds the difficulty fixed \u2014 the one decomposition a two-arm grid cannot make.",
-      "reading": {
-        "control": "456 episodes, 0 with a block, state NO_DOSE",
-        "front": "456 episodes, 0 with a block, state NO_DOSE \u2014 while the log counts 4,341 renders",
-        "whyNoDose": "the block goes into `state.system_messages`, which is composed into the request; `grep -c microglia-board` over 32 MB of front.json is 0",
-        "reconstructionTried": {
-          "boundaries": 7813,
-          "renders": 4341,
-          "charsPerBoundary": 121.0,
-          "charsPerRender": 146.3,
-          "verdict": "not implemented \u2014 the ordering is turn count, which is the same variable that makes a retail episode fail"
-        },
-        "repair": "R218e records the dose at the source, per episode"
-      }
-    },
-    {
-      "id": "R218e",
-      "title": "the dose, recorded where it is known \u2014 one line an episode, written by the arm",
-      "status": "read",
-      "dispatchBy": "2026-12-02T12:00:00Z",
-      "arms": [
-        "board"
-      ],
-      "episodes": 228,
-      "estimateUsd": 1.1,
-      "dependsOn": [
-        "R218d"
-      ],
-      "why": "R218d could not read a treated arm's material because the material was never written down: the block is in the request and the transcript is the conversation. One JSONL line an episode \u2014 turns, block characters, renders, the final verdict \u2014 turns the question the lane keeps asking into one it can answer per episode. The recording is the only route: the transcript holds no prompt.",
-      "amended": "Registered 25 November with 114 episodes and a transcript check. Amended 26 November, before dispatch, on three measurements that cost nothing: (1) tau2 stores no `system` message at either placement, so the transcript check is impossible and is replaced by an identity against the phase census; (2) one attempt a task cannot produce a within-task pair, so the grid is 114 x 2 rounds; (3) the trial index is the round, not a turn count.",
-      "build": "agent records one dict an episode (turns/renders/chars/written/changes/stable) at the single boundary site; runner resolves text->task and partitions by round; eval/drivers/tau2/dose.py joins and refuses three states; board_dose.py --sidecar reads it, and answers NO_SYSTEM on a transcript",
-      "run": 45752387029,
-      "dispatchedAt": "2026-11-26T08:03:10+08:00",
-      "actualUsd": 1.2217,
-      "outcome": "DOSE_READ, and the dose is null at both scales: over the 114 tasks whose two rounds received different amounts the higher-dose side read above on 14 and below on 14 with 86 level (p = 1.0000), and on the 17 tasks whose sides averaged within one turn of each other it read 2 against 3 with 12 level (p = 1.0000). The recorded block averages 1,421 characters an episode and 222 of 228 episodes carried one, so the material was present and its size varied by a median of 820 characters \u2014 and more of it changed nothing.",
-      "reading": {
-        "run": 45752387029,
-        "state": "DOSE_READ",
-        "source": "sidecar",
-        "episodes": 228,
-        "tasks": 114,
-        "coverage": {
-          "matched": 228,
-          "unordered": 0,
-          "unscored": 0,
-          "retries": 0
-        },
-        "episodesWithDose": 222,
-        "doseCharsMean": 1421.4,
-        "doseCharsMedian": 1202,
-        "doseGapMedianChars": 820.5,
-        "turnGapMedian": 7.0,
-        "full": {
-          "pairs": 114,
-          "higherWins": 14,
-          "lowerWins": 14,
-          "level": 86,
-          "higherPassed": 90,
-          "lowerPassed": 90,
-          "p": 1.0
-        },
-        "decided": {
-          "tolerance": 1,
-          "closeTurnPairs": 17,
-          "higherWins": 2,
-          "lowerWins": 3,
-          "level": 12,
-          "tiedTurnPairs": 6,
-          "closeDoseGapMedianChars": 108,
-          "p": 1.0
-        },
-        "verdict": "the full grid is a sign test with power and no direction (28 discordant tasks, 14-14, p = 1.0); the length-matched subset is a direction with no power (5 discordant tasks, 2-3, p = 1.0, and five is under the six a unanimous test needs). Neither supports the premise, and the pre-registered rule returns a bound rather than a verdict because the decided subset is one task short of six.",
-        "unit": "the sign test reads tasks and not attempts. An attempt inside a task is not an independent draw, and the first read of this grid counted passing attempts instead \u2014 180 of them standing in for 114 pairs, reported as '90 against 90 attempt-pairs' (AUDIT 34.313). The correction changed no verdict and changed every number in the sentence."
-      },
-      "readAt": "2026-11-26T04:40:00Z"
-    },
-    {
-      "id": "R219",
-      "title": "the invocation policy \u2014 serve the state when a write needs it, not when it is renderable",
-      "status": "read",
-      "dispatchBy": "2026-11-30T12:00:00Z",
-      "arms": [
-        "board",
-        "policy"
-      ],
-      "episodes": 228,
-      "estimateUsd": 1.2,
-      "dependsOn": [
-        "R216b"
-      ],
-      "prereg": "prereg/R219-admission.md",
-      "amended": "Registered 2026-11-25 with arms front+policy. Amended 2026-11-26, before dispatch: the tail is the placement the product ships (R216b, serving-defaults.json), so the rule is tested at the tail; testing it at the front would price a treatment the product does not use.",
-      "why": "The block has two state lines and two judgment lines. The judgments are the parser's claims about the request, and `goal_board.py --accusations` reads 1,808 of 1,965 of them (92.0%) on R218b's front arm as naming a family the task requires a write in. The rule admits state and refuses to admit judgment; the bar is a count in one stratum (regressions 6 -> <=1, rescues >=12 of 15).",
-      "instrument": "eval/tools/goal_board.py --accusations (free: reads an R218b artefact)",
-      "dispatchedAt": "2026-11-26T03:24:00+08:00",
-      "run": 45684914838,
-      "readAt": "2026-11-26T04:05:00+08:00",
-      "actualUsd": 1.2329,
-      "outcome": "read, then not replicated. The first dispatch read +10.5 pp; the identical second read -0.9 pp. Pooled +4.8 pp [-1.2, +10.8], McNemar p = 0.152: no accuracy claim. The mechanism replicated exactly in both (admission all/state, chars -8%, changes -19%, bill -4% and -7%), so the null is about the effect and not about the treatment.",
-      "reading": {
-        "board": "87/114 (76.3%)",
-        "policy": "99/114 (86.8%)",
-        "delta": "+10.5 pp [+0.4, +20.5], McNemar p = 0.029; moved 19, broke 7",
-        "mechanism": {
-          "admission": {
-            "board": "all",
-            "policy": "state"
-          },
-          "charsMean": {
-            "board": 152.4,
-            "policy": 140.1
-          },
-          "changes": {
-            "board": 260,
-            "policy": 211
-          },
-          "tailHeld": {
-            "board": 854,
-            "policy": 937
-          }
-        },
-        "billPerEpisode": {
-          "board": 0.00552,
-          "policy": 0.0053,
-          "change": "-4%"
-        },
-        "strataVsR218bControl": {
-          "easy": 96,
-          "boardRegressions": 21,
-          "policyRegressions": 1,
-          "hard": 18,
-          "boardRescues": 16,
-          "policyRescues": 18
-        },
-        "caveat": "the strata use R218b's control arm because this dispatch ran no control; the paired board-vs-policy contrast is within one dispatch and is the claim",
-        "pooled": {
-          "moved": 30,
-          "broke": 19,
-          "delta": "+4.8 pp [-1.2, +10.8]",
-          "mcnemarP": 0.1524
-        }
-      }
-    },
-    {
-      "id": "R220",
-      "title": "one manifest, two readers \u2014 the configuration the eval measured is the one the product ships",
-      "status": "read",
-      "dispatchBy": "2026-11-29T12:00:00Z",
-      "estimateUsd": 0.0,
-      "readAt": "2026-11-25T16:20:00Z",
-      "actualUsd": 0.0,
-      "outcome": "built; the probe now prices the shipped placement and --board names the population"
-    },
-    {
-      "id": "R219b",
-      "title": "the same two arms, again \u2014 a replication before the rule becomes a default",
-      "status": "read",
-      "dispatchBy": "2026-11-27T12:00:00Z",
-      "prereg": "prereg/R219b-replication.md",
-      "arms": [
-        "board",
-        "policy"
-      ],
-      "episodes": 228,
-      "estimateUsd": 1.25,
-      "dependsOn": [
-        "R219"
-      ],
-      "why": "R219 read +10.5 pp [+0.4, +20.5] with p = 0.029 on 19 moved and 7 broke. The grid's identical arms turn over 25.4% of their tasks, so 26 discordant pairs is what noise produces and only the asymmetry is the signal. A replication is the cheapest instrument for a single dispatch, and the product default does not move until the sign repeats.",
-      "run": 45690987353,
-      "dispatchedAt": "2026-11-26T04:10:00+08:00",
-      "readAt": "2026-11-26T04:32:00+08:00",
-      "actualUsd": 1.235,
-      "outcome": "NO_LIFT: the first reading did not replicate",
-      "reading": {
-        "board": "94/114 (82.5%)",
-        "policy": "93/114 (81.6%)",
-        "delta": "-0.9 pp [-10.9, +9.2], McNemar p = 1.0000; moved 11, broke 12",
-        "mechanism": {
-          "admission": {
-            "board": "all",
-            "policy": "state"
-          },
-          "charsMean": {
-            "board": 150.0,
-            "policy": 137.6
-          },
-          "changes": {
-            "board": 262,
-            "policy": 201
-          },
-          "tailHeld": {
-            "board": 845,
-            "policy": 883
-          }
-        },
-        "billPerEpisode": {
-          "board": 0.00562,
-          "policy": 0.00521,
-          "change": "-7%"
-        }
-      }
-    },
-    {
-      "id": "R222",
-      "title": "the admission rule at a resolution that could see it \u2014 800 tasks, or not at all",
-      "status": "cancelled",
-      "dispatchBy": "2026-12-12T12:00:00Z",
-      "arms": [
-        "board",
-        "policy"
-      ],
-      "episodes": 1600,
-      "estimateUsd": 7.4,
-      "dependsOn": [
-        "R219b"
-      ],
-      "why": "Pooled over two dispatches the rule is +4.8 pp [-1.2, +10.8]: inside the 13.2 pp a 114-task grid can resolve (R218c), which is why the first dispatch's +10.5 pp did not replicate. An accuracy claim would need ~800 tasks a contrast, 1,600 episodes, about $7.4 = CNY 53. Registered so the option is priced rather than forgotten; it is NOT the next item, because the rule is a correctness repair and the cost saving is already measured at -4% and -7%.",
-      "correctedUsd": 13.73,
-      "correctedAttempts": 10.95,
-      "outcome": "cancelled on its own arithmetic: the registration prices 1,600 episodes at $7.4 to resolve the rule's +4.8 pp, but the decomposition fitted from R218b says 4.8 pp needs 10.95 attempts a task and 2,497 episodes, $13.73 \u2014 the label was 85% low because it assumed episodes are independent when the task-level spread says otherwise. At $7.4 the round would have bought about 70% power, which is the worst purchase available: enough to run, not enough to believe."
-    },
-    {
-      "id": "R220c",
-      "title": "the price of a move, measured rather than derived \u2014 what R216b's -4% is made of",
-      "status": "read",
-      "dispatchBy": "2026-11-29T12:00:00Z",
-      "prereg": "prereg/R220c-moveprice.md",
-      "arms": [
-        "none"
-      ],
-      "episodes": 0,
-      "estimateUsd": 0.02,
-      "dependsOn": [
-        "R220b"
-      ],
-      "why": "R216b read the shipped tail at -4% against the second-system shape and explained it with a number it never measured: a change behind the conversation re-bills the block, a change in front of it re-bills everything behind it. `movePrice` computes that from the provider's own cache counters and the probe has always been able to ask for it with --rewrite-at; no dispatch ever has. A derived explanation of a measured bill is the shape this project refuses.",
-      "instrument": "pnpm eval:cache-probe --rewrite-at 10 (five shapes, nine turns, one changed call each: cents)",
-      "run": 45749577193,
-      "readAt": "2026-11-26T03:52:00Z",
-      "actualUsd": 0.02,
-      "outcome": "read and REFUTED: a move costs the same 2,010 tokens wherever the block sits, so the tail is not the cheap placement the derivation assumed",
-      "reading": {
-        "move_tokens": {
-          "control": -111,
-          "system-second": 2010.5,
-          "system-merged": 2010.5,
-          "tail": 2010.5,
-          "first-turn": 1882.5
-        },
-        "block_tokens_measured": 1497,
-        "state": "placement-is-free",
-        "calls": 55,
-        "cache_field_reported_calls": 45,
-        "prediction": "tail < system-second < system-merged < first-turn, with the tail within one block of zero",
-        "verdict": "the ordering is refuted: the three conversation-adjacent shapes price identically at 2,010.5 tokens, 1.34 blocks, and the first-turn shape is the cheapest at 1,882.5 \u2014 the tail is not cheaper than a front placement, and R216b's -4% therefore keeps no derivation",
-        "steadyState": "a second system message is re-billed 17 tokens a call over the control, inside the 128-token tolerance, so the steady-state premium is not where the -4% lives either"
-      }
-    },
-    {
-      "id": "R223",
-      "title": "when nothing should be served \u2014 the serving decision screened before it is armed",
-      "status": "read",
-      "dispatchBy": "2026-11-30T12:00:00Z",
-      "estimateUsd": 0.0,
-      "readAt": "2026-11-26T03:40:00Z",
-      "actualUsd": 0.0,
-      "dependsOn": [
-        "R218b",
-        "R219b"
-      ],
-      "outcome": "screened, not armed: 385 prefix cuts over R218b's 228 pairs yielded one admissible policy, and it did not replicate on the held-out half",
-      "why": "The stratified reading says the block is worth +7.5 points on the half-solved tasks and costs -9.5 on the solved ones, so the decision worth money is whether to serve at all. That decision needs an observable that exists before the outcome, and a replay over the one grid holding both arms prices any candidate for nothing.",
-      "reading": {
-        "cuts": 385,
-        "pairs": 228,
-        "admissibleInSample": 1,
-        "expectedByChance": 9.6,
-        "chosen": "skip openingAsks at least 2",
-        "screen": "35% skipped, skipDelta +13.8 pp on 15 discordant pairs (13 up, 2 down), p = 0.0074",
-        "confirm": "59% served, skipDelta +3.2 pp on 21 discordant pairs (12 up, 9 down), p = 0.66 \u2014 NOT_CONFIRMED",
-        "pooled": "skipDelta +8.1 pp on 36 discordant pairs (25 up, 11 down), p = 0.029, DOMINATED on the serve half",
-        "refutedForFree": {
-          "askCount": "110 of 114 openings state at least one ask, so a gate serves 96.5%",
-          "firstToolFamily": "the first call is an identity lookup in 452 of 456 episodes, so a gate serves 99.1%"
-        },
-        "taskLevel": "the opening turn is constant across a task's four attempts on 100% of tasks, so the only admissible cut was an admission rule and not a serving gate",
-        "resolution": {
-          "domain": "retail, 114 tasks \u2014 the whole domain, so the task count is a ceiling and not a choice",
-          "observed": {
-            "attempts": 4,
-            "episodes": 912,
-            "mde": 0.0672
-          },
-          "rungs": [
-            {
-              "attempts": 1,
-              "mde": 0.1224
-            },
-            {
-              "attempts": 2,
-              "mde": 0.0889
-            },
-            {
-              "attempts": 4,
-              "mde": 0.0672
-            }
-          ],
-          "fit": {
-            "a": 0.20247,
-            "b": 0.01496,
-            "state": "FIT"
-          },
-          "wall": 0.0321,
-          "wallMeans": "repeating a task lowers only the measurement half of the error; at 114 tasks the other half is the floor, so no budget resolves an effect below 3.21 pp inside this domain",
-          "unreachable": {
-            "sotaGap": 0.0023,
-            "largestOwnEffect": 0.032
-          },
-          "priced": {
-            "+0.048": {
-              "attempts": 10.95,
-              "episodes": 2497,
-              "usd": 13.73
-            }
-          },
-          "whyItMatters": "the 0.23 pp between this project and the strongest text row, and the 3.2 pp of this project's own largest measured effect, both sit under the floor \u2014 so a point-estimate claim on this domain is unprovable in either direction, and more episodes cannot change that"
-        }
-      }
-    },
-    {
-      "id": "R224",
-      "title": "reconstruct the memory against the live state \u2014 priced before it was registered, and refused",
-      "status": "cancelled",
-      "dispatchBy": "2026-12-12T12:00:00Z",
-      "estimateUsd": 18.0,
-      "dependsOn": [
-        "R218b"
-      ],
-      "why": "The literature's strongest published gate is a content repair rather than a serving one: reconstruct the memory against the current state and ALFWorld reads 85.2 against 79.6 without. This project's own stratification measures the same harm, so the round would test whether reconstruction recovers it.",
-      "outcome": "cancelled for nothing, before dispatch: a content repair can only reach the tasks whose material was wrong, and this project's harm is not in the tasks whose material was wrong. The 66 tasks a no-memory arm solved every attempt lose 9.5 pp by being served at all, which a better sentence does not fix. Crediting the whole published 5.6 pp to the mixed stratum gives +2.11 pp at the arm level; doubling that gain gives +2.83 pp. Both are under the domain's 3.21 pp floor, so the round could not have produced a readable result at any sample size this budget allows.",
-      "priced": {
-        "mixedStratumGain": 0.056,
-        "armLift": 0.0211,
-        "armLiftIfDoubled": 0.0283,
-        "floor": 0.0321
-      }
-    },
-    {
-      "id": "R225",
-      "title": "what the episode reveals \u2014 the serving decision read from the payload rather than from the request",
-      "status": "read",
-      "dispatchBy": "2026-12-05T12:00:00Z",
-      "prereg": "prereg/R225-reveal-gate.md",
-      "arms": [
-        "none"
-      ],
-      "episodes": 0,
-      "estimateUsd": 0.0,
-      "dependsOn": [
-        "R218b",
-        "R223"
-      ],
-      "why": "R223 closed the space of things a request declares and named its successor in the same document: read what the episode reveals. The lane had never read the first state payload, and R223 pre-committed the consequence of that reading being empty \u2014 that the harm is a property of the material's presence and not of its content. A screen over a grid already on disk decides it for nothing.",
-      "instrument": "python3 eval/tools/serve_policy.py --control control.json --treatment front.json --out r225-reveal.json",
-      "readAt": "2026-11-26T05:40:00Z",
-      "actualUsd": 0.0,
-      "outcome": "screened and REFUTED: 565 reveal-keyed cuts over R218b's 456 pairs yield 18 admissible, against 14.1 from noise alone (z = +1.04, p = 0.148), and the cut the screen chose reverses sign on the half it never saw",
-      "reading": {
-        "cuts": 565,
-        "pairs": 456,
-        "screenPairs": 228,
-        "confirmPairs": 228,
-        "admissibleInSample": 18,
-        "expectedByChance": 14.1,
-        "excess": {
-          "observed": 18,
-          "expected": 14.1,
-          "sd": 3.71,
-          "z": 1.04,
-          "p": 0.1482
-        },
-        "chosen": "skip revealLeaves>=52",
-        "confirm": "skips 66% of the pairs for -6.5 pp on 17 discordant pairs (6 up, 11 down), p = 0.3323, and serves the rest at -2.0 pp \u2014 NOT_CONFIRMED",
-        "pooled": "+1.8 pp against serving everything and +0.2 pp against serving nothing, DOMINATED on the serve half",
-        "family": [
-          "revealShape",
-          "revealChars",
-          "revealKeys",
-          "revealEntries",
-          "revealLeaves",
-          "revealOptions"
-        ],
-        "taskConstancy": "the reveal is nearly as task-constant as the request: revealEntries and revealChars vary inside a task on 11% of tasks, against 4% for the first tool call, so a cut on it is an admission rule for a task class and not a gate for one attempt",
-        "boundary": "the prefix now ends at the reveal's own result, which is the turn R219's invocation policy serves on, so the gate is implementable rather than counterfactual",
-        "consequence": "no observable decision recovers the +7.5 / -9.5 stratification, from the request (R223) or from the reveal (R225), so the harm belongs to the material's presence"
-      },
-      "artefacts": [
-        "prereg/R225-reveal-gate.md",
-        "eval/tools/serve_policy.py"
-      ]
-    },
-    {
-      "id": "R226",
-      "title": "the airline grid, admitted or refused before it is bought \u2014 the two numbers applied to the last purchase",
-      "status": "read",
-      "dispatchBy": "2026-12-05T12:00:00Z",
-      "prereg": "prereg/R226-airline-admission.md",
-      "arms": [
-        "none"
-      ],
-      "episodes": 0,
-      "estimateUsd": 0.0,
-      "dependsOn": [
-        "R223",
-        "R217"
-      ],
-      "why": "R223's test cancelled two rounds. The queue still holds one purchase, and no document had applied the test to it: 50 independent tasks in a domain this project has never measured. The floor for that grid and the mechanism's largest measured effect decide it, and both are arithmetic on artefacts already on disk.",
-      "instrument": "python3 eval/tools/resolution.py --control control.json --treatment front.json --domain-tasks 50 --delta 7.9",
-      "readAt": "2026-11-26T06:05:00Z",
-      "actualUsd": 0.0,
-      "outcome": "ADMITTED at the four-attempt rung by 1.18 pp: a 50-task grid resolves 6.72 pp at four attempts against a mechanism measured at 7.90, and 12.24 pp at one attempt, which fails outright",
-      "reading": {
-        "floorAt50Tasks": 0.0485,
-        "mdeByRung": {
-          "1": 0.1224,
-          "2": 0.0889,
-          "4": 0.0672
-        },
-        "mechanismPp": 0.079,
-        "marginPp": 0.0118,
-        "requiredTransfer": 0.85,
-        "priceCorrected": "400 episodes at the measured $0.0052-0.0056 is $2.20, about CNY 16, against the CNY 5.4 the queue carried: the queue's figure was registered when the round was one attempt an arm, and the design it needs is four",
-        "assumption": "the floor transfers retail's b = 0.01496 to airline; b is a property of the domain and airline's is unknown until an airline grid exists, so the transfer buys an order of magnitude and not a number",
-        "whyAirlineAtAll": "not resolution \u2014 airline is worse per task than retail at 50 tasks against 114 \u2014 but a second domain, which is the only thing that can say whether a finding is about memory or about retail"
-      },
-      "artefacts": [
-        "prereg/R226-airline-admission.md"
-      ]
-    },
-    {
-      "id": "R217a",
-      "title": "the airline parser \u2014 the board's families and receipts, taught the domain before it is dispatched into",
-      "status": "read",
-      "dispatchBy": "2026-12-03T12:00:00Z",
-      "prereg": "prereg/R217a-airline-parser.md",
-      "arms": [
-        "none"
-      ],
-      "episodes": 0,
-      "estimateUsd": 0.0,
-      "dependsOn": [
-        "R226"
-      ],
-      "why": "R226 admits R217 and names what blocks it: FAMILIES maps retail write tools to ask families, and an airline transcript's writes are not in it, so a dispatch today would serve a block whose items never settle. That is not a null result, it is a broken instrument reporting one, and the census that prevents it costs nothing because the airline tasks carry their own required actions.",
-      "bar": "the parser's family recall on the 50 airline requests at or above the retail parser's own, measured by --census before any dispatch is armed",
-      "readAt": "2026-11-26T07:05:00Z",
-      "actualUsd": 0.0,
-      "outcome": "REFUTED: the retail parser reaches 15 of 50 required airline writes (30.0% family recall) against its own 83.3% on retail, measured by the same census, so R217 is cancelled before dispatch",
-      "reading": {
-        "airline": {
-          "tasks": 50,
-          "required": 50,
-          "found": 15,
-          "familyRecall": 0.3,
-          "spurious": 52,
-          "tasksCovered": 29
-        },
-        "retail": {
-          "tasks": 114,
-          "required": 226,
-          "found": 176,
-          "familyRecall": 0.8333,
-          "spurious": 235,
-          "tasksCovered": 84
-        },
-        "instrument": "eval/tools/goal_board.py --census over eval/manifests/airline-goals.json, built from tau2 v1.0.1's own airline tasks.json: 50 tasks, 50 required writes, 7 with none",
-        "whatWasBuilt": "five airline write tools enter FAMILIES (cancel_reservation, update_reservation_flights, the passenger and baggage updates, book_reservation) and three cues enter the shared table after the retail seven, which the unchanged retail census is what proves harmless",
-        "decomposition": {
-          "askIsNotTheAction": "5 cancel misses and the 1 transfer are cases where the policy makes the correct action a different family from the stated ask: a change is settled by cancel-and-rebook, and a refusal is settled by a transfer",
-          "noActionVerb": "5 book misses include requests that state only a route (\"you want to fly from New York to Seattle\") and asks phrased as \"make a reservation\", which names an object and no action",
-          "cuePriority": "modify fires before passenger and baggage, so \"change the passenger to yourself\" reports a modify; one clause carries one family and these asks carry two",
-          "domainCollision": "the retail cue for `return` fires on \"the return flight is May 20\" in 5 tasks, where return names a leg and not a request"
-        },
-        "whyItIsNotAVocabularyProblem": "two of the four causes are properties of the domain rather than gaps in a word list, and the board's contract is what they break: an ask settles against a receipt of the same family, which holds in a catalogue domain where the request names the action and does not hold where the action is a policy consequence"
-      }
-    },
-    {
-      "id": "R217",
-      "title": "the airline column \u2014 50 independent tasks, a second domain, and the transfer of the mechanism",
-      "status": "cancelled",
-      "dispatchBy": "2026-12-10T12:00:00Z",
-      "prereg": "prereg/R217-airline.md",
-      "arms": [
-        "control",
-        "board"
-      ],
-      "episodes": 400,
-      "estimateUsd": 0.0,
-      "dependsOn": [
-        "R217a",
-        "R226"
-      ],
-      "why": "Retail's floor is 3.21 pp and no budget lowers it, so the only purchase that buys anything is more independent tasks in a domain not yet measured. Airline is 50 tasks, its published column is unsaturated (top 84.0, median 63.8 over 24 rows), and R226 prices the grid at 6.72 pp of resolution at four attempts against a mechanism measured at 7.90.",
-      "bar": "the paired pass^1 delta at the four-attempt rung, with the served share and the two conditional columns beside it; a reading inside 6.72 pp is a statement about the grid and is reported as one",
-      "priceNote": "CNY 16 at the measured rate, not the CNY 5.4 the queue carried (R226, AUDIT 34.316)",
-      "outcome": "cancelled by its own prerequisite: R217a measured the transfer at 30.0% family recall against retail's 83.3%, and a block whose items never settle is a broken instrument rather than a null result",
-      "cancelledBy": "R217a"
-    },
-    {
-      "id": "R227",
-      "title": "settle by the record, not by the family \u2014 the contract the airline domain actually supports",
-      "status": "read",
-      "dispatchBy": "2026-12-12T12:00:00Z",
-      "prereg": "prereg/R227-record-keyed.md",
-      "arms": [
-        "none"
-      ],
-      "episodes": 0,
-      "estimateUsd": 0.0,
-      "dependsOn": [
-        "R217a"
-      ],
-      "why": "R217a's refutation is not a vocabulary gap: two of its four causes are that the correct action has a different family from the stated ask (a change is settled by cancel-and-rebook) and that \"return\" names a leg in this domain. The board settles an ask against a receipt of the same family, which is a contract a catalogue domain supports and a policy domain does not. The successor rewrites the contract rather than the word list: an ask settles against a receipt that touches the record it names, whatever family that receipt is in.",
-      "bar": "family recall is replaced by a record-recall bar: on the 50 airline requests, the share of required writes whose record the parser names, at or above 0.75, measured by the same census before any dispatch",
-      "instrument": "python3 eval/tools/record_census.py --goals eval/manifests/airline-records.json --family-found 15",
-      "readAt": "2026-11-26T09:45:00Z",
-      "actualUsd": 0.0,
-      "outcome": "REFUTED: 27 of 50 graded airline writes are named by their record (54.0%) against the registered 0.75 bar, and 30 of 50 with the family rule the round retires; the misses are 13 writes on asks that select a set of records by a predicate and 6 bookings whose object the policy chooses, so the reference in this corpus is a set or a decision rather than a record",
-      "reading": {
-        "writes": 50,
-        "writingTasks": 27,
-        "refusingTasks": 23,
-        "idOnly": 7,
-        "single": 25,
-        "pair": 27,
-        "familyFound": 15,
-        "unionFound": 30,
-        "recall": {
-          "id": 0.14,
-          "single": 0.5,
-          "pair": 0.54,
-          "family": 0.3,
-          "union": 0.6
-        },
-        "bar": 0.75,
-        "misses": {
-          "total": 23,
-          "setPredicate": 13,
-          "policyChosenBooking": 6,
-          "chained": 2,
-          "unnameableRecord": 1,
-          "noRecord": 1
-        }
-      }
-    },
-    {
-      "id": "R228",
-      "title": "bind the item to the read, not to the words \u2014 the settlement a policy domain can support",
-      "status": "read",
-      "dispatchBy": "2026-12-19T12:00:00Z",
-      "prereg": "prereg/R228-read-anchored.md",
-      "arms": [
-        "none"
-      ],
-      "episodes": 0,
-      "estimateUsd": 0.0,
-      "dependsOn": [
-        "R227"
-      ],
-      "why": "R227 closed the record rule at 54.0% and named why: 13 of its 23 misses are asks over a *set* of records selected by a predicate the request never spells as tokens (\"all your upcoming flights\", \"flights longer than four hours\", \"multiple flights for the same day\"), and 6 are bookings whose object the policy chooses. A reference that neither the words nor the record can supply is supplied by the agent's own reads, which this lane has never used as the anchor. The successor binds each item to the record the episode reads and settles it on the write that touches that record, and it is measurable at zero cost on the retail grid the lane already owns.",
-      "bar": "on the retail grid already on disk, the read-anchored board must settle at least as many of its writing episodes as the request-anchored board does (the 1.18 pp admission R226 priced), while its false-accusation rate does not rise",
-      "instrument": "python3 eval/tools/read_anchor.py --document <grid>/control.json --replicate <grid>/front.json --scope strict",
-      "readAt": "2026-11-26T10:40:00Z",
-      "actualUsd": 0.0,
-      "outcome": "REFUTED on B3: the read-anchored board settles 644 of 654 discharged required writes (98.5%) against the request board's 416 (63.6%) and credits zero calls to nothing, but it opens 1019 items no required write needs (2.53 per episode against 1.79 required), and the open-tax bar refuses it on both grids (2.53/1.79 and 2.54/1.81)",
-      "reading": {
-        "grid": {
-          "episodes": 456,
-          "graded": 403,
-          "discharged": 654,
-          "required": 720
-        },
-        "boards": {
-          "strict": {
-            "covered": 644,
-            "complete": 393,
-            "unaccounted": 0,
-            "overCredit": 6,
-            "items": 1633,
-            "open": 1035,
-            "openUnneeded": 1019,
-            "precision": 0.991
-          },
-          "request": {
-            "covered": 416,
-            "complete": 225,
-            "unaccounted": 232,
-            "overCredit": 3,
-            "items": 970,
-            "open": 527,
-            "openUnneeded": 278,
-            "precision": 0.993
-          }
-        },
-        "replication": {
-          "strict": {
-            "coverage": 0.981,
-            "openUnneededPerEpisode": 2.54
-          },
-          "request": {
-            "coverage": 0.611,
-            "unaccounted": 240
-          }
-        },
-        "bars": {
-          "B1_settlement": true,
-          "B2_accusation": true,
-          "B3_openTax": false
-        }
-      }
-    },
-    {
-      "id": "R229",
-      "title": "an item is an ask, and the read supplies the binding",
-      "status": "read",
-      "dispatchBy": "2026-12-23T12:00:00Z",
-      "prereg": "prereg/R229-ask-bound.md",
-      "instrument": "python3 eval/tools/read_anchor.py --document <grid>/control.json --replicate <grid>/front.json --scope ask",
-      "readAt": "2026-11-26T10:55:00Z",
-      "actualUsd": 0.0,
-      "arms": [
-        "none"
-      ],
-      "episodes": 0,
-      "estimateUsd": 0.0,
-      "dependsOn": [
-        "R228"
-      ],
-      "why": "R228 priced two rules against each other and neither is a working memory: the request board attributes 63.6% of the required writes and accuses 232 calls, the read board attributes 98.5% and opens 2.53 unneeded items per episode. The two failures are one representational fact \u2014 what is required is only in the request, and which record a call touched is only in the read \u2014 so the successor binds an ask to a write of its family that touches a record the episode opened.",
-      "bar": "coverage of discharged required writes at or above the request board's on the same episodes, unaccounted writes at or below its 232, and at least 0.90 of the board's ticks backed by a graded write",
-      "outcome": "REFUTED on B1: the conjunction keeps the request board's items and gains 10 complete episodes while losing 12, covering 415 of 654 writes (63.5%) against the request board's 416, so the read rule's completeness came from having no ask at all; it holds on the replication (+1.7pp, 404 against 393), which is reported as a property of the grids, not as a pass. Its taxonomy is the round's real result: 155 of the 232 misses are asks stated after the first user turn, 61 are asks already spent, 16 are never stated",
-      "reading": {
-        "ask": {
-          "covered": 415,
-          "complete": 223,
-          "unaccounted": 232,
-          "items": 970,
-          "precision": 0.993,
-          "unaccountedBy": {
-            "disclosedLater": 155,
-            "consumed": 61,
-            "neverStated": 16
-          }
-        },
-        "request": {
-          "covered": 416,
-          "complete": 225,
-          "unaccounted": 232,
-          "items": 970
-        },
-        "askAll": {
-          "covered": 625,
-          "complete": 375,
-          "unaccounted": 19,
-          "items": 4761,
-          "openUnneededPerEpisode": 3.9
-        },
-        "replication": {
-          "ask": {
-            "covered": 404
-          },
-          "request": {
-            "covered": 393
-          },
-          "askAll": {
-            "covered": 611
-          }
-        },
-        "bars": {
-          "B1_settlement": false,
-          "B2_accusation": true,
-          "B3_soundness": true
-        }
-      }
-    },
-    {
-      "id": "R230",
-      "title": "admit a later-turn ask only from a turn that is not an answer",
-      "status": "registered",
-      "dispatchBy": "2026-12-24T12:00:00Z",
-      "prereg": "prereg/R230-not-an-answer.md",
-      "arms": [
-        "none"
-      ],
-      "episodes": 0,
-      "estimateUsd": 0.0,
-      "dependsOn": [
-        "R229"
-      ],
-      "why": "R229's taxonomy put 155 of its 232 unattributed writes on asks the conversation states after the first user turn, which makes disclosure order the largest defect this lane has measured in the block's own content. Following the conversation is not the repair either: the same binding rule over every user turn reaches 95.6% of the required writes at 4761 items, 4.9x the turn-one contract, because a user's *answer* can contain a cue word and be read as an ask. The successor tests the one discriminator that needs no vocabulary: an ask is admitted from a later turn only when the agent's previous turn did not ask the user a question, so a reply to a question is not a requirement.",
-      "bar": "of the 155 writes R229 attributed to later-turn asks, at least 60% must still be accounted for; the admitted asks must not exceed twice the turn-one contract's 970 items; and coverage must rise at least 10 points over the request board's 63.6%"
+    "attribution": "65.7% of 108 writing episodes",
+    "strata": {
+     "easy": "-10.8 pp (83 of 93)",
+     "hard": "+61.9 pp (13 of 21)",
+     "moved": 13,
+     "broke": 10
     }
-  ]
+   }
+  },
+  {
+   "id": "R218b",
+   "title": "the reliability column \u2014 four attempts, control against front",
+   "status": "read",
+   "dispatchBy": "2026-11-27T12:00:00Z",
+   "prereg": "prereg/R218b-pass4.md",
+   "arms": [
+    "control",
+    "front"
+   ],
+   "trials": 4,
+   "episodes": 912,
+   "estimateUsd": 4.75,
+   "dependsOn": [
+    "R216b"
+   ],
+   "dispatchedAt": "2026-11-25T15:32:00Z",
+   "run": 45646309827,
+   "readAt": "2026-11-25T16:45:00Z",
+   "actualUsd": 4.677,
+   "outcome": "refuted on two of five bars",
+   "reading": {
+    "control": "pass^1 96/114 (84.2%), pass^4 66/114 (57.9%), $0.00442 an episode",
+    "front": "pass^1 89/114 (78.1%), pass^4 61/114 (53.5%), $0.00584 an episode",
+    "deltaPass1": "-6.1 pp [-16.2, +4.1], McNemar p = 0.2295",
+    "deltaPass4": "-4.4 pp [-17.0, +8.4], McNemar p = 0.4869",
+    "attribution": "71.7% of 417 writing episodes",
+    "dependence": {
+     "icc": {
+      "control": 0.773,
+      "front": 0.745
+     },
+     "ratio": {
+      "control": 0.6875,
+      "front": 0.6854
+     },
+     "independentAttempts": 1.2
+    },
+    "drift": {
+     "front": [
+      86.84,
+      81.6,
+      78.07
+     ],
+     "control": [
+      78.95,
+      84.21
+     ]
+    },
+    "placement": {
+     "1x": "7th of 17",
+     "2xTextVerbatim": "2nd of 9"
+    }
+   }
+  },
+  {
+   "id": "R218c",
+   "title": "the placebo, interleaved \u2014 two identical arms, task by task, registered delta of zero",
+   "status": "read",
+   "dispatchBy": "2026-11-26T18:00:00Z",
+   "prereg": "prereg/R218c-interleave.md",
+   "arms": [
+    "control",
+    "control"
+   ],
+   "trials": 1,
+   "episodes": 228,
+   "estimateUsd": 1.3,
+   "dependsOn": [
+    "R218b"
+   ],
+   "why": "R218b found the same treatment arm reading 86.84, 81.60 and 78.07 in one afternoon, and the arms in its grid ran 35 minutes apart. Two identical arms interleaved task by task must read zero; if they do not, no contrast on this grid is measurable and the repair is the grid.",
+   "dispatchedAt": "2026-11-25T17:33:52Z",
+   "run": 45666085846,
+   "readAt": "2026-11-25T18:20:00Z",
+   "actualUsd": 1.0295,
+   "outcome": "the grid is usable and the asymmetry bar was mis-specified: 4 of 5 endpoints hold, the fifth by one task",
+   "reading": {
+    "controlA": "92/114 (80.70%), $0.004575 an episode",
+    "controlB": "95/114 (83.33%), $0.004455 an episode",
+    "deltaPp": 2.63,
+    "moved": 16,
+    "broke": 13,
+    "held": 79,
+    "neither": 6,
+    "unpaired": 0,
+    "p": 0.7111,
+    "billRatio": 0.9736,
+    "gapSeconds": {
+     "separationMedian": 70.9,
+     "separationMax": 100.3,
+     "handoverMedian": 0.0,
+     "blocks": 15
+    },
+    "turnover": {
+     "tasks": 29,
+     "rate": 0.254,
+     "r218bCrossDispatch": 0.22
+    },
+    "resolution": {
+     "detectablePp": 13.2,
+     "tasksFor5pp": 799,
+     "tasksFor10pp": 200,
+     "tasksInTau2": 300
+    },
+    "verdict": "ORDER_ASYMMETRIC: 16 against 13 is three tasks past a two-task window on 29 discordant pairs, which is p = 0.71",
+    "finding": "turnover does not shrink when the gap shrinks 30x: 25.4% at 71 s against R218b's 22% at 35 min, so the drift is sampling noise rather than a time confound, and no schedule repairs it"
+   }
+  },
+  {
+   "id": "R218d",
+   "title": "the dose inside the task \u2014 does an attempt that received more material pass more often",
+   "status": "read",
+   "dispatchBy": "2026-11-26T12:00:00Z",
+   "estimateUsd": 0.0,
+   "readAt": "2026-11-25T17:50:00Z",
+   "actualUsd": 0.0,
+   "dependsOn": [
+    "R218b"
+   ],
+   "outcome": "built and read on R218b's documents: NO_DOSE on both arms, because a front-placement block never enters the transcript",
+   "why": "Every flat reading this lane has is a between-arm mean. Within one task, the four attempts of R218b received different amounts of material, and comparing them holds the difficulty fixed \u2014 the one decomposition a two-arm grid cannot make.",
+   "reading": {
+    "control": "456 episodes, 0 with a block, state NO_DOSE",
+    "front": "456 episodes, 0 with a block, state NO_DOSE \u2014 while the log counts 4,341 renders",
+    "whyNoDose": "the block goes into `state.system_messages`, which is composed into the request; `grep -c microglia-board` over 32 MB of front.json is 0",
+    "reconstructionTried": {
+     "boundaries": 7813,
+     "renders": 4341,
+     "charsPerBoundary": 121.0,
+     "charsPerRender": 146.3,
+     "verdict": "not implemented \u2014 the ordering is turn count, which is the same variable that makes a retail episode fail"
+    },
+    "repair": "R218e records the dose at the source, per episode"
+   }
+  },
+  {
+   "id": "R218e",
+   "title": "the dose, recorded where it is known \u2014 one line an episode, written by the arm",
+   "status": "read",
+   "dispatchBy": "2026-12-02T12:00:00Z",
+   "arms": [
+    "board"
+   ],
+   "episodes": 228,
+   "estimateUsd": 1.1,
+   "dependsOn": [
+    "R218d"
+   ],
+   "why": "R218d could not read a treated arm's material because the material was never written down: the block is in the request and the transcript is the conversation. One JSONL line an episode \u2014 turns, block characters, renders, the final verdict \u2014 turns the question the lane keeps asking into one it can answer per episode. The recording is the only route: the transcript holds no prompt.",
+   "amended": "Registered 25 November with 114 episodes and a transcript check. Amended 26 November, before dispatch, on three measurements that cost nothing: (1) tau2 stores no `system` message at either placement, so the transcript check is impossible and is replaced by an identity against the phase census; (2) one attempt a task cannot produce a within-task pair, so the grid is 114 x 2 rounds; (3) the trial index is the round, not a turn count.",
+   "build": "agent records one dict an episode (turns/renders/chars/written/changes/stable) at the single boundary site; runner resolves text->task and partitions by round; eval/drivers/tau2/dose.py joins and refuses three states; board_dose.py --sidecar reads it, and answers NO_SYSTEM on a transcript",
+   "run": 45752387029,
+   "dispatchedAt": "2026-11-26T08:03:10+08:00",
+   "actualUsd": 1.2217,
+   "outcome": "DOSE_READ, and the dose is null at both scales: over the 114 tasks whose two rounds received different amounts the higher-dose side read above on 14 and below on 14 with 86 level (p = 1.0000), and on the 17 tasks whose sides averaged within one turn of each other it read 2 against 3 with 12 level (p = 1.0000). The recorded block averages 1,421 characters an episode and 222 of 228 episodes carried one, so the material was present and its size varied by a median of 820 characters \u2014 and more of it changed nothing.",
+   "reading": {
+    "run": 45752387029,
+    "state": "DOSE_READ",
+    "source": "sidecar",
+    "episodes": 228,
+    "tasks": 114,
+    "coverage": {
+     "matched": 228,
+     "unordered": 0,
+     "unscored": 0,
+     "retries": 0
+    },
+    "episodesWithDose": 222,
+    "doseCharsMean": 1421.4,
+    "doseCharsMedian": 1202,
+    "doseGapMedianChars": 820.5,
+    "turnGapMedian": 7.0,
+    "full": {
+     "pairs": 114,
+     "higherWins": 14,
+     "lowerWins": 14,
+     "level": 86,
+     "higherPassed": 90,
+     "lowerPassed": 90,
+     "p": 1.0
+    },
+    "decided": {
+     "tolerance": 1,
+     "closeTurnPairs": 17,
+     "higherWins": 2,
+     "lowerWins": 3,
+     "level": 12,
+     "tiedTurnPairs": 6,
+     "closeDoseGapMedianChars": 108,
+     "p": 1.0
+    },
+    "verdict": "the full grid is a sign test with power and no direction (28 discordant tasks, 14-14, p = 1.0); the length-matched subset is a direction with no power (5 discordant tasks, 2-3, p = 1.0, and five is under the six a unanimous test needs). Neither supports the premise, and the pre-registered rule returns a bound rather than a verdict because the decided subset is one task short of six.",
+    "unit": "the sign test reads tasks and not attempts. An attempt inside a task is not an independent draw, and the first read of this grid counted passing attempts instead \u2014 180 of them standing in for 114 pairs, reported as '90 against 90 attempt-pairs' (AUDIT 34.313). The correction changed no verdict and changed every number in the sentence."
+   },
+   "readAt": "2026-11-26T04:40:00Z"
+  },
+  {
+   "id": "R219",
+   "title": "the invocation policy \u2014 serve the state when a write needs it, not when it is renderable",
+   "status": "read",
+   "dispatchBy": "2026-11-30T12:00:00Z",
+   "arms": [
+    "board",
+    "policy"
+   ],
+   "episodes": 228,
+   "estimateUsd": 1.2,
+   "dependsOn": [
+    "R216b"
+   ],
+   "prereg": "prereg/R219-admission.md",
+   "amended": "Registered 2026-11-25 with arms front+policy. Amended 2026-11-26, before dispatch: the tail is the placement the product ships (R216b, serving-defaults.json), so the rule is tested at the tail; testing it at the front would price a treatment the product does not use.",
+   "why": "The block has two state lines and two judgment lines. The judgments are the parser's claims about the request, and `goal_board.py --accusations` reads 1,808 of 1,965 of them (92.0%) on R218b's front arm as naming a family the task requires a write in. The rule admits state and refuses to admit judgment; the bar is a count in one stratum (regressions 6 -> <=1, rescues >=12 of 15).",
+   "instrument": "eval/tools/goal_board.py --accusations (free: reads an R218b artefact)",
+   "dispatchedAt": "2026-11-26T03:24:00+08:00",
+   "run": 45684914838,
+   "readAt": "2026-11-26T04:05:00+08:00",
+   "actualUsd": 1.2329,
+   "outcome": "read, then not replicated. The first dispatch read +10.5 pp; the identical second read -0.9 pp. Pooled +4.8 pp [-1.2, +10.8], McNemar p = 0.152: no accuracy claim. The mechanism replicated exactly in both (admission all/state, chars -8%, changes -19%, bill -4% and -7%), so the null is about the effect and not about the treatment.",
+   "reading": {
+    "board": "87/114 (76.3%)",
+    "policy": "99/114 (86.8%)",
+    "delta": "+10.5 pp [+0.4, +20.5], McNemar p = 0.029; moved 19, broke 7",
+    "mechanism": {
+     "admission": {
+      "board": "all",
+      "policy": "state"
+     },
+     "charsMean": {
+      "board": 152.4,
+      "policy": 140.1
+     },
+     "changes": {
+      "board": 260,
+      "policy": 211
+     },
+     "tailHeld": {
+      "board": 854,
+      "policy": 937
+     }
+    },
+    "billPerEpisode": {
+     "board": 0.00552,
+     "policy": 0.0053,
+     "change": "-4%"
+    },
+    "strataVsR218bControl": {
+     "easy": 96,
+     "boardRegressions": 21,
+     "policyRegressions": 1,
+     "hard": 18,
+     "boardRescues": 16,
+     "policyRescues": 18
+    },
+    "caveat": "the strata use R218b's control arm because this dispatch ran no control; the paired board-vs-policy contrast is within one dispatch and is the claim",
+    "pooled": {
+     "moved": 30,
+     "broke": 19,
+     "delta": "+4.8 pp [-1.2, +10.8]",
+     "mcnemarP": 0.1524
+    }
+   }
+  },
+  {
+   "id": "R220",
+   "title": "one manifest, two readers \u2014 the configuration the eval measured is the one the product ships",
+   "status": "read",
+   "dispatchBy": "2026-11-29T12:00:00Z",
+   "estimateUsd": 0.0,
+   "readAt": "2026-11-25T16:20:00Z",
+   "actualUsd": 0.0,
+   "outcome": "built; the probe now prices the shipped placement and --board names the population"
+  },
+  {
+   "id": "R219b",
+   "title": "the same two arms, again \u2014 a replication before the rule becomes a default",
+   "status": "read",
+   "dispatchBy": "2026-11-27T12:00:00Z",
+   "prereg": "prereg/R219b-replication.md",
+   "arms": [
+    "board",
+    "policy"
+   ],
+   "episodes": 228,
+   "estimateUsd": 1.25,
+   "dependsOn": [
+    "R219"
+   ],
+   "why": "R219 read +10.5 pp [+0.4, +20.5] with p = 0.029 on 19 moved and 7 broke. The grid's identical arms turn over 25.4% of their tasks, so 26 discordant pairs is what noise produces and only the asymmetry is the signal. A replication is the cheapest instrument for a single dispatch, and the product default does not move until the sign repeats.",
+   "run": 45690987353,
+   "dispatchedAt": "2026-11-26T04:10:00+08:00",
+   "readAt": "2026-11-26T04:32:00+08:00",
+   "actualUsd": 1.235,
+   "outcome": "NO_LIFT: the first reading did not replicate",
+   "reading": {
+    "board": "94/114 (82.5%)",
+    "policy": "93/114 (81.6%)",
+    "delta": "-0.9 pp [-10.9, +9.2], McNemar p = 1.0000; moved 11, broke 12",
+    "mechanism": {
+     "admission": {
+      "board": "all",
+      "policy": "state"
+     },
+     "charsMean": {
+      "board": 150.0,
+      "policy": 137.6
+     },
+     "changes": {
+      "board": 262,
+      "policy": 201
+     },
+     "tailHeld": {
+      "board": 845,
+      "policy": 883
+     }
+    },
+    "billPerEpisode": {
+     "board": 0.00562,
+     "policy": 0.00521,
+     "change": "-7%"
+    }
+   }
+  },
+  {
+   "id": "R222",
+   "title": "the admission rule at a resolution that could see it \u2014 800 tasks, or not at all",
+   "status": "cancelled",
+   "dispatchBy": "2026-12-12T12:00:00Z",
+   "arms": [
+    "board",
+    "policy"
+   ],
+   "episodes": 1600,
+   "estimateUsd": 7.4,
+   "dependsOn": [
+    "R219b"
+   ],
+   "why": "Pooled over two dispatches the rule is +4.8 pp [-1.2, +10.8]: inside the 13.2 pp a 114-task grid can resolve (R218c), which is why the first dispatch's +10.5 pp did not replicate. An accuracy claim would need ~800 tasks a contrast, 1,600 episodes, about $7.4 = CNY 53. Registered so the option is priced rather than forgotten; it is NOT the next item, because the rule is a correctness repair and the cost saving is already measured at -4% and -7%.",
+   "correctedUsd": 13.73,
+   "correctedAttempts": 10.95,
+   "outcome": "cancelled on its own arithmetic: the registration prices 1,600 episodes at $7.4 to resolve the rule's +4.8 pp, but the decomposition fitted from R218b says 4.8 pp needs 10.95 attempts a task and 2,497 episodes, $13.73 \u2014 the label was 85% low because it assumed episodes are independent when the task-level spread says otherwise. At $7.4 the round would have bought about 70% power, which is the worst purchase available: enough to run, not enough to believe."
+  },
+  {
+   "id": "R220c",
+   "title": "the price of a move, measured rather than derived \u2014 what R216b's -4% is made of",
+   "status": "read",
+   "dispatchBy": "2026-11-29T12:00:00Z",
+   "prereg": "prereg/R220c-moveprice.md",
+   "arms": [
+    "none"
+   ],
+   "episodes": 0,
+   "estimateUsd": 0.02,
+   "dependsOn": [
+    "R220b"
+   ],
+   "why": "R216b read the shipped tail at -4% against the second-system shape and explained it with a number it never measured: a change behind the conversation re-bills the block, a change in front of it re-bills everything behind it. `movePrice` computes that from the provider's own cache counters and the probe has always been able to ask for it with --rewrite-at; no dispatch ever has. A derived explanation of a measured bill is the shape this project refuses.",
+   "instrument": "pnpm eval:cache-probe --rewrite-at 10 (five shapes, nine turns, one changed call each: cents)",
+   "run": 45749577193,
+   "readAt": "2026-11-26T03:52:00Z",
+   "actualUsd": 0.02,
+   "outcome": "read and REFUTED: a move costs the same 2,010 tokens wherever the block sits, so the tail is not the cheap placement the derivation assumed",
+   "reading": {
+    "move_tokens": {
+     "control": -111,
+     "system-second": 2010.5,
+     "system-merged": 2010.5,
+     "tail": 2010.5,
+     "first-turn": 1882.5
+    },
+    "block_tokens_measured": 1497,
+    "state": "placement-is-free",
+    "calls": 55,
+    "cache_field_reported_calls": 45,
+    "prediction": "tail < system-second < system-merged < first-turn, with the tail within one block of zero",
+    "verdict": "the ordering is refuted: the three conversation-adjacent shapes price identically at 2,010.5 tokens, 1.34 blocks, and the first-turn shape is the cheapest at 1,882.5 \u2014 the tail is not cheaper than a front placement, and R216b's -4% therefore keeps no derivation",
+    "steadyState": "a second system message is re-billed 17 tokens a call over the control, inside the 128-token tolerance, so the steady-state premium is not where the -4% lives either"
+   }
+  },
+  {
+   "id": "R223",
+   "title": "when nothing should be served \u2014 the serving decision screened before it is armed",
+   "status": "read",
+   "dispatchBy": "2026-11-30T12:00:00Z",
+   "estimateUsd": 0.0,
+   "readAt": "2026-11-26T03:40:00Z",
+   "actualUsd": 0.0,
+   "dependsOn": [
+    "R218b",
+    "R219b"
+   ],
+   "outcome": "screened, not armed: 385 prefix cuts over R218b's 228 pairs yielded one admissible policy, and it did not replicate on the held-out half",
+   "why": "The stratified reading says the block is worth +7.5 points on the half-solved tasks and costs -9.5 on the solved ones, so the decision worth money is whether to serve at all. That decision needs an observable that exists before the outcome, and a replay over the one grid holding both arms prices any candidate for nothing.",
+   "reading": {
+    "cuts": 385,
+    "pairs": 228,
+    "admissibleInSample": 1,
+    "expectedByChance": 9.6,
+    "chosen": "skip openingAsks at least 2",
+    "screen": "35% skipped, skipDelta +13.8 pp on 15 discordant pairs (13 up, 2 down), p = 0.0074",
+    "confirm": "59% served, skipDelta +3.2 pp on 21 discordant pairs (12 up, 9 down), p = 0.66 \u2014 NOT_CONFIRMED",
+    "pooled": "skipDelta +8.1 pp on 36 discordant pairs (25 up, 11 down), p = 0.029, DOMINATED on the serve half",
+    "refutedForFree": {
+     "askCount": "110 of 114 openings state at least one ask, so a gate serves 96.5%",
+     "firstToolFamily": "the first call is an identity lookup in 452 of 456 episodes, so a gate serves 99.1%"
+    },
+    "taskLevel": "the opening turn is constant across a task's four attempts on 100% of tasks, so the only admissible cut was an admission rule and not a serving gate",
+    "resolution": {
+     "domain": "retail, 114 tasks \u2014 the whole domain, so the task count is a ceiling and not a choice",
+     "observed": {
+      "attempts": 4,
+      "episodes": 912,
+      "mde": 0.0672
+     },
+     "rungs": [
+      {
+       "attempts": 1,
+       "mde": 0.1224
+      },
+      {
+       "attempts": 2,
+       "mde": 0.0889
+      },
+      {
+       "attempts": 4,
+       "mde": 0.0672
+      }
+     ],
+     "fit": {
+      "a": 0.20247,
+      "b": 0.01496,
+      "state": "FIT"
+     },
+     "wall": 0.0321,
+     "wallMeans": "repeating a task lowers only the measurement half of the error; at 114 tasks the other half is the floor, so no budget resolves an effect below 3.21 pp inside this domain",
+     "unreachable": {
+      "sotaGap": 0.0023,
+      "largestOwnEffect": 0.032
+     },
+     "priced": {
+      "+0.048": {
+       "attempts": 10.95,
+       "episodes": 2497,
+       "usd": 13.73
+      }
+     },
+     "whyItMatters": "the 0.23 pp between this project and the strongest text row, and the 3.2 pp of this project's own largest measured effect, both sit under the floor \u2014 so a point-estimate claim on this domain is unprovable in either direction, and more episodes cannot change that"
+    }
+   }
+  },
+  {
+   "id": "R224",
+   "title": "reconstruct the memory against the live state \u2014 priced before it was registered, and refused",
+   "status": "cancelled",
+   "dispatchBy": "2026-12-12T12:00:00Z",
+   "estimateUsd": 18.0,
+   "dependsOn": [
+    "R218b"
+   ],
+   "why": "The literature's strongest published gate is a content repair rather than a serving one: reconstruct the memory against the current state and ALFWorld reads 85.2 against 79.6 without. This project's own stratification measures the same harm, so the round would test whether reconstruction recovers it.",
+   "outcome": "cancelled for nothing, before dispatch: a content repair can only reach the tasks whose material was wrong, and this project's harm is not in the tasks whose material was wrong. The 66 tasks a no-memory arm solved every attempt lose 9.5 pp by being served at all, which a better sentence does not fix. Crediting the whole published 5.6 pp to the mixed stratum gives +2.11 pp at the arm level; doubling that gain gives +2.83 pp. Both are under the domain's 3.21 pp floor, so the round could not have produced a readable result at any sample size this budget allows.",
+   "priced": {
+    "mixedStratumGain": 0.056,
+    "armLift": 0.0211,
+    "armLiftIfDoubled": 0.0283,
+    "floor": 0.0321
+   }
+  },
+  {
+   "id": "R225",
+   "title": "what the episode reveals \u2014 the serving decision read from the payload rather than from the request",
+   "status": "read",
+   "dispatchBy": "2026-12-05T12:00:00Z",
+   "prereg": "prereg/R225-reveal-gate.md",
+   "arms": [
+    "none"
+   ],
+   "episodes": 0,
+   "estimateUsd": 0.0,
+   "dependsOn": [
+    "R218b",
+    "R223"
+   ],
+   "why": "R223 closed the space of things a request declares and named its successor in the same document: read what the episode reveals. The lane had never read the first state payload, and R223 pre-committed the consequence of that reading being empty \u2014 that the harm is a property of the material's presence and not of its content. A screen over a grid already on disk decides it for nothing.",
+   "instrument": "python3 eval/tools/serve_policy.py --control control.json --treatment front.json --out r225-reveal.json",
+   "readAt": "2026-11-26T05:40:00Z",
+   "actualUsd": 0.0,
+   "outcome": "screened and REFUTED: 565 reveal-keyed cuts over R218b's 456 pairs yield 18 admissible, against 14.1 from noise alone (z = +1.04, p = 0.148), and the cut the screen chose reverses sign on the half it never saw",
+   "reading": {
+    "cuts": 565,
+    "pairs": 456,
+    "screenPairs": 228,
+    "confirmPairs": 228,
+    "admissibleInSample": 18,
+    "expectedByChance": 14.1,
+    "excess": {
+     "observed": 18,
+     "expected": 14.1,
+     "sd": 3.71,
+     "z": 1.04,
+     "p": 0.1482
+    },
+    "chosen": "skip revealLeaves>=52",
+    "confirm": "skips 66% of the pairs for -6.5 pp on 17 discordant pairs (6 up, 11 down), p = 0.3323, and serves the rest at -2.0 pp \u2014 NOT_CONFIRMED",
+    "pooled": "+1.8 pp against serving everything and +0.2 pp against serving nothing, DOMINATED on the serve half",
+    "family": [
+     "revealShape",
+     "revealChars",
+     "revealKeys",
+     "revealEntries",
+     "revealLeaves",
+     "revealOptions"
+    ],
+    "taskConstancy": "the reveal is nearly as task-constant as the request: revealEntries and revealChars vary inside a task on 11% of tasks, against 4% for the first tool call, so a cut on it is an admission rule for a task class and not a gate for one attempt",
+    "boundary": "the prefix now ends at the reveal's own result, which is the turn R219's invocation policy serves on, so the gate is implementable rather than counterfactual",
+    "consequence": "no observable decision recovers the +7.5 / -9.5 stratification, from the request (R223) or from the reveal (R225), so the harm belongs to the material's presence"
+   },
+   "artefacts": [
+    "prereg/R225-reveal-gate.md",
+    "eval/tools/serve_policy.py"
+   ]
+  },
+  {
+   "id": "R226",
+   "title": "the airline grid, admitted or refused before it is bought \u2014 the two numbers applied to the last purchase",
+   "status": "read",
+   "dispatchBy": "2026-12-05T12:00:00Z",
+   "prereg": "prereg/R226-airline-admission.md",
+   "arms": [
+    "none"
+   ],
+   "episodes": 0,
+   "estimateUsd": 0.0,
+   "dependsOn": [
+    "R223",
+    "R217"
+   ],
+   "why": "R223's test cancelled two rounds. The queue still holds one purchase, and no document had applied the test to it: 50 independent tasks in a domain this project has never measured. The floor for that grid and the mechanism's largest measured effect decide it, and both are arithmetic on artefacts already on disk.",
+   "instrument": "python3 eval/tools/resolution.py --control control.json --treatment front.json --domain-tasks 50 --delta 7.9",
+   "readAt": "2026-11-26T06:05:00Z",
+   "actualUsd": 0.0,
+   "outcome": "ADMITTED at the four-attempt rung by 1.18 pp: a 50-task grid resolves 6.72 pp at four attempts against a mechanism measured at 7.90, and 12.24 pp at one attempt, which fails outright",
+   "reading": {
+    "floorAt50Tasks": 0.0485,
+    "mdeByRung": {
+     "1": 0.1224,
+     "2": 0.0889,
+     "4": 0.0672
+    },
+    "mechanismPp": 0.079,
+    "marginPp": 0.0118,
+    "requiredTransfer": 0.85,
+    "priceCorrected": "400 episodes at the measured $0.0052-0.0056 is $2.20, about CNY 16, against the CNY 5.4 the queue carried: the queue's figure was registered when the round was one attempt an arm, and the design it needs is four",
+    "assumption": "the floor transfers retail's b = 0.01496 to airline; b is a property of the domain and airline's is unknown until an airline grid exists, so the transfer buys an order of magnitude and not a number",
+    "whyAirlineAtAll": "not resolution \u2014 airline is worse per task than retail at 50 tasks against 114 \u2014 but a second domain, which is the only thing that can say whether a finding is about memory or about retail"
+   },
+   "artefacts": [
+    "prereg/R226-airline-admission.md"
+   ]
+  },
+  {
+   "id": "R217a",
+   "title": "the airline parser \u2014 the board's families and receipts, taught the domain before it is dispatched into",
+   "status": "read",
+   "dispatchBy": "2026-12-03T12:00:00Z",
+   "prereg": "prereg/R217a-airline-parser.md",
+   "arms": [
+    "none"
+   ],
+   "episodes": 0,
+   "estimateUsd": 0.0,
+   "dependsOn": [
+    "R226"
+   ],
+   "why": "R226 admits R217 and names what blocks it: FAMILIES maps retail write tools to ask families, and an airline transcript's writes are not in it, so a dispatch today would serve a block whose items never settle. That is not a null result, it is a broken instrument reporting one, and the census that prevents it costs nothing because the airline tasks carry their own required actions.",
+   "bar": "the parser's family recall on the 50 airline requests at or above the retail parser's own, measured by --census before any dispatch is armed",
+   "readAt": "2026-11-26T07:05:00Z",
+   "actualUsd": 0.0,
+   "outcome": "REFUTED: the retail parser reaches 15 of 50 required airline writes (30.0% family recall) against its own 83.3% on retail, measured by the same census, so R217 is cancelled before dispatch",
+   "reading": {
+    "airline": {
+     "tasks": 50,
+     "required": 50,
+     "found": 15,
+     "familyRecall": 0.3,
+     "spurious": 52,
+     "tasksCovered": 29
+    },
+    "retail": {
+     "tasks": 114,
+     "required": 226,
+     "found": 176,
+     "familyRecall": 0.8333,
+     "spurious": 235,
+     "tasksCovered": 84
+    },
+    "instrument": "eval/tools/goal_board.py --census over eval/manifests/airline-goals.json, built from tau2 v1.0.1's own airline tasks.json: 50 tasks, 50 required writes, 7 with none",
+    "whatWasBuilt": "five airline write tools enter FAMILIES (cancel_reservation, update_reservation_flights, the passenger and baggage updates, book_reservation) and three cues enter the shared table after the retail seven, which the unchanged retail census is what proves harmless",
+    "decomposition": {
+     "askIsNotTheAction": "5 cancel misses and the 1 transfer are cases where the policy makes the correct action a different family from the stated ask: a change is settled by cancel-and-rebook, and a refusal is settled by a transfer",
+     "noActionVerb": "5 book misses include requests that state only a route (\"you want to fly from New York to Seattle\") and asks phrased as \"make a reservation\", which names an object and no action",
+     "cuePriority": "modify fires before passenger and baggage, so \"change the passenger to yourself\" reports a modify; one clause carries one family and these asks carry two",
+     "domainCollision": "the retail cue for `return` fires on \"the return flight is May 20\" in 5 tasks, where return names a leg and not a request"
+    },
+    "whyItIsNotAVocabularyProblem": "two of the four causes are properties of the domain rather than gaps in a word list, and the board's contract is what they break: an ask settles against a receipt of the same family, which holds in a catalogue domain where the request names the action and does not hold where the action is a policy consequence"
+   }
+  },
+  {
+   "id": "R217",
+   "title": "the airline column \u2014 50 independent tasks, a second domain, and the transfer of the mechanism",
+   "status": "cancelled",
+   "dispatchBy": "2026-12-10T12:00:00Z",
+   "prereg": "prereg/R217-airline.md",
+   "arms": [
+    "control",
+    "board"
+   ],
+   "episodes": 400,
+   "estimateUsd": 0.0,
+   "dependsOn": [
+    "R217a",
+    "R226"
+   ],
+   "why": "Retail's floor is 3.21 pp and no budget lowers it, so the only purchase that buys anything is more independent tasks in a domain not yet measured. Airline is 50 tasks, its published column is unsaturated (top 84.0, median 63.8 over 24 rows), and R226 prices the grid at 6.72 pp of resolution at four attempts against a mechanism measured at 7.90.",
+   "bar": "the paired pass^1 delta at the four-attempt rung, with the served share and the two conditional columns beside it; a reading inside 6.72 pp is a statement about the grid and is reported as one",
+   "priceNote": "CNY 16 at the measured rate, not the CNY 5.4 the queue carried (R226, AUDIT 34.316)",
+   "outcome": "cancelled by its own prerequisite: R217a measured the transfer at 30.0% family recall against retail's 83.3%, and a block whose items never settle is a broken instrument rather than a null result",
+   "cancelledBy": "R217a"
+  },
+  {
+   "id": "R227",
+   "title": "settle by the record, not by the family \u2014 the contract the airline domain actually supports",
+   "status": "read",
+   "dispatchBy": "2026-12-12T12:00:00Z",
+   "prereg": "prereg/R227-record-keyed.md",
+   "arms": [
+    "none"
+   ],
+   "episodes": 0,
+   "estimateUsd": 0.0,
+   "dependsOn": [
+    "R217a"
+   ],
+   "why": "R217a's refutation is not a vocabulary gap: two of its four causes are that the correct action has a different family from the stated ask (a change is settled by cancel-and-rebook) and that \"return\" names a leg in this domain. The board settles an ask against a receipt of the same family, which is a contract a catalogue domain supports and a policy domain does not. The successor rewrites the contract rather than the word list: an ask settles against a receipt that touches the record it names, whatever family that receipt is in.",
+   "bar": "family recall is replaced by a record-recall bar: on the 50 airline requests, the share of required writes whose record the parser names, at or above 0.75, measured by the same census before any dispatch",
+   "instrument": "python3 eval/tools/record_census.py --goals eval/manifests/airline-records.json --family-found 15",
+   "readAt": "2026-11-26T09:45:00Z",
+   "actualUsd": 0.0,
+   "outcome": "REFUTED: 27 of 50 graded airline writes are named by their record (54.0%) against the registered 0.75 bar, and 30 of 50 with the family rule the round retires; the misses are 13 writes on asks that select a set of records by a predicate and 6 bookings whose object the policy chooses, so the reference in this corpus is a set or a decision rather than a record",
+   "reading": {
+    "writes": 50,
+    "writingTasks": 27,
+    "refusingTasks": 23,
+    "idOnly": 7,
+    "single": 25,
+    "pair": 27,
+    "familyFound": 15,
+    "unionFound": 30,
+    "recall": {
+     "id": 0.14,
+     "single": 0.5,
+     "pair": 0.54,
+     "family": 0.3,
+     "union": 0.6
+    },
+    "bar": 0.75,
+    "misses": {
+     "total": 23,
+     "setPredicate": 13,
+     "policyChosenBooking": 6,
+     "chained": 2,
+     "unnameableRecord": 1,
+     "noRecord": 1
+    }
+   }
+  },
+  {
+   "id": "R228",
+   "title": "bind the item to the read, not to the words \u2014 the settlement a policy domain can support",
+   "status": "read",
+   "dispatchBy": "2026-12-19T12:00:00Z",
+   "prereg": "prereg/R228-read-anchored.md",
+   "arms": [
+    "none"
+   ],
+   "episodes": 0,
+   "estimateUsd": 0.0,
+   "dependsOn": [
+    "R227"
+   ],
+   "why": "R227 closed the record rule at 54.0% and named why: 13 of its 23 misses are asks over a *set* of records selected by a predicate the request never spells as tokens (\"all your upcoming flights\", \"flights longer than four hours\", \"multiple flights for the same day\"), and 6 are bookings whose object the policy chooses. A reference that neither the words nor the record can supply is supplied by the agent's own reads, which this lane has never used as the anchor. The successor binds each item to the record the episode reads and settles it on the write that touches that record, and it is measurable at zero cost on the retail grid the lane already owns.",
+   "bar": "on the retail grid already on disk, the read-anchored board must settle at least as many of its writing episodes as the request-anchored board does (the 1.18 pp admission R226 priced), while its false-accusation rate does not rise",
+   "instrument": "python3 eval/tools/read_anchor.py --document <grid>/control.json --replicate <grid>/front.json --scope strict",
+   "readAt": "2026-11-26T10:40:00Z",
+   "actualUsd": 0.0,
+   "outcome": "REFUTED on B3: the read-anchored board settles 644 of 654 discharged required writes (98.5%) against the request board's 416 (63.6%) and credits zero calls to nothing, but it opens 1019 items no required write needs (2.53 per episode against 1.79 required), and the open-tax bar refuses it on both grids (2.53/1.79 and 2.54/1.81)",
+   "reading": {
+    "grid": {
+     "episodes": 456,
+     "graded": 403,
+     "discharged": 654,
+     "required": 720
+    },
+    "boards": {
+     "strict": {
+      "covered": 644,
+      "complete": 393,
+      "unaccounted": 0,
+      "overCredit": 6,
+      "items": 1633,
+      "open": 1035,
+      "openUnneeded": 1019,
+      "precision": 0.991
+     },
+     "request": {
+      "covered": 416,
+      "complete": 225,
+      "unaccounted": 232,
+      "overCredit": 3,
+      "items": 970,
+      "open": 527,
+      "openUnneeded": 278,
+      "precision": 0.993
+     }
+    },
+    "replication": {
+     "strict": {
+      "coverage": 0.981,
+      "openUnneededPerEpisode": 2.54
+     },
+     "request": {
+      "coverage": 0.611,
+      "unaccounted": 240
+     }
+    },
+    "bars": {
+     "B1_settlement": true,
+     "B2_accusation": true,
+     "B3_openTax": false
+    }
+   }
+  },
+  {
+   "id": "R229",
+   "title": "an item is an ask, and the read supplies the binding",
+   "status": "read",
+   "dispatchBy": "2026-12-23T12:00:00Z",
+   "prereg": "prereg/R229-ask-bound.md",
+   "instrument": "python3 eval/tools/read_anchor.py --document <grid>/control.json --replicate <grid>/front.json --scope ask",
+   "readAt": "2026-11-26T10:55:00Z",
+   "actualUsd": 0.0,
+   "arms": [
+    "none"
+   ],
+   "episodes": 0,
+   "estimateUsd": 0.0,
+   "dependsOn": [
+    "R228"
+   ],
+   "why": "R228 priced two rules against each other and neither is a working memory: the request board attributes 63.6% of the required writes and accuses 232 calls, the read board attributes 98.5% and opens 2.53 unneeded items per episode. The two failures are one representational fact \u2014 what is required is only in the request, and which record a call touched is only in the read \u2014 so the successor binds an ask to a write of its family that touches a record the episode opened.",
+   "bar": "coverage of discharged required writes at or above the request board's on the same episodes, unaccounted writes at or below its 232, and at least 0.90 of the board's ticks backed by a graded write",
+   "outcome": "REFUTED on B1: the conjunction keeps the request board's items and gains 10 complete episodes while losing 12, covering 415 of 654 writes (63.5%) against the request board's 416, so the read rule's completeness came from having no ask at all; it holds on the replication (+1.7pp, 404 against 393), which is reported as a property of the grids, not as a pass. Its taxonomy is the round's real result: 155 of the 232 misses are asks stated after the first user turn, 61 are asks already spent, 16 are never stated",
+   "reading": {
+    "ask": {
+     "covered": 415,
+     "complete": 223,
+     "unaccounted": 232,
+     "items": 970,
+     "precision": 0.993,
+     "unaccountedBy": {
+      "disclosedLater": 155,
+      "consumed": 61,
+      "neverStated": 16
+     }
+    },
+    "request": {
+     "covered": 416,
+     "complete": 225,
+     "unaccounted": 232,
+     "items": 970
+    },
+    "askAll": {
+     "covered": 625,
+     "complete": 375,
+     "unaccounted": 19,
+     "items": 4761,
+     "openUnneededPerEpisode": 3.9
+    },
+    "replication": {
+     "ask": {
+      "covered": 404
+     },
+     "request": {
+      "covered": 393
+     },
+     "askAll": {
+      "covered": 611
+     }
+    },
+    "bars": {
+     "B1_settlement": false,
+     "B2_accusation": true,
+     "B3_soundness": true
+    }
+   }
+  },
+  {
+   "id": "R230",
+   "title": "admit a later-turn ask only from a turn that is not an answer",
+   "status": "read",
+   "dispatchBy": "2026-12-24T12:00:00Z",
+   "prereg": "prereg/R230-not-an-answer.md",
+   "arms": [
+    "none"
+   ],
+   "episodes": 0,
+   "estimateUsd": 0.0,
+   "dependsOn": [
+    "R229"
+   ],
+   "why": "R229's taxonomy put 155 of its 232 unattributed writes on asks the conversation states after the first user turn, which makes disclosure order the largest defect this lane has measured in the block's own content. Following the conversation is not the repair either: the same binding rule over every user turn reaches 95.6% of the required writes at 4761 items, 4.9x the turn-one contract, because a user's *answer* can contain a cue word and be read as an ask. The successor tests the one discriminator that needs no vocabulary: an ask is admitted from a later turn only when the agent's previous turn did not ask the user a question, so a reply to a question is not a requirement.",
+   "bar": "of the 155 writes R229 attributed to later-turn asks, at least 60% must still be accounted for; the admitted asks must not exceed twice the turn-one contract's 970 items; and coverage must rise at least 10 points over the request board's 63.6%",
+   "instrument": "python3 eval/tools/read_anchor.py --document <grid>/control.json --replicate <grid>/front.json --scope admitted",
+   "readAt": "2026-11-26T12:05:39Z",
+   "actualUsd": 0.0,
+   "outcome": "REFUTED on B1 and B3: 25 of the 155 later-turn writes are recovered (16.1% against a bar of 60%) and the admitted board covers 410 of 654 required writes (62.7%, below the request board's 416); only the noise bar holds, at 1,110 items against 1,940. The mechanism is a property of the corpus's user model rather than of the rule: 1,893 of 2,453 user turns (77.2%) follow an assistant question, so the discriminator admits 560 turns and refuses 1,893 - the requirement and the answer share a turn. A second, independent loss is visible in the same reading: 52 episodes read their contract from a turn that is not turn one, because the first turn stated no ask and `request_of` falls back, and the filter refused exactly that turn in 50 of them, which is how a board that reads more turns covers fewer writes. The replication repeats all three: 20 of 156 (12.8%), 63.9% against 61.1%, 1,043 items, 1,876 of 2,422 turns preceded by a question.",
+   "reading": {
+    "admitted": {
+     "covered": 410,
+     "complete": 222,
+     "unaccounted": 237,
+     "items": 1110,
+     "coverage": 0.627
+    },
+    "request": {
+     "covered": 416,
+     "complete": 225,
+     "unaccounted": 232,
+     "items": 970,
+     "coverage": 0.636
+    },
+    "askAll": {
+     "covered": 625,
+     "complete": 375,
+     "unaccounted": 19,
+     "items": 4761
+    },
+    "recovery": {
+     "recovered": 25,
+     "of": 155,
+     "rate": 0.1613
+    },
+    "turns": {
+     "total": 2453,
+     "admitted": 560,
+     "answers": 1893,
+     "shareAnswers": 0.7717
+    },
+    "contract": {
+     "later": 52,
+     "refused": 50
+    },
+    "replication": {
+     "admitted": {
+      "covered": 411,
+      "items": 1043
+     },
+     "request": {
+      "covered": 393
+     },
+     "recovery": {
+      "recovered": 20,
+      "of": 156,
+      "rate": 0.1282
+     },
+     "turns": {
+      "total": 2422,
+      "answers": 1876
+     },
+     "contract": {
+      "later": 51,
+      "refused": 49
+     }
+    },
+    "bars": {
+     "B1_recovery": false,
+     "B2_noise": true,
+     "B3_coverage": false
+    }
+   }
+  },
+  {
+   "id": "R231",
+   "title": "admit the requirement clause, not the turn",
+   "status": "registered",
+   "dispatchBy": "2026-12-25T12:00:00Z",
+   "prereg": "prereg/R231-the-clause.md",
+   "instrument": "python3 eval/tools/read_anchor.py --document <grid>/control.json --replicate <grid>/front.json --scope clause",
+   "arms": [
+    "none"
+   ],
+   "episodes": 0,
+   "estimateUsd": 0.0,
+   "actualUsd": 0.0,
+   "dependsOn": [
+    "R230"
+   ],
+   "why": "R230 established that the requirement and the answer share a turn: 77.2% of user turns follow an assistant question, so a turn-level filter discards 84% of the requirements disclosed after turn one and lands below the contract it was meant to extend. The material is therefore inside the turn, and the next discriminator has to be the clause - the one that carries a requirement verb and an object - with turn position demoted from gate to tie-break.",
+   "bar": "registered in prereg/R231-the-clause.md before the reading; not yet read"
+  }
+ ]
 }

@@ -2896,3 +2896,17 @@ that reads only the first user message misses the operative ask on a third of th
 writes the turn-one contract cannot account for, **155 (66.8%)** are asks the conversation states after the first turn,
 61 are asks already spent, and 16 are never stated at all. It is the first measured property of the block's *content*
 that explains a negative result as a defect rather than as an absence of effect.
+
+**Admitted turn** — a user turn a rule agrees to read. R230 admitted a later turn only when the assistant's previous
+turn carried no question mark; the reading refused **1,893 of 2,453** turns (77.2%) and recovered 25 of the 155
+later-turn writes, so the admitted set is a measure of the *user model* — how often a turn is a reply — before it is a
+measure of any rule.
+
+**Answer share** — the percentage of user turns that follow a question from the agent. **77.2%** on the retail grid
+(1,893 of 2,453), and 77.5% on the replication. It is the number that closed the turn-level admission question: a
+feature that fires on three turns in four cannot separate the material from the medium.
+
+**Contract turn** — the turn the contract is read from, which is **not** turn one: `request_of` reads the first turn
+that states an ask and falls back to the first turn only when none does, so an episode that opens with a greeting puts
+the contract in turn three. Measured at **52 of 403** episodes here, and a positional admission rule refused that very
+turn in 50 of them — which is how a rule that reads more turns can cover fewer writes.
