@@ -7303,3 +7303,37 @@ transcript that differs between a task your memory helps and one it damages.
 data and evaluated on all of it is significant partly *because* it was chosen, and the difference between the two
 readings is usually the whole effect: on this grid the chosen rule read +13.8 points on the screen half, +3.2 on the
 confirm half, and the win-to-loss ratio fell from 6.5:1 to 1.3:1.
+
+### 32.81 How big an effect can your test suite even see? Compute it before you spend
+
+Once your block is right and your admission rule is settled, you will want to prove that a change helped. Before you
+run anything, compute the number that decides whether that is possible: **the smallest effect your suite can resolve**.
+Most projects never compute it, and the consequence is a series of experiments that each read "no significant
+difference" for reasons that have nothing to do with the idea being tested.
+
+**Why a suite has a floor.** Your paired difference has two kinds of variation. One is noise you can average away by
+running each task more times. The other is real: some tasks are the kind your memory helps and some are the kind it
+damages, and running them again does not make them agree. Fit both from a grid you already have — the spread at `m`
+attempts goes as `a/m + b` — and the `b` term is the floor. With 114 tasks and a task-level spread of 12.2 points, the
+floor works out to **3.21 points**: below that, no number of attempts will ever produce a significant result.
+
+**The three numbers to print.** For any test you are about to run, write down (1) the smallest effect the grid can
+resolve, (2) the largest effect your mechanism could possibly produce, and (3) the price. Run it only when (2) exceeds
+(1) with room to spare. On this project that test cancelled two rounds worth $25.4 — one because a content repair
+could reach at most 43 of 114 tasks and lift the arm by 2.11 points against a 3.21-point floor, the other because its
+price assumed episodes are independent when the tasks they belong to are not.
+
+**How to compute (2), which is the step people skip.** Take the harm you have already measured, stratum by stratum, and
+ask which strata your mechanism can reach. A better sentence can only fix tasks whose material was *wrong*. It cannot
+fix tasks that are damaged by being served at all — those lose points because the material was there, not because it
+said the wrong thing. Crediting the full published improvement to the reachable stratum gives an upper bound; if that
+bound is under your floor, the experiment is dead and the money is saved.
+
+**What to do with the floor once you have it.** Use it on your leaderboard comparisons. If six systems sit within one
+floor of each other, they are one measurement and the ordering between them is not evidence. That is not a consolation
+prize: it means you cannot be shown to be behind, and it means the honest thing to publish is the resolution rather
+than the rank — a column almost nobody prints, and the one that stops readers from over-reading everyone else's.
+
+**The mistake to avoid.** Do not shrink the sample and call it a pilot. An underpowered null is worse than no
+experiment: it spends the idea's credibility along with its money, and the next person to propose the idea has to argue
+against a result that never tested it.

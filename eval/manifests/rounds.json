@@ -344,7 +344,7 @@
     {
       "id": "R222",
       "title": "the admission rule at a resolution that could see it \u2014 800 tasks, or not at all",
-      "status": "registered",
+      "status": "cancelled",
       "dispatchBy": "2026-12-12T12:00:00Z",
       "arms": [
         "board",
@@ -355,7 +355,10 @@
       "dependsOn": [
         "R219b"
       ],
-      "why": "Pooled over two dispatches the rule is +4.8 pp [-1.2, +10.8]: inside the 13.2 pp a 114-task grid can resolve (R218c), which is why the first dispatch's +10.5 pp did not replicate. An accuracy claim would need ~800 tasks a contrast, 1,600 episodes, about $7.4 = CNY 53. Registered so the option is priced rather than forgotten; it is NOT the next item, because the rule is a correctness repair and the cost saving is already measured at -4% and -7%."
+      "why": "Pooled over two dispatches the rule is +4.8 pp [-1.2, +10.8]: inside the 13.2 pp a 114-task grid can resolve (R218c), which is why the first dispatch's +10.5 pp did not replicate. An accuracy claim would need ~800 tasks a contrast, 1,600 episodes, about $7.4 = CNY 53. Registered so the option is priced rather than forgotten; it is NOT the next item, because the rule is a correctness repair and the cost saving is already measured at -4% and -7%.",
+      "correctedUsd": 13.73,
+      "correctedAttempts": 10.95,
+      "outcome": "cancelled on its own arithmetic: the registration prices 1,600 episodes at $7.4 to resolve the rule's +4.8 pp, but the decomposition fitted from R218b says 4.8 pp needs 10.95 attempts a task and 2,497 episodes, $13.73 \u2014 the label was 85% low because it assumed episodes are independent when the task-level spread says otherwise. At $7.4 the round would have bought about 70% power, which is the worst purchase available: enough to run, not enough to believe."
     },
     {
       "id": "R220c",
@@ -421,7 +424,66 @@
           "askCount": "110 of 114 openings state at least one ask, so a gate serves 96.5%",
           "firstToolFamily": "the first call is an identity lookup in 452 of 456 episodes, so a gate serves 99.1%"
         },
-        "taskLevel": "the opening turn is constant across a task's four attempts on 100% of tasks, so the only admissible cut was an admission rule and not a serving gate"
+        "taskLevel": "the opening turn is constant across a task's four attempts on 100% of tasks, so the only admissible cut was an admission rule and not a serving gate",
+        "resolution": {
+          "domain": "retail, 114 tasks \u2014 the whole domain, so the task count is a ceiling and not a choice",
+          "observed": {
+            "attempts": 4,
+            "episodes": 912,
+            "mde": 0.0672
+          },
+          "rungs": [
+            {
+              "attempts": 1,
+              "mde": 0.1224
+            },
+            {
+              "attempts": 2,
+              "mde": 0.0889
+            },
+            {
+              "attempts": 4,
+              "mde": 0.0672
+            }
+          ],
+          "fit": {
+            "a": 0.20247,
+            "b": 0.01496,
+            "state": "FIT"
+          },
+          "wall": 0.0321,
+          "wallMeans": "repeating a task lowers only the measurement half of the error; at 114 tasks the other half is the floor, so no budget resolves an effect below 3.21 pp inside this domain",
+          "unreachable": {
+            "sotaGap": 0.0023,
+            "largestOwnEffect": 0.032
+          },
+          "priced": {
+            "+0.048": {
+              "attempts": 10.95,
+              "episodes": 2497,
+              "usd": 13.73
+            }
+          },
+          "whyItMatters": "the 0.23 pp between this project and the strongest text row, and the 3.2 pp of this project's own largest measured effect, both sit under the floor \u2014 so a point-estimate claim on this domain is unprovable in either direction, and more episodes cannot change that"
+        }
+      }
+    },
+    {
+      "id": "R224",
+      "title": "reconstruct the memory against the live state \u2014 priced before it was registered, and refused",
+      "status": "cancelled",
+      "dispatchBy": "2026-12-12T12:00:00Z",
+      "estimateUsd": 18.0,
+      "dependsOn": [
+        "R218b"
+      ],
+      "why": "The literature's strongest published gate is a content repair rather than a serving one: reconstruct the memory against the current state and ALFWorld reads 85.2 against 79.6 without. This project's own stratification measures the same harm, so the round would test whether reconstruction recovers it.",
+      "outcome": "cancelled for nothing, before dispatch: a content repair can only reach the tasks whose material was wrong, and this project's harm is not in the tasks whose material was wrong. The 66 tasks a no-memory arm solved every attempt lose 9.5 pp by being served at all, which a better sentence does not fix. Crediting the whole published 5.6 pp to the mixed stratum gives +2.11 pp at the arm level; doubling that gain gives +2.83 pp. Both are under the domain's 3.21 pp floor, so the round could not have produced a readable result at any sample size this budget allows.",
+      "priced": {
+        "mixedStratumGain": 0.056,
+        "armLift": 0.0211,
+        "armLiftIfDoubled": 0.0283,
+        "floor": 0.0321
       }
     }
   ]

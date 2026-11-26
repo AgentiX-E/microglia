@@ -2811,3 +2811,24 @@ selection rather than an effect. Quoting a screen without this number is quoting
 field cannot serve one attempt and skip another; it can only switch memory off for a **task class**, which makes it an
 admission rule and not a serving gate. On this project's grid every field available before the first content reveal is
 task-constant on 100% of tasks, which is the structural reason the serving question needs the episode's own content.
+
+**Resolution (of a grid)** — the smallest difference in pass rate a paired grid can distinguish from zero at a stated
+power, usually 80% at a two-sided 5% test. It is a property of the **domain** as much as of the budget: the spread of a
+task's paired difference splits into a measurement term that falls as `1/m` with attempts and a task-heterogeneity term
+that does not fall at all, so more attempts help only until the second term dominates. On this project's retail grid the
+resolution is 6.72 points at four attempts a task and 12.24 at one, which is the number R218c was quoting as a caveat.
+
+**Floor (the domain's)** — a grid's resolution at unlimited attempts, `2.802·√b/√N`. It is a function of the number of
+independent tasks alone, so a domain with a fixed task count has a fixed floor and no budget crosses it. Retail holds
+114 tasks and its floor is **3.21 points**: any effect smaller than that is unprovable there in either direction, which
+is why the board's six text rows — spanning 2.30 points — are one measurement rather than a ranking.
+
+**Design effect** — how many raw observations one effective observation is worth, `1 + (m − 1)·ICC`. On this project's
+grid it is **4.94** at fourteen attempts a task, so 1,600 episodes carry the information of about 324. It is the number
+that turns an episode budget into a resolution, and the number whose absence made a $7.4 round cost $13.73 when the
+arithmetic was finally done (AUDIT 34.311).
+
+**Admissibility test** — the two-number check a funded round must pass before it is registered: the smallest effect its
+grid can resolve, and the largest effect its mechanism can produce. The ceiling is computed generously — every stratum
+the mechanism could reach, at the full size of the strongest published result — so failing it means the round cannot
+succeed even under assumptions chosen to favour it. Two rounds failed it in one month, worth $25.4 between them.

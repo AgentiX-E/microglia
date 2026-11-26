@@ -182,9 +182,17 @@ jobs:
           # decides whether money is spent, and arithmetic in a paragraph is arithmetic nobody re-ran.
           python3 -m coverage run --append --branch --include="*/eval/tools/serve_policy.py" \
             eval/tools/serve_policy.py --self-test
+          # R223's other half: what a dispatch can buy, in points, before it is dispatched. A grid's resolution
+          # is a property of the domain and not of the budget — repeating a task lowers only the measurement half
+          # of the error, so past a floor no amount of money resolves a smaller effect. This module fits that
+          # floor from a grid already on disk and prices any effect against it. It is under the floor for the same
+          # reason as the rest: it is the file that decides whether money is spent, and a spending rule that lives
+          # in a paragraph is a rule nobody re-ran.
+          python3 -m coverage run --append --branch --include="*/eval/tools/resolution.py" \
+            eval/tools/resolution.py --self-test
           python3 -m coverage json -o coverage-python.json
           python3 scripts/check-python-coverage.py --self-test
-          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 21
+          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 22
 
       - name: The rounds this project owes, and the date each one was registered for
         # The failure this prevents is not a wrong number, it is a round that quietly stops being planned: R216b's

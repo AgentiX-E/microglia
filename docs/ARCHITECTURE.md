@@ -5046,3 +5046,33 @@ on disk. The consequence is a constraint on the successor rather than a closed q
 what the episode **reveals after the identity gate** — the order, the item, the attribute row — because that is the
 only content in a transcript that varies inside a task, and a field that is constant within a task can only be an
 admission rule for a task class, never a gate for an attempt.
+
+### 8.101 The resolution wall: why a grid has a smallest visible effect, and why it is a domain property
+
+Section 8.100 ends by saying the serving question needs what the episode reveals. This section is about the constraint
+that sits underneath every measurement in this project, and it was found by asking a question no round had asked:
+**how large an effect can this grid resolve?**
+
+**1. The spread of a paired difference splits in two.** For a paired grid, each task contributes one number — the
+difference between the two arms' pass rates at that task — and the spread of those numbers has two sources. One is
+measurement: two arms of `m` attempts estimate the same task imperfectly, and averaging more attempts shrinks that part
+as `1/m`. The other is the tasks themselves: some tasks are the kind memory helps and some are the kind it damages, and
+that difference does not shrink when you run them more. The fitted form on this project's grid is
+`var(m) = 0.2025/m + 0.0150`.
+
+**2. The residue is a floor, and it belongs to the domain.** As attempts go up the first term vanishes and the second
+is all that is left: `2.802·√0.0150/√114 = 3.21` points. At 114 tasks — the whole retail domain, so the count is not a
+choice — **no budget resolves an effect smaller than 3.21 points.** Buying attempts past a certain point buys nothing,
+and the point where it stops paying is computable before any money is spent.
+
+**3. The floor retires a framing rather than a number.** The board's retail column spans 83.90 to 86.20 across six text
+rows, and that entire 2.30-point range is smaller than one grid's floor. The rows are not ordered by measurement; they
+are ordered by point estimate. The correct statement about this project's standing is not "sixth of forty-nine with a
+0.23-point gap to the second text row" but "the six text rows are one measurement", and that is a statement no other
+row on the board can make, because none of them prints a resolution.
+
+**4. It is used as an admission test, in one direction.** A round carries two numbers: the smallest effect its grid can
+resolve and the largest effect its mechanism can produce. The ceiling is computed generously — every task the mechanism
+could reach, and the full size of the strongest published result — so failing the test means the round cannot succeed
+even under assumptions chosen to favour it. Two rounds failed it this month: one because its ceiling was two thirds of
+the floor, one because its price was 85% above its label once the attempts were counted properly (AUDIT 34.311, 34.312).
