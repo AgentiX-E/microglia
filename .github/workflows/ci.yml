@@ -159,9 +159,17 @@ jobs:
           # hand on the day a registration is written.
           python3 -m coverage run --append --branch --include="*/eval/tools/dose_power.py" \
             eval/tools/dose_power.py --self-test
+          # R218e's stratification. Where a memory arm's deficit comes from: the tasks the control already solved or
+          # the ones it never did. R216b answered that across dispatches, and cross-dispatch is where this lane's
+          # numbers go to die — so the tool reads a grid that holds both arms with four attempts each, and it refuses
+          # to print a delta when the strata are borrowed from another dispatch. That refusal is the reason it is under
+          # a floor rather than in a notebook: the mode that looks most like the paired one is the one that cannot
+          # support a sign test.
+          python3 -m coverage run --append --branch --include="*/eval/tools/solve_strata.py" \
+            eval/tools/solve_strata.py --self-test
           python3 -m coverage json -o coverage-python.json
           python3 scripts/check-python-coverage.py --self-test
-          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 19
+          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 20
 
       - name: The rounds this project owes, and the date each one was registered for
         # The failure this prevents is not a wrong number, it is a round that quietly stops being planned: R216b's

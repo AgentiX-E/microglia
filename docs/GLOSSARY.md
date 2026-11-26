@@ -2771,3 +2771,12 @@ the reason a 114-task grid is not a 114-pair test: in the one arm that ran four 
 all four and 3 failed all four, so the quantity available to the test is set by the ~50 tasks that move and by how many
 of those the second attempt happens to flip — ≈ 20 on a two-round grid, ≈ 12 among the close-turn subset. A reading
 that quotes its rate without its discordant count is quoting a denominator nobody can check.
+
+**Control stratum** — the bucket a task falls into by how often the *no-memory* arm passed it, and the only
+stratification in this project made on a quantity that exists before the treatment does. Three buckets: **never**
+(the control failed every attempt), **mixed** (it passed some), **always** (it passed every attempt). The distinction
+carries the whole harm question, because a suite mean adds a treatment's damage on the `always` stratum to its gain on
+the `mixed` one and reports the sum: the shipped block reads −9.5 points on the 66 tasks the control always solved,
++7.5 on the 43 it solved some of the time, and −1.5 overall (PROGRESS 249.18). Two rules keep it honest — the buckets
+are cut from the control's *rate* rather than from an attempt count (AUDIT 34.268), and a stratum borrowed from another
+dispatch is a covariate, so it supports a per-stratum rate and not a delta.
