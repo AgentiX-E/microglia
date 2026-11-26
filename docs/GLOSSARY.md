@@ -2738,3 +2738,22 @@ names is one the task *requires* a write in. The definition needs ground truth t
 instrument (`--accusations`) reads a finished results document and takes the evaluator's
 `evaluation_criteria.actions` as that truth. Measured at **92.0% of 1,965 entries** on R218b's front arm and **98.1%**
 of the `unattributed` ones; the block was asserting the parser's blindness as if it were the agent's mistake.
+
+**Dose** — how much memory material a **single episode** was served, as distinct from how much an arm was served on
+average. Every reading in this project before R218e was a mean over arms, and a mean cannot separate "the material is
+inert" from "the material helps the episodes that receive it and the average is over a population where it rarely
+applies". The dose is recorded by the driver, one record an episode, because the saved transcript cannot hold it: the
+benchmark saves the conversation and the block is composed into the request (§8.99, AUDIT 34.262).
+
+**Served versus carried** — the two numbers a dose record keeps, and the difference between them is a placement's
+price. **Served** characters are what the model read, summed over every turn. **Carried** characters are what had to be
+written into the prompt, summed over the messages the driver put there. At the `tail` placement an unchanged block is
+served again and never written again, so `written / chars` is below one and that ratio *is* the saving; at the `front`
+placement the block is replaced every turn and the two are equal. A record that kept one number would make the two
+placements indistinguishable in exactly the column that distinguishes them.
+
+**Boundary text** — the opening user message of an episode, truncated, recorded by the driver at the same moment as the
+episode index. It exists because the driver is never told which task it is in: the harness constructs an agent per
+simulation and reveals no identity, so the runner resolves the text against the messages it holds (`R136`). Every
+per-episode join in this project — the served share, the dose, the attempt index — is built on it, and it is appended
+at one site for that reason: two sites is one site that will forget (AUDIT 34.264).

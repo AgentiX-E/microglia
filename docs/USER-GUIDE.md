@@ -7196,3 +7196,64 @@ So if you are choosing a default for a product, the honest sequence is: fix the 
 ≈¥53) instead of moving a default on a draw. If you are choosing for a research paper, the same numbers are the more
 interesting result: **a mechanism that applied exactly and cost 7% less moved accuracy by +10.5 points and then by
 −0.9**, which is a measurement of the grid rather than of the memory.
+
+### 32.79 Measuring how much memory an episode received — and why you cannot read it off the transcript
+
+If you have ever asked "did the memory help *this* episode?", the answer needs a number nobody publishes: how many
+characters of memory material one episode was served. This section is the shortest path to that number, plus the trap
+that catches almost everyone first.
+
+**The trap: the saved transcript is the conversation, not the prompt.** A finished episode's document holds the user's
+turns, the assistant's turns and the tool results. It does **not** hold the system prompt, and it does not hold your
+memory block — at either placement, in any of the four documents this project has measured (0 occurrences of the tag
+over 456 episodes and 30 MB; AUDIT 34.262). So a reader that counts block characters in the transcript returns zero,
+and the zero is a fact about the document, not about your memory.
+
+**The repair: record it where it is made.** The driver keeps one record an episode:
+
+| field | what it holds |
+|---|---|
+| `turns` | model calls the episode made — the confound you have to print beside the dose |
+| `renders` | how many times the block was recomposed |
+| `chars` | characters of block **served**, summed over renders |
+| `written` | characters of block **carried** into the prompt |
+| `changes` / `stable` | renders that differed from the previous one, and renders that were byte-identical |
+
+`chars` and `written` are different on purpose. At the tail placement an unchanged block is left where it was written,
+so it is served again and never written again; the ratio `written / chars` is that placement's price as a number. At
+the front placement the two are equal, because the block is replaced every turn and the prompt behind it is re-bought.
+
+**Reading it.** The runner writes the record as one JSONL line an episode, joined to the task and the attempt, beside
+the results document:
+
+```bash
+# what the arm recorded, one line an episode
+cat eval/results/working-memory/board.dose.jsonl | head -2
+
+# the reading: does more material help the attempt that received it, holding the task fixed
+python3 eval/verifiers/board_dose.py \
+    --document eval/results/working-memory/board.json \
+    --sidecar  eval/results/working-memory/board.dose.jsonl
+```
+
+Four answers, and they send you to four different places:
+
+| answer | what it means | where to look |
+|---|---|---|
+| `NO_SYSTEM` | the document holds no system message at all | nothing to fix in your memory: the artefact cannot carry a dose |
+| `NO_DOSE` | the recording arrived and carried no characters | your renderer, or the population you ran |
+| `NO_PAIRS` | doses were served, and no task got two different ones | the premise: one attempt a task can never pair |
+| `DOSE_READ` | a within-task sign test, with the turn-count confound printed beside it | the reading |
+
+**Two things to get right before you spend money.**
+
+1. **One attempt a task cannot produce a pair.** The reader splits each task at its median dose and needs an attempt on
+   each side, so a 114-task, one-attempt grid answers `NO_PAIRS` by construction. Run two rounds.
+2. **Use rounds, not trials.** `--rounds 2` makes each attempt its own run, so the round index is a real attempt
+   number; `--trials 2` runs both attempts concurrently and the attempt index is then completion order — not
+   recoverable, and the join will say so (`identity: "unordered"`) rather than guess.
+
+**What the reading is not.** Dose is endogenous: a longer episode both receives more blocks and has more chances to go
+wrong. So the output prints the turn gap beside the dose gap, and the number to act on is the **sign** of the effect on
+the pairs whose turn counts are close. A positive sign means the material is useful where it arrives, which no arm-level
+mean can tell you; a negative sign is the harm hypothesis in its strongest testable form.

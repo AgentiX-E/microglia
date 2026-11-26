@@ -4956,3 +4956,49 @@ the failure this project has spent forty rounds learning to refuse. What survive
 the two judgment lines are false about the task **92.0%** of the time, which is a correctness argument for removing
 them; the rule makes the block cheaper and less mobile, replicated; and R222 prices the 1,600-episode reading that
 would settle the accuracy question at **≈¥53**, registered rather than queued.
+
+### 8.99 The dose: how much material an episode received, and why nobody could measure it before
+
+Every result in §8.90–8.98 is a **mean over arms**. That shape has one weakness a mean cannot see: a treatment that
+helps the episodes which receive a lot of material and does nothing on the rest reports the same number as a treatment
+that does nothing at all. Separating those two needs a quantity the harness does not publish — how much memory material
+a *single episode* was served.
+
+It looks like it should be readable from the saved transcript. It is not, and the reason is worth stating plainly
+because it cost a round to learn: **the benchmark saves the conversation, not the prompt.** A saved episode holds the
+user's turns, the agent's turns and the tool results; the system prompt, the adapter's preamble and the memory block
+are composed into the request and never written down. Measured over four documents and 456 paid episodes, at both
+placements this project ships: **zero occurrences of the block's tag, and zero system messages of any kind**
+(AUDIT 34.262).
+
+So the quantity is recorded where it is made, and the architecture of that recording is three small decisions:
+
+**1. One record an episode, opened at the boundary.** The agent already records where each episode begins, whether its
+prompt carried a body, and which request text it opened for — three lists appended at one site. The dose joins them
+there, so the four lists cannot drift apart, and the invariant
+`records == boundary texts == episode starts` is a property of one function rather than a convention four call sites
+have to remember (AUDIT 34.264 shows what happens when one of them forgets).
+
+**2. Two numbers instead of one, and the difference is the price.** The record keeps the characters **served** (what
+the model read, summed over every turn) apart from the characters **carried** (what had to be written into the prompt):
+
+| placement | served | carried | what the gap is |
+|---|---|---|---|
+| `front` — block in the system message | every turn | every turn | no gap: the block is replaced each turn, and the prompt behind it is re-bought |
+| `tail` — block behind the conversation | every turn | only when it changes | the turns that found an unchanged block in place and left it there |
+
+That single ratio is why the tail placement exists, and it is now a measured number (`written / chars`) rather than an
+argument about cache behaviour.
+
+**3. The attempt, not the episode, is what a within-task comparison needs.** Comparing two episodes of one task holds
+the difficulty, the domain and the seeded world fixed, but only if the reader knows which two attempts it is holding.
+The runner provides that exactly — an attempt is a *round*, and the round index is already the document's trial number
+— so the join is `(task, round)` and needs no guessing. The join refuses three states rather than guessing at them: a
+round whose recording is the wrong length, a task that appears twice in one round, and a record whose episode the
+round did not run.
+
+**What it is not.** It is not a randomised contrast. A longer episode both receives more blocks and has more chances to
+go wrong, so a dose reading prints the turn gap beside the dose gap, and the number that decides whether it is worth a
+larger round is the sign of the effect on the pairs whose turn counts are close. The instrument's own falsification is
+part of its design: a controlled arm has a dose of exactly zero on every episode, and the reader must answer "no dose"
+there — an instrument that reports an effect where the dose is identically zero is reading the clock.
