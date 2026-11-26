@@ -91,3 +91,10 @@ attempts and priced at **¥36.2**, and it can see 6.72 pp.
 - **B3 failing with the accuracy column moving** means the replay and the dispatch disagree about what was served, which
   is the one defect that would invalidate the reading rather than refuse the rule. The round is then re-dispatched
   before anything is quoted from it.
+
+**WITHDRAWN 27 November 2026, before any token was spent.** B1's 3.21-point margin **is** this grid's floor: the
+sampling error that survives unlimited attempts is 3.21 points on 114 tasks, so the gate cannot pass at any price,
+and `eval/tools/resolution.py` had printed `+0.0321: UNREACHABLE` since R223. The registration stays as the record of
+what was almost bought; `rounds.json` carries `status: cancelled` and `actualUsd: 0.0`, AUDIT 34.332 is the audit, and
+the question it meant to ask is now R236's (a mechanism probe at sixty episodes, ¥2.5) rather than a resolution no
+budget on this domain can buy.

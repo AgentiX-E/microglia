@@ -1,0 +1,284 @@
+"""Draw the plan's price, before and after three corrections of reference.
+
+A waterfall is the right shape for this and a bar chart is not: the claim is not that the plan is cheap, it is that
+**four lines were each wrong in a nameable way** and that the corrections are attributable one at a time. A reader
+who sees a total fall from ¥92 to ¥5.3 learns nothing; a reader who sees which line moved, by how much, and what the
+wrong quantity was, can disagree with a specific correction.
+
+So this file reads `eval/manifests/plan-costs.json` — the one place the four lines live — checks it against the two
+manifests that own their numbers, and draws. It does not compute a cost of its own: a drawing that re-derives a
+number is a second source for it, and this project has already audited what a second source costs.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import pathlib
+import sys
+
+HERE = pathlib.Path(__file__).resolve().parents[1]
+PLAN = HERE / "eval" / "manifests" / "plan-costs.json"
+BUDGET = HERE / "eval" / "manifests" / "bench-budget.json"
+
+#: The lane's red, reused from `display.py` so two figures in one report do not disagree about what red means.
+RED = "#c5221f"
+GREY = "#9aa0a6"
+GREEN = "#1e8e3e"
+
+
+def load(path: pathlib.Path | None = None) -> dict:
+    # The default is resolved at call time rather than bound at definition time: a test that points `PLAN` at a
+    # doctored file and gets back the real one is testing the binding rather than the check, which is how the first
+    # version of this file's command-line test passed a plan that was not the one it had written.
+    return json.loads((path or PLAN).read_text(encoding="utf-8"))
+
+
+def checked(plan: dict, budget: dict) -> list:
+    """Every derived line, re-derived, and every stated total, re-added.
+
+    The three checks are the three ways this file could lie: a line whose `nowCny` is not the arithmetic its own
+    source gives, a total that is not the sum of its lines, and — the one that matters — a plan whose external
+    benchmarks are priced differently here than in the manifest the build re-derives on every push.
+    """
+    problems: list = []
+    by = {item["id"]: item for item in plan["items"]}
+
+    episodes = plan["episodeUsd"] * plan["cnyPerUsd"]
+    if abs(by["R236"]["nowCny"] - 60 * episodes) > 0.02:
+        problems.append(f"R236: {by['R236']['nowCny']} against {60 * episodes:.2f} from sixty episodes")
+    if abs(by["R237"]["nowCny"] - budget["totalCny"]) > 0.02:
+        problems.append(f"R237: {by['R237']['nowCny']} against the budget manifest's {budget['totalCny']}")
+    for identifier in ("R235", "R221"):
+        if by[identifier]["nowCny"] != 0.0:
+            problems.append(f"{identifier}: cancelled or already bought, and priced at {by[identifier]['nowCny']}")
+
+    total = sum(item["nowCny"] for item in plan["items"])
+    if abs(plan["totalNowCny"] - total) > 0.02:
+        problems.append(f"totalNowCny is {plan['totalNowCny']} against {total:.2f}")
+    was = sum(item["wasCny"] for item in plan["items"])
+    if abs(plan["totalWasCny"] - was) > 0.05:
+        problems.append(f"totalWasCny is {plan['totalWasCny']} against {was:.2f}")
+
+    # The claim the figure exists to support, asserted rather than drawn: the corrections are what did the work, and
+    # a plan that fell for some other reason would be a plan whose figure says the opposite of its paragraph.
+    if not order_of_magnitude(plan):
+        problems.append("the corrections did not remove an order of magnitude, so the figure's caption is false")
+    return problems
+
+
+def order_of_magnitude(plan: dict) -> bool:
+    """Whether the corrections still leave the plan at a tenth of what it was, as the caption claims."""
+    return plan["totalNowCny"] * 10 <= plan["totalWasCny"]
+
+
+def waterfall(plan: dict, out: pathlib.Path) -> None:
+    """The four lines as one descending cascade, starting from what the plan used to cost.
+
+    The direction is the whole figure: a waterfall that started at zero would draw four savings stacked from the
+    floor and leave a reader unable to see that R236 *adds* ¥2.52 while the other three subtract. So the cascade
+    starts at the old total and steps through every line in order, which is the only arrangement in which the last
+    step lands on the new total and the intermediate heights mean something.
+    """
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    figure, axes = plt.subplots(figsize=(11.6, 5.2), dpi=165)
+    height = plan["totalWasCny"]
+    for index, item in enumerate(plan["items"]):
+        step = item["nowCny"] - item["wasCny"]
+        axes.bar(index, step, bottom=height, color=RED if step < 0 else GREEN, width=0.54, zorder=3)
+        middle = height + step / 2
+        label = f"−¥{-step:.2f}" if step < 0 else f"+¥{step:.2f}"
+        # The threshold is a share of the axis rather than a number of yuan: a step is legible if the bar has room for
+        # the label, and "room" is decided by the drawing's own height, not by the size of the number.
+        if abs(step) > plan["totalWasCny"] * 0.07:
+            axes.text(index, middle, label, ha="center", va="center", color="white", fontsize=10.5)
+        else:
+            # A step too short to hold its own label gets it outside the bar, because a label that does not fit is a
+            # label nobody reads — and this is the one positive step, so its label is the one a reader needs.
+            axes.text(index, middle + 0.6, label, ha="center", va="bottom", color=GREEN, fontsize=10)
+        axes.text(index, plan["totalWasCny"] + 2.4, item["id"], ha="center", va="bottom", fontsize=10.5,
+                  color="#202124", fontweight="bold")
+        axes.text(index, -3.4, f"¥{item['wasCny']:.2f} → ¥{item['nowCny']:.2f}", ha="center", va="top", fontsize=8.8,
+                  color=GREY)
+        height += step
+
+    # Both reference lines are labelled in the empty left margin rather than beside themselves: at ¥5.34 the closing
+    # line sits under the last bar and at ¥92 the opening line sits under the first column's header, and a label
+    # placed "beside" either of them lands on a bar.
+    axes.axhline(plan["totalNowCny"], color=GREEN, linestyle="--", linewidth=1.1, zorder=2)
+    axes.text(-0.66, plan["totalNowCny"] + 1.6,
+              f"after the corrections: ¥{plan['totalNowCny']:.2f}", ha="left", fontsize=9.5, color=GREEN)
+    axes.axhline(plan["totalWasCny"], color=GREY, linestyle=":", linewidth=1.0, zorder=2)
+
+    axes.set_xticks([])
+    axes.set_ylabel("CNY", fontsize=10)
+    axes.set_ylim(-2, plan["totalWasCny"] * 1.12)
+    axes.set_xlim(-0.75, len(plan["items"]) - 0.25)
+    axes.set_title("The plan was ¥92 and is ¥5.34: every correction is a rate applied to the wrong quantity",
+                   fontsize=11.5)
+    axes.grid(axis="y", alpha=0.16)
+    for spine in ("top", "right", "bottom"):
+        axes.spines[spine].set_visible(False)
+
+    notes = [
+        "R235 cancelled: its 3.21-point margin IS this domain's floor, so the gate could not pass at any price.",
+        "R221 is ¥0 because its 456-episode grids were bought in R218b — \"submit\" was priced as \"produce\".",
+        "R237 is ¥2.82 because 99.5% of a long-context set is one shared prefix, billed at 1/50 the miss rate.",
+        "What survives buys an external ladder position and a mechanism probe — not a retail accuracy gain.",
+    ]
+    figure.text(0.012, -0.03, "\n".join(notes), fontsize=8.6, color="#3c4043", va="top", family="DejaVu Sans")
+
+    figure.tight_layout()
+    out.parent.mkdir(parents=True, exist_ok=True)
+    figure.savefig(out, facecolor="white", bbox_inches="tight")
+    plt.close(figure)
+
+
+def report(failures: list, tail: str = "") -> int:
+    """The suite's result, as an exit code and a sentence.
+
+    A function because the failure path is the only part of a suite that runs when the suite is failing, and it is
+    the part nobody exercises: the first version of this file had those four lines inline and the coverage run
+    reported them as unmeasured on every green build.
+    """
+    if failures:
+        print("FAILED:")
+        for name in failures:
+            print(f"  {name}")
+        return 1
+    print(f"budget: all assertions hold{tail}")
+    return 0
+
+
+def self_test() -> int:
+    """The checks, driven, and the drawing, produced."""
+    failures: list = []
+
+    def judge(into: list):
+        def check(name: str, condition: bool) -> None:
+            if not condition:
+                into.append(name)
+        return check
+
+    check = judge(failures)
+    scratch: list = []
+    judge(scratch)("a deliberate failure", False)
+    check("a failing assertion is recorded rather than dropped", scratch == ["a deliberate failure"])
+
+    plan, budget = load(), json.loads(BUDGET.read_text(encoding="utf-8"))
+    check("the plan's own numbers agree with the manifests that own them", checked(plan, budget) == [])
+    check("four lines, two of them cancelled or already bought",
+          len(plan["items"]) == 4 and sum(1 for item in plan["items"] if item["nowCny"] == 0) == 2)
+
+    doctored = json.loads(json.dumps(plan))
+    doctored["items"][2]["nowCny"] = 20.0
+    check("a line repriced away from the budget manifest is caught", checked(doctored, budget) != [])
+    doctored = json.loads(json.dumps(plan))
+    doctored["items"][1]["nowCny"] = 9.0
+    check("an episode line that is not sixty episodes at the measured price is caught",
+          checked(doctored, budget) != [])
+    doctored = json.loads(json.dumps(plan))
+    doctored["items"][0]["nowCny"] = 1.0
+    check("a cancelled line that has been given a price is caught", checked(doctored, budget) != [])
+    doctored = json.loads(json.dumps(plan))
+    doctored["totalNowCny"] = 92.2
+    check("a total that is not the sum of its lines is caught", checked(doctored, budget) != [])
+    doctored = json.loads(json.dumps(plan))
+    doctored["totalWasCny"] = 100.0
+    check("an opening total that is not the sum of what the plan used to cost is caught",
+          any("totalWasCny" in problem for problem in checked(doctored, budget)))
+    check("the caption's arithmetic holds on the plan as it stands", order_of_magnitude(plan) is True)
+    check("and a plan that only halved is not described as an order of magnitude",
+          order_of_magnitude({"totalNowCny": 40.0, "totalWasCny": 92.2}) is False)
+
+    # The command line, driven in this process so the coverage run measures it rather than a child.
+    import contextlib
+    import io
+
+    saved_argv = sys.argv
+
+    def command(*arguments) -> tuple:
+        printed = io.StringIO()
+        try:
+            sys.argv = [str(pathlib.Path(__file__).resolve()), *arguments]
+            with contextlib.redirect_stdout(printed):
+                return main(), printed.getvalue()
+        finally:
+            sys.argv = saved_argv
+
+    import tempfile
+    with tempfile.TemporaryDirectory() as temporary:
+        out = pathlib.Path(temporary) / "budget.png"
+        code, printed = command("--out", str(out))
+        check("the figure is drawn from the command line and is not empty",
+              code == 0 and out.exists() and out.stat().st_size > 8000 and "wrote" in printed)
+        code, printed = command()
+        check("and a plain run prints every line and the two totals",
+              code == 0 and "R236" in printed and "total" in printed)
+
+        # A plan that does not add up is refused by the command line, not only by the checker: this is the path a
+        # build takes, and a check that only the test can reach is a check that runs nowhere.
+        broken = pathlib.Path(temporary) / "plan.json"
+        doctored = json.loads(json.dumps(plan))
+        doctored["totalNowCny"] = 92.2
+        broken.write_text(json.dumps(doctored), encoding="utf-8")
+        original = PLAN
+        try:
+            globals()["PLAN"] = broken
+            code, printed = command()
+        finally:
+            globals()["PLAN"] = original
+        check("a plan whose total is wrong exits non-zero and names the line",
+              code == 1 and "totalNowCny" in printed)
+
+    # The reporter, driven both ways, and the module loaded as a module so the file is measured on the path an
+    # importer takes as well as on the path a script does.
+    quiet = io.StringIO()
+    with contextlib.redirect_stdout(quiet):
+        failing = report(["a named failure"])
+    check("the reporter exits one and names what failed",
+          failing == 1 and "FAILED:" in quiet.getvalue() and "a named failure" in quiet.getvalue())
+    quiet = io.StringIO()
+    with contextlib.redirect_stdout(quiet):
+        passing = report([])
+    check("and exits zero when nothing failed", passing == 0)
+
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("budget_as_module", pathlib.Path(__file__).resolve())
+    as_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(as_module)
+    check("the file is importable without drawing anything", as_module.RED == RED)
+
+    return report(failures, f" — ¥{plan['totalWasCny']:.1f} to ¥{plan['totalNowCny']:.2f}")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Draw the plan's price, before and after its corrections.")
+    parser.add_argument("--out", default="")
+    parser.add_argument("--self-test", action="store_true")
+    arguments = parser.parse_args()
+    if arguments.self_test:
+        return self_test()
+    plan = load()
+    problems = checked(plan, json.loads(BUDGET.read_text(encoding="utf-8")))
+    if problems:
+        print("the plan does not add up:")
+        for problem in problems:
+            print(f"  {problem}")
+        return 1
+    if arguments.out:
+        waterfall(plan, pathlib.Path(arguments.out))
+        print(f"budget: wrote {arguments.out}")
+    for item in plan["items"]:
+        print(f"{item['id']:5s} was ¥{item['wasCny']:6.2f}  now ¥{item['nowCny']:5.2f}  {item['status']:9s} "
+              f"{item['why']}")
+    print(f"total  was ¥{plan['totalWasCny']:6.2f}  now ¥{plan['totalNowCny']:5.2f}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

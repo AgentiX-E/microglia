@@ -204,9 +204,21 @@ jobs:
           # It carries the source's sha256 because a manifest without one is a table of claims.
           python3 -m coverage run --append --branch --include="*/scripts/build_airline_records.py" \
             scripts/build_airline_records.py --self-test
+          # R236/R237. What the two external replications cost, priced before they are run. The plan carried twenty
+          # dollars for them for four rounds; the arithmetic over one rate card and three integers - questions,
+          # context length, and how many questions share a prefix - puts the pair at under three, and the gap is the
+          # provider's cache rate, which is one fiftieth of its miss rate. A budget that lives in a roadmap is a
+          # number nobody re-derived, which is exactly how the twenty dollars survived four readings of this lane.
+          python3 -m coverage run --append --branch --include="*/eval/tools/bench_budget.py" \
+            eval/tools/bench_budget.py --self-test
+          # R236/R237's figure. It reads the plan's four lines and refuses to draw them when they do not agree with the
+          # manifests that own the numbers, because a waterfall that re-derives a cost is a second source for it - and
+          # this repository has already audited what a second source costs (AUDIT 34.329).
+          python3 -m coverage run --append --branch --include="*/scripts/budget.py" \
+            scripts/budget.py --self-test
           python3 -m coverage json -o coverage-python.json
           python3 scripts/check-python-coverage.py --self-test
-          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 25
+          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 27
 
       - name: The rounds this project owes, and the date each one was registered for
         # The failure this prevents is not a wrong number, it is a round that quietly stops being planned: R216b's
@@ -239,6 +251,13 @@ jobs:
           # The figure's own loader, over the same file: a rendering of a reading that does not add up is a figure
           # nobody should publish, and this is the only place the two are read together.
           python3 scripts/display.py --self-test
+          # The budget, re-derived from the rate card it names rather than trusted: a saved line whose total no
+          # longer matches the card is refused here instead of quoted in a plan.
+          python3 eval/tools/bench_budget.py --check eval/manifests/bench-budget.json
+          # The plan's four cost lines, added up against the two manifests that own them. A total that stops matching
+          # its lines is refused here rather than quoted in a roadmap, which is how a twenty-dollar line survived four
+          # readings of this lane.
+          python3 scripts/budget.py
           python3 - <<'CHECK'
           import json
 
@@ -382,6 +401,25 @@ jobs:
           assert seventh["replication"]["display"]["clause"]["displayed"] == 621
           assert seventh["replication"]["display"]["clause"]["hidden"] == 0
           assert seventh["replication"]["bar"]["B2_contract"]["floor"] == 443
+          # R236/R237. The plan's two external replications, priced from the card the dispatchers bill against.
+          # These three lines are the whole argument that the twenty-dollar line was wrong, so they are pinned:
+          # LoCoMo's 1,986 questions over ten conversations move 0.27M tokens at the miss rate and 53.35M at the
+          # cached rate, and the pair costs under three yuan off-peak against sixty-seven uncached.
+          budget = json.load(open("eval/manifests/bench-budget.json"))
+          assert budget["band"] == "off_peak", budget["band"]
+          assert budget["benchmarks"]["locomo"]["tokens"]["documents"] == 10
+          assert budget["benchmarks"]["locomo"]["bill"]["cny"] == 1.96, budget["benchmarks"]["locomo"]["bill"]
+          assert budget["benchmarks"]["memtrapbench"]["bill"]["cny"] == 0.86
+          assert budget["totalCny"] == 2.82, budget["totalCny"]
+          assert budget["benchmarks"]["locomo"]["bill"]["multiplier"] > 25
+          # The cancelled round, whose cancellation is a result and not a gap: a 3.21-point non-inferiority gate on
+          # a domain whose floor is 3.21 points cannot pass at any price, and the registry is the record of that.
+          rounds = json.load(open("eval/manifests/rounds.json"))
+          states = {row["id"]: row["status"] for row in rounds["rounds"]}
+          assert states["R235"] == "cancelled" and states["R236"] == "registered", states
+          assert states["R237"] == "registered"
+          cited = [row for row in rounds["rounds"] if row["id"] == "R235"][0]
+          assert cited["actualUsd"] == 0.0, cited["actualUsd"]
           print(f"ok  read {boards['strict']['coverage']:.1%} vs request {boards['request']['coverage']:.1%}; "
                 f"ask {second['boards']['ask']['coverage']:.1%} with 155/232 misses disclosed after turn one; "
                 f"admitted {admitted['coverage']:.1%} recovering {third['bar']['B1_recovery']['recovered']}/155 with "
@@ -396,7 +434,8 @@ jobs:
                 f"{ordered_clause['hidden']} hidden against a bar of 97.0%; "
                 f"folded {folded_clause['displayed']}/{folded_clause['required']} with "
                 f"{folded_clause['hidden']} hidden, contract {seventh['bar']['B2_contract']['displayed']} against "
-                f"{seventh['unfolded']}")
+                f"{seventh['unfolded']}; "
+                f"external pair CNY {budget['totalCny']:.2f} against CNY {budget['benchmarks']['locomo']['bill']['uncachedCny'] + budget['benchmarks']['memtrapbench']['bill']['uncachedCny']:.2f} uncached")
           CHECK
 
       - name: Does the request name the record, which is R227's bar and the reason the grid is still unbought

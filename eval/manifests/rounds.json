@@ -58,7 +58,7 @@
    "dispatchedAt": "2026-11-25T15:32:00Z",
    "run": 45646309827,
    "readAt": "2026-11-25T16:45:00Z",
-   "actualUsd": 4.677,
+   "actualUsd": 4.6771,
    "outcome": "refuted on two of five bars",
    "reading": {
     "control": "pass^1 96/114 (84.2%), pass^4 66/114 (57.9%), $0.00442 an episode",
@@ -92,7 +92,8 @@
      "1x": "7th of 17",
      "2xTextVerbatim": "2nd of 9"
     }
-   }
+   },
+   "measured": "456 episodes an arm, both arms on disk: agent_cost 1.5841 + 2.2437 and user_cost 0.4303 + 0.4190, so USD 4.6771 against the 4.75 projected - the projection was 1.6% high, which is the card being right rather than the estimate being lucky. R221's submission reads these two documents and needs no new dispatch."
   },
   {
    "id": "R218c",
@@ -1076,7 +1077,7 @@
   {
    "id": "R235",
    "title": "the clause rule's accuracy dispatch: does 31.8 more points of covered writes buy a task",
-   "status": "registered",
+   "status": "cancelled",
    "dispatchBy": "2026-12-05T12:00:00Z",
    "prereg": "prereg/R235-clause-accuracy.md",
    "instrument": "the tau2 retail grid, two arms over 114 tasks at four attempts each; read with eval/tools/resolution.py for its MDE and with eval/tools/read_anchor.py --scope grouped on the dispatched transcripts for its mechanism",
@@ -1089,8 +1090,45 @@
    "dependsOn": [
     "R234"
    ],
-   "why": "Four rounds were read on a board no model was shown. R231 established where the requirement lives (95.4% coverage against the contract's 63.6%), R232 measured the block the product renders, R233 and R234 closed the rendering axis at zero hidden writes - all for ¥0 and none with a token spent. What no round has measured is whether an agent that reads a live ask for 31.8 more points of the graded writes succeeds more often. The grid's own resolution, computed for ¥0, says a pair of 456-episode arms can see 6.72pp and that the domain's floor is 3.21pp at unlimited attempts, so the round is armed at four attempts for ¥36 and cannot resolve anything smaller than the floor at any price on 114 tasks.",
-   "bar": "registered in prereg/R235-clause-accuracy.md before any dispatch: B1 the clause arm is not below the contract arm by more than 3.21pp (the domain's floor); B2 a positive delta must reach 6.72pp, the grid's MDE at four attempts, or it is reported UNRESOLVED rather than as a win; B3 on at least 95% of served blocks the clause arm carries an open ask of the family the episode later writes, measured on the dispatched transcripts"
+   "why": "Four rounds were read on a board no model was shown (R231-R234, all Y0). What none measured is whether an agent that reads a live ask for 31.8 more points of the graded writes succeeds more often - and on this domain that question costs more than the answer is worth: the floor is 3.21 points and the effect, if any, is below it.",
+   "bar": "registered in prereg/R235-clause-accuracy.md before any dispatch: B1 the clause arm is not below the contract arm by more than 3.21pp (the domain's floor); B2 a positive delta must reach 6.72pp, the grid's MDE at four attempts, or it is reported UNRESOLVED rather than as a win; B3 on at least 95% of served blocks the clause arm carries an open ask of the family the episode later writes, measured on the dispatched transcripts",
+   "cancelledAt": "2026-11-27T00:20:00Z",
+   "actualUsd": 0.0,
+   "outcome": "WITHDRAWN ON ITS OWN ARITHMETIC, BEFORE ANY TOKEN WAS SPENT. R235 registered B1 as a 3.21-point non-inferiority test on the 114-task retail grid. `eval/tools/resolution.py` prices that grid's floor at 3.21 points AT UNLIMITED ATTEMPTS - the sampling error that is left when the attempts half of the variance is driven to zero, i.e. all task heterogeneity and no measurement noise - so a 3.21-point test on this grid cannot pass at any budget, and the tool says so in one line: `+0.0321: UNREACHABLE`. Two further numbers settle it. At the four attempts B1 was armed with, the minimum detectable effect is 6.72 points for USD 5.02, and the paired difference's standard deviation measured over the 456 episodes already on disk is 0.4755, so resolving 3.2 points needs 1,356 paired episodes for about USD 10 - a non-inferiority test bought at twice the price, still unable to see a gain. The round's real uncertainty was whether a gain exists at all, and every estimate of that effect in this lane (the placement contrast, the admission contrast) sits inside the interval the round cannot resolve. So the honest action is the one this lane already takes with R222 and R224: cancel, and spend the money on the question that has a mechanism's sample size (R236) and on ladder positions that someone else's harness grades (R237). The registration stays in the repository as the record of what was almost bought; its bars were written before the floor was read, which is the defect AUDIT 34.332 names."
+  },
+  {
+   "id": "R236",
+   "title": "the clause board's mechanism, bought at sixty episodes instead of nine hundred",
+   "status": "registered",
+   "dispatchBy": "2026-12-06T12:00:00Z",
+   "prereg": "prereg/R236-clause-mechanism.md",
+   "instrument": "30 retail tasks x 2 trials, one arm on the clause board (R231 admission, R233 order, R234 fold), read on the dispatched transcripts against the 456 contract transcripts already on disk",
+   "arms": [
+    "clause"
+   ],
+   "episodes": 60,
+   "estimateUsd": 0.35,
+   "dependsOn": [
+    "R234"
+   ],
+   "why": "R235 asked whether 31.8 points of covered writes buy a task and was withdrawn because the 114-task domain's floor is the size of its own non-inferiority margin (AUDIT 34.332). The question underneath it is cheap: when the block carries a live ask for the family the model is about to write, does the model write that family, and at a rate the contract board does not reach? A proportion is estimated, not a difference resolved, so sixty episodes give a mechanism's answer to plus or minus twelve points for Y2.5, and the control arm is the 456 transcripts already paid for.",
+   "bar": "registered in prereg/R236-clause-mechanism.md before any dispatch: B1 on at least 95% of the 60 episodes some block the model reads carries an OPEN ask of the family the episode later writes, measured on the dispatched transcript; B2 the share of episodes whose graded tool call names a family that was open at the time of the call is not below the same share on the 456 contract transcripts (a direction with a margin, not a win, at plus or minus 9 points); B3 total spend at most Y3, read from the run's own agent_cost and user_cost"
+  },
+  {
+   "id": "R237",
+   "title": "the two external ladders, priced at the cache rather than at the card's miss rate",
+   "status": "registered",
+   "dispatchBy": "2026-12-08T12:00:00Z",
+   "prereg": "prereg/R236-clause-mechanism.md#and-the-two-external-replications-priced-in-the-same-pass",
+   "instrument": "LoCoMo locomo10.json (1986 QA over 10 conversations) and MemTrapBench, both on this harness, question sets grouped by document so the transcript is one shared prefix, graded by the sets' own rule scorers (token F1 and adversarial refusal) with no model judge",
+   "arms": [
+    "long-context-qa"
+   ],
+   "episodes": 2986,
+   "estimateUsd": 0.39,
+   "dependsOn": [],
+   "why": "The plan carried Y20 for two benchmarks whose cost is three integers - how many questions, how long the context is, and how many questions share it. `eval/tools/bench_budget.py` prices them from the same rate card the dispatchers bill against: 1986 questions over ten 27k-token conversations move 0.27M tokens at the miss rate and 53.35M at the cached rate, which is Y1.96 off-peak; MemTrapBench at a deliberately pessimistic 8k context is Y0.86. Without the shared prefix the same work is Y67.33, so the twenty dollars was the uncached column read as if it were the only one.",
+   "bar": "registered before any dispatch: B1 both sets run to completion with zero grader calls to a model, so the bill is input and output tokens only and a run whose agent_cost exceeds Y4 is a cache miss to be diagnosed rather than a benchmark to be re-run; B2 LoCoMo reports the five category scores separately (single-hop 841, multi-hop 282, temporal 321, open-domain 96, adversarial 446) rather than one number, because a memory system's failure mode is category-shaped; B3 every score is reported beside the harness's own uncached-cost counterfactual, so the ladder position is quotable at our price and not only at the provider's"
   }
  ]
 }

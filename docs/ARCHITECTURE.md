@@ -5584,3 +5584,55 @@ python3 eval/tools/read_anchor.py --document control.json --scope grouped
 property of a board with repetition on it; the shipped contract board is 2.41 items a call and holds one line per
 obligation already, so folding it changes nothing. The rules of R233 and R234 become live on the day the clause board is
 served, which is the dispatch that would also tell whether any of it changes what a model does.
+
+### 8.110 Two gates stand in front of every dispatch: can this domain resolve the effect, and what does the work cost
+
+Both questions are answerable from artefacts already on disk, both are answered by a tool rather than by a
+judgement, and both run on every push. They are the reason this project's plan got **cheaper as it got more
+rigorous** rather than the other way round.
+
+**Gate one: resolution.** A grid has a **floor** — the sampling error that remains when the attempts half of the
+variance is driven to zero. Repeating a task lowers only the measurement half; past the floor the error is real
+task-to-task heterogeneity and no budget moves it. `eval/tools/resolution.py` fits that floor from a grid with two
+arms and prices any effect against it:
+
+```
+$ python3 eval/tools/resolution.py --control control.json --treatment front.json --domain-tasks 114 --delta 3.21
+      m      sd     MDE  episodes      USD  per point
+     4   25.6%   6.72pp       912     5.02  0.746 USD/pp
+  the domain's floor: 3.21pp at unlimited attempts — repeating a task cannot cross it, only more tasks can
+  +0.0321: UNREACHABLE — the domain's floor is 0.0321, above the 0.0321 it would have to resolve
+```
+
+A round whose bar sits **at or below** its own domain's floor fails the build. That rule cancelled a ¥36 round
+(R235) which had been armed at exactly 3.21 points on a domain whose floor is 3.21 — the gate could not pass at
+any price, and the tool had said so in one line for four rounds before anyone read it.
+
+**Gate two: cost.** A benchmark's bill is three integers and a rate card:
+
+```
+cost = Σ  miss × rate.miss  +  hit × rate.hit  +  out × rate.out
+          ↑ documents × context        ↑ (questions − documents) × context
+```
+
+The card is `eval/manifests/model-rates.json`, which the TypeScript billing code and the tau2 driver also read, so
+a budget and a bill cannot drift. `eval/tools/bench_budget.py` prices a set from its own specification and saves
+the reading; `--check` re-derives it on every push. The substitution that matters is `miss = documents` rather
+than `miss = questions`: a long-context set asks thousands of questions of a handful of transcripts, so 99.5% of
+its input is a shared prefix billed at **one fiftieth** the miss rate.
+
+| benchmark | questions | documents | context | off-peak | no shared prefix | ratio |
+|---|---|---|---|---|---|---|
+| LoCoMo | 1,986 | 10 | 27k | **¥1.96** | ¥58.43 | 29.8× |
+| MemTrapBench | 1,000 | 50 | 8k | **¥0.86** | ¥8.90 | 10.4× |
+| both | 2,986 | 60 | | **¥2.82** | ¥67.33 | 23.9× |
+
+**What the two gates together buy.** Three of the four cost lines this project carried were wrong for one reason —
+a rate applied to the wrong quantity — and none needed a new measurement to catch, only the quantity printed
+beside the rate. With both gates in place the remaining plan is **¥5.3** rather than ¥92: an external ladder
+position that somebody else's harness grades, and a mechanism reading on a board no model has yet been shown.
+
+**What no gate can buy.** A pass-rate gain on the 114-task retail domain. Its floor is 3.21 points, the effect
+sizes this lane has measured sit inside that interval, and 1.98 points would need 300 tasks — a third domain, not
+a bigger retail dispatch. A project that only asks "can we afford this?" buys resolution it cannot use; the floor
+is the question that comes first.

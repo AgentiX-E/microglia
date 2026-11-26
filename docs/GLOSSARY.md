@@ -2987,3 +2987,29 @@ what the parser never produced: 15 `modify`, 2 `transfer`, 1 `exchange`, three o
 floor a fold must not cost the shipped board, and it is measured rather than derived: taking the floor from the folded
 board itself would be the treatment supplying its own baseline, which is the defect AUDIT 34.329 caught with a constant
 from another grid. **463** on the retail control grid, **443** on the replication.
+
+**Domain floor** — the sampling error a grid retains at **unlimited attempts**. Repeating a task lowers only the
+measurement half of the variance; past the floor the error is real task-to-task heterogeneity, so no budget lowers
+it — only more tasks do. **3.21 points** on the 114-task retail grid, which is why a round registered at a 3.21-point
+margin could not pass at any price (R235, cancelled; AUDIT 34.332) and why resolving 1.98 points needs **300**
+tasks rather than 900 more episodes. Fitted by `eval/tools/resolution.py` from a grid with two arms.
+
+**Prefix cache** — a provider's mechanism for billing a prompt token it has already read at a much lower rate
+than one it has not. On this project's card the ratio is **fifty to one** ($0.006 against $0.30 per million), which
+makes the number of *distinct prefixes* — not the number of questions — the quantity that decides a long-context
+benchmark's price. A set that shares one transcript across 200 questions moves 0.5% of its input at the miss rate;
+a harness that opens a fresh context per question moves 100% of it there, and pays 30× more for the same answers.
+A second pass over the same questions is a second round of misses: see **budget**.
+
+**Peak band** — one of the two bands a provider bills in, where every rate is **exactly double** the off-peak one.
+On this card the windows are 01–04 and 06–10 UTC on weekdays, so a dispatch's hour is a line in its budget rather
+than a scheduling preference. The lane's budgets take `--band` as an argument instead of reading the clock, because
+a budget that depends on when it was computed is not a budget.
+
+**Budget (a reading, not an estimate)** — the cost of a benchmark expressed as three integers (questions,
+documents, context length) and one rate card, written to `eval/manifests/bench-budget.json` and **re-derived on every
+push**: `bench_budget.py --check` refuses a total the card no longer produces, a benchmark silently dropped, or a
+budget whose cached column has been zeroed. Three of the four cost lines this project carried were wrong for one
+reason — a rate applied to the wrong quantity — and none of them needed a new measurement to catch, only the
+quantity printed beside the rate. Both external replications together are **¥2.82** off-peak against ¥67.33 without
+a shared prefix.

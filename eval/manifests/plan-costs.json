@@ -1,0 +1,46 @@
+{
+ "schema": "microglia/plan-costs@1",
+ "note": "What the remaining plan costs, before and after three corrections of reference. Every `nowCny` is derived rather than typed: R236 from sixty episodes at the per-episode cost the R218b grid actually spent, R237 from the rate card through eval/tools/bench_budget.py, and the two cancellations from zero. A figure in a document that this file does not carry is a figure with no source, which is how a plan kept a twenty-dollar line for four rounds.",
+ "cnyPerUsd": 7.2,
+ "episodeUsd": 0.00584,
+ "items": [
+  {
+   "id": "R235",
+   "what": "the clause rule's accuracy dispatch, two arms",
+   "wasCny": 36.2,
+   "nowCny": 0.0,
+   "status": "cancelled",
+   "why": "its 3.21-point margin is the domain's own floor, so the gate could not pass at any price",
+   "source": "eval/tools/resolution.py --delta 3.21 (prints UNREACHABLE) and AUDIT 34.332"
+  },
+  {
+   "id": "R236",
+   "what": "the clause board's mechanism, sixty episodes, one arm",
+   "wasCny": 0.0,
+   "nowCny": 2.52,
+   "status": "registered",
+   "why": "a proportion estimated at a proportion's sample size, with the control arm already on disk",
+   "source": "60 episodes x the 0.00584 USD an episode R218b measured, at 7.2 CNY/USD"
+  },
+  {
+   "id": "R237",
+   "what": "LoCoMo and MemTrapBench, grouped by document",
+   "wasCny": 20.0,
+   "nowCny": 2.82,
+   "status": "registered",
+   "why": "99.5% of a long-context set is a shared prefix billed at one fiftieth the miss rate",
+   "source": "eval/manifests/bench-budget.json, re-derived from the rate card on every push"
+  },
+  {
+   "id": "R221",
+   "what": "the 2.0 submission",
+   "wasCny": 36.0,
+   "nowCny": 0.0,
+   "status": "ready",
+   "why": "the 456-episode grids it reports were bought in R218b and carry grades, cost and transcripts",
+   "source": "the two documents on disk; AUDIT 34.333"
+  }
+ ],
+ "totalWasCny": 92.2,
+ "totalNowCny": 5.34
+}

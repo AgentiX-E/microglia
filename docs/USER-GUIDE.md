@@ -7760,3 +7760,48 @@ items a call — one line per obligation already — so there is nothing to fold
 repetition on it is served, which is a different decision (an accuracy dispatch, not a rendering one). Folding a board
 that does not repeat is free and invisible; that is why it can be adopted on the rendering alone and why adopting it is
 not the same as shipping it.
+
+### 32.91 If your long-context benchmark bill looks wrong, it is: you are probably paying the uncached rate
+
+The symptom is a number in a plan that keeps getting bigger without anyone re-deriving it. "Long-context
+evaluation is expensive" is true of *some* harnesses and false of others, and the difference is not the model or
+the context length — it is **how many times you pay to read the same transcript**.
+
+**The arithmetic, which is all of it.** A long-context QA set asks *n* questions about *d* documents. A provider
+bills a prompt token it must read at a **miss** rate and one it serves from its prefix cache at a **hit** rate,
+and on the card this project runs against those are $0.30 and $0.006 per million — a factor of **fifty**. So:
+
+```
+tokens at miss = d × context          (one per document, not one per question)
+tokens at hit  = (n − d) × context
+cost = miss × rate_miss + hit × rate_hit + answers × rate_out
+```
+
+For LoCoMo — 1,986 questions over 10 conversations, 27k tokens of context — that is 0.27M tokens at miss and
+**53.35M** at hit: **$0.27**, or ¥1.96. Price the same work as 1,986 fresh contexts and it is $8.11 / ¥58.43,
+which is what a harness that asks one question at a time pays. Same model, same questions, 30× the bill.
+
+**Three things to check before you believe a number.**
+
+**1. Does your harness share a prefix at all?** If each question opens a new context containing the full
+transcript, nothing can be cached and the uncached column is your real cost. Group the questions by document,
+emit the transcript once as a system-style prefix, and ask the questions in order — the cache is automatic from
+there, and it is worth more than every other optimisation combined.
+
+**2. Did you re-sample?** A second pass over the same questions is a second round of **misses**, not hits: the
+provider's cache has a lifetime you do not control. Budgeting the second pass at the cached rate is a budget that
+assumes the favourable case, and the favourable case is the one that does not happen overnight.
+
+**3. What band are you dispatching in?** Peak windows double every rate. On this project's card they are 01–04
+and 06–10 UTC on weekdays, so the same run is ¥2.82 off-peak and ¥5.63 at peak. That is not a scheduling
+preference, it is a line in the budget — and a budget computed from "whenever the job runs" is not a budget.
+
+**And the gate that comes before the money.** Long-context benchmarks are cheap enough that the temptation is to
+run them first and think later. The order that pays is the other one: price the set (three integers, one card,
+thirty seconds), then run it. If the price surprises you, the surprise is a harness bug — a prefix that stopped
+hitting — and re-running the benchmark will reproduce the bug at full price rather than diagnose it.
+
+**What this looks like when it is right.** In this project the two external replications cost **¥2.82** together,
+re-derived on every push by a check that refuses a total the rate card does not produce. The number is in a
+manifest, and a document that quotes it is quoting something a build can recompute — which is the only durable
+form a cost estimate takes.

@@ -1,0 +1,74 @@
+{
+ "benchmarks": {
+  "locomo": {
+   "questions": 1986,
+   "documents": 10,
+   "context": 27000,
+   "answer": 60,
+   "samples": 1,
+   "note": "10 conversations, 1986 QA over five categories; graded by token F1 and adversarial refusal, so the grader calls no model and costs nothing",
+   "rate": {
+    "model": "deepseek-flash",
+    "band": "off_peak",
+    "pricedAs": "deepseek-flash",
+    "miss": 0.15,
+    "hit": 0.003,
+    "out": 0.6
+   },
+   "tokens": {
+    "questions": 1986,
+    "documents": 10,
+    "context": 27000,
+    "samples": 1,
+    "miss": 270000,
+    "hit": 53352000,
+    "out": 119160
+   },
+   "bill": {
+    "usd": 0.272052,
+    "cny": 1.96,
+    "uncachedUsd": 8.114796,
+    "uncachedCny": 58.43,
+    "multiplier": 29.83,
+    "missShare": 0.005
+   }
+  },
+  "memtrapbench": {
+   "questions": 1000,
+   "documents": 50,
+   "context": 8000,
+   "answer": 60,
+   "samples": 1,
+   "note": "a bound rather than a reading: the published specification does not state a per-item context, so 8k is chosen above what its transcripts plausibly hold",
+   "rate": {
+    "model": "deepseek-flash",
+    "band": "off_peak",
+    "pricedAs": "deepseek-flash",
+    "miss": 0.15,
+    "hit": 0.003,
+    "out": 0.6
+   },
+   "tokens": {
+    "questions": 1000,
+    "documents": 50,
+    "context": 8000,
+    "samples": 1,
+    "miss": 400000,
+    "hit": 7600000,
+    "out": 60000
+   },
+   "bill": {
+    "usd": 0.1188,
+    "cny": 0.86,
+    "uncachedUsd": 1.236,
+    "uncachedCny": 8.9,
+    "multiplier": 10.4,
+    "missShare": 0.05
+   }
+  }
+ },
+ "totalUsd": 0.3909,
+ "totalCny": 2.82,
+ "band": "off_peak",
+ "model": "deepseek-flash"
+}
