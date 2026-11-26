@@ -34,6 +34,14 @@ on:
         description: 'Delay between calls. Measured, not chosen: at 5s the block-bearing shapes read 617 uncached tokens a call against a control of 180, which is a cache-write latency misread as a placement effect'
         required: false
         default: '15000'
+      # R220c. `movePrice` needs a call that moved: held still, every placement's steady state is the control's plus
+      # one write, so R216b's −4% cannot be attributed from any column a held probe prints. One extra call per shape
+      # with the block's body changed on it is the cheapest thing that separates "the block was re-billed" from
+      # "everything behind the block was re-billed", and it is cents.
+      rewrite_at:
+        description: 'Call on which the block''s body changes, buying one extra call per shape (0 disables: the held probe R102 was measured with)'
+        required: false
+        default: '10'
 
 jobs:
   probe:
@@ -65,7 +73,8 @@ jobs:
             --turns '${{ github.event.inputs.turns }}' \
             --block-tokens '${{ github.event.inputs.block_tokens }}' \
             --native-tokens '${{ github.event.inputs.native_tokens }}' \
-            --wait-ms '${{ github.event.inputs.wait_ms }}'
+            --wait-ms '${{ github.event.inputs.wait_ms }}' \
+            --rewrite-at '${{ github.event.inputs.rewrite_at }}'
       - name: Say what the shapes cost
         if: always()
         run: |
@@ -88,6 +97,27 @@ jobs:
           for row in a['readouts']:
               print(f"| `{row['placement']}` | {row['ledger']['firstUncached']} | "
                     f"{row['ledger']['steadyUncached']:.0f} | {row['delta']:+.0f} |")
+          # R220c. The move, which is the round's own reading and the only column a held probe cannot print: a
+          # change behind the conversation re-bills the block, a change in front of it re-bills everything behind it.
+          moves = a.get('move_tokens') or {}
+          print()
+          print('### what a change cost, beyond the shape\'s own steady state')
+          print()
+          if not a.get('rewrite_at'):
+              print('no rewrite asked for: this run is the held probe and prices no move (pass `rewrite_at`).')
+          elif not moves:
+              raise SystemExit('the probe asked for a rewrite and wrote no `move_tokens`: the move was not measured')
+          else:
+              print(f"- block measured **{a['block_tokens_measured']}** prompt tokens")
+              print(f"- cache counter reported on {a['cache_field_reported_calls']} of {a['calls']} call(s)")
+              print()
+              print('| shape | move (tokens) |')
+              print('|---|---|')
+              for placement, move in moves.items():
+                  print(f"| `{placement}` | {move:+.0f} |")
+              if a['cache_field_reported_calls'] == 0:
+                  print()
+                  print('**inconclusive**: no call reported the counter, so no move was measured — this is not a zero.')
           PY
       - uses: actions/upload-artifact@v4
         if: always()
