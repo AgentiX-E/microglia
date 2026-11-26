@@ -101,7 +101,7 @@ jobs:
         run: |
           set -euo pipefail
           exec > >(tee /tmp/python-gates.log) 2>&1
-          trap 'code=$?; if [ "$code" -ne 0 ]; then tail -n 15 /tmp/python-gates.log | while IFS= read -r line; do echo "::error title=python gate::$line"; done; fi; exit "$code"' EXIT
+          trap 'code=$?; if [ "$code" -ne 0 ]; then { grep -nE "Error|error:|FAIL|below the" /tmp/python-gates.log | tail -n 12; echo "--- last 40 lines ---"; tail -n 40 /tmp/python-gates.log; } | while IFS= read -r line; do echo "::error title=python gate::$line"; done; fi; exit "$code"' EXIT
           python3 -m coverage run --branch --source=eval/drivers/alfworld -m unittest discover \
             -s eval/drivers/alfworld -p "test_*.py"
           # Each suite puts its own directory on `sys.path` rather than relying on the interpreter to do it, and
