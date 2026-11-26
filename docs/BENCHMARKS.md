@@ -53,7 +53,7 @@ Regenerate with `python3 scripts/frontier.py`; the data is the pinned 2.0 snapsh
 
 | domain | rows on the directory | rows that state a cost | spread of `pass^1` | this project |
 |---|---|---|---|---|
-| retail | 48 | **8** | 46.5 → 81.6 across the priced rows; 84.43 at the top of the whole column | **84.20 at $0.00558** |
+| retail | 48 | **8** | 46.5 → 81.6 across the priced rows; **86.20** at the top of the whole column (a 0.1.3 row), **84.43** the top text row at 1.0.1 | **84.20 at $0.00558** |
 | airline | 47 | **9** | 52.5 → 84.0 | not measured |
 | telecom | 43 | **9** | 57.2 → 92.3 | not measured |
 
