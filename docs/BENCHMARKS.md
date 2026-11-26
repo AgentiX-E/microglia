@@ -32,7 +32,7 @@ prediction rather than a saving.
 
 | benchmark | leaderboard | LLM in the loop | reference stack | what it scores | cost published | this project |
 | --- | --- | --- | --- | --- | --- | --- |
-| **τ²-bench** (retail, airline) | its own board; submissions carry trajectories | **yes** — agent loop with a user simulator | **Python** (upstream), **TypeScript** in this repo's driver | pass^k on task completion | **no** — no row reports tokens or dollars | measured: pass@1 82.5 / 85.0 / 87.5 on 40 retail tasks; pass^4 36.0 (void) and 46.0 on 50 airline tasks |
+| **τ²-bench** (retail, airline) | its own board; submissions carry trajectories | **yes** — agent loop with a user simulator | **Python** (upstream), **TypeScript** in this repo's driver | pass^k on task completion | **2.0 only, on a minority of rows**: 8 of 48 retail, 9 of 47 airline, 9 of 43 telecom | measured: pass@1 82.5 / 85.0 / 87.5 on 40 retail tasks; retail pass^1 **84.20** on the 114-task domain at **$0.00558** a trajectory; airline pass^4 36.0 (void) and 46.0 on 50 tasks |
 | **BIRD** (dev / Mini-Dev) | its own board, EX by submission | **yes** — generator, optional selector ensemble | **Python** | execution accuracy | **no** | measured: 57.63 dev (n = 1,534) no memory, 56.26 memory arm |
 | **ALFWorld** | its own board | **yes** — embodied agent | **Python** | task success | **no** | measured, with 8 failure trajectories unexplained |
 | **LongMemEval** | paper tables, no public board | **yes** | **Python** | answer accuracy over long sessions | **no** | not run here |
@@ -41,10 +41,34 @@ prediction rather than a saving.
 | **MEME** | paper tables | **yes** | **Python** | memory-editing accuracy | **no** | not run here |
 | **MemTrapBench** | paper tables | **yes** | **Python** | whether a memory *misleads* | **no** | not run here; its AdaptiveMem direction is registered as a candidate arm |
 
-**Answer to "is the field's instrumentation complete?" — no, and the gap is one column.** Every leaderboard above
-publishes an accuracy. None publishes the bill, the pack's size, whether the treatment was applied, or the sample's
-own resolution. That is why the middle and right panels end in a hatched block: the cost axis for the field does not
-exist, and drawing it anyway would be inventing numbers.
+**Answer to "is the field's instrumentation complete?" — no, and the gap is four columns, of which one has just
+narrowed.** Every leaderboard above publishes an accuracy. One of them — τ² 2.0 — now also publishes a **cost per
+trajectory on a minority of rows**, which is new since the earlier charts on this page were drawn and is the reason the
+frontier chart below exists. None of them publishes the pack's size, whether the treatment was applied, the served
+share of the treatment, or the sample's own resolution.
+
+![accuracy against price, three domains, on the rows that state both](benchmarks/frontier-2x.svg)
+
+Regenerate with `python3 scripts/frontier.py`; the data is the pinned 2.0 snapshot in `eval/manifests/`.
+
+| domain | rows on the directory | rows that state a cost | spread of `pass^1` | this project |
+|---|---|---|---|---|
+| retail | 48 | **8** | 46.5 → 81.6 across the priced rows; 84.43 at the top of the whole column | **84.20 at $0.00558** |
+| airline | 47 | **9** | 52.5 → 84.0 | not measured |
+| telecom | 43 | **9** | 57.2 → 92.3 | not measured |
+
+**On the plane the priced rows define, nothing on the directory dominates this project.** The cheapest published retail
+row is **8.6×** this project's price and 2.62 points below it; the most accurate priced row (GPT-5.2 at 81.58) is
+**12.8×** the price. A factor of eight on a measured axis does not need a bigger sample to establish, which is why this
+is the one comparative claim available today that does not run into the resolution floor that governs the accuracy
+column.
+
+**And the floor is the reason the accuracy column reads the way it does.** Retail holds 114 independent tasks, and the
+paired difference between two arms has a floor of **3.21 points** there — no attempt count crosses it, because
+repeating a task only lowers the measurement half of the error. Six text rows of the retail column sit inside that
+band, so their ordering is a ranking of point estimates rather than of measured differences, in both directions. The
+band is drawn on the retail panel and nowhere else: no floor has been measured for airline or telecom, and drawing an
+unmeasured one would be the error the band exists to prevent.
 
 ## Where this implementation sits
 

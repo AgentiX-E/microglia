@@ -7337,3 +7337,34 @@ than the rank — a column almost nobody prints, and the one that stops readers 
 **The mistake to avoid.** Do not shrink the sample and call it a pilot. An underpowered null is worse than no
 experiment: it spends the idea's credibility along with its money, and the next person to propose the idea has to argue
 against a result that never tested it.
+
+### 32.82 Should you gate memory on what the request says, or on what the episode reveals?
+
+Two answers, both measured, both no. This section is the shortest path to the conclusion so that you do not spend a
+month re-deriving it.
+
+**The question.** If memory helps some episodes and hurts others, a gate in front of it should be worth more than any
+rewrite of its text. A gate needs an observable that exists *before* the outcome, and there are exactly two places to
+look: what the request **declares**, and what the episode **reveals** once it starts.
+
+**What the request gives you.** Nothing that separates. 385 candidate rules over the request prefix and the identity
+gate: one admissible in sample, none confirmed on the half it was chosen from (R223). Two of them die for free — the
+opening turn states at least one ask on 110 of 114 tasks, and the first tool call is an identity lookup on 99.1% of
+episodes — so a threshold on either serves almost everything and decides nothing.
+
+**What the episode reveals.** The first state payload, read at the turn you would serve on. Six structural quantities
+(shape, length, keys, entries, leaves, variant axes), 565 candidate rules: 18 admissible in sample where noise alone
+yields **14.1**, and the best-looking one — "do not serve the biggest order records" — reverses sign on the half it
+never saw (−6.5 points, p = 0.33). R225.
+
+**Why the second reading is not just a bigger first reading.** The order record is a property of the *task*, not of the
+attempt: it varies inside a task on 11% of tasks. So a threshold on it is an admission rule for a task class, and the
+class rule is what failed to transfer the first time. If your episodes share a world across attempts — most benchmarks
+do — then no prefix observable can gate one attempt and serve another.
+
+**What to do instead.** Serve on a **timing rule** rather than a predicate: inject the state when the agent is composing
+a state change, and not when the conversation opens. That is the shipped default, it is measured (R219, twice, with the
+mechanism replicating both times and the accuracy effect inside the noise), and it is cheaper — 8% shorter block, 19%
+fewer changes, 4–7% less spend. If you are looking for an accuracy win from gating, the honest statement this project
+can offer is that on its grid the search is closed at both ends, and the closure was computed for nothing on artefacts
+that already existed.

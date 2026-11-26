@@ -507,6 +507,135 @@
         "armLiftIfDoubled": 0.0283,
         "floor": 0.0321
       }
+    },
+    {
+      "id": "R225",
+      "title": "what the episode reveals \u2014 the serving decision read from the payload rather than from the request",
+      "status": "read",
+      "dispatchBy": "2026-12-05T12:00:00Z",
+      "prereg": "prereg/R225-reveal-gate.md",
+      "arms": [
+        "none"
+      ],
+      "episodes": 0,
+      "estimateUsd": 0.0,
+      "dependsOn": [
+        "R218b",
+        "R223"
+      ],
+      "why": "R223 closed the space of things a request declares and named its successor in the same document: read what the episode reveals. The lane had never read the first state payload, and R223 pre-committed the consequence of that reading being empty \u2014 that the harm is a property of the material's presence and not of its content. A screen over a grid already on disk decides it for nothing.",
+      "instrument": "python3 eval/tools/serve_policy.py --control control.json --treatment front.json --out r225-reveal.json",
+      "readAt": "2026-11-26T05:40:00Z",
+      "actualUsd": 0.0,
+      "outcome": "screened and REFUTED: 565 reveal-keyed cuts over R218b's 456 pairs yield 18 admissible, against 14.1 from noise alone (z = +1.04, p = 0.148), and the cut the screen chose reverses sign on the half it never saw",
+      "reading": {
+        "cuts": 565,
+        "pairs": 456,
+        "screenPairs": 228,
+        "confirmPairs": 228,
+        "admissibleInSample": 18,
+        "expectedByChance": 14.1,
+        "excess": {
+          "observed": 18,
+          "expected": 14.1,
+          "sd": 3.71,
+          "z": 1.04,
+          "p": 0.1482
+        },
+        "chosen": "skip revealLeaves>=52",
+        "confirm": "skips 66% of the pairs for -6.5 pp on 17 discordant pairs (6 up, 11 down), p = 0.3323, and serves the rest at -2.0 pp \u2014 NOT_CONFIRMED",
+        "pooled": "+1.8 pp against serving everything and +0.2 pp against serving nothing, DOMINATED on the serve half",
+        "family": [
+          "revealShape",
+          "revealChars",
+          "revealKeys",
+          "revealEntries",
+          "revealLeaves",
+          "revealOptions"
+        ],
+        "taskConstancy": "the reveal is nearly as task-constant as the request: revealEntries and revealChars vary inside a task on 11% of tasks, against 4% for the first tool call, so a cut on it is an admission rule for a task class and not a gate for one attempt",
+        "boundary": "the prefix now ends at the reveal's own result, which is the turn R219's invocation policy serves on, so the gate is implementable rather than counterfactual",
+        "consequence": "no observable decision recovers the +7.5 / -9.5 stratification, from the request (R223) or from the reveal (R225), so the harm belongs to the material's presence"
+      },
+      "artefacts": [
+        "prereg/R225-reveal-gate.md",
+        "eval/tools/serve_policy.py"
+      ]
+    },
+    {
+      "id": "R226",
+      "title": "the airline grid, admitted or refused before it is bought \u2014 the two numbers applied to the last purchase",
+      "status": "read",
+      "dispatchBy": "2026-12-05T12:00:00Z",
+      "prereg": "prereg/R226-airline-admission.md",
+      "arms": [
+        "none"
+      ],
+      "episodes": 0,
+      "estimateUsd": 0.0,
+      "dependsOn": [
+        "R223",
+        "R217"
+      ],
+      "why": "R223's test cancelled two rounds. The queue still holds one purchase, and no document had applied the test to it: 50 independent tasks in a domain this project has never measured. The floor for that grid and the mechanism's largest measured effect decide it, and both are arithmetic on artefacts already on disk.",
+      "instrument": "python3 eval/tools/resolution.py --control control.json --treatment front.json --domain-tasks 50 --delta 7.9",
+      "readAt": "2026-11-26T06:05:00Z",
+      "actualUsd": 0.0,
+      "outcome": "ADMITTED at the four-attempt rung by 1.18 pp: a 50-task grid resolves 6.72 pp at four attempts against a mechanism measured at 7.90, and 12.24 pp at one attempt, which fails outright",
+      "reading": {
+        "floorAt50Tasks": 0.0485,
+        "mdeByRung": {
+          "1": 0.1224,
+          "2": 0.0889,
+          "4": 0.0672
+        },
+        "mechanismPp": 0.079,
+        "marginPp": 0.0118,
+        "requiredTransfer": 0.85,
+        "priceCorrected": "400 episodes at the measured $0.0052-0.0056 is $2.20, about CNY 16, against the CNY 5.4 the queue carried: the queue's figure was registered when the round was one attempt an arm, and the design it needs is four",
+        "assumption": "the floor transfers retail's b = 0.01496 to airline; b is a property of the domain and airline's is unknown until an airline grid exists, so the transfer buys an order of magnitude and not a number",
+        "whyAirlineAtAll": "not resolution \u2014 airline is worse per task than retail at 50 tasks against 114 \u2014 but a second domain, which is the only thing that can say whether a finding is about memory or about retail"
+      },
+      "artefacts": [
+        "prereg/R226-airline-admission.md"
+      ]
+    },
+    {
+      "id": "R217a",
+      "title": "the airline parser \u2014 the board's families and receipts, taught the domain before it is dispatched into",
+      "status": "registered",
+      "dispatchBy": "2026-12-03T12:00:00Z",
+      "prereg": "prereg/R217a-airline-parser.md",
+      "arms": [
+        "none"
+      ],
+      "episodes": 0,
+      "estimateUsd": 0.0,
+      "dependsOn": [
+        "R226"
+      ],
+      "why": "R226 admits R217 and names what blocks it: FAMILIES maps retail write tools to ask families, and an airline transcript's writes are not in it, so a dispatch today would serve a block whose items never settle. That is not a null result, it is a broken instrument reporting one, and the census that prevents it costs nothing because the airline tasks carry their own required actions.",
+      "bar": "the parser's family recall on the 50 airline requests at or above the retail parser's own, measured by --census before any dispatch is armed"
+    },
+    {
+      "id": "R217",
+      "title": "the airline column \u2014 50 independent tasks, a second domain, and the transfer of the mechanism",
+      "status": "registered",
+      "dispatchBy": "2026-12-10T12:00:00Z",
+      "prereg": "prereg/R217-airline.md",
+      "arms": [
+        "control",
+        "board"
+      ],
+      "episodes": 400,
+      "estimateUsd": 2.2,
+      "dependsOn": [
+        "R217a",
+        "R226"
+      ],
+      "why": "Retail's floor is 3.21 pp and no budget lowers it, so the only purchase that buys anything is more independent tasks in a domain not yet measured. Airline is 50 tasks, its published column is unsaturated (top 84.0, median 63.8 over 24 rows), and R226 prices the grid at 6.72 pp of resolution at four attempts against a mechanism measured at 7.90.",
+      "bar": "the paired pass^1 delta at the four-attempt rung, with the served share and the two conditional columns beside it; a reading inside 6.72 pp is a statement about the grid and is reported as one",
+      "priceNote": "CNY 16 at the measured rate, not the CNY 5.4 the queue carried (R226, AUDIT 34.316)"
     }
   ]
 }

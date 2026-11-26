@@ -5076,3 +5076,38 @@ resolve and the largest effect its mechanism can produce. The ceiling is compute
 could reach, and the full size of the strongest published result — so failing the test means the round cannot succeed
 even under assumptions chosen to favour it. Two rounds failed it this month: one because its ceiling was two thirds of
 the floor, one because its price was 85% above its label once the attempts were counted properly (AUDIT 34.311, 34.312).
+
+### 8.102 The reveal channel: what a serving decision may read, and where the prefix ends
+
+A serving decision has to be made before the episode's outcome exists, so it can only read what the episode has already
+shown. Section 8.100 built the estimator that prices such a decision and named the boundary it was allowed to read: the
+first tool call outside the authentication family. That boundary is correct for a decision timed at the **request** and
+wrong for one timed at the **write**, and the product serves at the write — a block is injected when the agent is
+composing a state change, not when the conversation opens. So the channel now reads one message further: the **payload**
+that the first non-authentication call returned.
+
+**What makes it a policy rather than a counterfactual.** The reveal exists at the turn the decision is taken. On this
+domain it is `get_order_details` in 436 of 456 episodes, and it carries the order, its items, their variant axes and the
+payment history — which is precisely the state a block summarises, and therefore the only place a decision about
+summarising it can be grounded.
+
+**What is read from it, and why the list is fixed.** Six quantities: `revealShape` (object / array / scalar / unparsable
+/ none), `revealChars`, `revealKeys`, `revealEntries` (an order's `items`, or an array's length), `revealLeaves`
+(scalars, counted to a ceiling of 400) and `revealOptions` (variant axes under every `options` map). The list is declared
+in the instrument before any screen runs, because a family assembled after the outcomes are known has a multiplicity
+column that is a lie. Free text is `unparsable` **and** carries its length; a payload that never arrived is `none` and
+not the smallest possible record, because an episode that spent its budget on authentication cannot be gated by what it
+never showed.
+
+**How results are bound to calls.** The recorder writes one `role: tool` message per result and no call ids, so a turn
+carrying *k* calls is answered by the next *k* results in order. A turn that authenticates and then asks for the order
+is the case that matters: the reveal is the second call and is owed the second result, and a reader that took "the next
+tool message" would price the reveal as the user id. A turn that leaves a call unanswered releases the slot rather than
+binding the next turn's result to it.
+
+**What the channel found, and what the architecture does with it.** 565 cuts over a grid that holds both arms: 18
+admissible, against 14.1 from noise alone (`z = +1.04`), and the cut the screen chose reverses sign on the half it never
+saw. The reveal is also 89–93% task-constant, so a threshold on it is an admission rule for a task class — the same
+shape as the request-declared rules that had already failed. The architectural consequence is not another gate: it is
+that **the shipped serving policy is the state channel plus the timing rule**, and no gate is installed on top of it.
+A negative result that changes nothing in the shipped configuration is the configuration doing its job.

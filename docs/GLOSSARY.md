@@ -2806,11 +2806,13 @@ beside its yield. At `m` cuts and a two-sided 5% test it is about `0.025·m`, so
 discoveries. A family that produces *fewer* admissible rules than chance has no signal, and its one survivor is a
 selection rather than an effect. Quoting a screen without this number is quoting a p-hack with a table.
 
-**Task-constant observable** — a prefix field that never varies across a task's attempts, such as the opening request
-(the user simulator's fixed utterance) or the identity lookup that opens this domain. A threshold on a task-constant
-field cannot serve one attempt and skip another; it can only switch memory off for a **task class**, which makes it an
-admission rule and not a serving gate. On this project's grid every field available before the first content reveal is
-task-constant on 100% of tasks, which is the structural reason the serving question needs the episode's own content.
+**Task-constant observable** — a prefix field that does not vary across a task's attempts. A threshold on a
+task-constant field cannot serve one attempt and skip another; it can only switch memory off for a **task class**, which
+makes it an admission rule and not a serving gate. The corrected measurement (AUDIT 34.315) is that **no prefix field on
+this project's grid is fully task-constant**: the opening request is paraphrased by the user simulator on every attempt,
+so its length varies inside a task on 100% of tasks and its ask count on 80%; the first tool call varies on 4%; the
+order record a reveal returns varies on 11%. The sentence the lane may say is therefore the weaker and harder one —
+*nothing that varies inside a task separates the pairs* — rather than the stronger one it said for four rounds.
 
 **Resolution (of a grid)** — the smallest difference in pass rate a paired grid can distinguish from zero at a stated
 power, usually 80% at a two-sided 5% test. It is a property of the **domain** as much as of the budget: the spread of a
@@ -2832,3 +2834,17 @@ arithmetic was finally done (AUDIT 34.311).
 grid can resolve, and the largest effect its mechanism can produce. The ceiling is computed generously — every stratum
 the mechanism could reach, at the full size of the strongest published result — so failing it means the round cannot
 succeed even under assumptions chosen to favour it. Two rounds failed it in one month, worth $25.4 between them.
+
+**Reveal** — the first state payload an episode is shown: the result of the first tool call outside the authentication
+family. On this project's grid it is `get_order_details` in 436 of 456 episodes, and it carries the order, its items,
+their variant axes and the payment history. It matters because of **when** it exists: it is available at the turn a
+write is composed, which is exactly where the shipped invocation policy serves, so a decision keyed on it is a decision
+the harness can actually take. A gate keyed on the request is a counterfactual; a gate keyed on the reveal is a policy.
+
+**Excess over chance** — how far a screen's yield sits above the number of rules the same screen would produce from
+noise, expressed in standard deviations of a binomial with `p = 0.025` per cut: `z = (observed − 0.025·m) / √(0.025·m·0.975)`.
+It exists because "18 survivors against 14 expected" is a surplus to a reader who wants one and a rounding difference to
+a reader who does not. The cuts are **not** independent — thresholds a few units apart name nearly the same subset — so
+the binomial treats the family as more multiplied than it is, which errs in the direction that makes a claim harder.
+Every screen this project reports now carries it; R225's two families read `+1.04σ` over 565 cuts, and R223's read
+`−2.81σ` over 385, which is how a negative result stops being an argument.

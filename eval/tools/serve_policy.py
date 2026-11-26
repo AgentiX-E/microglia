@@ -76,10 +76,39 @@ than a failure: it says the observable is noise.
 
 ## What the proxies may read
 
-Only the episode's **prefix** — the opening user turn and the first tool calls, never a later message and never the
-reward. The reader enforces this by construction: `observables()` walks messages until the first non-auth tool call and
-stops. A proxy that read further would be reading the outcome, and the test below pins the boundary by re-reading a
-truncated transcript and asserting the observable set is identical.
+Only the episode's **prefix** — the opening user turn, the first tool calls, and the **payload the first non-auth call
+returned**, never a later message and never the reward. The reader enforces this by construction: `observables()` walks
+messages until the reveal's own result and stops. A proxy that read further would be reading the outcome, and the test
+below pins the boundary by re-reading a transcript truncated just after that result and asserting the observable set is
+identical.
+
+## R225 — the reveal, and why the boundary moved one message
+
+R223 closed the space of things a **request** declares: every prefix observable available before the model acts is
+constant within a task on 100% of tasks, so a threshold on one of them is an admission rule for a task class, and the
+one class rule that survived the screen did not replicate on the half it never saw. Its own report ended by naming the
+successor: read what the episode **reveals** — the order, the item, the returned attribute row.
+
+So this layer reads the payload of the first call outside the authentication family. It is the same artefact and the
+same estimator; what changes is the boundary, and the boundary is the claim. A gate timed at the request acts before
+anything is known; a gate timed at the **write** acts after the reveal and before the write, which is exactly where
+R219's invocation policy serves. That makes a reveal-keyed gate implementable rather than a counterfactual, and it is
+the reason the grid below is R219b's (`board` against `policy`) as well as R218b's (`control` against `front`): the
+first prices the decision as it would ship, the second prices it with a true control beside it.
+
+Six quantities are declared rather than discovered, each with a mechanism sentence, and they are screened as **one
+family** whose multiplicity is printed beside its yield:
+
+| field | what it is | why it could be the decision |
+|---|---|---|
+| `revealShape` | object / array / scalar / unparsable / none | a payload that is not a record is not the state the block summarises |
+| `revealChars` | the payload's length | a summary of a long record leaves more out than a summary of a short one |
+| `revealKeys` | top-level keys | breadth of the record rather than its size |
+| `revealEntries` | `items` of an order, or an array's length | the benchmark fails on "one of two items done", so the count is the failure's own shape |
+| `revealLeaves` | scalar values, counted to a ceiling | two payloads of one length can be one long field or forty short ones |
+| `revealOptions` | variant axes under every `options` map | an exchange against one variant is a lookup; against six it is a decision |
+
+Declaring them is the protection: a family chosen after the outcomes are known has a multiplicity column that is a lie.
 
 Usage:
   python3 eval/tools/serve_policy.py --control control.json --treatment front.json
@@ -112,6 +141,21 @@ MAX_SERVE_SHARE = 0.90
 MIN_PAIRS = 10
 # Half the grid, so half the floor. 2·2⁻⁶ = 0.031 is the smallest count that clears 0.05 with a unanimous sign.
 MIN_CONFIRM_PAIRS = 6
+
+# R225. The reveal, and the four facts it is read into. The boundary moves from "before the first non-auth call" to
+# "before anything after the first non-auth call's result", and that move is the whole of this layer: R223 established
+# that nothing a request *declares* varies inside a task, so a serving gate has to read what the episode *reveals*. The
+# first reveal is the one a write is composed against (`get_order_details` in 436 of 456 control episodes), and it is
+# available at exactly the turn R219's invocation policy serves on, which is what makes the gate implementable rather
+# than a counterfactual.
+#
+# The fields are declared here rather than discovered, and the declaration is the file's main protection against a
+# fishing expedition: six quantities, each with a mechanism sentence, screened as one family with its multiplicity
+# printed. A family chosen after the outcomes are known is a family whose `expectedByChance` is a lie.
+REVEAL_FIELDS = ("revealChars", "revealKeys", "revealEntries", "revealLeaves", "revealOptions")
+# A leaf count over a pathological payload is a number nothing can compare with, so the walk stops. 400 is above the
+# largest order in the grid (an five-item order with every variant axis expands to about 260 leaves).
+LEAF_CEILING = 400
 
 
 def _verdict(simulation) -> int:
@@ -150,6 +194,119 @@ def _calls(simulation) -> "list[str]":
     return names
 
 
+def _result_of_each_call(messages) -> dict:
+    """Every tool result, keyed by the call that asked for it.
+
+    The transcript has no call ids (the recorder writes a `role: tool` message per result and nothing else), so the
+    pairing is positional: a message carrying k calls is answered by the next k tool messages, in order. Matching by
+    position rather than by "the next tool message" is what keeps a multi-call turn honest — the reveal is the first
+    call *outside* the auth family, and in a turn that authenticated and then read the state, the result it is owed is
+    the second one.
+    """
+    results: dict = {}
+    pending: list = []
+    for index, message in enumerate(messages):
+        if not isinstance(message, dict):
+            continue
+        if message.get("role") == "tool":
+            if pending:
+                results[pending.pop(0)] = message.get("content")
+            continue
+        calls = [call for call in (message.get("tool_calls") or []) if isinstance(call, dict)]
+        if calls:
+            # A message with calls and no results consumed yet starts a new turn: anything the previous turn left
+            # unanswered was never recorded, and holding its slot would bind this turn's first result to it.
+            pending = [(index, position) for position in range(len(calls))]
+    return results
+
+
+def _leaves(value, budget: int) -> int:
+    """How many scalar values a payload holds, counted to a ceiling.
+
+    This is the quantity `revealChars` is a poor proxy for: two payloads of the same length can be one long free-text
+    field or forty short ones, and it is the second shape that a summary of the state has to leave something out of.
+    """
+    if budget <= 0:
+        return 0
+    if isinstance(value, dict):
+        total = 0
+        for item in value.values():
+            total += _leaves(item, budget - total)
+            if total >= budget:
+                return budget
+        return total
+    if isinstance(value, list):
+        total = 0
+        for item in value:
+            total += _leaves(item, budget - total)
+            if total >= budget:
+                return budget
+        return total
+    return 1
+
+
+def _option_keys(value, budget: int) -> int:
+    """How many variant axes the payload names, counted under every `options` mapping.
+
+    The retail catalogue keeps a product's variants in an `options` dict, so this is the breadth of the *catalogue
+    choice* rather than of the record, and it is the field the harm hypothesis actually asks about: an exchange against
+    one variant is a lookup, an exchange against six is a decision.
+    """
+    if budget <= 0 or not isinstance(value, (dict, list)):
+        return 0
+    if isinstance(value, list):
+        total = 0
+        for item in value:
+            total += _option_keys(item, budget - total)
+            if total >= budget:
+                return budget
+        return total
+    total = 0
+    for key, item in value.items():
+        if key == "options" and isinstance(item, dict):
+            total += len(item)
+        else:
+            total += _option_keys(item, budget - total)
+        if total >= budget:
+            return budget
+    return total
+
+
+def reveal(text) -> dict:
+    """The reveal's own facts, from the payload of the first non-auth call.
+
+    `none` is a state and not a zero: an episode whose transcript ends before the reveal — a refusal, a crash, a turn
+    budget spent on the authentication gate — cannot be gated by what it never showed, and the caller reads the six
+    fields as absent rather than as the smallest possible record.
+    """
+    absent = {"revealShape": "none", "revealChars": 0, "revealKeys": 0, "revealEntries": 0,
+              "revealLeaves": 0, "revealOptions": 0}
+    if not isinstance(text, str) or not text.strip():
+        return absent
+    absent = {**absent, "revealChars": len(text)}
+    try:
+        payload = json.loads(text)
+    except (ValueError, TypeError):
+        # Free text is a payload too: an agent that answered in prose revealed something of the same length and of no
+        # structure, and calling it unparsable while counting its characters is the honest pair of fields.
+        return {**absent, "revealShape": "unparsable"}
+    if isinstance(payload, dict):
+        entries = payload.get("items")
+        return {
+            "revealShape": "object",
+            "revealChars": len(text),
+            "revealKeys": len(payload),
+            "revealEntries": len(entries) if isinstance(entries, list) else 0,
+            "revealLeaves": _leaves(payload, LEAF_CEILING),
+            "revealOptions": _option_keys(payload, LEAF_CEILING),
+        }
+    if isinstance(payload, list):
+        return {**absent, "revealShape": "array", "revealEntries": len(payload),
+                "revealLeaves": _leaves(payload, LEAF_CEILING),
+                "revealOptions": _option_keys(payload, LEAF_CEILING)}
+    return {**absent, "revealShape": "scalar"}
+
+
 def observables(simulation) -> "dict | None":
     """The prefix observables, or None when the episode kept no transcript.
 
@@ -157,8 +314,11 @@ def observables(simulation) -> "dict | None":
     defaulting either way would put an unmeasured decision into the policy's value. The caller counts these as
     `unreadable` and drops them from the base rather than from the numerator.
 
-    The walk stops at the first tool call outside the auth family, which is what makes the set a *prefix*: everything
-    after that point is the trajectory the policy is supposed to act before.
+    R225 moved the boundary by one message. It used to stop *at* the first tool call outside the auth family, on the
+    argument that everything after that point is the trajectory the policy acts before. That argument holds for a
+    policy timed at the request; it does not hold for one timed at the write, which is where R219 put the serve and
+    which necessarily has the reveal's answer in hand. So the boundary is now the reveal's **result**: the payload the
+    episode was shown before it chose what to do, and nothing after it.
     """
     messages = simulation.get("messages") or []
     if not messages:
@@ -170,20 +330,34 @@ def observables(simulation) -> "dict | None":
             auth_run += 1
         else:
             break
-    reveal = names[auth_run] if auth_run < len(names) else None
+    reveal_name = names[auth_run] if auth_run < len(names) else None
     opening = _opening(simulation)
+    payload = None
+    if reveal_name is not None:
+        # The flattened call list and the per-message keys are the same walk in the same order, so the reveal is the
+        # only non-auth call *before* which every call was auth — which is exactly the `auth_run` position.
+        keys = []
+        for index, message in enumerate(messages):
+            if not isinstance(message, dict):
+                continue
+            for position, call in enumerate(message.get("tool_calls") or []):
+                if isinstance(call, dict):
+                    keys.append((index, position))
+        if auth_run < len(keys):
+            payload = _result_of_each_call(messages).get(keys[auth_run])
     return {
         "firstTool": names[0] if names else "none",
         "authCalls": auth_run,
-        "revealTool": reveal if reveal is not None else "none",
+        "revealTool": reveal_name if reveal_name is not None else "none",
         # Calls *up to and including* the reveal, never the whole episode's: the first version counted every call and
         # the prefix test below caught it, because a truncated transcript read a different number. An observable that
         # reads the trajectory is a proxy that has already seen the outcome.
-        "callsToReveal": auth_run + (1 if reveal is not None else 0),
+        "callsToReveal": auth_run + (1 if reveal_name is not None else 0),
         "openingChars": len(opening),
         # The ask count is kept because it is the proxy that was refuted and the refutation has to stay reproducible:
         # a screen that can no longer compute the proxy it killed cannot say whether the kill still holds.
         "openingAsks": opening.count("?") + opening.count("I'd like") + opening.count("I want"),
+        **reveal(payload),
     }
 
 
@@ -323,10 +497,10 @@ def candidates(subset) -> "list[tuple]":
     cut as the threshold at the higher one.
     """
     built = []
-    for field in ("firstTool", "revealTool"):
+    for field in ("firstTool", "revealTool", "revealShape"):
         for value in sorted({pair["obs"][field] for pair in subset}):
             built.append((f"skip {field}={value}", (lambda observed, v=value, f=field: observed[f] == v)))
-    for field in ("openingChars", "authCalls", "callsToReveal", "openingAsks"):
+    for field in ("openingChars", "authCalls", "callsToReveal", "openingAsks") + REVEAL_FIELDS:
         values = sorted({pair["obs"][field] for pair in subset})
         for value in values:
             built.append((f"skip {field}>={value}",
@@ -341,6 +515,32 @@ def _row(row: dict) -> dict:
     return {"candidate": row["candidate"], **{key: row[key] for key in
                                               ("servedShare", "skippedShare", "skip", "serve", "value",
                                                "gainVsServeAll", "gainVsServeNone", "verdict")}}
+
+
+def _excess(observed: int, cuts: int, rate: float = 0.025) -> dict:
+    """How far a screen's yield sits above what the same number of cuts produces from noise.
+
+    `expectedByChance` alone is an invitation to argue: 18 against 14.1 is a "surplus" to a reader who wants one and a
+    rounding difference to a reader who does not. The count is binomial — each cut clears a two-sided 5% test with
+    probability `rate` when the family carries no signal — so the surplus has a standard deviation and the sentence can
+    carry a tail probability instead of a comparison of two numbers.
+
+    The cuts are **not** independent: a threshold at 1,255 and one at 1,286 are two names for nearly the same subset,
+    so the true number of trials is smaller than `cuts` and the binomial treats the family as more multiplied than it
+    is. That errs in the direction that makes a claim harder, which is the direction a screen may err in.
+    """
+    expected = cuts * rate
+    spread = math.sqrt(cuts * rate * (1 - rate)) or 1.0
+    z = (observed - expected) / spread
+    return {
+        "observed": observed,
+        "expected": round(expected, 1),
+        "sd": round(spread, 2),
+        "z": round(z, 2),
+        # One-sided, because the question is only ever "more than chance": a family that yields fewer admissible cuts
+        # than noise is not a discovery with a small p-value on the other side.
+        "p": round(0.5 * math.erfc(z / math.sqrt(2)), 4),
+    }
 
 
 def screen(built, split: str = "task-parity") -> dict:
@@ -386,10 +586,12 @@ def screen(built, split: str = "task-parity") -> dict:
         },
         # The predicate is a closure and cannot be serialised, so the ranked rows keep only their reading: a JSON
         # document that fails to write is a screen whose result never reaches the artefact the docs quote.
-        # The screen's own multiplicity, printed beside its yield: at 385 cuts and a two-sided 5% test, noise alone
-        # produces about ten positive-and-significant cuts. A screen that yields fewer admissible cuts than chance is
-        # not a weak signal, it is evidence that the family carries none.
+        # The screen's own multiplicity, printed beside its yield: at 565 cuts and a two-sided 5% test, noise alone
+        # produces about fourteen positive-and-significant cuts. A screen that yields no more admissible cuts than
+        # chance is not a weak signal, it is evidence that the family carries none — and the surplus has a
+        # distribution, so `excess` reports the tail probability rather than leaving a reader to compare two numbers.
         "expectedByChance": round(len(seen) * 0.025, 1),
+        "excess": _excess(len(admissible), len(seen)),
         "best": _row(ranked[0]) if ranked else None,
         "screen": [_row(row) for row in ranked[:6]],
     }
@@ -432,9 +634,12 @@ def render(reading: dict) -> str:
     if state == "TOO_FEW_TASKS":
         return (f"TOO_FEW_TASKS: {reading['tasks']} task(s) cannot be split into a screen and a confirmation half")
     verdicts = ", ".join(f"{name} {count}" for name, count in reading["verdicts"].items())
+    excess = reading.get("excess")
     head = (f"{reading['candidates']} cut(s) on {reading['screenPairs']} pair(s) "
             f"({reading['screenTasks']} task(s)): {verdicts}; at this many cuts noise alone yields about "
-            f"{reading['expectedByChance']} of them")
+            f"{reading['expectedByChance']} of them"
+            + (f", so the {excess['observed']} that cleared the bar sit {excess['z']:+.2f}σ from chance "
+               f"(p = {excess['p']:.3f})" if excess else ""))
     if state == "NOTHING_ADMISSIBLE":
         best = reading["best"]
         worst = (f"; the least dominated serves {best['servedShare']:.0%} and its skip half reads "
@@ -496,7 +701,7 @@ def observables_report(path) -> str:
         return f"{path}: NO_EPISODES — nothing was recorded, so nothing is observable"
     total = len(seen)
     lines = [f"{total} episode(s) in {Path(path).name}"]
-    for field in ("firstTool", "revealTool"):
+    for field in ("firstTool", "revealTool", "revealShape"):
         counts: dict = {}
         for row in seen:
             counts[row[field]] = counts.get(row[field], 0) + 1
@@ -507,7 +712,16 @@ def observables_report(path) -> str:
     # serving gate. The share is printed for every field rather than inferred, because the distinction is easy to get
     # backwards and impossible to see in a median.
     repeated = [rows for rows in by_task.values() if len(rows) > 1]
-    for field in ("authCalls", "callsToReveal", "openingChars", "openingAsks"):
+    # R225. The categorical fields carry the same question as the numeric ones and are reported for the same reason:
+    # R223's reading said the prefix is constant within a task on 100% of tasks, and the transcript says 96% for the
+    # first tool call and 0% for the opening's length. A claim about what a field can express is a measurement, so it
+    # is printed rather than asserted (AUDIT 34.315).
+    for field in ("firstTool", "revealTool", "revealShape"):
+        if repeated:
+            constant = sum(1 for rows in repeated if len({row[field] for row in rows}) == 1)
+            lines.append(f"  {field:12s} constant within {constant}/{len(repeated)} task(s) "
+                         f"({constant / len(repeated):.0%})")
+    for field in ("authCalls", "callsToReveal", "openingChars", "openingAsks") + REVEAL_FIELDS:
         values = sorted(row[field] for row in seen)
         constant = sum(1 for rows in repeated if len({row[field] for row in rows}) == 1)
         lines.append(f"  {field:12s} median {statistics.median(values):g}  min {values[0]}  max {values[-1]}"
@@ -532,10 +746,20 @@ def self_test() -> int:
         if not condition:
             failures.append(f"{name}{': ' + str(detail) if detail else ''}")
 
-    def simulation(task, reward, calls, opening="hello there? I'd like a swap"):
+    def simulation(task, reward, calls, opening="hello there? I'd like a swap", payload=None, results=None):
         messages = [{"role": "user", "content": opening}]
         for name in calls:
             messages.append({"role": "assistant", "content": "", "tool_calls": [{"name": name}]})
+            # R225. A transcript with no tool results is a transcript no reveal can be read from, so the fixture that
+            # the screen runs on carries them: `payload` is attached to the reveal (the only non-auth call), and
+            # `results` overrides the mapping per call name when a test needs two different payloads in one episode.
+            answer = None
+            if results and name in results:
+                answer = results[name]
+            elif payload is not None and name not in AUTH_FAMILY:
+                answer = payload
+            if answer is not None:
+                messages.append({"role": "tool", "content": answer})
         messages.append({"role": "assistant", "content": "done"})
         return {"task_id": task, "reward_info": {"reward": reward}, "messages": messages}
 
@@ -553,6 +777,13 @@ def self_test() -> int:
         # control wins one, so serving them is worth +0.25 and the policy is admissible end to end.
         control_payload = []
         treatment_payload = []
+        # One order record, the same in every episode of the main fixture: the reveal fields are then constant, so no
+        # reveal cut can separate this grid and the assertions below stay about the cut they were written for. The
+        # shape is the real one — items with `options` maps — so the leaf and variant walks run through the screen.
+        order = json.dumps({"order_id": "#W1", "user_id": "u", "status": "pending",
+                            "items": [{"name": "Keyboard", "options": {"switch": "clicky", "size": "full"}},
+                                      {"name": "Lamp", "options": {"color": "blue"}}],
+                            "payment_history": [{"method": "card", "amount": 100}]})
         for index in range(16):
             task = f"t{index:02d}"
             skipping = index < 8
@@ -562,8 +793,9 @@ def self_test() -> int:
                 control_wins = True if skipping else (attempt == 0)
                 treatment_wins = False if skipping else (attempt < 2)
                 opening = "hello? I'd like a swap " + "z" * index
-                control_payload.append(simulation(task, 1.0 if control_wins else 0.0, calls, opening))
-                treatment_payload.append(simulation(task, 1.0 if treatment_wins else 0.0, calls, opening))
+                control_payload.append(simulation(task, 1.0 if control_wins else 0.0, calls, opening, payload=order))
+                treatment_payload.append(simulation(task, 1.0 if treatment_wins else 0.0, calls, opening,
+                                                   payload=order))
         control = document("control.json", control_payload)
         treatment = document("treatment.json", treatment_payload)
 
@@ -602,17 +834,115 @@ def self_test() -> int:
         check("a non-dict message is skipped", ragged["callsToReveal"] == 1, ragged)
         check("and a non-dict call is skipped with it", ragged["firstTool"] == "find_user_id_by_email", ragged)
 
-        # The prefix boundary: everything after the reveal is invisible, so an observable computed on a truncated
-        # transcript must be identical. This is the test that makes "observable when" a property rather than a claim.
+        # The prefix boundary: everything after the reveal's result is invisible, so an observable computed on a
+        # transcript truncated just after that result must be identical. R225 moved the cut by one message, and the
+        # second assertion is the one that keeps the move honest — a transcript that ends *before* the result has no
+        # reveal at all, rather than the smallest possible one.
         full = {"messages": [
             {"role": "user", "content": "hi"},
             {"role": "assistant", "tool_calls": [{"name": "find_user_id_by_email"}]},
+            {"role": "tool", "content": "yusuf_rossi_9620"},
             {"role": "assistant", "tool_calls": [{"name": "get_order_details"}]},
+            {"role": "tool", "content": json.dumps({"order_id": "#W2", "items": [{"name": "Lamp"}]})},
             {"role": "assistant", "tool_calls": [{"name": "cancel_pending_order"}]},
+            {"role": "tool", "content": "{}"},
         ]}
-        truncated = {"messages": full["messages"][:3]}
-        check("a truncated transcript reads the same", observables(full) == observables(truncated),
-              (observables(full), observables(truncated)))
+        after_reveal = {"messages": full["messages"][:5]}
+        before_reveal = {"messages": full["messages"][:4]}
+        check("a transcript truncated after the reveal reads the same", observables(full) == observables(after_reveal),
+              (observables(full), observables(after_reveal)))
+        check("the reveal it read belongs to the reveal call", observables(full)["revealEntries"] == 1,
+              observables(full))
+        check("the reveal's own keys are counted", observables(full)["revealKeys"] == 2, observables(full))
+        check("a transcript cut before the reveal has no reveal", observables(before_reveal)["revealShape"] == "none",
+              observables(before_reveal))
+        check("and reports zero rather than the smallest record", observables(before_reveal)["revealLeaves"] == 0,
+              observables(before_reveal))
+        # The pairing is positional, and this is the case that makes it so: one turn that authenticated **and** asked
+        # for the order. A reader that took "the next tool message" would price the reveal as the user id.
+        two_calls = {"messages": [
+            {"role": "user", "content": "hi"},
+            {"role": "assistant", "tool_calls": [{"name": "find_user_id_by_email"}, {"name": "get_order_details"}]},
+            {"role": "tool", "content": "yusuf_rossi_9620"},
+            {"role": "tool", "content": json.dumps({"items": [{"name": "A"}, {"name": "B"}, {"name": "C"}]})},
+        ]}
+        check("a two-call turn binds the reveal to its own result", observables(two_calls)["revealEntries"] == 3,
+              observables(two_calls))
+        check("and not to the authentication result", observables(two_calls)["revealShape"] == "object",
+              observables(two_calls))
+        # An unanswered call — a crash, a step budget — does not keep its slot: the next turn's result binds to the
+        # next turn's call. This is the one failure a positional pairing can make, and the assertion is that the slot
+        # is released rather than that the result is borrowed.
+        unanswered = {"messages": [
+            {"role": "user", "content": "hi"},
+            {"role": "assistant", "tool_calls": [{"name": "find_user_id_by_email"}]},
+            {"role": "assistant", "tool_calls": [{"name": "get_order_details"}]},
+            {"role": "tool", "content": json.dumps({"items": []})},
+        ]}
+        check("an unanswered call releases its slot", observables(unanswered)["revealShape"] == "object",
+              observables(unanswered))
+        check("and the reveal is the call it was owed by", observables(unanswered)["revealTool"] == "get_order_details",
+              observables(unanswered))
+
+        # The reveal reader on its own: every shape it can return, and the arithmetic of the walks it uses.
+        check("a dict payload is an object", reveal('{"a": 1}')["revealShape"] == "object")
+        check("an array payload is an array", reveal("[1, 2, 3]")["revealShape"] == "array")
+        check("its length is its entries", reveal("[1, 2, 3]")["revealEntries"] == 3)
+        check("a scalar payload is a scalar", reveal("42")["revealShape"] == "scalar")
+        check("prose is unparsable", reveal("I found your order")["revealShape"] == "unparsable")
+        check("and still has a length", reveal("I found your order")["revealChars"] == 18)
+        check("an empty payload has no shape", reveal("   ")["revealShape"] == "none")
+        check("nor has a missing one", reveal(None)["revealShape"] == "none")
+        check("a non-string payload is not read", reveal({"a": 1})["revealShape"] == "none")
+        deep = {"items": [{"options": {"a": 1, "b": 2}}, {"options": {"c": 1}}, {"options": "not a map"}]}
+        check("the variant axes are counted under every options map", reveal(json.dumps(deep))["revealOptions"] == 3,
+              reveal(json.dumps(deep)))
+        check("a nested options map is not counted twice", reveal(json.dumps({"x": {"options": {"a": 1}}}))
+              ["revealOptions"] == 1)
+        check("leaves count scalars and not containers", _leaves({"a": [1, {"b": 2}], "c": "x"}, LEAF_CEILING) == 3,
+              _leaves({"a": [1, {"b": 2}], "c": "x"}, LEAF_CEILING))
+        # The ceiling, which is the only thing standing between a pathological payload and a 40,000-leaf walk.
+        wide = {"k": list(range(LEAF_CEILING + 50))}
+        check("the leaf walk stops at its ceiling", _leaves(wide, LEAF_CEILING) == LEAF_CEILING,
+              _leaves(wide, LEAF_CEILING))
+        check("a spent budget counts nothing", _leaves({"a": 1}, 0) == 0)
+        check("the variant walk stops at its ceiling too", _option_keys({"options": {str(i): i for i in range(9)}}, 4) == 4,
+              _option_keys({"options": {str(i): i for i in range(9)}}, 4))
+        check("and a spent budget counts nothing there", _option_keys({"options": {"a": 1}}, 0) == 0)
+        check("nor does a scalar carry options", _option_keys("x", LEAF_CEILING) == 0)
+        check("an array's items map is walked", _option_keys([{"options": {"a": 1}}], LEAF_CEILING) == 1)
+        check("an array's variant walk stops at its ceiling",
+              _option_keys([{"options": {"a": 1}}, {"options": {"b": 1}}], 1) == 1,
+              _option_keys([{"options": {"a": 1}}, {"options": {"b": 1}}], 1))
+        # A result with no call waiting for it: a transcript that begins mid-turn, which the recorder writes when an
+        # invocation is resumed. It must not bind to anything, and the reveal after it must still read.
+        orphan = {"messages": [
+            {"role": "tool", "content": "orphan"},
+            "not a message",
+            {"role": "user", "content": "hi"},
+            {"role": "assistant", "tool_calls": [{"name": "find_user_id_by_email"}, "not a call"]},
+            {"role": "assistant", "tool_calls": [{"name": "get_order_details"}]},
+            {"role": "tool", "content": json.dumps({"items": [{"name": "A"}]})},
+        ]}
+        check("an orphan result binds to nothing", observables(orphan)["revealEntries"] == 1, observables(orphan))
+        check("and a junk message does not disturb the walk", observables(orphan)["authCalls"] == 1,
+              observables(orphan))
+        # Two payloads in one episode, so the per-call override is exercised: the auth result must not be read as the
+        # reveal's, even when both are present.
+        split_payload = {"messages": [
+            {"role": "user", "content": "hi"},
+            {"role": "assistant", "tool_calls": [{"name": "find_user_id_by_email"}]},
+            {"role": "tool", "content": "yusuf_rossi_9620"},
+            {"role": "assistant", "tool_calls": [{"name": "get_order_details"}]},
+            {"role": "tool", "content": json.dumps({"items": [{"name": "A"}, {"name": "B"}]})},
+        ]}
+        check("the reveal is read from its own result, not the auth one",
+              observables(split_payload)["revealEntries"] == 2, observables(split_payload))
+        overridden = simulation("t", 1.0, ["find_user_id_by_email", "get_order_details"],
+                                payload=json.dumps({"items": []}),
+                                results={"find_user_id_by_email": json.dumps({"items": [1, 2, 3, 4]})})
+        check("a per-call override leaves the reveal alone", observables(overridden)["revealEntries"] == 0,
+              observables(overridden))
 
         good = evaluate(built["pairs"], lambda observed: observed["revealTool"] == "get_product_details")
         check("the separating cut is admissible", good["verdict"] == "ADMISSIBLE", good["verdict"])
@@ -707,6 +1037,54 @@ def self_test() -> int:
         check("an arm against itself admits nothing", same["state"] == "NOTHING_ADMISSIBLE", same["state"])
         check("and the sentence says the dispatch would buy nothing", "buys nothing" in render(same),
               render(same)[-90:])
+        check("a yield of zero sits below chance rather than at it", same["excess"]["z"] < -0.5, same["excess"])
+        check("whose tail probability is near one, not near zero", same["excess"]["p"] > 0.75, same["excess"])
+        check("a reading without the column still renders", "noise alone yields about" in
+              render({key: value for key, value in same.items() if key != "excess"}))
+
+        # The positive control for the layer itself. Without it, a reader that silently failed to see any payload
+        # would return `NOTHING_ADMISSIBLE` on every grid and read as a negative result for ever — so the fixture has
+        # to be able to win. Forty-eight tasks: the twenty-four whose order holds three items are the ones the
+        # material damages, the twenty-four whose order holds one are the ones it does not, and the answer the screen
+        # has to find is the item count.
+        #
+        # The two payloads are **the same length** and the same key set, padded to it: a fixture where the three-item
+        # order is also the longer string would let `revealChars` win and prove nothing about the structural fields.
+        # Order ids are fixed-width for the same reason — an index that changes a payload's length by a digit would
+        # reintroduce the correlation the padding removes.
+        reveal_control, reveal_treatment = [], []
+        for index in range(48):
+            task = f"rv{index:02d}"
+            damaged = index < 24
+            # Both payloads carry the same keys *and* the same length, so the only fields that can separate them are
+            # the structural two — entries and leaves. A fixture where the three-item order was also longer or
+            # wider-keyed would let `revealChars` or `revealKeys` win and prove nothing about the structural reader.
+            three = json.dumps({"order_id": f"#W{index:04d}", "items": [{"name": "x"}] * 3, "note": ""})
+            one = json.dumps({"order_id": f"#W{index:04d}", "items": [{"name": "x"}], "note": ""})
+            padding = "z" * (len(three) - len(one))
+            order = three if damaged else json.dumps({"order_id": f"#W{index:04d}", "items": [{"name": "x"}],
+                                                      "note": padding})
+            calls = ["find_user_id_by_name_zip", "get_order_details"]
+            reveal_control.append(simulation(task, 1.0, calls, payload=order))
+            reveal_treatment.append(simulation(task, 0.0 if damaged else 1.0, calls, payload=order))
+        lengths = {row["obs"]["revealChars"] for row in pairs(document("rv-c.json", reveal_control),
+                                                              document("rv-t.json", reveal_treatment))["pairs"]}
+        revealed = screen(pairs(document("rv-c.json", reveal_control),
+                                document("rv-t.json", reveal_treatment))["pairs"])
+        check("the fixture's two payloads are one length", len(lengths) == 1, lengths)
+        check("a reveal that separates is confirmed", revealed["state"] == "SCREEN_CONFIRMED", revealed["state"])
+        check("and the cut it chose is the item count", "revealEntries" in (revealed.get("chosen") or ""),
+              revealed.get("chosen"))
+        check("the reveal family is in the generator", any("revealEntries" in name for name, _ in
+                                                          candidates(built["pairs"])),
+              [name for name, _ in candidates(built["pairs"])][:3])
+        check("the reveal family is priced like the rest", revealed["pooled"]["skip"]["delta"] == 1.0,
+              revealed["pooled"]["skip"])
+        # The surplus over chance, as a distribution rather than a comparison: `observed` is the yield, `expected` is
+        # the same number of cuts at the 5% rate, and `z` is the difference in standard deviations of a binomial.
+        check("a family with signal sits above chance", revealed["excess"]["z"] > 1.5, revealed["excess"])
+        check("and its tail is small", revealed["excess"]["p"] < 0.06, revealed["excess"])
+        check("the sentence carries the distance from chance", "σ from chance" in render(revealed), render(revealed))
 
         # The refusals.
         disjoint = document("disjoint.json", [simulation("z", 1.0, [])])
@@ -759,6 +1137,11 @@ def self_test() -> int:
         # and the sentence has to carry the number that makes it one.
         check("the screen reports what noise would yield", screened["expectedByChance"] > 0, screened)
         check("and the sentence says so", "noise alone yields about" in render(screened), render(screened)[:120])
+        check("the surplus counts the admissible cuts", screened["excess"]["observed"] == screened["admissible"],
+              screened["excess"])
+        check("against the rate the screen's own candidates imply",
+              abs(screened["excess"]["expected"] - round(screened["candidates"] * 0.025, 1)) < 1e-9,
+              screened["excess"])
 
         # The observable report, which is where both free refutations came from.
         lines = observables_report(control)
