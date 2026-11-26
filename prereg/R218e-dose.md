@@ -150,3 +150,93 @@ The confound, the falsifications and the cost arithmetic are unchanged, and the 
   prediction is a finding and a red job teaches an operator to rerun until it is green;
 - `turns` and `chars` collinear above 0.9 still refute the decomposition as a *dose* reading.
 
+
+---
+
+# Amendment 2, 26 November 2026 — the estimator, fixed before the second dispatch
+
+## What was missing, and it was the round's decisive quantity
+
+The registration names the confound and then declines to control it: *"the quantity that decides whether it is worth a
+registered round is the **sign** of the effect on the pairs whose dose differs while their turn counts are close."*
+The reader implemented `turnGapMedian` — the confound summarised over **all** pairs — and no subset at all. A file whose
+prose says which quantity decides, and which computes a different one, has a decisive number that does not exist; the
+second dispatch would have landed on it and the reading would have been quoted from the confounded column because it
+was the only column there was (AUDIT 34.267).
+
+The subset is now `closeTurnPairs` and four companions, drawn at one tolerance, and the tolerance is a measurement
+rather than a preference.
+
+## How many close pairs a 114 × 2 grid can make, counted before spending
+
+R218b's `front` arm holds **four attempts at each of 114 tasks in one arm** — 684 within-task attempt pairs, and the
+only artefact on disk where one task's attempts can be compared without changing the arm. Measured over it
+(`eval/tools/dose_power.py --document <an arm with four attempts a task>`, no model calls):
+
+| quantity | value |
+|---|---|
+| within-task pairs | 684 |
+| gap in length, median / mean | **1** / 1.57 turns |
+| pairs tied exactly | 27.3% |
+| pairs within **1** turn | **60.2%** |
+| pairs within 2 turns | 80.0% |
+| pairs within 3 turns | 91.7% |
+| within-task outcome disagreement under exchangeability | **17.9%** |
+| tasks that always pass / never pass / do both | 61 / 3 / 50 |
+
+Two consequences, and both are about the grid rather than about the material. On 114 tasks with two attempts each the
+round expects **≈ 20 discordant pairs** in total and **≈ 12** among the subset whose sides ran within one turn. A
+sign test counts discordant pairs and nothing else: sixty-one tasks here pass all four attempts, so most of the grid
+can never enter the test however different their doses are.
+
+The length is the **assistant-message count**, not the recorded `turns`: R219b's phase counted 1,171 agent calls
+against 1,274 assistant messages over 114 episodes (AUDIT 34.263), so these shares carry about nine percent of slack,
+and a tool loop re-renders inside one user turn. The measurement is also from the `front` placement, which is not the
+placement this round runs; no tail artefact holds more than one attempt a task, and that is precisely why the round is
+being dispatched.
+
+## The estimator
+
+| | what | reported as |
+|---|---|---|
+| **primary, decisive** | the exact two-sided sign test on the pairs whose two sides average within **1 turn** of each other | `closeTurnPairs`, `closeHigherDosePassed`, `closeLowerDosePassed`, `closeP`, `tiedTurnPairs` |
+| secondary | the same test over every pair, with the length gap beside it | `pairs`, `higherDosePassed`, `lowerDosePassed`, `p`, `turnGapMedian` |
+| secondary | how much material the decided subset received | `closeDoseGapMedianChars`, `closeTurnGapMedian` |
+
+**Not analyses of this round**, and named so they are not run afterwards and reported as if they had been registered:
+
+- a dose-quartile reading — the grid holds two attempts a task, so a quartile split would be a split of one pair;
+- a between-task dose regression — it recovers task difficulty and is the reading the reader's docstring already
+  refuses;
+- anything computed on the **reconstructed** block — 7,813 turn boundaries against 4,341 renders, and its ordering is
+  dominated by the turn count.
+
+## Power, enumerated rather than approximated
+
+Pair counts here are under thirty and the normal approximation is worst exactly there, so the reject probabilities are
+enumerated. Two-sided, α = 0.05:
+
+| discordant pairs | shift 65% | 70% | 75% | 80% | 90% |
+|---|---|---|---|---|---|
+| 6 | 0.08 | 0.12 | 0.18 | 0.26 | 0.53 |
+| 10 | 0.09 | 0.15 | 0.24 | 0.38 | 0.74 |
+| 14 | 0.08 | 0.16 | 0.28 | 0.45 | 0.84 |
+| 20 | 0.25 | 0.42 | 0.62 | 0.80 | 0.99 |
+| 30 | 0.36 | 0.59 | 0.80 | 0.94 | 1.00 |
+
+`shift` is the probability that the higher-dose side wins a discordant pair. At the ~12 pairs the decided subset is
+expected to hold, the round has **0.4** power against a shift of 80% and **0.8** against 90%; over all ~20 discordant
+pairs it has 0.80 against 80%. So the round can return a **verdict** only on a large effect and a **bound** otherwise.
+
+## The decision rule, written before the numbers exist
+
+- **Verdict** requires all three: `closeTurnPairs ≥ 10`; the sign test on that subset at `closeP < 0.05`; and the same
+  sign over all pairs, so the decided subset is not the only place the effect appears. The reported quantity is then
+  the decided subset's `closeHigherDoseRate`, with its pair count and the tie count beside it.
+- **Bound** — the pre-registered default, and the outcome for any weaker sign — is reported as: *no shift in the
+  pass rate of the higher-dose attempt larger than this grid can see, at the pair counts it actually made.* The
+  sentence must carry both numbers, because "no effect" over 12 discordant pairs is a statement about 12 pairs.
+- **Underpowered** is its own outcome: `closeTurnPairs < 10` returns no verdict at all, whatever `closeP` says. The
+  workflow prints it as a warning rather than failing, because a grid whose attempts happened to differ in length is a
+  fact about the population and not a defect in the build.
+- **`NO_PAIRS`** still refutes the premise rather than the recording, unchanged from the first amendment.

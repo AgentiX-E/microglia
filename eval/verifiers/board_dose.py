@@ -58,6 +58,12 @@ remove the turn count — the attempt that ran longer is also the attempt that s
 with its confound named, and the quantity that decides whether it is worth a registered round is the **sign** of the
 effect on the pairs whose dose differs while their turn counts are close.
 
+That subset was described in this file from the day it was written and **computed by nothing** until R218e's second
+amendment: `turnGapMedian` summarised the confound over all pairs, so a reader could see how large it was but not read
+the effect without it. `closeTurnPairs` and its four companions are that subset, drawn at `CLOSE_TURN_TOLERANCE`,
+which is a measurement off R218b's four-attempt arm rather than a preference — a file that says which quantity decides
+and does not compute it is a file whose decisive number does not exist.
+
 ## The instrument's own falsification
 
 A `control` arm carries no board at all, so every one of its episodes has a dose of exactly zero. Run this reader on
@@ -98,6 +104,15 @@ def _tools_on_path() -> None:
 _tools_on_path()
 
 from goal_board import BOARD_TAG, messages_of, role_of  # noqa: E402  — the tag and the walker, not copies of them
+
+# The tolerance the reading's decisive subset is drawn at, in turns of mean side length. A measurement, not a
+# preference: over R218b's four-attempt arm — 684 within-task attempt pairs, the only document on disk where one task's
+# attempts can be compared without changing the arm — the within-task gap has median 1 and mean 1.57, 27.3% of pairs are
+# tied, and 60.2% sit within one turn of each other. A tolerance of one therefore keeps the majority of the pairs and
+# still excludes the ones whose lengths differ by more than the arm itself moves a task's turn count by. Declared at
+# module level rather than passed in, so the reading this file prints and the reading R218e registered cannot drift
+# apart; `--tolerance` exists only for the self-test's own boundaries.
+CLOSE_TURN_TOLERANCE = 1.0
 
 
 def _drivers_on_path() -> None:
@@ -266,16 +281,25 @@ def _sign_test(positive: int, negative: int) -> "float | None":
     return min(1.0, 2 * tail)
 
 
-def within_task(grouped: dict) -> dict:
+def within_task(grouped: dict, tolerance: float = CLOSE_TURN_TOLERANCE) -> dict:
     """The pairs a task's own attempts make, split by dose, with the turn count reported beside them.
 
     The split is at the task's **median dose**, and an attempt exactly on the median joins neither side: with four
     attempts the median is the average of the middle two, so a tie is common and assigning it to a side would decide
     the reading by a rounding rule. `pairs` counts the tasks that produced at least one attempt on each side.
+
+    Two subsets are reported beside it, because the whole reading's confound is length and the arm cannot separate the
+    two on its own: `closeTurnPairs` keeps only the tasks whose two sides average within `tolerance` turns of each
+    other, and `tiedTurnPairs` keeps the strict subset where they are equal. The first is the pre-registered decisive
+    quantity (R218e, amendment 2); the second is a check on it, since a grid can be close on the median gap and still
+    hold almost no exact ties.
     """
     pairs = high_pass = low_pass = 0
     turn_gap = []
     dose_gap = []
+    close_pairs = close_high = close_low = tied_pairs = 0
+    close_turn_gap = []
+    close_dose_gap = []
     for task in sorted(grouped):
         attempts = grouped[task]
         if len(attempts) < 2:
@@ -290,8 +314,20 @@ def within_task(grouped: dict) -> dict:
         low_pass += sum(1 for _, reward, _ in lower if reward >= 1.0)
         dose_gap.append(statistics.mean([dose for dose, _, _ in higher]) - statistics.mean(
             [dose for dose, _, _ in lower]))
-        turn_gap.append(statistics.mean([turns for _, _, turns in higher]) - statistics.mean(
-            [turns for _, _, turns in lower]))
+        task_turn_gap = statistics.mean([turns for _, _, turns in higher]) - statistics.mean(
+            [turns for _, _, turns in lower])
+        turn_gap.append(task_turn_gap)
+        # The subset the sign test is decided on, and it uses the same split by dose as the full reading so the two
+        # cannot disagree about which attempt was the treated one.
+        if abs(task_turn_gap) <= tolerance:
+            close_pairs += 1
+            close_high += sum(1 for _, reward, _ in higher if reward >= 1.0)
+            close_low += sum(1 for _, reward, _ in lower if reward >= 1.0)
+            close_turn_gap.append(task_turn_gap)
+            close_dose_gap.append(statistics.mean([dose for dose, _, _ in higher]) - statistics.mean(
+                [dose for dose, _, _ in lower]))
+            if task_turn_gap == 0:
+                tied_pairs += 1
     return {
         "tasks": len(grouped),
         "pairs": pairs,
@@ -303,6 +339,17 @@ def within_task(grouped: dict) -> dict:
         # of magnitude, the pair is "the longer attempt" as much as it is "the more material".
         "turnGapMedian": round(statistics.median(turn_gap), 1) if turn_gap else None,
         "p": _sign_test(high_pass, low_pass),
+        # The decided subset: close on length, and therefore the only pairs on which "more material" is not also
+        # "a longer conversation".
+        "closeTurnTolerance": tolerance,
+        "closeTurnPairs": close_pairs,
+        "closeHigherDosePassed": close_high,
+        "closeLowerDosePassed": close_low,
+        "closeHigherDoseRate": (close_high / (close_high + close_low)) if (close_high + close_low) else None,
+        "closeTurnGapMedian": round(statistics.median(close_turn_gap), 1) if close_turn_gap else None,
+        "closeDoseGapMedianChars": round(statistics.median(close_dose_gap), 1) if close_dose_gap else None,
+        "closeP": _sign_test(close_high, close_low),
+        "tiedTurnPairs": tied_pairs,
     }
 
 
@@ -382,6 +429,21 @@ def render(reading: dict) -> str:
         )
     rate = reading["higherDoseRate"]
     driven = "read from the recording" if reading["source"] == "sidecar" else "read from the transcript"
+    if reading["closeTurnPairs"]:
+        close = (
+            f" On the subset that decides it — the {reading['closeTurnPairs']} task(s) whose two sides averaged "
+            f"within {reading['closeTurnTolerance']:g} turn(s) of each other — the higher-dose side passed "
+            f"{reading['closeHigherDoseRate']:.1%} of "
+            f"{reading['closeHigherDosePassed'] + reading['closeLowerDosePassed']} attempt-pairs "
+            f"({reading['closeHigherDosePassed']} against {reading['closeLowerDosePassed']}), sign test p = "
+            f"{reading['closeP'] if reading['closeP'] is None else format(reading['closeP'], '.4f')}, "
+            f"{reading['tiedTurnPairs']} of them tied exactly."
+        )
+    else:
+        close = (
+            " Not one pair ran close enough on turn count to be read without the confound, so this is a decomposition "
+            "of the arm's episodes and the sign above is not a reading about the material."
+        )
     return (
         f"DOSE_READ: {reading['episodesWithDose']} of {reading['episodes']} episode(s) carried a block, "
         f"{reading['doseCharsMean']:.0f} characters an episode ({driven}); of the {reading['pairs']} task(s) whose "
@@ -391,7 +453,8 @@ def render(reading: dict) -> str:
         f"{reading['p'] if reading['p'] is None else format(reading['p'], '.4f')}, the higher-dose side running "
         f"{reading['turnGapMedian']:+} turns longer on the median task and receiving "
         f"{reading['doseGapMedianChars']:.0f} more characters — and because dose and turn count move together, "
-        "this is a decomposition of the arm's episodes and not a randomised contrast"
+        "this is a decomposition of the arm's episodes and not a randomised contrast."
+        f"{close}"
     )
 
 
@@ -451,6 +514,54 @@ def self_test() -> int:
     check("a task's attempts at the median join neither side", within_task(by_task({"simulations": [
         episode("a", 1.0, 1), episode("a", 1.0, 2), episode("a", 0.0, 3), episode("a", 0.0, 4),
     ]}))["pairs"] == 1)
+
+    # --- the subset that decides the reading, which nothing computed before R218e's second amendment ---------------
+    # Every fixture below is one task with one attempt each side, so the split is unambiguous and the only thing that
+    # varies between them is the gap in length.
+    def pair_of(high_turns, low_turns, high_pass=0.0, low_pass=1.0):
+        return by_task({"simulations": [
+            episode("t", low_pass, 1, turns=low_turns),
+            episode("t", high_pass, 5, turns=high_turns),
+        ]})
+
+    far = within_task(pair_of(12, 4))
+    check("a pair whose sides differ by eight turns makes a pair", far["pairs"] == 1)
+    check("and it is not in the decided subset", far["closeTurnPairs"] == 0, far)
+    check("and its decided sign test has no p", far["closeP"] is None)
+    check("the confound is still reported over the full set", far["turnGapMedian"] == 8.0, far["turnGapMedian"])
+    one = within_task(pair_of(6, 5, high_pass=1.0, low_pass=0.0))
+    check("a one-turn gap is inside the tolerance", one["closeTurnPairs"] == 1, one)
+    check("and it carries its own sign", one["closeHigherDosePassed"] == 1 and one["closeLowerDosePassed"] == 0)
+    check("and its own p, which is one on a single discordant pair", one["closeP"] == 1.0, one["closeP"])
+    two = within_task(pair_of(7, 5))
+    check("a two-turn gap is outside the tolerance", two["closeTurnPairs"] == 0, two)
+    tied = within_task(pair_of(6, 6, high_pass=1.0, low_pass=0.0))
+    check("a tied pair is in the decided subset", tied["closeTurnPairs"] == 1)
+    check("and is counted as tied", tied["tiedTurnPairs"] == 1, tied["tiedTurnPairs"])
+    check("a zero tolerance keeps only the ties", within_task(pair_of(6, 5), tolerance=0)["closeTurnPairs"] == 0)
+    check("and keeps a tie", within_task(pair_of(6, 6), tolerance=0)["closeTurnPairs"] == 1)
+    check("the tolerance travels with the reading", tied["closeTurnTolerance"] == CLOSE_TURN_TOLERANCE)
+    # One document, four pairs, two of them close: the full sign and the decided sign are then allowed to disagree, and
+    # a reader who is shown only the first would be reading a decomposition as an effect.
+    mixed = within_task(by_task({"simulations": [
+        episode("far", 1.0, 1, turns=3), episode("far", 0.0, 5, turns=14),
+        episode("mid", 1.0, 1, turns=3), episode("mid", 0.0, 5, turns=10),
+        episode("close", 0.0, 1, turns=6), episode("close", 1.0, 5, turns=6),
+        episode("tie", 1.0, 1, turns=5), episode("tie", 0.0, 5, turns=5),
+    ]}))
+    check("four pairs, two of them close", (mixed["pairs"], mixed["closeTurnPairs"]) == (4, 2), mixed)
+    check("the decided subset is never wider than the set", mixed["closeTurnPairs"] <= mixed["pairs"])
+    check("the decided subset counts only its own attempts",
+          mixed["closeHigherDosePassed"] + mixed["closeLowerDosePassed"] == 2, mixed)
+    check("and one of the close pairs is a tie", mixed["tiedTurnPairs"] == 1, mixed)
+    reading_with_no_close = render(read({"simulations": [
+        episode("t", 1.0, 1, turns=3), episode("t", 0.0, 5, turns=14)]}))
+    check("a reading with no close pair refuses the sign", "Not one pair ran close enough" in reading_with_no_close,
+          reading_with_no_close)
+    reading_with_close = render(read({"simulations": [
+        episode("t", 0.0, 1, turns=6), episode("t", 1.0, 5, turns=6)]}))
+    check("a reading with a close pair prints its own sign", "within 1 turn(s) of each other" in reading_with_close,
+          reading_with_close)
 
     # --- the four states --------------------------------------------------------------------------------
     # `NO_SYSTEM` is the state R218d should have published and did not: the fixture is a document that holds no

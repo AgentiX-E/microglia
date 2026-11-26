@@ -816,9 +816,26 @@ jobs:
           # that cannot be paired and the reading would be over a population nobody chose.
           assert coverage.get("unscored") == 0, coverage
           assert coverage.get("unordered") == 0, coverage
+          # R218e's second amendment. The quantity the registration says decides the round — the sign on the pairs
+          # whose sides ran close enough on length — was described in two files and computed by none of them until the
+          # reader grew the subset below (AUDIT 34.267). So the gate asserts that the reading **carries** it: a
+          # reading printed without its decided subset is the one a reader quotes as if the confound were controlled.
+          assert "closeTurnPairs" in reading, sorted(reading)
+          assert reading["closeTurnTolerance"] == 1.0, reading.get("closeTurnTolerance")
+          assert reading["closeTurnPairs"] <= reading["pairs"], (reading["closeTurnPairs"], reading["pairs"])
+          assert reading["tiedTurnPairs"] <= reading["closeTurnPairs"], (reading["tiedTurnPairs"],
+                                                                         reading["closeTurnPairs"])
           print(f"::notice title=R218e dose::{reading['state']}, {reading['episodesWithDose']} of "
                 f"{reading['episodes']} episode(s) carried a block, {reading['doseCharsMean']:.0f} characters an "
-                f"episode, {reading.get('pairs', 0)} task(s) split into a higher and a lower dose")
+                f"episode, {reading.get('pairs', 0)} task(s) split into a higher and a lower dose, "
+                f"{reading['closeTurnPairs']} of them within {reading['closeTurnTolerance']:g} turn(s)")
+          if reading["state"] == "DOSE_READ" and reading["closeTurnPairs"] < 10:
+              # The pre-registered floor on the decided subset: below ten close pairs the round cannot return a
+              # verdict whatever the sign says, and the honest output is a bound. A warning rather than a failure for
+              # the same reason `NO_PAIRS` is one — this is a fact about the grid, not a defect in the build.
+              print(f"::warning title=R218e::only {reading['closeTurnPairs']} of {reading['pairs']} pair(s) ran "
+                    f"close enough on turn count to be read without the confound, which is under the ten this round "
+                    f"registered as its floor for a verdict — the reading is a bound")
           if reading["state"] != "DOSE_READ":
               # A finding, not a build failure: the material does not vary inside a task, or it varies and no task
               # produced an attempt on each side. Both refute the premise rather than the recording.

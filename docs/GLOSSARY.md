@@ -2757,3 +2757,17 @@ episode index. It exists because the driver is never told which task it is in: t
 simulation and reveals no identity, so the runner resolves the text against the messages it holds (`R136`). Every
 per-episode join in this project — the served share, the dose, the attempt index — is built on it, and it is appended
 at one site for that reason: two sites is one site that will forget (AUDIT 34.264).
+
+**Close-turn subset** — the pairs of attempts a dose reading is actually decided on: those whose two sides averaged
+within one turn of each other, so that "more material" is not also "a longer conversation". Every pair a grid produces
+carries a length gap, and the gap is the confound rather than a nuisance — dose is endogenous, so the attempt that ran
+longer both received more blocks and had more chances to fail. The subset is a **computed column** (`closeTurnPairs`,
+with its own pass counts and its own exact sign test) and not an adjective, and the one-turn tolerance is measured: over
+the only artefact with four attempts at each task, the within-task length gap has median 1 turn and 60.2% of pairs sit
+inside it (R218e, amendment 2; AUDIT 34.267).
+
+**Discordant pair** — a task whose two attempts disagree in outcome, which is the only kind a sign test counts. It is
+the reason a 114-task grid is not a 114-pair test: in the one arm that ran four attempts at every task, 61 tasks passed
+all four and 3 failed all four, so the quantity available to the test is set by the ~50 tasks that move and by how many
+of those the second attempt happens to flip — ≈ 20 on a two-round grid, ≈ 12 among the close-turn subset. A reading
+that quotes its rate without its discordant count is quoting a denominator nobody can check.

@@ -7257,3 +7257,18 @@ Four answers, and they send you to four different places:
 wrong. So the output prints the turn gap beside the dose gap, and the number to act on is the **sign** of the effect on
 the pairs whose turn counts are close. A positive sign means the material is useful where it arrives, which no arm-level
 mean can tell you; a negative sign is the harm hypothesis in its strongest testable form.
+
+**"Close" is one turn, and the output shows you both columns.** The JSON carries `pairs` (every task that split) and
+`closeTurnPairs` (the tasks whose two sides averaged within a turn of each other), each with its own pass counts and
+its own exact sign test — `p` and `closeP`. Read `closeP`: it is the one with the confound taken out, and the other is a
+description of how the arm's episodes differ. Two numbers put the decided subset in proportion before you quote it:
+
+| what | on a 114-task, two-round grid | why |
+|---|---|---|
+| discordant pairs it can expect | ≈ 20, of which ≈ 12 close | a sign test counts only the tasks whose attempts disagree; 61 of 114 tasks passed all four attempts in the one arm that had four |
+| power at 12 discordant pairs, 80/20 shift | **0.40** | so a null here is a **bound**, not a demonstration that memory is inert |
+| power at 20 discordant pairs, 90/10 shift | **0.99** | a large effect is visible at this size; a small one is not |
+
+If you get fewer than ten close pairs, the reading cannot return a verdict at all: report it as a bound and say over
+how many pairs. That rule is registered before the run rather than after it, because a rule chosen after seeing the
+sign is how a grid this size produces a finding every time.
