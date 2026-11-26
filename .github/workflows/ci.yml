@@ -63,9 +63,13 @@ jobs:
       - name: The lane's python drivers, on the interpreter the lane runs
         run: |
           set -euo pipefail
-          # One package, named because its absence is silent: without PyYAML the workflow checker answers "clean"
-          # for every structural rule it has, and its self-test used to pass in that mode.
-          python3 -m pip install --disable-pip-version-check --quiet pyyaml coverage
+          # Three packages, each named because its absence is silent. Without PyYAML the workflow checker answers
+          # "clean" for every structural rule it has, and its self-test used to pass in that mode. Without coverage
+          # the floor below measures nothing. Without matplotlib the *figure* suites do not fail — they skip the
+          # drawing and report a green run — which is how `scripts/budget.py` first arrived here: its self-test drew a
+          # real cascade, the runner had no matplotlib, and the step that was supposed to gate a deliverable failed on
+          # an import instead. A chart is a deliverable, so its renderer is a dependency of the build.
+          python3 -m pip install --disable-pip-version-check --quiet pyyaml coverage matplotlib
           python3 scripts/check-python-floor.py --self-test
           python3 scripts/check-python-floor.py
           for suite in test_agent test_aggregate test_banks test_cli test_cycles test_distill test_floor test_selfcheck test_wait; do

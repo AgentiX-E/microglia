@@ -78,13 +78,31 @@ a difference to be resolved, and sixty episodes estimate a proportion to ±12 po
 * **B3 — the bill.** Total spend ≤ **¥3**, read from the run's own `agent_cost` and `user_cost` rather
   than projected.
 
+## Stopping rule, registered before the first episode
+
+Sixty is the ceiling, not the target. B1 is a proportion with a bar at 0.95, so it can be decided early in one
+direction and never early in the other: after every **fifteen** episodes the run recomputes B1's exact binomial
+interval, and
+
+* stops if the interval's **lower** bound is at or above 0.95 — the board is demonstrably served, and the remaining
+  episodes would only narrow a number that has already passed;
+* stops if the interval's **upper** bound is below 0.90 — the board is demonstrably not served, which is a driver
+  defect and not a mechanism reading, and buying forty-five more episodes of it is buying the same defect.
+
+Otherwise it runs to sixty. The expected bill is therefore **¥1.3 to ¥2.5** rather than ¥2.5, and the stopping
+points are fifteen, thirty, forty-five and sixty episodes — fixed before the first one, because a stopping rule
+chosen after seeing the data is a rule that stops when the answer is convenient.
+
+This is the only place in the plan where a round can come in under its own estimate, and it is the honest shape of
+one: the ceiling is what the question costs if it is close, and the floor is what it costs if it is not.
+
 ## Price, from the card and from what the lane actually spent
 
 | | value | source |
 |---|---|---|
 | episodes | 60 | this registration |
 | per-episode cost | $0.00584 | the 456 `front` episodes, `agent_cost` + `user_cost`, measured |
-| projected | **$0.35 ≈ ¥2.5** | off-peak, `deepseek-flash` |
+| projected | **$0.35 ≈ ¥2.5**, or **¥1.3** if the stopping rule fires at fifteen | off-peak, `deepseek-flash` |
 | previous plan | ¥36 | two arms × 456 episodes — withdrawn |
 
 ## What this round does not claim
