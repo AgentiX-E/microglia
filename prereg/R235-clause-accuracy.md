@@ -33,6 +33,13 @@ already paid for and the only grid this lane has with both placements measured:
 Everything else is held: the same placement (`tail`), the same settlement grades (`name`, `overlap`), the same
 `blockCeilingChars` of 500, the same task sample, the same seed, one attempt a task a trial (four trials).
 
+**The prerequisite, named before it is built.** The driver's board is the contract's — `microglia_agent.py` builds it
+from the asks the request states, ticked by the receipts since — so the `clause` arm does not exist yet and cannot be
+armed by a workflow input. This round therefore has an engineering half that costs **¥0** and a dispatch that costs
+**¥36**: the clause board has to be served by the driver (R231's admission, R233's order, R234's fold) before the arm
+means anything, and B3 is the bar that fails if it is not actually served. Nothing is quoted from this round until B3
+holds on the dispatched transcripts.
+
 ## What it costs, before it is armed
 
 Read from `eval/tools/resolution.py` over R218b's own pair, which is a ¥0 computation and not an estimate:
