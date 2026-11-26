@@ -7272,3 +7272,34 @@ description of how the arm's episodes differ. Two numbers put the decided subset
 If you get fewer than ten close pairs, the reading cannot return a verdict at all: report it as a bound and say over
 how many pairs. That rule is registered before the run rather than after it, because a rule chosen after seeing the
 sign is how a grid this size produces a finding every time.
+
+### 32.80 Deciding whether to serve at all, and how to tell a decision from a coincidence
+
+If you have got this far, your memory block says what you want it to say, your admission rule is settled, and your
+suite still reports a flat delta. The next question is not "what else should the block say" — it is **"should this
+episode have been served at all"**, and it is worth more than any rewrite. Two habits make it answerable without
+spending money.
+
+**Habit one: split your tasks before you look at cuts.** A serving rule is a threshold on something you can see before
+the outcome. If you try every threshold you can think of on the whole suite, one of them will look excellent, and you
+will not be able to tell it from a coincidence. Split the tasks in half, choose the rule on one half, and judge it on
+the other. The rule you ship is the one that survives the half it never saw. With 114 tasks at four attempts, that is
+57 tasks and 114 pairs a half — enough to see a large effect and not enough to see a small one, which is the honest
+statement rather than a defect.
+
+**Habit two: count how many rules you tried.** If you screened 385 thresholds at a 5% test, about ten of them would
+have looked significant on noise alone. A single survivor out of 385 is therefore not a discovery — it is *fewer* than
+chance, which is evidence the thing you are thresholding on carries no signal. Print the count of what you tried next
+to what you found; a screen quoted without it is a number nobody can check.
+
+**What you will probably find.** On this project's grid, every observable available before the episode's first content
+arrives turned out to be **constant within a task**: the opening request is the same text on all four attempts, and the
+first two tool calls are the identity lookup. A threshold on those fields can only switch memory off for a whole class
+of tasks — an admission rule, not a serving gate. If that is what you find, stop looking at the request and start
+looking at what the episode **reveals**: the order, the item, the returned attribute row. That is the first thing in a
+transcript that differs between a task your memory helps and one it damages.
+
+**What you should not do.** Do not promote a rule because its pooled reading is significant. A rule chosen on half the
+data and evaluated on all of it is significant partly *because* it was chosen, and the difference between the two
+readings is usually the whole effect: on this grid the chosen rule read +13.8 points on the screen half, +3.2 on the
+confirm half, and the win-to-loss ratio fell from 6.5:1 to 1.3:1.

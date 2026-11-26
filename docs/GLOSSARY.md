@@ -2780,3 +2780,34 @@ the `mixed` one and reports the sum: the shipped block reads −9.5 points on th
 +7.5 on the 43 it solved some of the time, and −1.5 overall (PROGRESS 249.18). Two rules keep it honest — the buckets
 are cut from the control's *rate* rather than from an attempt count (AUDIT 34.268), and a stratum borrowed from another
 dispatch is a covariate, so it supports a per-stratum rate and not a delta.
+
+**Serving decision** — the choice, taken **before** an episode's outcome exists, between serving the memory material
+and serving nothing. It is a separate decision from *what* the material says and from whether a given line is admitted,
+and it is the one worth the most money in this project: the shipped block loses 9.5 points on the tasks a no-memory
+arm solved every attempt and gains 7.5 on the ones it solved some of the time, so a suite mean reports their sum while
+the decision that would separate them is never taken (PROGRESS 249.18). A serving decision must be a function of the
+**prefix** — what the request declares and what the episode has revealed so far — never of the trajectory.
+
+**Skip delta / serve delta** — the two conditional means a serving policy is made of, and they are separate columns
+because either one alone can flatter a policy. `skipDelta` is the mean of `control − treated` over the pairs the policy
+refuses: what refusing bought, on the pairs it refused. `serveDelta` is the mean of `treated − control` over the pairs
+it serves. A policy that refuses well and serves at a loss is worse than refusing everything, and a single value column
+cannot show that. Both carry their own exact sign test over the pairs that disagreed.
+
+**Screen and confirm halves** — the deterministic split of a grid's tasks (parity of position in sorted order) used to
+choose a serving rule on one half and judge it on the other. The split is derived from the artefact rather than from a
+random seed, so two people reading the same grid cannot promote different rules. `CONFIRMED` requires the held-out half
+to carry at least **six** discordant pairs (the smallest count at which a unanimous sign test clears 0.05, since
+2·2⁻⁶ = 0.031), a positive `skipDelta` and a p below 0.05 in the same direction. The pooled row is printed and is
+in-sample by construction, which is why it cannot be the verdict.
+
+**Multiplicity floor** — the number of admissible rules a screen of a given size produces from noise alone, printed
+beside its yield. At `m` cuts and a two-sided 5% test it is about `0.025·m`, so 385 cuts yield about **9.6** chance
+discoveries. A family that produces *fewer* admissible rules than chance has no signal, and its one survivor is a
+selection rather than an effect. Quoting a screen without this number is quoting a p-hack with a table.
+
+**Task-constant observable** — a prefix field that never varies across a task's attempts, such as the opening request
+(the user simulator's fixed utterance) or the identity lookup that opens this domain. A threshold on a task-constant
+field cannot serve one attempt and skip another; it can only switch memory off for a **task class**, which makes it an
+admission rule and not a serving gate. On this project's grid every field available before the first content reveal is
+task-constant on 100% of tasks, which is the structural reason the serving question needs the episode's own content.

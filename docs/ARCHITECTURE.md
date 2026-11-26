@@ -5012,3 +5012,37 @@ the length gap at median 1 turn, with 27.3% tied and 60.2% within one. That meas
 patience — the subset is expected to hold about twelve discordant pairs against about twenty overall, and an exact sign
 test on twelve pairs has **0.40** power against the treated side winning 80% of them, so the honest output of a null
 here is a bound over the pairs it made rather than a claim that the material is inert.
+
+### 8.100 The serving decision: an estimator that can refuse, and the prefix it is allowed to read
+
+Sections 8.98 and 8.99 end at the same wall from opposite sides. 8.98 measured that the block was accusing the user of
+things the conversation had already settled, and fixed the wording; 8.99 measured that a front-placement block never
+enters the transcript, and fixed the recording. Neither answered *whether the block should be served at all*, and the
+stratified reading says that is the question that carries the money: the shipped block loses **9.5 points** on the 66
+tasks a no-memory arm solved every attempt and gains **7.5** on the 43 it solved some of the time, so every arm mean in
+this project has been reporting the sum of two opposite effects.
+
+**1. A serving policy is priced as an estimator, not as a feature.** Given a paired two-arm grid, the value of a policy
+π is `π(x)·y_treated + (1 − π(x))·y_control` over (task, attempt) pairs, and the two quantities that decide whether it
+is worth running are conditional means over the subsets it creates: `skipDelta` on the pairs it refuses and
+`serveDelta` on the pairs it serves. A gate that refuses correctly and serves at a loss has improved nothing, and a
+single number cannot show that.
+
+**2. The input has to be a prefix, and the only proof of a prefix is a truncated re-read.** Every observable the
+instrument uses is computed by walking the messages and stopping at the first tool call outside the identity family;
+the test re-reads a transcript truncated at that point and asserts the observable set is identical. The first version
+of the field list included the episode's total tool-call count, which the truncation test caught — an observable that
+reads the trajectory is an oracle wearing a covariate's clothes (AUDIT 34.306).
+
+**3. A screen needs a split, and a split needs a floor.** Hundreds of cuts over one grid always contain one that looks
+good, so a cut is chosen on half the tasks and judged on the other, with its own pair floor on the held-out half. The
+multiplicity is printed beside the yield: at 385 cuts a two-sided 5% test yields about 9.6 chance discoveries, so a
+yield of one is not a weak signal but the absence of one.
+
+**4. The two cheap candidates were refuted without a dispatch, and that is the design working.** A gate on the opening
+turn's ask count fires on 110 of 114 openings; a gate on the first tool call's family fires on 452 of 456 episodes,
+because the first act in this domain is the identity lookup. Neither could be a decision, and both facts were already
+on disk. The consequence is a constraint on the successor rather than a closed question: the signal has to come from
+what the episode **reveals after the identity gate** — the order, the item, the attribute row — because that is the
+only content in a transcript that varies inside a task, and a field that is constant within a task can only be an
+admission rule for a task class, never a gate for an attempt.
