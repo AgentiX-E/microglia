@@ -5002,3 +5002,13 @@ go wrong, so a dose reading prints the turn gap beside the dose gap, and the num
 larger round is the sign of the effect on the pairs whose turn counts are close. The instrument's own falsification is
 part of its design: a controlled arm has a dose of exactly zero on every episode, and the reader must answer "no dose"
 there — an instrument that reports an effect where the dose is identically zero is reading the clock.
+
+**4. The close-turn subset is a column, not an adjective.** "The pairs whose turn counts are close" is the decisive
+quantity, and for one round it existed only in prose — the reader printed the gap summarised over *all* pairs and
+computed no subset, so the decisive number did not exist while two documents said it did (AUDIT 34.267). It is now
+`closeTurnPairs` with its own pass counts, its own exact sign test and its tie count, and the one-turn tolerance is
+measured rather than preferred: on the only arm that ran four attempts at each of 114 tasks, 684 within-task pairs put
+the length gap at median 1 turn, with 27.3% tied and 60.2% within one. That measurement also prices the round's
+patience — the subset is expected to hold about twelve discordant pairs against about twenty overall, and an exact sign
+test on twelve pairs has **0.40** power against the treated side winning 80% of them, so the honest output of a null
+here is a bound over the pairs it made rather than a claim that the material is inert.
