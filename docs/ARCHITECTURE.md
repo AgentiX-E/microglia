@@ -5111,3 +5111,14 @@ saw. The reveal is also 89–93% task-constant, so a threshold on it is an admis
 shape as the request-declared rules that had already failed. The architectural consequence is not another gate: it is
 that **the shipped serving policy is the state channel plus the timing rule**, and no gate is installed on top of it.
 A negative result that changes nothing in the shipped configuration is the configuration doing its job.
+
+**And it does not transfer to a policy domain, which is measured rather than assumed.** The state channel is a *checker*:
+an item is settled when a receipt names the product its ask named. That contract is sound where a request states the
+action and the tool that performs it is named after the action — a catalogue domain — and unsound where the action is a
+policy consequence. Teaching the parser the airline domain's five write tools and three words lifts its family recall
+there to **30.0%**, against its own **83.3%** on retail, and only half of the misses are vocabulary: five are asks a
+policy settles with a *different* action (a change is cancel-and-rebook), five are requests that state a route and no
+verb at all, and five are the retail cue for `return` firing on "the return flight is May 20", where it names a leg.
+The board therefore ships as a catalogue instrument and says so; the successor contract — settle when a receipt touches
+the **record** the ask names, whatever family it is in — is registered rather than guessed at, with a recall bar a
+census checks before any dispatch is armed.

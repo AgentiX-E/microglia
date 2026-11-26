@@ -203,6 +203,39 @@ jobs:
           python3 eval/tools/round_clock.py
           python3 eval/tools/serving_defaults.py
 
+      - name: The parser in a second domain, which is a measured number and not a hope
+        # R217a. The board is a retail parser, and R217 would dispatch it into airline. A block whose items never
+        # settle is not a null result — it is a broken instrument reporting one — so the transfer is graded **before**
+        # any money is spent, against the airline tasks' own required actions.
+        #
+        # The gate holds two numbers in opposite directions. Retail's are asserted **unchanged**: three airline cues
+        # were appended to a shared table, and the only thing that can show they did not move the retail parse is the
+        # retail census. Airline's are asserted **at their measured value**, which is the round's finding — 30% family
+        # recall against retail's 83.3% — so a later round that changes the contract has to change this line on
+        # purpose rather than by drifting.
+        run: |
+          set -euo pipefail
+          python3 eval/tools/goal_board.py --census --goals eval/manifests/retail-goals.json --json > "${RUNNER_TEMP}/retail.json"
+          python3 eval/tools/goal_board.py --census --goals eval/manifests/airline-goals.json --json > "${RUNNER_TEMP}/airline.json"
+          python3 - "${RUNNER_TEMP}/retail.json" "${RUNNER_TEMP}/airline.json" <<'PY'
+          import json, sys
+
+          retail = json.load(open(sys.argv[1]))
+          airline = json.load(open(sys.argv[2]))
+          assert retail["tasks"] == 114, retail["tasks"]
+          assert retail["found"] == 176, retail["found"]
+          assert retail["familyRecall"] >= 0.83, retail["familyRecall"]
+          assert retail["spurious"] == 235, retail["spurious"]
+          assert retail["tasksCovered"] == 84, retail["tasksCovered"]
+          assert airline["tasks"] == 50, airline["tasks"]
+          assert airline["required"] == 50, airline["required"]
+          assert airline["found"] == 15, airline["found"]
+          print(f"ok  retail {retail['found']}/{retail['required']} objects at {retail['familyRecall']:.1%} of "
+                f"families; airline {airline['found']}/{airline['required']} at {airline['familyRecall']:.1%} — the "
+                f"gap R217a was registered to find")
+          assert airline["familyRecall"] < retail["familyRecall"], "the airline parse caught up: re-read R217a"
+          PY
+
       - name: Repository audit (source rules, manifests, published dependencies)
         run: pnpm audit:repo
 

@@ -97,6 +97,16 @@ FAMILIES = {
     "modify_user_address": "address",
     "modify_pending_order_payment": "payment",
     "transfer_to_human_agents": "transfer",
+    # R217a. The airline domain's five state-changing tools. A family is the **shape of an ask** and not the name of a
+    # tool, which is why the two updates that a single "change" can perform share the `modify` family and the two that
+    # name their own object do not: "add a bag" and "add a passenger" are asks a request states in their own words, and
+    # a receipt that settled them under `modify` would tick a flight change against a bag. `book` has no retail
+    # analogue because retail's orders arrive already placed.
+    "cancel_reservation": "cancel",
+    "update_reservation_flights": "modify",
+    "update_reservation_passengers": "passenger",
+    "update_reservation_baggages": "baggage",
+    "book_reservation": "book",
 }
 
 #: How an ask is recognised in the user's words. Closed and short on purpose: a cue list that grows with the
@@ -109,6 +119,12 @@ CUES = (
     ("payment", r"\bpayment\b"),
     ("transfer", r"\b(human|representative|supervisor)\b"),
     ("modify", r"\b(modify\w*|chang\w*)\b"),
+    # R217a's three, appended so that no retail request can change its parse: a cue earlier in this list wins, and
+    # every retail reason that mentions these words also states one of the seven above. The census over both domains is
+    # what holds that claim (the retail numbers are asserted unchanged).
+    ("baggage", r"\b(bag|bags|baggage)\b"),
+    ("passenger", r"\bpassenger\w*\b"),
+    ("book", r"\b(book|books|booking|reserve|reserved)\b"),
 )
 
 #: Words that name no object. Deliberately the same closed list the debit reader uses for requirement words, plus
@@ -1294,6 +1310,19 @@ def self_test() -> int:
     check("a human is a transfer", family_of("give me a human") == "transfer")
     check("change is a modify", family_of("change the size") == "modify")
     check("no cue is no family", family_of("hello there") == "")
+    # R217a. The airline domain's vocabulary, appended after the seven retail cues so that no retail request can change
+    # its parse. These three assertions and the retail census's unchanged numbers are what hold that claim.
+    check("a bag is the baggage family", family_of("add 3 checked bags") == "baggage")
+    check("a passenger names its own family", family_of("add my daughter as a passenger") == "passenger")
+    check("a booking is the book family", family_of("book a new flight") == "book")
+    check("and a reservation is one too", family_of("make a reservation for my friend") == "")
+    # The last one is a **deliberate** miss and the reason the round failed: "reservation" alone names no action, and
+    # a cue for it would fire on "cancel reservation EHGLP3" if it were ordered before `cancel`. It is asserted as a
+    # miss so that a later round which fixes the *contract* rather than the vocabulary has to change this line.
+    check("the airline families are receipts too", FAMILIES.get("cancel_reservation") == "cancel"
+          and FAMILIES.get("update_reservation_baggages") == "baggage"
+          and FAMILIES.get("book_reservation") == "book")
+    check("a retail cue still wins over an airline one", family_of("cancel my bag") == "cancel")
 
     # Items.
     one = items_of("I want to exchange the mechanical keyboard for clicky switches.")

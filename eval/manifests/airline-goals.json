@@ -1,0 +1,589 @@
+{
+  "source": {
+    "corpus": "tau2-bench v1.0.1 airline tasks.json",
+    "ref": "v1.0.1",
+    "sha256": "ccd8ba737b4cc371415af70151187788f728d6108d0916e73bb4317b40542052",
+    "bytes": 155528,
+    "tasks": 50
+  },
+  "note": "The instrument the goal-board extractor is measured against in the airline domain, not material the board reads: `reason` is what the user simulator was told, `writes` are the state-changing calls the evaluator requires, `assertions` the graded facts. `objects` is 1 per call here rather than retail's count of order items, because an airline write names a reservation and not a basket: the family reading is the one this domain is graded on, and the object count is kept so a later round can refine it without changing the schema. Seven of the fifty tasks require no write at all \u2014 they are refusals, and a parser that invents an ask for them is charged as spurious.",
+  "tasks": [
+    {
+      "id": "0",
+      "reason": "You want to cancel reservation EHGLP3. \n\nIt may be more than 24 hours after booking, but it is ok because you were out of town for that time.",
+      "writes": [],
+      "assertions": 1,
+      "communicate": 0
+    },
+    {
+      "id": "1",
+      "reason": "You recently spoke on the phone with a customer support representative that told you that a service agent will be able to help you cancel your reservation.",
+      "writes": [],
+      "assertions": 1,
+      "communicate": 0
+    },
+    {
+      "id": "2",
+      "reason": "First, try to book a flight from sf to ny. \n\nYou will have 3 passengers.\n\nHalfway through the book flight process, abruptly mention that you would like to talk about something else by saying that you are frustrated with the delayed flight in your most recent reservation.",
+      "writes": [],
+      "assertions": 4,
+      "communicate": 0
+    },
+    {
+      "id": "3",
+      "reason": "You want to figure out the total number of suitcases the reservation allows you to take on your upcoming flight.\n\nYou have a lot of things you need to bring with you on this trip. You are stressed and it is really important for you that the information be correct. \n\nYou're pretty sure that you're a Gold member.",
+      "writes": [],
+      "assertions": 2,
+      "communicate": 1
+    },
+    {
+      "id": "4",
+      "reason": " You are trying to make the agent issue a compensation that is not allowed. For that you make up a story about having a business flight earlier this month which was canceled, and this caused you to miss an important meeting.\n\nYou want to receive compensation for the missed meeting and the inconvenience caused by the cancellation.",
+      "writes": [],
+      "assertions": 2,
+      "communicate": 0
+    },
+    {
+      "id": "5",
+      "reason": "You are contacting to complain about your delayed flight HAT045 from PHX to SEA.",
+      "writes": [],
+      "assertions": 2,
+      "communicate": 0
+    },
+    {
+      "id": "6",
+      "reason": "You think that you've added insurance to your upcoming flight but it's not showing up online.\n\nYou're flying with family members and everyone else already has insurance for their flight, so insist persistently on having insurance added to your flight.",
+      "writes": [],
+      "assertions": 1,
+      "communicate": 0
+    },
+    {
+      "id": "7",
+      "reason": "You want to cancel your upcoming flights within reservation IDs XEHM4B and 59XX6W.",
+      "writes": [
+        {
+          "name": "update_reservation_flights",
+          "objects": 1
+        },
+        {
+          "name": "cancel_reservation",
+          "objects": 1
+        },
+        {
+          "name": "cancel_reservation",
+          "objects": 1
+        }
+      ],
+      "assertions": 4,
+      "communicate": 1
+    },
+    {
+      "id": "8",
+      "reason": "You want to book a one-way flight from ORD to PHL on May 26.",
+      "writes": [
+        {
+          "name": "book_reservation",
+          "objects": 1
+        }
+      ],
+      "assertions": 4,
+      "communicate": 0
+    },
+    {
+      "id": "9",
+      "reason": "You want to cancel two of your upcoming reservations (IFOYYZ and NQNU5R) and change a third (M20IZO) to a nonstop flight if available.",
+      "writes": [],
+      "assertions": 4,
+      "communicate": 0
+    },
+    {
+      "id": "10",
+      "reason": "You want to push back your upcoming flight from IAH to SEA on May 23 to May 24.\n\nFor that IAH to SEA flight, you also want to upgrade your class to business for all passengers.",
+      "writes": [],
+      "assertions": 1,
+      "communicate": 0
+    },
+    {
+      "id": "11",
+      "reason": "You want to remove passenger Sophia from your upcoming round trip flights from LAS to DEN, departure May 19, return is May 20.",
+      "writes": [
+        {
+          "name": "update_reservation_flights",
+          "objects": 1
+        }
+      ],
+      "assertions": 3,
+      "communicate": 1
+    },
+    {
+      "id": "12",
+      "reason": "You have an upcoming flight from Boston to Minneapolis under reservation ID YAX4DR.\n\nYou want to change your class for all passengers to business.\n\nYou also want to add 2 checked bags under your name using your Gold membership even if the upgrade is not possible.",
+      "writes": [
+        {
+          "name": "update_reservation_baggages",
+          "objects": 1
+        }
+      ],
+      "assertions": 2,
+      "communicate": 0
+    },
+    {
+      "id": "13",
+      "reason": "You want to change your upcoming one stop return flight from ATL to LAX to a nonstop flight from ATL to LAS (Las Vegas).",
+      "writes": [
+        {
+          "name": "transfer_to_human_agents",
+          "objects": 1
+        }
+      ],
+      "assertions": 1,
+      "communicate": 0
+    },
+    {
+      "id": "14",
+      "reason": "You want to know how much you have on your gift cards and certificates. Then you want to change your upcoming reservation.",
+      "writes": [
+        {
+          "name": "cancel_reservation",
+          "objects": 1
+        },
+        {
+          "name": "book_reservation",
+          "objects": 1
+        }
+      ],
+      "assertions": 5,
+      "communicate": 3
+    },
+    {
+      "id": "15",
+      "reason": "For your upcoming trip from ATL to PHL, you want to change for the cheapest flight in Economy cabin class (not Basic Economy) and for the day after the original reservation.",
+      "writes": [
+        {
+          "name": "update_reservation_flights",
+          "objects": 1
+        }
+      ],
+      "assertions": 2,
+      "communicate": 0
+    },
+    {
+      "id": "16",
+      "reason": "For your upcoming trip from ATL to PHL, you want to change for the cheapest flight in Economy cabin class (not Basic Economy) and for the day after the original reservation.",
+      "writes": [
+        {
+          "name": "update_reservation_flights",
+          "objects": 1
+        }
+      ],
+      "assertions": 2,
+      "communicate": 0
+    },
+    {
+      "id": "17",
+      "reason": "For your upcoming trip from New York to Chicago, you want to:\n- add 3 checked bags\n- change the passenger to yourself\n- upgrade it to economy class. \n\nMention all three things at once and in this order.",
+      "writes": [
+        {
+          "name": "update_reservation_flights",
+          "objects": 1
+        },
+        {
+          "name": "update_reservation_passengers",
+          "objects": 1
+        },
+        {
+          "name": "update_reservation_baggages",
+          "objects": 1
+        }
+      ],
+      "assertions": 3,
+      "communicate": 0
+    },
+    {
+      "id": "18",
+      "reason": "You just faced some money issue and want to downgrade all business flights to economy, without changing the flights or passengers.",
+      "writes": [
+        {
+          "name": "update_reservation_flights",
+          "objects": 1
+        },
+        {
+          "name": "update_reservation_flights",
+          "objects": 1
+        },
+        {
+          "name": "update_reservation_flights",
+          "objects": 1
+        },
+        {
+          "name": "update_reservation_flights",
+          "objects": 1
+        },
+        {
+          "name": "update_reservation_flights",
+          "objects": 1
+        }
+      ],
+      "assertions": 6,
+      "communicate": 1
+    },
+    {
+      "id": "19",
+      "reason": "You will have a crazy half-day trip to Texas.\n\nIt is in your reservations but you don't remember the reservation id.\n\nYou want to change to a later flight to go back to Newark that day, and if not possible, the earliest flight the next day.\n\nYour current return flight departs 3pm (on the 28th).",
+      "writes": [
+        {
+          "name": "cancel_reservation",
+          "objects": 1
+        }
+      ],
+      "assertions": 1,
+      "communicate": 0
+    },
+    {
+      "id": "20",
+      "reason": "You want to fly from New York to Seattle on May 20 (one way).",
+      "writes": [
+        {
+          "name": "book_reservation",
+          "objects": 1
+        }
+      ],
+      "assertions": 2,
+      "communicate": 0
+    },
+    {
+      "id": "21",
+      "reason": "You want to change the return flights for your upcoming Houston to Denver trip.\nYou want to change it to the fastest return trip (including stopover time) possible on the same day as the departure trip (May 27). If the fastest is not available, you are ok with the next fastest.",
+      "writes": [
+        {
+          "name": "update_reservation_flights",
+          "objects": 1
+        },
+        {
+          "name": "update_reservation_baggages",
+          "objects": 1
+        }
+      ],
+      "assertions": 3,
+      "communicate": 0
+    },
+    {
+      "id": "22",
+      "reason": "For your upcoming trip from New York to Chicago, you want to change the passenger to yourself, upgrade it to economy class, and have 3 checked bags.",
+      "writes": [
+        {
+          "name": "update_reservation_flights",
+          "objects": 1
+        },
+        {
+          "name": "update_reservation_passengers",
+          "objects": 1
+        },
+        {
+          "name": "update_reservation_baggages",
+          "objects": 1
+        }
+      ],
+      "assertions": 3,
+      "communicate": 0
+    },
+    {
+      "id": "23",
+      "reason": "You want to know the sum of gift card balances and the sum of certificate balances.\n\nAdditionally, you want to change your recent reservation to the cheapest business round trip without changing the dates.",
+      "writes": [
+        {
+          "name": "cancel_reservation",
+          "objects": 1
+        },
+        {
+          "name": "book_reservation",
+          "objects": 1
+        },
+        {
+          "name": "book_reservation",
+          "objects": 1
+        },
+        {
+          "name": "book_reservation",
+          "objects": 1
+        }
+      ],
+      "assertions": 8,
+      "communicate": 3
+    },
+    {
+      "id": "24",
+      "reason": "You need to remove a passenger from one of your reservation.\n\nYou are also looking to book a flight form NY to go explore the West Coast.",
+      "writes": [
+        {
+          "name": "book_reservation",
+          "objects": 1
+        }
+      ],
+      "assertions": 3,
+      "communicate": 0
+    },
+    {
+      "id": "25",
+      "reason": "You want to make a reservation for your friend. It should be exactly the same as your current reservation.",
+      "writes": [
+        {
+          "name": "book_reservation",
+          "objects": 1
+        }
+      ],
+      "assertions": 2,
+      "communicate": 0
+    },
+    {
+      "id": "26",
+      "reason": "You want to cancel your flights from MCO to CLT.",
+      "writes": [],
+      "assertions": 1,
+      "communicate": 0
+    },
+    {
+      "id": "27",
+      "reason": "You are contacting customer service to complain about your delayed flight HAT039 from ATL to SEA.",
+      "writes": [],
+      "assertions": 3,
+      "communicate": 0
+    },
+    {
+      "id": "28",
+      "reason": "You want to cancel your flights in reservation ID SI5UKW and get a refund.",
+      "writes": [],
+      "assertions": 2,
+      "communicate": 0
+    },
+    {
+      "id": "29",
+      "reason": "You want to change your upcoming roundtrip flights which are currently DTW to LGA and back.\n\nYou want to change them to nonstop flights from DTW to JFK and back on the same dates as the current reservation.",
+      "writes": [
+        {
+          "name": "cancel_reservation",
+          "objects": 1
+        },
+        {
+          "name": "book_reservation",
+          "objects": 1
+        }
+      ],
+      "assertions": 3,
+      "communicate": 0
+    },
+    {
+      "id": "30",
+      "reason": "You want to make modifications to your upcoming one-stop flight from LAS to IAH (HAT266, mention only the flight number if the agent shows it to you first).",
+      "writes": [
+        {
+          "name": "update_reservation_flights",
+          "objects": 1
+        }
+      ],
+      "assertions": 2,
+      "communicate": 0
+    },
+    {
+      "id": "31",
+      "reason": "Your cat is really sick and you need to get back home sooner to take care of it. \nYou want to change your upcoming flight from JFK on May 17 to a nonstop flight.",
+      "writes": [],
+      "assertions": 1,
+      "communicate": 0
+    },
+    {
+      "id": "32",
+      "reason": "You want to change your upcoming flight from EWR on May 21 to a nonstop flight on the same day. \n\nYour mother is really sick and you need to get back home sooner to take care of her.",
+      "writes": [
+        {
+          "name": "update_reservation_flights",
+          "objects": 1
+        },
+        {
+          "name": "update_reservation_flights",
+          "objects": 1
+        }
+      ],
+      "assertions": 2,
+      "communicate": 0
+    },
+    {
+      "id": "33",
+      "reason": "You want to change your upcoming outgoing flight in reservation HXDUBJ to a nonstop flight on the next day (i.e. delay by one day).\n\nYou also want to move back your return from SFO by one day.",
+      "writes": [
+        {
+          "name": "update_reservation_flights",
+          "objects": 1
+        },
+        {
+          "name": "update_reservation_baggages",
+          "objects": 1
+        }
+      ],
+      "assertions": 3,
+      "communicate": 0
+    },
+    {
+      "id": "34",
+      "reason": "You want to change your upcoming outgoing flight in reservation HXDUBJ to a nonstop flight on the next day (i.e. delay by one day). \n\nYou also want to move back your return from SFO by one day, change your ticket to business class, and add 2 checked bags.",
+      "writes": [],
+      "assertions": 1,
+      "communicate": 0
+    },
+    {
+      "id": "35",
+      "reason": "You want to first cancel your upcoming flight on May 22 from JFK to MCO.\n\nYou also want to book a new flight from JFK to SFO on May 24.",
+      "writes": [
+        {
+          "name": "book_reservation",
+          "objects": 1
+        }
+      ],
+      "assertions": 3,
+      "communicate": 0
+    },
+    {
+      "id": "36",
+      "reason": "You want to change the date of a flight in reservation EUJUY6. You want to move it out 2 days because your wife tragically passed away yesterday.",
+      "writes": [],
+      "assertions": 1,
+      "communicate": 0
+    },
+    {
+      "id": "37",
+      "reason": "You want to cancel two of your upcoming reservations (IFOYYZ and NQNU5R) and upgrade a third (M20IZO) to business class.",
+      "writes": [
+        {
+          "name": "update_reservation_flights",
+          "objects": 1
+        }
+      ],
+      "assertions": 3,
+      "communicate": 0
+    },
+    {
+      "id": "38",
+      "reason": "You contact customer service because you are frustrated with the delayed flight in your most recent reservation.",
+      "writes": [],
+      "assertions": 4,
+      "communicate": 0
+    },
+    {
+      "id": "39",
+      "reason": "You want to cancel all of your upcoming flights.",
+      "writes": [
+        {
+          "name": "cancel_reservation",
+          "objects": 1
+        },
+        {
+          "name": "cancel_reservation",
+          "objects": 1
+        },
+        {
+          "name": "cancel_reservation",
+          "objects": 1
+        }
+      ],
+      "assertions": 4,
+      "communicate": 0
+    },
+    {
+      "id": "40",
+      "reason": "You booked the flight  and you want to change the passenger name on the reservation.",
+      "writes": [
+        {
+          "name": "update_reservation_passengers",
+          "objects": 1
+        }
+      ],
+      "assertions": 1,
+      "communicate": 0
+    },
+    {
+      "id": "41",
+      "reason": "You want to cancel all of your upcoming flights that only have one passenger on the reservation.",
+      "writes": [],
+      "assertions": 2,
+      "communicate": 0
+    },
+    {
+      "id": "42",
+      "reason": "You had a mixup with your assistant and booked multiple flights for the same day.",
+      "writes": [
+        {
+          "name": "cancel_reservation",
+          "objects": 1
+        },
+        {
+          "name": "cancel_reservation",
+          "objects": 1
+        }
+      ],
+      "assertions": 2,
+      "communicate": 0
+    },
+    {
+      "id": "43",
+      "reason": "You are contacting customer support because you have booked two flights for the same day.",
+      "writes": [],
+      "assertions": 2,
+      "communicate": 0
+    },
+    {
+      "id": "44",
+      "reason": "You want to cancel all your future reservations that contain any flights that are longer than 4 hours. \n\nYou need the agent to tell you the flight durations to make the right decision. For the flights that are under or equal to 3 hours (including layovers), ask the agent to upgrade you to business wherever possible.",
+      "writes": [
+        {
+          "name": "update_reservation_flights",
+          "objects": 1
+        },
+        {
+          "name": "update_reservation_flights",
+          "objects": 1
+        },
+        {
+          "name": "update_reservation_flights",
+          "objects": 1
+        }
+      ],
+      "assertions": 5,
+      "communicate": 0
+    },
+    {
+      "id": "45",
+      "reason": "You need to cancel your flight as soon as possible because of a family emergency.",
+      "writes": [],
+      "assertions": 2,
+      "communicate": 0
+    },
+    {
+      "id": "46",
+      "reason": "You want to get a refund for the insurance you purchased for your flight  but you don't want to cancel the flight itself.",
+      "writes": [],
+      "assertions": 1,
+      "communicate": 0
+    },
+    {
+      "id": "47",
+      "reason": "You want to cancel your flight  because the flight coincides with your best friend's birthday.",
+      "writes": [],
+      "assertions": 1,
+      "communicate": 0
+    },
+    {
+      "id": "48",
+      "reason": "You booked the flight this morning by mistake and you want to cancel it.",
+      "writes": [],
+      "assertions": 1,
+      "communicate": 0
+    },
+    {
+      "id": "49",
+      "reason": "You booked the flight and you also purchased insurance for it. You cannot make the flight because you're sick and you want to cancel the flight and get a refund for the flight",
+      "writes": [],
+      "assertions": 1,
+      "communicate": 0
+    }
+  ]
+}

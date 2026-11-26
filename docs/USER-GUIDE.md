@@ -7368,3 +7368,34 @@ mechanism replicating both times and the accuracy effect inside the noise), and 
 fewer changes, 4–7% less spend. If you are looking for an accuracy win from gating, the honest statement this project
 can offer is that on its grid the search is closed at both ends, and the closure was computed for nothing on artefacts
 that already existed.
+
+### 32.83 Would this board work on your domain? A census answers before you dispatch
+
+The board is a checker: it lists the asks your request states, and it ticks one when a receipt names the thing the ask
+named. That sentence contains a hidden assumption — that the **action the request states** is the action the tool
+performs — and whether it holds is a property of your domain, not of the code.
+
+**Measure it for nothing.** Take your domain's tasks, extract each one's request and the writes its evaluator requires,
+and run the census:
+
+```bash
+python3 eval/tools/goal_board.py --census --goals eval/manifests/airline-goals.json
+```
+
+Two numbers come back. **Family recall** is the share of required writes whose family the request mentions; **spurious**
+counts asks no required write accounts for. On this project's catalogue domain they are 83.3% and 235 of 226 objects; on
+the airline domain, after teaching the parser its five write tools and three words, family recall is **30.0%**.
+
+**The gap is two-thirds vocabulary and one-third contract**, and the census's own misses tell you which you have:
+
+| what you see in the misses | what it means | what to do |
+|---|---|---|
+| the request states a route, a date, or an object and no verb | the ask names a *record*, not an action | settle on the record, not the family |
+| the required action's family differs from the ask's family | the policy decides the action (a change is cancel-and-rebook; a refusal is a transfer) | the same |
+| one clause needs two families ("change the passenger to yourself") | a clause carries one family | split the clause, or settle on the record |
+| a word means something else here ("the return flight") | a shared cue table is not domain-free | scope the cues by domain |
+
+**Do not grow the word list until the number moves.** A cue table that grows with the corpus is a parser fitted to the
+corpus, and the census will then be a measurement of the fit. If the first two rows of that table are where your misses
+are, more words cannot help: the contract has to change, and that is a design decision you can price at zero before you
+spend anything on it.
