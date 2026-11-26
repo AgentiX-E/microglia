@@ -173,9 +173,18 @@ jobs:
           # support a sign test.
           python3 -m coverage run --append --branch --include="*/eval/tools/solve_strata.py" \
             eval/tools/solve_strata.py --self-test
+          # R223. The serving decision, priced before it is armed. Every arm in this lane served every episode, so the
+          # only question the dispatches have answered is what the block should say — and the stratified reading says
+          # the question worth more is *whether* to serve. This module replays a policy over the one grid that holds
+          # both arms and both placements, so a proxy can be refused for nothing instead of for ¥9, and its value is
+          # exactly that it can refuse: it already killed two candidates on artefacts that were already on disk. Under
+          # the floor for the same reason as the rest — the arithmetic that turns a policy into two sign tests is what
+          # decides whether money is spent, and arithmetic in a paragraph is arithmetic nobody re-ran.
+          python3 -m coverage run --append --branch --include="*/eval/tools/serve_policy.py" \
+            eval/tools/serve_policy.py --self-test
           python3 -m coverage json -o coverage-python.json
           python3 scripts/check-python-coverage.py --self-test
-          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 20
+          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 21
 
       - name: The rounds this project owes, and the date each one was registered for
         # The failure this prevents is not a wrong number, it is a round that quietly stops being planned: R216b's
