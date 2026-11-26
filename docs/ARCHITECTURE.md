@@ -5122,3 +5122,69 @@ verb at all, and five are the retail cue for `return` firing on "the return flig
 The board therefore ships as a catalogue instrument and says so; the successor contract — settle when a receipt touches
 the **record** the ask names, whatever family it is in — is registered rather than guessed at, with a recall bar a
 census checks before any dispatch is armed.
+
+### 8.103 A record is something the episode reads, not a phrase the request says
+
+Section 8.102 left one contract registered and unmeasured: an item is settled when a receipt **touches the record the
+ask names**, whatever family that receipt is in. The contract is the right shape for a policy domain — the action a
+request wants is whatever the rules permit — and it rests on an assumption nobody had tested: that a request *names*
+its record. It does not, and the census that shows it is the first in this lane whose ground truth is state rather
+than a call name.
+
+**What "names" was made to mean, before the number was read.** Three grades, each weaker than the next:
+
+| grade | the request… |
+|---|---|
+| `id` | states the reservation code the write carries |
+| `unique` | states a token that appears in exactly one of the user's records — a route end, a passenger, a flight number, a date |
+| `pair` | states at least two of the record's identity tokens |
+
+A single shared token is not naming: `economy` is in the record and in the request and identifies nothing. Identity
+is restricted to the fields that pick a record out — code, route (as code and as the city a user says), flight
+numbers, dates, passengers — and cabin and flight type are excluded on purpose, because they describe the record's
+class and including them raised the reading by matching `economy`. The ground truth is the domain's own database,
+projected to the 50 graded tasks by a script that writes the source's sha256 beside the table, so a claim about a
+record can be recomputed from the same bytes it was made from.
+
+**The ladder, on 50 graded writes over 27 writing tasks and 23 whose correct outcome is no write at all:**
+
+| grade | writes | share |
+|---|---|---|
+| `id` | 7 | 14.0% |
+| `unique` | 25 | 50.0% |
+| `pair` | 27 | **54.0%** |
+| family (the rule the contract retires) | 15 | 30.0% |
+| record or family, each write once | 30 | 60.0% |
+
+The bar was 0.75 and the loosest rule reaches 54.0%. The failure is not close, and it is not a parser defect.
+
+**The 23 misses are the finding.** Thirteen of them are asks that select a **set of records by a predicate** — "cancel
+all of your upcoming flights", "all your future reservations that contain any flights that are longer than four hours",
+"multiple flights for the same day", "downgrade all business flights to economy". The predicate is computed *from* the
+records (cabin, duration, date-equality), so no token in the request can name its extension; the reference is a query,
+not a phrase. Six more are bookings whose object **the policy chooses** — "the cheapest business round trip", "exactly
+the same as your current reservation" — and at the moment the user speaks that object does not exist to be named. Two
+are records the request genuinely leaves unnamed (nine reservations on the account, "the reservation"), one is a
+transfer, which is a refusal and not a write, and one is a change the policy settles with two receipts over two
+records.
+
+**The architectural consequence, and it is where the anchor moves.** The identifier a write carries is almost never in
+the request; it enters the episode through a **read** — `get_reservation_details`, `get_order_details` — because the
+agent cannot act without resolving one. So the record a board item should be about is not the one the request
+describes; it is the one the episode has read. That is a different contract with a different failure mode (every
+record the agent reads becomes an item, so the cost of a false "done" rises), and it is registered rather than
+implemented on the strength of a hypothesis: its bar is a comparison on a grid this project has already paid for, at
+zero cost, on the domain where the instrument works.
+
+**Running it.** Two commands, no provider, no harness:
+
+```bash
+python3 scripts/build_airline_records.py --self-test         # the projection's own assertions
+python3 eval/tools/record_census.py --self-test              # the census's own assertions
+python3 eval/tools/record_census.py --goals eval/manifests/airline-records.json --family-found 15
+```
+
+The last line prints the ladder, the family column, the union, and every write no rule reaches, with the record it
+touched and how many identity tokens it had. `--family-found` is not a knob: it is the family count from
+`goal_board --census` over the same corpus, and a disagreement between the two implementations of one allocation rule
+fails the run instead of being reported.

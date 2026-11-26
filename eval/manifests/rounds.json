@@ -672,7 +672,7 @@
     {
       "id": "R227",
       "title": "settle by the record, not by the family \u2014 the contract the airline domain actually supports",
-      "status": "registered",
+      "status": "read",
       "dispatchBy": "2026-12-12T12:00:00Z",
       "prereg": "prereg/R227-record-keyed.md",
       "arms": [
@@ -684,7 +684,54 @@
         "R217a"
       ],
       "why": "R217a's refutation is not a vocabulary gap: two of its four causes are that the correct action has a different family from the stated ask (a change is settled by cancel-and-rebook) and that \"return\" names a leg in this domain. The board settles an ask against a receipt of the same family, which is a contract a catalogue domain supports and a policy domain does not. The successor rewrites the contract rather than the word list: an ask settles against a receipt that touches the record it names, whatever family that receipt is in.",
-      "bar": "family recall is replaced by a record-recall bar: on the 50 airline requests, the share of required writes whose record the parser names, at or above 0.75, measured by the same census before any dispatch"
+      "bar": "family recall is replaced by a record-recall bar: on the 50 airline requests, the share of required writes whose record the parser names, at or above 0.75, measured by the same census before any dispatch",
+      "instrument": "python3 eval/tools/record_census.py --goals eval/manifests/airline-records.json --family-found 15",
+      "readAt": "2026-11-26T09:45:00Z",
+      "actualUsd": 0.0,
+      "outcome": "REFUTED: 27 of 50 graded airline writes are named by their record (54.0%) against the registered 0.75 bar, and 30 of 50 with the family rule the round retires; the misses are 13 writes on asks that select a set of records by a predicate and 6 bookings whose object the policy chooses, so the reference in this corpus is a set or a decision rather than a record",
+      "reading": {
+        "writes": 50,
+        "writingTasks": 27,
+        "refusingTasks": 23,
+        "idOnly": 7,
+        "single": 25,
+        "pair": 27,
+        "familyFound": 15,
+        "unionFound": 30,
+        "recall": {
+          "id": 0.14,
+          "single": 0.5,
+          "pair": 0.54,
+          "family": 0.3,
+          "union": 0.6
+        },
+        "bar": 0.75,
+        "misses": {
+          "total": 23,
+          "setPredicate": 13,
+          "policyChosenBooking": 6,
+          "unnameableRecord": 2,
+          "noRecord": 1,
+          "chained": 1
+        }
+      }
+    },
+    {
+      "id": "R228",
+      "title": "bind the item to the read, not to the words \u2014 the settlement a policy domain can support",
+      "status": "registered",
+      "dispatchBy": "2026-12-19T12:00:00Z",
+      "prereg": "prereg/R228-read-anchored.md",
+      "arms": [
+        "none"
+      ],
+      "episodes": 0,
+      "estimateUsd": 0.0,
+      "dependsOn": [
+        "R227"
+      ],
+      "why": "R227 closed the record rule at 54.0% and named why: 13 of its 23 misses are asks over a *set* of records selected by a predicate the request never spells as tokens (\"all your upcoming flights\", \"flights longer than four hours\", \"multiple flights for the same day\"), and 6 are bookings whose object the policy chooses. A reference that neither the words nor the record can supply is supplied by the agent's own reads, which this lane has never used as the anchor. The successor binds each item to the record the episode reads and settles it on the write that touches that record, and it is measurable at zero cost on the retail grid the lane already owns.",
+      "bar": "on the retail grid already on disk, the read-anchored board must settle at least as many of its writing episodes as the request-anchored board does (the 1.18 pp admission R226 priced), while its false-accusation rate does not rise"
     }
   ]
 }

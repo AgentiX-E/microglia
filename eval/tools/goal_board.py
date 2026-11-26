@@ -848,6 +848,8 @@ def census(document: dict, wanted=None) -> dict:
     per_family: dict = {}
     covered = 0
     tasks = 0
+    writing = refusing = 0
+    spurious_writing = spurious_refusing = 0
     family_required = family_found = 0
     for task in document.get("tasks") or []:
         if wanted is not None and str(task.get("id")) not in wanted:
@@ -878,13 +880,30 @@ def census(document: dict, wanted=None) -> dict:
             family_required += 1
             family_found += 1 if available > 0 else 0
         covered += 1 if matched == sum(count for _family, count in objects) else 0
-        spurious += sum(counts.values())
+        left = sum(counts.values())
+        spurious += left
+        # R227. A task whose evaluator requires no write is a task whose **correct outcome is that nothing happens**:
+        # the user still states an ask ("cancel reservation EHGLP3"), the policy refuses it, and an ask that is never
+        # settled is the board working rather than noise. Counting those leftovers as spurious is a reading about the
+        # corpus's refusals, not about the parser — in the airline manifest it is 29 of 52 — so the two are separated
+        # and the split travels in the artefact. Nothing in retail reads it: there, a task with no required write is
+        # a task this manifest does not contain.
+        if objects:
+            writing += 1
+            spurious_writing += left
+        else:
+            refusing += 1
+            spurious_refusing += left
     return {
         "tasks": tasks,
         "required": required,
         "found": found,
         "recall": (found / required) if required else None,
         "spurious": spurious,
+        "spuriousOnWriting": spurious_writing,
+        "spuriousOnRefusing": spurious_refusing,
+        "writingTasks": writing,
+        "refusingTasks": refusing,
         "precision": (found / (found + spurious)) if (found + spurious) else None,
         "asksPerTask": ((found + spurious) / tasks) if tasks else None,
         "tasksCovered": covered,
@@ -1734,6 +1753,21 @@ def self_test() -> int:
     check("a wanted task filters the census", census(little, wanted=["0"])["tasks"] == 1)
     check("a task id may be an int", census({"tasks": [{"id": 7, "reason": "cancel the order", "writes": []}]},
           wanted=["7"])["tasks"] == 1)
+    # R227. A spare ask on a task whose correct outcome is no write is not the same finding as a spare ask on a task
+    # that had work to do, and the airline manifest is mostly the first kind. The split is a field, not a paragraph.
+    refusals = {"tasks": [
+        {"id": "0", "reason": "I want to return the lamp.", "writes": [{"name": "return_delivered_order_items",
+                                                                        "objects": 1}]},
+        {"id": "1", "reason": "I want to cancel the order.", "writes": []},
+        {"id": "2", "reason": "hello", "writes": []},
+    ]}
+    split = census(refusals)
+    check("a task with no required write is a refusal task", split["refusingTasks"] == 2)
+    check("and a task with one is a writing task", split["writingTasks"] == 1)
+    check("a spare ask is charged to the refusal task that made it", split["spuriousOnRefusing"] == 1)
+    check("a writing task with nothing spare charges nothing", split["spuriousOnWriting"] == 0)
+    check("the split adds up to the whole", split["spuriousOnRefusing"] + split["spuriousOnWriting"] == split["spurious"])
+    check("a correct ask on a refusal task is still spare", split["found"] == 1 and split["recall"] == 1.0)
 
     # The pairing states, including the one only a real dispatch produces.
     moved_only = compare_of(arm({str(i): 0 for i in range(8)} | {str(i): 1 for i in range(8, 114)}),
@@ -2004,8 +2038,10 @@ def main(argv: list) -> int:
             print(
                 f"{reading['found']}/{reading['required']} required objects have an ask of their family "
                 f"({reading['recall']:.1%}); {reading['familyFound']}/{reading['familyRequired']} required families "
-                f"are mentioned ({reading['familyRecall']:.1%}); {reading['spurious']} spurious ask(s), "
-                f"precision {reading['precision']:.1%}, {reading['tasksCovered']}/{reading['tasks']} tasks fully covered"
+                f"are mentioned ({reading['familyRecall']:.1%}); {reading['spurious']} spare ask(s), "
+                f"{reading['spuriousOnRefusing']} of them on the {reading['refusingTasks']} task(s) whose correct "
+                f"outcome is no write (precision {reading['precision']:.1%} over every ask); "
+                f"{reading['tasksCovered']}/{reading['tasks']} tasks fully covered"
             )
             for family, bucket in sorted(reading["perFamily"].items()):
                 print(f"  {family:9s} {bucket['found']}/{bucket['required']} objects, {bucket['asks']} task(s)")

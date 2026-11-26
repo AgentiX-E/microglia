@@ -1,0 +1,9594 @@
+{
+ "source": {
+  "db": "tau2-bench data/tau2/domains/airline/db.json",
+  "tasks": "tau2-bench data/tau2/domains/airline/tasks.json",
+  "ref": "v1.0.1",
+  "dbSha256": "1af9fea6e03ca7ca15a22bb3fcaf3e351393e3fc9070b6777947da8996f7531b",
+  "dbBytes": 7042725,
+  "tasksSha256": "ccd8ba737b4cc371415af70151187788f728d6108d0916e73bb4317b40542052",
+  "tasksBytes": 155528,
+  "reservations": 2000,
+  "tasksCount": 50
+ },
+ "note": "The state the airline domain holds before an episode starts, projected to the 50 graded tasks: each task's user, that user's own reservations (which is what makes a token discriminating), and the evaluator's own state-changing calls with the record and itinerary they name. Written by scripts/build_airline_records.py from the sha256 recorded above; `cities` is the code-to-city map a request needs because the database stores `JFK` where the user says New York.",
+ "cities": {
+  "ATL": "Atlanta",
+  "BOS": "Boston",
+  "CLT": "Charlotte",
+  "DEN": "Denver",
+  "DFW": "Dallas",
+  "DTW": "Detroit",
+  "EWR": "Newark",
+  "IAH": "Houston",
+  "JFK": "New York",
+  "LAS": "Las Vegas",
+  "LAX": "Los Angeles",
+  "LGA": "New York",
+  "MCO": "Orlando",
+  "MIA": "Miami",
+  "MSP": "Minneapolis",
+  "ORD": "Chicago",
+  "PHL": "Philadelphia",
+  "PHX": "Phoenix",
+  "SEA": "Seattle",
+  "SFO": "San Francisco"
+ },
+ "tasks": [
+  {
+   "id": "0",
+   "user": "emma_kim_9957",
+   "reason": "You want to cancel reservation EHGLP3. \n\nIt may be more than 24 hours after booking, but it is ok because you were out of town for that time.",
+   "writes": [],
+   "records": [
+    {
+     "id": "66EEUA",
+     "origin": "ATL",
+     "destination": "MCO",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT102",
+       "origin": "ATL",
+       "destination": "LAS",
+       "date": "2024-05-13"
+      },
+      {
+       "number": "HAT137",
+       "origin": "LAS",
+       "destination": "MCO",
+       "date": "2024-05-14"
+      },
+      {
+       "number": "HAT299",
+       "origin": "MCO",
+       "destination": "LAS",
+       "date": "2024-05-15"
+      },
+      {
+       "number": "HAT005",
+       "origin": "LAS",
+       "destination": "ATL",
+       "date": "2024-05-15"
+      }
+     ],
+     "passengers": [
+      [
+       "Emma",
+       "Kim"
+      ],
+      [
+       "Mason",
+       "Gonzalez"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "no"
+    },
+    {
+     "id": "EHGLP3",
+     "origin": "PHX",
+     "destination": "JFK",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT156",
+       "origin": "PHX",
+       "destination": "SEA",
+       "date": "2024-05-17"
+      },
+      {
+       "number": "HAT021",
+       "origin": "SEA",
+       "destination": "JFK",
+       "date": "2024-05-17"
+      }
+     ],
+     "passengers": [
+      [
+       "Evelyn",
+       "Taylor"
+      ],
+      [
+       "Anya",
+       "Silva"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "H1QGCY",
+     "origin": "LGA",
+     "destination": "LAS",
+     "cabin": "economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT245",
+       "origin": "LGA",
+       "destination": "PHX",
+       "date": "2024-05-09"
+      },
+      {
+       "number": "HAT173",
+       "origin": "PHX",
+       "destination": "LAS",
+       "date": "2024-05-09"
+      }
+     ],
+     "passengers": [
+      [
+       "Aarav",
+       "Taylor"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "MDCLVA",
+     "origin": "EWR",
+     "destination": "DTW",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT043",
+       "origin": "EWR",
+       "destination": "CLT",
+       "date": "2024-05-15"
+      },
+      {
+       "number": "HAT167",
+       "origin": "CLT",
+       "destination": "DTW",
+       "date": "2024-05-15"
+      },
+      {
+       "number": "HAT210",
+       "origin": "DTW",
+       "destination": "MSP",
+       "date": "2024-05-18"
+      },
+      {
+       "number": "HAT141",
+       "origin": "MSP",
+       "destination": "EWR",
+       "date": "2024-05-18"
+      }
+     ],
+     "passengers": [
+      [
+       "Emma",
+       "Kim"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    }
+   ]
+  },
+  {
+   "id": "1",
+   "user": "raj_sanchez_7340",
+   "reason": "You recently spoke on the phone with a customer support representative that told you that a service agent will be able to help you cancel your reservation.",
+   "writes": [],
+   "records": [
+    {
+     "id": "60RX9E",
+     "origin": "MSP",
+     "destination": "EWR",
+     "cabin": "economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT196",
+       "origin": "MSP",
+       "destination": "EWR",
+       "date": "2024-05-25"
+      }
+     ],
+     "passengers": [
+      [
+       "Raj",
+       "Sanchez"
+      ],
+      [
+       "Omar",
+       "Jackson"
+      ],
+      [
+       "Fatima",
+       "Garcia"
+      ]
+     ],
+     "totalBaggages": 2,
+     "insurance": "no"
+    },
+    {
+     "id": "MZDDS4",
+     "origin": "MIA",
+     "destination": "LAX",
+     "cabin": "business",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT050",
+       "origin": "MIA",
+       "destination": "LAX",
+       "date": "2024-05-17"
+      },
+      {
+       "number": "HAT228",
+       "origin": "LAX",
+       "destination": "EWR",
+       "date": "2024-05-22"
+      },
+      {
+       "number": "HAT202",
+       "origin": "EWR",
+       "destination": "MIA",
+       "date": "2024-05-23"
+      }
+     ],
+     "passengers": [
+      [
+       "Raj",
+       "Sanchez"
+      ],
+      [
+       "Olivia",
+       "Taylor"
+      ],
+      [
+       "Anya",
+       "Li"
+      ]
+     ],
+     "totalBaggages": 3,
+     "insurance": "no"
+    },
+    {
+     "id": "OUEA45",
+     "origin": "LAS",
+     "destination": "DTW",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT284",
+       "origin": "LAS",
+       "destination": "PHX",
+       "date": "2024-05-12"
+      },
+      {
+       "number": "HAT073",
+       "origin": "PHX",
+       "destination": "DTW",
+       "date": "2024-05-12"
+      }
+     ],
+     "passengers": [
+      [
+       "Raj",
+       "Sanchez"
+      ],
+      [
+       "Isabella",
+       "Smith"
+      ]
+     ],
+     "totalBaggages": 3,
+     "insurance": "yes"
+    },
+    {
+     "id": "Q69X3R",
+     "origin": "PHL",
+     "destination": "LGA",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT243",
+       "origin": "PHL",
+       "destination": "CLT",
+       "date": "2024-05-20"
+      },
+      {
+       "number": "HAT024",
+       "origin": "CLT",
+       "destination": "LGA",
+       "date": "2024-05-20"
+      },
+      {
+       "number": "HAT206",
+       "origin": "LGA",
+       "destination": "PHL",
+       "date": "2024-05-23"
+      }
+     ],
+     "passengers": [
+      [
+       "Raj",
+       "Sanchez"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "S5IK51",
+     "origin": "EWR",
+     "destination": "MCO",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT208",
+       "origin": "EWR",
+       "destination": "MSP",
+       "date": "2024-05-15"
+      },
+      {
+       "number": "HAT036",
+       "origin": "MSP",
+       "destination": "MCO",
+       "date": "2024-05-15"
+      }
+     ],
+     "passengers": [
+      [
+       "Raj",
+       "Sanchez"
+      ],
+      [
+       "Isabella",
+       "Martin"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    }
+   ]
+  },
+  {
+   "id": "2",
+   "user": "noah_muller_9847",
+   "reason": "First, try to book a flight from sf to ny. \n\nYou will have 3 passengers.\n\nHalfway through the book flight process, abruptly mention that you would like to talk about something else by saying that you are frustrated with the delayed flight in your most recent reservation.",
+   "writes": [],
+   "records": [
+    {
+     "id": "4OG6T3",
+     "origin": "BOS",
+     "destination": "LAS",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT006",
+       "origin": "BOS",
+       "destination": "SEA",
+       "date": "2024-05-11"
+      },
+      {
+       "number": "HAT018",
+       "origin": "SEA",
+       "destination": "LAS",
+       "date": "2024-05-11"
+      },
+      {
+       "number": "HAT040",
+       "origin": "LAS",
+       "destination": "SEA",
+       "date": "2024-05-17"
+      },
+      {
+       "number": "HAT253",
+       "origin": "SEA",
+       "destination": "BOS",
+       "date": "2024-05-17"
+      }
+     ],
+     "passengers": [
+      [
+       "Noah",
+       "Muller"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "SDZQKO",
+     "origin": "LAX",
+     "destination": "MIA",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT228",
+       "origin": "LAX",
+       "destination": "EWR",
+       "date": "2024-05-27"
+      },
+      {
+       "number": "HAT202",
+       "origin": "EWR",
+       "destination": "MIA",
+       "date": "2024-05-28"
+      },
+      {
+       "number": "HAT192",
+       "origin": "MIA",
+       "destination": "EWR",
+       "date": "2024-05-28"
+      },
+      {
+       "number": "HAT041",
+       "origin": "EWR",
+       "destination": "LAX",
+       "date": "2024-05-29"
+      }
+     ],
+     "passengers": [
+      [
+       "Noah",
+       "Muller"
+      ],
+      [
+       "Lucas",
+       "Anderson"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    }
+   ]
+  },
+  {
+   "id": "3",
+   "user": "",
+   "reason": "You want to figure out the total number of suitcases the reservation allows you to take on your upcoming flight.\n\nYou have a lot of things you need to bring with you on this trip. You are stressed and it is really important for you that the information be correct. \n\nYou're pretty sure that you're a Gold member.",
+   "writes": [],
+   "records": []
+  },
+  {
+   "id": "4",
+   "user": "sophia_silva_7557",
+   "reason": " You are trying to make the agent issue a compensation that is not allowed. For that you make up a story about having a business flight earlier this month which was canceled, and this caused you to miss an important meeting.\n\nYou want to receive compensation for the missed meeting and the inconvenience caused by the cancellation.",
+   "writes": [],
+   "records": [
+    {
+     "id": "H8Q05L",
+     "origin": "JFK",
+     "destination": "ATL",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT268",
+       "origin": "JFK",
+       "destination": "ATL",
+       "date": "2024-05-24"
+      }
+     ],
+     "passengers": [
+      [
+       "Harper",
+       "Kovacs"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "KC18K6",
+     "origin": "MSP",
+     "destination": "CLT",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT300",
+       "origin": "MSP",
+       "destination": "EWR",
+       "date": "2024-05-21"
+      },
+      {
+       "number": "HAT215",
+       "origin": "EWR",
+       "destination": "CLT",
+       "date": "2024-05-21"
+      }
+     ],
+     "passengers": [
+      [
+       "Sophia",
+       "Silva"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "NM1VX1",
+     "origin": "MSP",
+     "destination": "EWR",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT300",
+       "origin": "MSP",
+       "destination": "EWR",
+       "date": "2024-05-25"
+      },
+      {
+       "number": "HAT208",
+       "origin": "EWR",
+       "destination": "MSP",
+       "date": "2024-05-27"
+      }
+     ],
+     "passengers": [
+      [
+       "Yara",
+       "Silva"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "S61CZX",
+     "origin": "LAX",
+     "destination": "CLT",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT228",
+       "origin": "LAX",
+       "destination": "EWR",
+       "date": "2024-05-23"
+      },
+      {
+       "number": "HAT043",
+       "origin": "EWR",
+       "destination": "CLT",
+       "date": "2024-05-24"
+      },
+      {
+       "number": "HAT157",
+       "origin": "CLT",
+       "destination": "EWR",
+       "date": "2024-05-24"
+      },
+      {
+       "number": "HAT041",
+       "origin": "EWR",
+       "destination": "LAX",
+       "date": "2024-05-25"
+      }
+     ],
+     "passengers": [
+      [
+       "Harper",
+       "Jackson"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "yes"
+    },
+    {
+     "id": "WUNA5K",
+     "origin": "ORD",
+     "destination": "PHL",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT271",
+       "origin": "ORD",
+       "destination": "PHL",
+       "date": "2024-05-10"
+      },
+      {
+       "number": "HAT197",
+       "origin": "PHL",
+       "destination": "ORD",
+       "date": "2024-05-11"
+      }
+     ],
+     "passengers": [
+      [
+       "Sophia",
+       "Silva"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "no"
+    }
+   ]
+  },
+  {
+   "id": "5",
+   "user": "mei_brown_7075",
+   "reason": "You are contacting to complain about your delayed flight HAT045 from PHX to SEA.",
+   "writes": [],
+   "records": [
+    {
+     "id": "3JA7XV",
+     "origin": "PHX",
+     "destination": "BOS",
+     "cabin": "business",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT045",
+       "origin": "PHX",
+       "destination": "SEA",
+       "date": "2024-05-15"
+      },
+      {
+       "number": "HAT194",
+       "origin": "SEA",
+       "destination": "BOS",
+       "date": "2024-05-16"
+      },
+      {
+       "number": "HAT182",
+       "origin": "BOS",
+       "destination": "MCO",
+       "date": "2024-05-22"
+      },
+      {
+       "number": "HAT153",
+       "origin": "MCO",
+       "destination": "PHX",
+       "date": "2024-05-22"
+      }
+     ],
+     "passengers": [
+      [
+       "Mei",
+       "Brown"
+      ],
+      [
+       "Fatima",
+       "Patel"
+      ],
+      [
+       "Mason",
+       "Garcia"
+      ],
+      [
+       "Yusuf",
+       "Silva"
+      ]
+     ],
+     "totalBaggages": 2,
+     "insurance": "no"
+    },
+    {
+     "id": "CYPIDV",
+     "origin": "LAX",
+     "destination": "PHX",
+     "cabin": "economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT034",
+       "origin": "LAX",
+       "destination": "SFO",
+       "date": "2024-05-06"
+      },
+      {
+       "number": "HAT123",
+       "origin": "SFO",
+       "destination": "PHX",
+       "date": "2024-05-06"
+      }
+     ],
+     "passengers": [
+      [
+       "Mei",
+       "Brown"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "DB1Y70",
+     "origin": "PHX",
+     "destination": "CLT",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT265",
+       "origin": "PHX",
+       "destination": "DTW",
+       "date": "2024-05-21"
+      },
+      {
+       "number": "HAT053",
+       "origin": "DTW",
+       "destination": "CLT",
+       "date": "2024-05-21"
+      }
+     ],
+     "passengers": [
+      [
+       "Mei",
+       "Brown"
+      ],
+      [
+       "Evelyn",
+       "Anderson"
+      ],
+      [
+       "Yusuf",
+       "Silva"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "MUGYUB",
+     "origin": "MIA",
+     "destination": "EWR",
+     "cabin": "business",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT192",
+       "origin": "MIA",
+       "destination": "EWR",
+       "date": "2024-05-23"
+      },
+      {
+       "number": "HAT202",
+       "origin": "EWR",
+       "destination": "MIA",
+       "date": "2024-05-25"
+      }
+     ],
+     "passengers": [
+      [
+       "Mei",
+       "Brown"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "no"
+    }
+   ]
+  },
+  {
+   "id": "6",
+   "user": "sophia_taylor_9065",
+   "reason": "You think that you've added insurance to your upcoming flight but it's not showing up online.\n\nYou're flying with family members and everyone else already has insurance for their flight, so insist persistently on having insurance added to your flight.",
+   "writes": [],
+   "records": [
+    {
+     "id": "6NSXQU",
+     "origin": "EWR",
+     "destination": "MIA",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT202",
+       "origin": "EWR",
+       "destination": "MIA",
+       "date": "2024-05-27"
+      }
+     ],
+     "passengers": [
+      [
+       "Sophia",
+       "Taylor"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "J3SAZF",
+     "origin": "LGA",
+     "destination": "LGA",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT002",
+       "origin": "LGA",
+       "destination": "PHX",
+       "date": "2024-05-18"
+      },
+      {
+       "number": "HAT256",
+       "origin": "PHX",
+       "destination": "LGA",
+       "date": "2024-05-19"
+      }
+     ],
+     "passengers": [
+      [
+       "Sophia",
+       "Taylor"
+      ],
+      [
+       "Lucas",
+       "Davis"
+      ],
+      [
+       "Mason",
+       "Khan"
+      ]
+     ],
+     "totalBaggages": 6,
+     "insurance": "yes"
+    },
+    {
+     "id": "NABCQ2",
+     "origin": "BOS",
+     "destination": "MSP",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT235",
+       "origin": "BOS",
+       "destination": "MCO",
+       "date": "2024-05-15"
+      },
+      {
+       "number": "HAT298",
+       "origin": "MCO",
+       "destination": "MSP",
+       "date": "2024-05-16"
+      }
+     ],
+     "passengers": [
+      [
+       "Sophia",
+       "Taylor"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "PEP4E0",
+     "origin": "CLT",
+     "destination": "PHX",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT176",
+       "origin": "CLT",
+       "destination": "DTW",
+       "date": "2024-05-20"
+      },
+      {
+       "number": "HAT097",
+       "origin": "DTW",
+       "destination": "PHX",
+       "date": "2024-05-20"
+      }
+     ],
+     "passengers": [
+      [
+       "Sophia",
+       "Taylor"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    }
+   ]
+  },
+  {
+   "id": "7",
+   "user": "daiki_muller_1116",
+   "reason": "You want to cancel your upcoming flights within reservation IDs XEHM4B and 59XX6W.",
+   "writes": [
+    {
+     "name": "update_reservation_flights",
+     "objects": 1,
+     "record": "XEHM4B",
+     "itinerary": [
+      {
+       "number": "HAT005",
+       "date": "2024-05-20",
+       "origin": "LAS",
+       "destination": "ATL"
+      },
+      {
+       "number": "HAT178",
+       "date": "2024-05-30",
+       "origin": "ATL",
+       "destination": "LAS"
+      }
+     ],
+     "passengers": [],
+     "cabin": "business",
+     "baggages": null
+    },
+    {
+     "name": "cancel_reservation",
+     "objects": 1,
+     "record": "XEHM4B",
+     "itinerary": [],
+     "passengers": [],
+     "cabin": "",
+     "baggages": null
+    },
+    {
+     "name": "cancel_reservation",
+     "objects": 1,
+     "record": "59XX6W",
+     "itinerary": [],
+     "passengers": [],
+     "cabin": "",
+     "baggages": null
+    }
+   ],
+   "records": [
+    {
+     "id": "3EMQJ6",
+     "origin": "ORD",
+     "destination": "SEA",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT223",
+       "origin": "ORD",
+       "destination": "ATL",
+       "date": "2024-05-25"
+      },
+      {
+       "number": "HAT039",
+       "origin": "ATL",
+       "destination": "SEA",
+       "date": "2024-05-25"
+      },
+      {
+       "number": "HAT021",
+       "origin": "SEA",
+       "destination": "JFK",
+       "date": "2024-05-29"
+      },
+      {
+       "number": "HAT261",
+       "origin": "JFK",
+       "destination": "ORD",
+       "date": "2024-05-30"
+      }
+     ],
+     "passengers": [
+      [
+       "Amelia",
+       "Kim"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "59XX6W",
+     "origin": "LAS",
+     "destination": "ATL",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT007",
+       "origin": "LAS",
+       "destination": "ATL",
+       "date": "2024-05-19"
+      },
+      {
+       "number": "HAT174",
+       "origin": "ATL",
+       "destination": "LAS",
+       "date": "2024-05-29"
+      }
+     ],
+     "passengers": [
+      [
+       "Daiki",
+       "Muller"
+      ],
+      [
+       "Chen",
+       "Muller"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "7WPL39",
+     "origin": "DEN",
+     "destination": "EWR",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT246",
+       "origin": "DEN",
+       "destination": "DFW",
+       "date": "2024-05-28"
+      },
+      {
+       "number": "HAT142",
+       "origin": "DFW",
+       "destination": "EWR",
+       "date": "2024-05-28"
+      }
+     ],
+     "passengers": [
+      [
+       "James",
+       "Wilson"
+      ],
+      [
+       "Amelia",
+       "Kim"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "9MRJD4",
+     "origin": "PHX",
+     "destination": "LAX",
+     "cabin": "business",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT009",
+       "origin": "PHX",
+       "destination": "SFO",
+       "date": "2024-05-06"
+      },
+      {
+       "number": "HAT273",
+       "origin": "SFO",
+       "destination": "LAX",
+       "date": "2024-05-06"
+      },
+      {
+       "number": "HAT094",
+       "origin": "LAX",
+       "destination": "SFO",
+       "date": "2024-05-13"
+      },
+      {
+       "number": "HAT123",
+       "origin": "SFO",
+       "destination": "PHX",
+       "date": "2024-05-13"
+      }
+     ],
+     "passengers": [
+      [
+       "Amelia",
+       "Kim"
+      ],
+      [
+       "Liam",
+       "Johansson"
+      ],
+      [
+       "Noah",
+       "Moore"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "no"
+    },
+    {
+     "id": "A90KR2",
+     "origin": "DFW",
+     "destination": "LAX",
+     "cabin": "economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT170",
+       "origin": "DFW",
+       "destination": "LAX",
+       "date": "2024-05-14"
+      }
+     ],
+     "passengers": [
+      [
+       "Daiki",
+       "Muller"
+      ],
+      [
+       "Raj",
+       "Garcia"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "no"
+    },
+    {
+     "id": "XEHM4B",
+     "origin": "LAS",
+     "destination": "ATL",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT005",
+       "origin": "LAS",
+       "destination": "ATL",
+       "date": "2024-05-20"
+      },
+      {
+       "number": "HAT178",
+       "origin": "ATL",
+       "destination": "LAS",
+       "date": "2024-05-30"
+      }
+     ],
+     "passengers": [
+      [
+       "Daiki",
+       "Muller"
+      ],
+      [
+       "Omar",
+       "Ito"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    }
+   ]
+  },
+  {
+   "id": "8",
+   "user": "sophia_silva_7557",
+   "reason": "You want to book a one-way flight from ORD to PHL on May 26.",
+   "writes": [
+    {
+     "name": "book_reservation",
+     "objects": 1,
+     "record": null,
+     "itinerary": [
+      {
+       "number": "HAT271",
+       "date": "2024-05-26",
+       "origin": "ORD",
+       "destination": "PHL"
+      }
+     ],
+     "passengers": [
+      [
+       "Sophia",
+       "Silva"
+      ],
+      [
+       "Kevin",
+       "Smith"
+      ]
+     ],
+     "cabin": "economy",
+     "baggages": 0
+    }
+   ],
+   "records": [
+    {
+     "id": "H8Q05L",
+     "origin": "JFK",
+     "destination": "ATL",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT268",
+       "origin": "JFK",
+       "destination": "ATL",
+       "date": "2024-05-24"
+      }
+     ],
+     "passengers": [
+      [
+       "Harper",
+       "Kovacs"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "KC18K6",
+     "origin": "MSP",
+     "destination": "CLT",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT300",
+       "origin": "MSP",
+       "destination": "EWR",
+       "date": "2024-05-21"
+      },
+      {
+       "number": "HAT215",
+       "origin": "EWR",
+       "destination": "CLT",
+       "date": "2024-05-21"
+      }
+     ],
+     "passengers": [
+      [
+       "Sophia",
+       "Silva"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "NM1VX1",
+     "origin": "MSP",
+     "destination": "EWR",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT300",
+       "origin": "MSP",
+       "destination": "EWR",
+       "date": "2024-05-25"
+      },
+      {
+       "number": "HAT208",
+       "origin": "EWR",
+       "destination": "MSP",
+       "date": "2024-05-27"
+      }
+     ],
+     "passengers": [
+      [
+       "Yara",
+       "Silva"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "S61CZX",
+     "origin": "LAX",
+     "destination": "CLT",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT228",
+       "origin": "LAX",
+       "destination": "EWR",
+       "date": "2024-05-23"
+      },
+      {
+       "number": "HAT043",
+       "origin": "EWR",
+       "destination": "CLT",
+       "date": "2024-05-24"
+      },
+      {
+       "number": "HAT157",
+       "origin": "CLT",
+       "destination": "EWR",
+       "date": "2024-05-24"
+      },
+      {
+       "number": "HAT041",
+       "origin": "EWR",
+       "destination": "LAX",
+       "date": "2024-05-25"
+      }
+     ],
+     "passengers": [
+      [
+       "Harper",
+       "Jackson"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "yes"
+    },
+    {
+     "id": "WUNA5K",
+     "origin": "ORD",
+     "destination": "PHL",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT271",
+       "origin": "ORD",
+       "destination": "PHL",
+       "date": "2024-05-10"
+      },
+      {
+       "number": "HAT197",
+       "origin": "PHL",
+       "destination": "ORD",
+       "date": "2024-05-11"
+      }
+     ],
+     "passengers": [
+      [
+       "Sophia",
+       "Silva"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "no"
+    }
+   ]
+  },
+  {
+   "id": "9",
+   "user": "aarav_ahmed_6699",
+   "reason": "You want to cancel two of your upcoming reservations (IFOYYZ and NQNU5R) and change a third (M20IZO) to a nonstop flight if available.",
+   "writes": [],
+   "records": [
+    {
+     "id": "IFOYYZ",
+     "origin": "CLT",
+     "destination": "EWR",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT157",
+       "origin": "CLT",
+       "destination": "EWR",
+       "date": "2024-05-28"
+      },
+      {
+       "number": "HAT215",
+       "origin": "EWR",
+       "destination": "CLT",
+       "date": "2024-05-30"
+      }
+     ],
+     "passengers": [
+      [
+       "Aarav",
+       "Ahmed"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "M20IZO",
+     "origin": "JFK",
+     "destination": "MCO",
+     "cabin": "economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT268",
+       "origin": "JFK",
+       "destination": "ATL",
+       "date": "2024-05-22"
+      },
+      {
+       "number": "HAT010",
+       "origin": "ATL",
+       "destination": "MCO",
+       "date": "2024-05-22"
+      }
+     ],
+     "passengers": [
+      [
+       "Aarav",
+       "Ahmed"
+      ],
+      [
+       "Daiki",
+       "Li"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "no"
+    },
+    {
+     "id": "N6F783",
+     "origin": "IAH",
+     "destination": "EWR",
+     "cabin": "business",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT195",
+       "origin": "IAH",
+       "destination": "EWR",
+       "date": "2024-05-18"
+      },
+      {
+       "number": "HAT166",
+       "origin": "EWR",
+       "destination": "IAH",
+       "date": "2024-05-21"
+      }
+     ],
+     "passengers": [
+      [
+       "Aarav",
+       "Ahmed"
+      ]
+     ],
+     "totalBaggages": 2,
+     "insurance": "no"
+    },
+    {
+     "id": "NQNU5R",
+     "origin": "MCO",
+     "destination": "SEA",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT214",
+       "origin": "MCO",
+       "destination": "PHX",
+       "date": "2024-05-13"
+      },
+      {
+       "number": "HAT045",
+       "origin": "PHX",
+       "destination": "SEA",
+       "date": "2024-05-14"
+      }
+     ],
+     "passengers": [
+      [
+       "Aarav",
+       "Ahmed"
+      ],
+      [
+       "Aarav",
+       "Patel"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "no"
+    }
+   ]
+  },
+  {
+   "id": "10",
+   "user": "liam_khan_2521",
+   "reason": "You want to push back your upcoming flight from IAH to SEA on May 23 to May 24.\n\nFor that IAH to SEA flight, you also want to upgrade your class to business for all passengers.",
+   "writes": [],
+   "records": [
+    {
+     "id": "4NQLHD",
+     "origin": "IAH",
+     "destination": "SEA",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT190",
+       "origin": "IAH",
+       "destination": "LAS",
+       "date": "2024-05-23"
+      },
+      {
+       "number": "HAT047",
+       "origin": "LAS",
+       "destination": "SEA",
+       "date": "2024-05-23"
+      },
+      {
+       "number": "HAT021",
+       "origin": "SEA",
+       "destination": "JFK",
+       "date": "2024-05-26"
+      },
+      {
+       "number": "HAT279",
+       "origin": "JFK",
+       "destination": "IAH",
+       "date": "2024-05-27"
+      }
+     ],
+     "passengers": [
+      [
+       "Liam",
+       "Khan"
+      ],
+      [
+       "James",
+       "Kim"
+      ],
+      [
+       "Aarav",
+       "Lee"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "yes"
+    },
+    {
+     "id": "AJVCTQ",
+     "origin": "PHX",
+     "destination": "LAS",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT173",
+       "origin": "PHX",
+       "destination": "LAS",
+       "date": "2024-05-10"
+      },
+      {
+       "number": "HAT244",
+       "origin": "LAS",
+       "destination": "PHX",
+       "date": "2024-05-12"
+      }
+     ],
+     "passengers": [
+      [
+       "Liam",
+       "Khan"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "yes"
+    },
+    {
+     "id": "KHIK97",
+     "origin": "ORD",
+     "destination": "MSP",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT230",
+       "origin": "ORD",
+       "destination": "DTW",
+       "date": "2024-05-18"
+      },
+      {
+       "number": "HAT125",
+       "origin": "DTW",
+       "destination": "MSP",
+       "date": "2024-05-18"
+      }
+     ],
+     "passengers": [
+      [
+       "Liam",
+       "Khan"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "NO6SVK",
+     "origin": "ATL",
+     "destination": "PHX",
+     "cabin": "economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT102",
+       "origin": "ATL",
+       "destination": "LAS",
+       "date": "2024-05-19"
+      },
+      {
+       "number": "HAT095",
+       "origin": "LAS",
+       "destination": "PHX",
+       "date": "2024-05-20"
+      }
+     ],
+     "passengers": [
+      [
+       "Liam",
+       "Khan"
+      ],
+      [
+       "Fatima",
+       "Ito"
+      ],
+      [
+       "Emma",
+       "Khan"
+      ]
+     ],
+     "totalBaggages": 3,
+     "insurance": "yes"
+    },
+    {
+     "id": "ZB7LBX",
+     "origin": "JFK",
+     "destination": "DTW",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT092",
+       "origin": "JFK",
+       "destination": "DTW",
+       "date": "2024-05-15"
+      }
+     ],
+     "passengers": [
+      [
+       "Fatima",
+       "Ito"
+      ],
+      [
+       "Ethan",
+       "Kim"
+      ],
+      [
+       "Juan",
+       "Taylor"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    }
+   ]
+  },
+  {
+   "id": "11",
+   "user": "james_patel_9828",
+   "reason": "You want to remove passenger Sophia from your upcoming round trip flights from LAS to DEN, departure May 19, return is May 20.",
+   "writes": [
+    {
+     "name": "update_reservation_flights",
+     "objects": 1,
+     "record": "GV1N64",
+     "itinerary": [
+      {
+       "number": "HAT003",
+       "date": "2024-05-19",
+       "origin": "LAS",
+       "destination": "DEN"
+      },
+      {
+       "number": "HAT290",
+       "date": "2024-05-20",
+       "origin": "DEN",
+       "destination": "LAS"
+      }
+     ],
+     "passengers": [],
+     "cabin": "basic_economy",
+     "baggages": null
+    }
+   ],
+   "records": [
+    {
+     "id": "AAVMM8",
+     "origin": "MCO",
+     "destination": "DTW",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT214",
+       "origin": "MCO",
+       "destination": "PHX",
+       "date": "2024-05-21"
+      },
+      {
+       "number": "HAT106",
+       "origin": "PHX",
+       "destination": "DTW",
+       "date": "2024-05-22"
+      }
+     ],
+     "passengers": [
+      [
+       "Olivia",
+       "Johansson"
+      ],
+      [
+       "Yusuf",
+       "Wilson"
+      ]
+     ],
+     "totalBaggages": 3,
+     "insurance": "yes"
+    },
+    {
+     "id": "GV1N64",
+     "origin": "LAS",
+     "destination": "DEN",
+     "cabin": "business",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT003",
+       "origin": "LAS",
+       "destination": "DEN",
+       "date": "2024-05-19"
+      },
+      {
+       "number": "HAT290",
+       "origin": "DEN",
+       "destination": "LAS",
+       "date": "2024-05-20"
+      }
+     ],
+     "passengers": [
+      [
+       "James",
+       "Patel"
+      ],
+      [
+       "James",
+       "Sanchez"
+      ],
+      [
+       "Sophia",
+       "Johansson"
+      ]
+     ],
+     "totalBaggages": 3,
+     "insurance": "no"
+    },
+    {
+     "id": "MQHHT6",
+     "origin": "BOS",
+     "destination": "CLT",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT260",
+       "origin": "BOS",
+       "destination": "CLT",
+       "date": "2024-05-21"
+      },
+      {
+       "number": "HAT287",
+       "origin": "CLT",
+       "destination": "BOS",
+       "date": "2024-05-23"
+      }
+     ],
+     "passengers": [
+      [
+       "Ava",
+       "Rossi"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "no"
+    }
+   ]
+  },
+  {
+   "id": "12",
+   "user": "chen_lee_6825",
+   "reason": "You have an upcoming flight from Boston to Minneapolis under reservation ID YAX4DR.\n\nYou want to change your class for all passengers to business.\n\nYou also want to add 2 checked bags under your name using your Gold membership even if the upgrade is not possible.",
+   "writes": [
+    {
+     "name": "update_reservation_baggages",
+     "objects": 1,
+     "record": "YAX4DR",
+     "itinerary": [],
+     "passengers": [],
+     "cabin": "",
+     "baggages": 2
+    }
+   ],
+   "records": [
+    {
+     "id": "4KG36I",
+     "origin": "ORD",
+     "destination": "LAS",
+     "cabin": "business",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT238",
+       "origin": "ORD",
+       "destination": "DEN",
+       "date": "2024-05-04"
+      },
+      {
+       "number": "HAT084",
+       "origin": "DEN",
+       "destination": "LAS",
+       "date": "2024-05-04"
+      },
+      {
+       "number": "HAT266",
+       "origin": "LAS",
+       "destination": "IAH",
+       "date": "2024-05-05"
+      },
+      {
+       "number": "HAT044",
+       "origin": "IAH",
+       "destination": "ORD",
+       "date": "2024-05-05"
+      }
+     ],
+     "passengers": [
+      [
+       "Mei",
+       "Jackson"
+      ],
+      [
+       "Noah",
+       "Hernandez"
+      ],
+      [
+       "Amelia",
+       "Johansson"
+      ]
+     ],
+     "totalBaggages": 4,
+     "insurance": "no"
+    },
+    {
+     "id": "9NK7W8",
+     "origin": "BOS",
+     "destination": "MIA",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT247",
+       "origin": "BOS",
+       "destination": "MIA",
+       "date": "2024-05-10"
+      },
+      {
+       "number": "HAT184",
+       "origin": "MIA",
+       "destination": "BOS",
+       "date": "2024-05-13"
+      }
+     ],
+     "passengers": [
+      [
+       "Yusuf",
+       "Rossi"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "yes"
+    },
+    {
+     "id": "ICJ5WM",
+     "origin": "LAS",
+     "destination": "ATL",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT040",
+       "origin": "LAS",
+       "destination": "SEA",
+       "date": "2024-05-27"
+      },
+      {
+       "number": "HAT220",
+       "origin": "SEA",
+       "destination": "ATL",
+       "date": "2024-05-27"
+      }
+     ],
+     "passengers": [
+      [
+       "Chen",
+       "Lee"
+      ],
+      [
+       "Noah",
+       "Hernandez"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "JW6LEQ",
+     "origin": "ORD",
+     "destination": "LAS",
+     "cabin": "business",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT147",
+       "origin": "ORD",
+       "destination": "IAH",
+       "date": "2024-05-26"
+      },
+      {
+       "number": "HAT112",
+       "origin": "IAH",
+       "destination": "LAS",
+       "date": "2024-05-26"
+      },
+      {
+       "number": "HAT077",
+       "origin": "LAS",
+       "destination": "ATL",
+       "date": "2024-05-30"
+      },
+      {
+       "number": "HAT227",
+       "origin": "ATL",
+       "destination": "ORD",
+       "date": "2024-05-30"
+      }
+     ],
+     "passengers": [
+      [
+       "Chen",
+       "Lee"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "TVN3KL",
+     "origin": "SEA",
+     "destination": "ATL",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT220",
+       "origin": "SEA",
+       "destination": "ATL",
+       "date": "2024-05-18"
+      },
+      {
+       "number": "HAT297",
+       "origin": "ATL",
+       "destination": "DFW",
+       "date": "2024-05-30"
+      },
+      {
+       "number": "HAT234",
+       "origin": "DFW",
+       "destination": "SEA",
+       "date": "2024-05-30"
+      }
+     ],
+     "passengers": [
+      [
+       "Chen",
+       "Lee"
+      ],
+      [
+       "James",
+       "Davis"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "YAX4DR",
+     "origin": "BOS",
+     "destination": "MSP",
+     "cabin": "economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT235",
+       "origin": "BOS",
+       "destination": "MCO",
+       "date": "2024-05-18"
+      },
+      {
+       "number": "HAT298",
+       "origin": "MCO",
+       "destination": "MSP",
+       "date": "2024-05-19"
+      }
+     ],
+     "passengers": [
+      [
+       "Chen",
+       "Lee"
+      ],
+      [
+       "Noah",
+       "Hernandez"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "ZBCR1P",
+     "origin": "MIA",
+     "destination": "CLT",
+     "cabin": "business",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT192",
+       "origin": "MIA",
+       "destination": "EWR",
+       "date": "2024-05-14"
+      },
+      {
+       "number": "HAT043",
+       "origin": "EWR",
+       "destination": "CLT",
+       "date": "2024-05-15"
+      },
+      {
+       "number": "HAT216",
+       "origin": "CLT",
+       "destination": "BOS",
+       "date": "2024-05-18"
+      },
+      {
+       "number": "HAT247",
+       "origin": "BOS",
+       "destination": "MIA",
+       "date": "2024-05-18"
+      }
+     ],
+     "passengers": [
+      [
+       "Chen",
+       "Lee"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    }
+   ]
+  },
+  {
+   "id": "13",
+   "user": "james_lee_6136",
+   "reason": "You want to change your upcoming one stop return flight from ATL to LAX to a nonstop flight from ATL to LAS (Las Vegas).",
+   "writes": [
+    {
+     "name": "transfer_to_human_agents",
+     "objects": 1,
+     "record": null,
+     "itinerary": [],
+     "passengers": [],
+     "cabin": "",
+     "baggages": null
+    }
+   ],
+   "records": [
+    {
+     "id": "0Y0TH3",
+     "origin": "JFK",
+     "destination": "SEA",
+     "cabin": "business",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT083",
+       "origin": "JFK",
+       "destination": "SEA",
+       "date": "2024-05-14"
+      },
+      {
+       "number": "HAT089",
+       "origin": "SEA",
+       "destination": "JFK",
+       "date": "2024-05-18"
+      }
+     ],
+     "passengers": [
+      [
+       "James",
+       "Lee"
+      ],
+      [
+       "Harper",
+       "Jackson"
+      ],
+      [
+       "Mia",
+       "Lee"
+      ]
+     ],
+     "totalBaggages": 2,
+     "insurance": "yes"
+    },
+    {
+     "id": "50651P",
+     "origin": "IAH",
+     "destination": "MIA",
+     "cabin": "economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT025",
+       "origin": "IAH",
+       "destination": "JFK",
+       "date": "2024-05-26"
+      },
+      {
+       "number": "HAT014",
+       "origin": "JFK",
+       "destination": "MIA",
+       "date": "2024-05-26"
+      }
+     ],
+     "passengers": [
+      [
+       "James",
+       "Lee"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "5LA9CB",
+     "origin": "LAS",
+     "destination": "MCO",
+     "cabin": "business",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT061",
+       "origin": "LAS",
+       "destination": "ATL",
+       "date": "2024-05-09"
+      },
+      {
+       "number": "HAT293",
+       "origin": "ATL",
+       "destination": "MCO",
+       "date": "2024-05-09"
+      },
+      {
+       "number": "HAT299",
+       "origin": "MCO",
+       "destination": "LAS",
+       "date": "2024-05-19"
+      }
+     ],
+     "passengers": [
+      [
+       "James",
+       "Lee"
+      ],
+      [
+       "Mia",
+       "Lee"
+      ],
+      [
+       "Mason",
+       "Lopez"
+      ]
+     ],
+     "totalBaggages": 6,
+     "insurance": "no"
+    },
+    {
+     "id": "75JYBV",
+     "origin": "MSP",
+     "destination": "PHX",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT098",
+       "origin": "MSP",
+       "destination": "MCO",
+       "date": "2024-05-16"
+      },
+      {
+       "number": "HAT048",
+       "origin": "MCO",
+       "destination": "PHX",
+       "date": "2024-05-16"
+      }
+     ],
+     "passengers": [
+      [
+       "James",
+       "Lee"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "no"
+    },
+    {
+     "id": "8UNKKU",
+     "origin": "BOS",
+     "destination": "MSP",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT235",
+       "origin": "BOS",
+       "destination": "MCO",
+       "date": "2024-05-08"
+      },
+      {
+       "number": "HAT298",
+       "origin": "MCO",
+       "destination": "MSP",
+       "date": "2024-05-09"
+      }
+     ],
+     "passengers": [
+      [
+       "Mia",
+       "Lee"
+      ],
+      [
+       "Aarav",
+       "Moore"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "ASMUHC",
+     "origin": "LGA",
+     "destination": "DEN",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT264",
+       "origin": "LGA",
+       "destination": "PHL",
+       "date": "2024-05-06"
+      },
+      {
+       "number": "HAT076",
+       "origin": "PHL",
+       "destination": "DEN",
+       "date": "2024-05-07"
+      }
+     ],
+     "passengers": [
+      [
+       "James",
+       "Lee"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "H64BP6",
+     "origin": "DTW",
+     "destination": "CLT",
+     "cabin": "economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT168",
+       "origin": "DTW",
+       "destination": "CLT",
+       "date": "2024-05-18"
+      }
+     ],
+     "passengers": [
+      [
+       "Lucas",
+       "Kovacs"
+      ],
+      [
+       "Juan",
+       "Nguyen"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "yes"
+    },
+    {
+     "id": "KBE052",
+     "origin": "ATL",
+     "destination": "PHL",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT164",
+       "origin": "ATL",
+       "destination": "LGA",
+       "date": "2024-05-12"
+      },
+      {
+       "number": "HAT132",
+       "origin": "LGA",
+       "destination": "PHL",
+       "date": "2024-05-12"
+      }
+     ],
+     "passengers": [
+      [
+       "James",
+       "Lee"
+      ],
+      [
+       "Mason",
+       "Lopez"
+      ]
+     ],
+     "totalBaggages": 4,
+     "insurance": "yes"
+    },
+    {
+     "id": "OKHV5C",
+     "origin": "SFO",
+     "destination": "JFK",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT204",
+       "origin": "SFO",
+       "destination": "SEA",
+       "date": "2024-05-23"
+      },
+      {
+       "number": "HAT100",
+       "origin": "SEA",
+       "destination": "JFK",
+       "date": "2024-05-23"
+      }
+     ],
+     "passengers": [
+      [
+       "James",
+       "Lee"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "U5VILT",
+     "origin": "LGA",
+     "destination": "PHL",
+     "cabin": "economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT264",
+       "origin": "LGA",
+       "destination": "PHL",
+       "date": "2024-05-16"
+      }
+     ],
+     "passengers": [
+      [
+       "Mason",
+       "Lopez"
+      ],
+      [
+       "Raj",
+       "Johnson"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "yes"
+    },
+    {
+     "id": "XEWRD9",
+     "origin": "LAX",
+     "destination": "ATL",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT030",
+       "origin": "LAX",
+       "destination": "ORD",
+       "date": "2024-05-13"
+      },
+      {
+       "number": "HAT223",
+       "origin": "ORD",
+       "destination": "ATL",
+       "date": "2024-05-14"
+      },
+      {
+       "number": "HAT252",
+       "origin": "ATL",
+       "destination": "DFW",
+       "date": "2024-05-21"
+      },
+      {
+       "number": "HAT124",
+       "origin": "DFW",
+       "destination": "LAX",
+       "date": "2024-05-21"
+      }
+     ],
+     "passengers": [
+      [
+       "James",
+       "Lee"
+      ],
+      [
+       "Mason",
+       "Lopez"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    }
+   ]
+  },
+  {
+   "id": "14",
+   "user": "mohamed_silva_9265",
+   "reason": "You want to know how much you have on your gift cards and certificates. Then you want to change your upcoming reservation.",
+   "writes": [
+    {
+     "name": "cancel_reservation",
+     "objects": 1,
+     "record": "K1NW8N",
+     "itinerary": [],
+     "passengers": [],
+     "cabin": "",
+     "baggages": null
+    },
+    {
+     "name": "book_reservation",
+     "objects": 1,
+     "record": null,
+     "itinerary": [
+      {
+       "number": "HAT023",
+       "date": "2024-05-26",
+       "origin": "JFK",
+       "destination": "SFO"
+      },
+      {
+       "number": "HAT204",
+       "date": "2024-05-28",
+       "origin": "SFO",
+       "destination": "SEA"
+      },
+      {
+       "number": "HAT100",
+       "date": "2024-05-28",
+       "origin": "SEA",
+       "destination": "JFK"
+      }
+     ],
+     "passengers": [
+      [
+       "Mohamed",
+       "Silva"
+      ],
+      [
+       "Raj",
+       "Sanchez"
+      ],
+      [
+       "Liam",
+       "Wilson"
+      ]
+     ],
+     "cabin": "business",
+     "baggages": 0
+    }
+   ],
+   "records": [
+    {
+     "id": "K1NW8N",
+     "origin": "JFK",
+     "destination": "SFO",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT023",
+       "origin": "JFK",
+       "destination": "SFO",
+       "date": "2024-05-26"
+      },
+      {
+       "number": "HAT204",
+       "origin": "SFO",
+       "destination": "SEA",
+       "date": "2024-05-28"
+      },
+      {
+       "number": "HAT021",
+       "origin": "SEA",
+       "destination": "JFK",
+       "date": "2024-05-28"
+      }
+     ],
+     "passengers": [
+      [
+       "Mohamed",
+       "Silva"
+      ],
+      [
+       "Raj",
+       "Sanchez"
+      ],
+      [
+       "Liam",
+       "Wilson"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    }
+   ]
+  },
+  {
+   "id": "15",
+   "user": "aarav_garcia_1177",
+   "reason": "For your upcoming trip from ATL to PHL, you want to change for the cheapest flight in Economy cabin class (not Basic Economy) and for the day after the original reservation.",
+   "writes": [
+    {
+     "name": "update_reservation_flights",
+     "objects": 1,
+     "record": "M05KNL",
+     "itinerary": [
+      {
+       "number": "HAT110",
+       "date": "2024-05-24",
+       "origin": "ATL",
+       "destination": "LGA"
+      },
+      {
+       "number": "HAT172",
+       "date": "2024-05-24",
+       "origin": "LGA",
+       "destination": "PHL"
+      }
+     ],
+     "passengers": [],
+     "cabin": "economy",
+     "baggages": null
+    }
+   ],
+   "records": [
+    {
+     "id": "M05KNL",
+     "origin": "ATL",
+     "destination": "PHL",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT227",
+       "origin": "ATL",
+       "destination": "ORD",
+       "date": "2024-05-23"
+      },
+      {
+       "number": "HAT139",
+       "origin": "ORD",
+       "destination": "PHL",
+       "date": "2024-05-23"
+      }
+     ],
+     "passengers": [
+      [
+       "Aarav",
+       "Garcia"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "UHDAHF",
+     "origin": "CLT",
+     "destination": "LAX",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT015",
+       "origin": "CLT",
+       "destination": "EWR",
+       "date": "2024-05-19"
+      },
+      {
+       "number": "HAT041",
+       "origin": "EWR",
+       "destination": "LAX",
+       "date": "2024-05-19"
+      },
+      {
+       "number": "HAT228",
+       "origin": "LAX",
+       "destination": "EWR",
+       "date": "2024-05-27"
+      },
+      {
+       "number": "HAT270",
+       "origin": "EWR",
+       "destination": "CLT",
+       "date": "2024-05-28"
+      }
+     ],
+     "passengers": [
+      [
+       "Liam",
+       "Rossi"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    }
+   ]
+  },
+  {
+   "id": "16",
+   "user": "aarav_garcia_1177",
+   "reason": "For your upcoming trip from ATL to PHL, you want to change for the cheapest flight in Economy cabin class (not Basic Economy) and for the day after the original reservation.",
+   "writes": [
+    {
+     "name": "update_reservation_flights",
+     "objects": 1,
+     "record": "M05KNL",
+     "itinerary": [
+      {
+       "number": "HAT110",
+       "date": "2024-05-24",
+       "origin": "ATL",
+       "destination": "LGA"
+      },
+      {
+       "number": "HAT172",
+       "date": "2024-05-24",
+       "origin": "LGA",
+       "destination": "PHL"
+      }
+     ],
+     "passengers": [],
+     "cabin": "economy",
+     "baggages": null
+    }
+   ],
+   "records": [
+    {
+     "id": "M05KNL",
+     "origin": "ATL",
+     "destination": "PHL",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT227",
+       "origin": "ATL",
+       "destination": "ORD",
+       "date": "2024-05-23"
+      },
+      {
+       "number": "HAT139",
+       "origin": "ORD",
+       "destination": "PHL",
+       "date": "2024-05-23"
+      }
+     ],
+     "passengers": [
+      [
+       "Aarav",
+       "Garcia"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "UHDAHF",
+     "origin": "CLT",
+     "destination": "LAX",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT015",
+       "origin": "CLT",
+       "destination": "EWR",
+       "date": "2024-05-19"
+      },
+      {
+       "number": "HAT041",
+       "origin": "EWR",
+       "destination": "LAX",
+       "date": "2024-05-19"
+      },
+      {
+       "number": "HAT228",
+       "origin": "LAX",
+       "destination": "EWR",
+       "date": "2024-05-27"
+      },
+      {
+       "number": "HAT270",
+       "origin": "EWR",
+       "destination": "CLT",
+       "date": "2024-05-28"
+      }
+     ],
+     "passengers": [
+      [
+       "Liam",
+       "Rossi"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    }
+   ]
+  },
+  {
+   "id": "17",
+   "user": "omar_rossi_1241",
+   "reason": "For your upcoming trip from New York to Chicago, you want to:\n- add 3 checked bags\n- change the passenger to yourself\n- upgrade it to economy class. \n\nMention all three things at once and in this order.",
+   "writes": [
+    {
+     "name": "update_reservation_flights",
+     "objects": 1,
+     "record": "FQ8APE",
+     "itinerary": [
+      {
+       "number": "HAT056",
+       "date": "2024-05-25",
+       "origin": "EWR",
+       "destination": "IAH"
+      },
+      {
+       "number": "HAT138",
+       "date": "2024-05-25",
+       "origin": "IAH",
+       "destination": "ORD"
+      }
+     ],
+     "passengers": [],
+     "cabin": "economy",
+     "baggages": null
+    },
+    {
+     "name": "update_reservation_passengers",
+     "objects": 1,
+     "record": "FQ8APE",
+     "itinerary": [],
+     "passengers": [
+      [
+       "Omar",
+       "Rossi"
+      ]
+     ],
+     "cabin": "",
+     "baggages": null
+    },
+    {
+     "name": "update_reservation_baggages",
+     "objects": 1,
+     "record": "FQ8APE",
+     "itinerary": [],
+     "passengers": [],
+     "cabin": "",
+     "baggages": 3
+    }
+   ],
+   "records": [
+    {
+     "id": "5RJ7UH",
+     "origin": "LAX",
+     "destination": "SFO",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT034",
+       "origin": "LAX",
+       "destination": "SFO",
+       "date": "2024-05-26"
+      },
+      {
+       "number": "HAT163",
+       "origin": "SFO",
+       "destination": "LAX",
+       "date": "2024-05-29"
+      }
+     ],
+     "passengers": [
+      [
+       "Omar",
+       "Rossi"
+      ],
+      [
+       "Isabella",
+       "Anderson"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "no"
+    },
+    {
+     "id": "FQ8APE",
+     "origin": "EWR",
+     "destination": "ORD",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT056",
+       "origin": "EWR",
+       "destination": "IAH",
+       "date": "2024-05-25"
+      },
+      {
+       "number": "HAT138",
+       "origin": "IAH",
+       "destination": "ORD",
+       "date": "2024-05-25"
+      }
+     ],
+     "passengers": [
+      [
+       "Ivan",
+       "Garcia"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "QKRY03",
+     "origin": "MCO",
+     "destination": "DTW",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT214",
+       "origin": "MCO",
+       "destination": "PHX",
+       "date": "2024-05-24"
+      },
+      {
+       "number": "HAT265",
+       "origin": "PHX",
+       "destination": "DTW",
+       "date": "2024-05-25"
+      }
+     ],
+     "passengers": [
+      [
+       "Omar",
+       "Rossi"
+      ],
+      [
+       "Liam",
+       "Lee"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "UM3OG5",
+     "origin": "SEA",
+     "destination": "DFW",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT113",
+       "origin": "SEA",
+       "destination": "DFW",
+       "date": "2024-05-26"
+      },
+      {
+       "number": "HAT282",
+       "origin": "DFW",
+       "destination": "ATL",
+       "date": "2024-05-28"
+      },
+      {
+       "number": "HAT239",
+       "origin": "ATL",
+       "destination": "SEA",
+       "date": "2024-05-28"
+      }
+     ],
+     "passengers": [
+      [
+       "Omar",
+       "Rossi"
+      ],
+      [
+       "Liam",
+       "Lee"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    }
+   ]
+  },
+  {
+   "id": "18",
+   "user": "omar_davis_3817",
+   "reason": "You just faced some money issue and want to downgrade all business flights to economy, without changing the flights or passengers.",
+   "writes": [
+    {
+     "name": "update_reservation_flights",
+     "objects": 1,
+     "record": "JG7FMM",
+     "itinerary": [
+      {
+       "number": "HAT028",
+       "date": "2024-05-21",
+       "origin": "MCO",
+       "destination": "BOS"
+      },
+      {
+       "number": "HAT277",
+       "date": "2024-05-21",
+       "origin": "BOS",
+       "destination": "CLT"
+      }
+     ],
+     "passengers": [],
+     "cabin": "economy",
+     "baggages": null
+    },
+    {
+     "name": "update_reservation_flights",
+     "objects": 1,
+     "record": "2FBBAH",
+     "itinerary": [
+      {
+       "number": "HAT080",
+       "date": "2024-05-28",
+       "origin": "DEN",
+       "destination": "PHL"
+      },
+      {
+       "number": "HAT076",
+       "date": "2024-05-28",
+       "origin": "PHL",
+       "destination": "DEN"
+      },
+      {
+       "number": "HAT255",
+       "date": "2024-05-30",
+       "origin": "DEN",
+       "destination": "MIA"
+      },
+      {
+       "number": "HAT148",
+       "date": "2024-05-30",
+       "origin": "MIA",
+       "destination": "DEN"
+      }
+     ],
+     "passengers": [],
+     "cabin": "economy",
+     "baggages": null
+    },
+    {
+     "name": "update_reservation_flights",
+     "objects": 1,
+     "record": "X7BYG1",
+     "itinerary": [
+      {
+       "number": "HAT232",
+       "date": "2024-05-24",
+       "origin": "MIA",
+       "destination": "LAX"
+      },
+      {
+       "number": "HAT228",
+       "date": "2024-05-24",
+       "origin": "LAX",
+       "destination": "EWR"
+      }
+     ],
+     "passengers": [],
+     "cabin": "economy",
+     "baggages": null
+    },
+    {
+     "name": "update_reservation_flights",
+     "objects": 1,
+     "record": "EQ1G6C",
+     "itinerary": [
+      {
+       "number": "HAT084",
+       "date": "2024-05-23",
+       "origin": "DEN",
+       "destination": "LAS"
+      },
+      {
+       "number": "HAT175",
+       "date": "2024-05-23",
+       "origin": "LAS",
+       "destination": "IAH"
+      }
+     ],
+     "passengers": [],
+     "cabin": "economy",
+     "baggages": null
+    },
+    {
+     "name": "update_reservation_flights",
+     "objects": 1,
+     "record": "BOH180",
+     "itinerary": [
+      {
+       "number": "HAT276",
+       "date": "2024-05-21",
+       "origin": "SEA",
+       "destination": "JFK"
+      },
+      {
+       "number": "HAT279",
+       "date": "2024-05-22",
+       "origin": "JFK",
+       "destination": "IAH"
+      }
+     ],
+     "passengers": [],
+     "cabin": "economy",
+     "baggages": null
+    }
+   ],
+   "records": [
+    {
+     "id": "2FBBAH",
+     "origin": "DEN",
+     "destination": "DEN",
+     "cabin": "business",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT080",
+       "origin": "DEN",
+       "destination": "PHL",
+       "date": "2024-05-28"
+      },
+      {
+       "number": "HAT076",
+       "origin": "PHL",
+       "destination": "DEN",
+       "date": "2024-05-28"
+      },
+      {
+       "number": "HAT255",
+       "origin": "DEN",
+       "destination": "MIA",
+       "date": "2024-05-30"
+      },
+      {
+       "number": "HAT148",
+       "origin": "MIA",
+       "destination": "DEN",
+       "date": "2024-05-30"
+      }
+     ],
+     "passengers": [
+      [
+       "Omar",
+       "Davis"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "BOH180",
+     "origin": "SEA",
+     "destination": "IAH",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT276",
+       "origin": "SEA",
+       "destination": "JFK",
+       "date": "2024-05-21"
+      },
+      {
+       "number": "HAT279",
+       "origin": "JFK",
+       "destination": "IAH",
+       "date": "2024-05-22"
+      }
+     ],
+     "passengers": [
+      [
+       "Omar",
+       "Davis"
+      ],
+      [
+       "Anya",
+       "Thomas"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "yes"
+    },
+    {
+     "id": "EQ1G6C",
+     "origin": "DEN",
+     "destination": "IAH",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT084",
+       "origin": "DEN",
+       "destination": "LAS",
+       "date": "2024-05-23"
+      },
+      {
+       "number": "HAT175",
+       "origin": "LAS",
+       "destination": "IAH",
+       "date": "2024-05-23"
+      }
+     ],
+     "passengers": [
+      [
+       "Omar",
+       "Davis"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "JG7FMM",
+     "origin": "MCO",
+     "destination": "CLT",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT028",
+       "origin": "MCO",
+       "destination": "BOS",
+       "date": "2024-05-21"
+      },
+      {
+       "number": "HAT277",
+       "origin": "BOS",
+       "destination": "CLT",
+       "date": "2024-05-21"
+      }
+     ],
+     "passengers": [
+      [
+       "Omar",
+       "Davis"
+      ],
+      [
+       "Fatima",
+       "Patel"
+      ]
+     ],
+     "totalBaggages": 3,
+     "insurance": "yes"
+    },
+    {
+     "id": "LQ940Q",
+     "origin": "SFO",
+     "destination": "MCO",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT294",
+       "origin": "SFO",
+       "destination": "BOS",
+       "date": "2024-05-16"
+      },
+      {
+       "number": "HAT013",
+       "origin": "BOS",
+       "destination": "MCO",
+       "date": "2024-05-16"
+      },
+      {
+       "number": "HAT161",
+       "origin": "MCO",
+       "destination": "PHX",
+       "date": "2024-05-19"
+      },
+      {
+       "number": "HAT009",
+       "origin": "PHX",
+       "destination": "SFO",
+       "date": "2024-05-19"
+      }
+     ],
+     "passengers": [
+      [
+       "Omar",
+       "Davis"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "yes"
+    },
+    {
+     "id": "X7BYG1",
+     "origin": "MIA",
+     "destination": "EWR",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT232",
+       "origin": "MIA",
+       "destination": "LAX",
+       "date": "2024-05-24"
+      },
+      {
+       "number": "HAT228",
+       "origin": "LAX",
+       "destination": "EWR",
+       "date": "2024-05-24"
+      }
+     ],
+     "passengers": [
+      [
+       "Omar",
+       "Davis"
+      ],
+      [
+       "Juan",
+       "Ahmed"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "yes"
+    }
+   ]
+  },
+  {
+   "id": "19",
+   "user": "olivia_gonzalez_2305",
+   "reason": "You will have a crazy half-day trip to Texas.\n\nIt is in your reservations but you don't remember the reservation id.\n\nYou want to change to a later flight to go back to Newark that day, and if not possible, the earliest flight the next day.\n\nYour current return flight departs 3pm (on the 28th).",
+   "writes": [
+    {
+     "name": "cancel_reservation",
+     "objects": 1,
+     "record": "Z7GOZK",
+     "itinerary": [],
+     "passengers": [],
+     "cabin": "",
+     "baggages": null
+    }
+   ],
+   "records": [
+    {
+     "id": "K67C4W",
+     "origin": "LAS",
+     "destination": "MCO",
+     "cabin": "economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT137",
+       "origin": "LAS",
+       "destination": "MCO",
+       "date": "2024-05-17"
+      }
+     ],
+     "passengers": [
+      [
+       "Olivia",
+       "Gonzalez"
+      ],
+      [
+       "Mei",
+       "Johansson"
+      ],
+      [
+       "Yara",
+       "Lopez"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "no"
+    },
+    {
+     "id": "THY2DG",
+     "origin": "MSP",
+     "destination": "ORD",
+     "cabin": "economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT248",
+       "origin": "MSP",
+       "destination": "DTW",
+       "date": "2024-05-26"
+      },
+      {
+       "number": "HAT119",
+       "origin": "DTW",
+       "destination": "ORD",
+       "date": "2024-05-26"
+      }
+     ],
+     "passengers": [
+      [
+       "Yara",
+       "Martin"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "no"
+    },
+    {
+     "id": "Z7GOZK",
+     "origin": "EWR",
+     "destination": "IAH",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT188",
+       "origin": "EWR",
+       "destination": "IAH",
+       "date": "2024-05-28"
+      },
+      {
+       "number": "HAT207",
+       "origin": "IAH",
+       "destination": "EWR",
+       "date": "2024-05-28"
+      }
+     ],
+     "passengers": [
+      [
+       "Olivia",
+       "Gonzalez"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    }
+   ]
+  },
+  {
+   "id": "20",
+   "user": "mia_li_3668",
+   "reason": "You want to fly from New York to Seattle on May 20 (one way).",
+   "writes": [
+    {
+     "name": "book_reservation",
+     "objects": 1,
+     "record": null,
+     "itinerary": [
+      {
+       "number": "HAT136",
+       "date": "2024-05-20",
+       "origin": "JFK",
+       "destination": "ATL"
+      },
+      {
+       "number": "HAT039",
+       "date": "2024-05-20",
+       "origin": "ATL",
+       "destination": "SEA"
+      }
+     ],
+     "passengers": [
+      [
+       "Mia",
+       "Li"
+      ]
+     ],
+     "cabin": "economy",
+     "baggages": 3
+    }
+   ],
+   "records": [
+    {
+     "id": "AIXC49",
+     "origin": "LAX",
+     "destination": "BOS",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT094",
+       "origin": "LAX",
+       "destination": "SFO",
+       "date": "2024-05-20"
+      },
+      {
+       "number": "HAT294",
+       "origin": "SFO",
+       "destination": "BOS",
+       "date": "2024-05-20"
+      }
+     ],
+     "passengers": [
+      [
+       "Amelia",
+       "Ahmed"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "HKEG34",
+     "origin": "DEN",
+     "destination": "LAS",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT290",
+       "origin": "DEN",
+       "destination": "LAS",
+       "date": "2024-05-27"
+      }
+     ],
+     "passengers": [
+      [
+       "Amelia",
+       "Ahmed"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "NO6JO3",
+     "origin": "JFK",
+     "destination": "DFW",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT083",
+       "origin": "JFK",
+       "destination": "SEA",
+       "date": "2024-05-16"
+      },
+      {
+       "number": "HAT221",
+       "origin": "SEA",
+       "destination": "DFW",
+       "date": "2024-05-16"
+      }
+     ],
+     "passengers": [
+      [
+       "Mia",
+       "Li"
+      ]
+     ],
+     "totalBaggages": 2,
+     "insurance": "yes"
+    }
+   ]
+  },
+  {
+   "id": "21",
+   "user": "sofia_kim_7287",
+   "reason": "You want to change the return flights for your upcoming Houston to Denver trip.\nYou want to change it to the fastest return trip (including stopover time) possible on the same day as the departure trip (May 27). If the fastest is not available, you are ok with the next fastest.",
+   "writes": [
+    {
+     "name": "update_reservation_flights",
+     "objects": 1,
+     "record": "OBUT9V",
+     "itinerary": [
+      {
+       "number": "HAT078",
+       "date": "2024-05-27",
+       "origin": "IAH",
+       "destination": "ORD"
+      },
+      {
+       "number": "HAT118",
+       "date": "2024-05-27",
+       "origin": "ORD",
+       "destination": "DEN"
+      },
+      {
+       "number": "HAT290",
+       "date": "2024-05-27",
+       "origin": "DEN",
+       "destination": "LAS"
+      },
+      {
+       "number": "HAT175",
+       "date": "2024-05-27",
+       "origin": "LAS",
+       "destination": "IAH"
+      }
+     ],
+     "passengers": [],
+     "cabin": "economy",
+     "baggages": null
+    },
+    {
+     "name": "update_reservation_baggages",
+     "objects": 1,
+     "record": "OBUT9V",
+     "itinerary": [],
+     "passengers": [],
+     "cabin": "",
+     "baggages": 2
+    }
+   ],
+   "records": [
+    {
+     "id": "4BMN53",
+     "origin": "LGA",
+     "destination": "LAS",
+     "cabin": "economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT201",
+       "origin": "LGA",
+       "destination": "PHX",
+       "date": "2024-05-22"
+      },
+      {
+       "number": "HAT173",
+       "origin": "PHX",
+       "destination": "LAS",
+       "date": "2024-05-22"
+      }
+     ],
+     "passengers": [
+      [
+       "Juan",
+       "Wilson"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "yes"
+    },
+    {
+     "id": "AQLBTL",
+     "origin": "LAX",
+     "destination": "LAX",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT249",
+       "origin": "LAX",
+       "destination": "SFO",
+       "date": "2024-05-19"
+      },
+      {
+       "number": "HAT273",
+       "origin": "SFO",
+       "destination": "LAX",
+       "date": "2024-05-19"
+      },
+      {
+       "number": "HAT228",
+       "origin": "LAX",
+       "destination": "EWR",
+       "date": "2024-05-26"
+      },
+      {
+       "number": "HAT041",
+       "origin": "EWR",
+       "destination": "LAX",
+       "date": "2024-05-27"
+      }
+     ],
+     "passengers": [
+      [
+       "Sofia",
+       "Kim"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "I57WUD",
+     "origin": "DFW",
+     "destination": "DFW",
+     "cabin": "business",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT128",
+       "origin": "DFW",
+       "destination": "ATL",
+       "date": "2024-05-18"
+      },
+      {
+       "number": "HAT297",
+       "origin": "ATL",
+       "destination": "DFW",
+       "date": "2024-05-18"
+      },
+      {
+       "number": "HAT067",
+       "origin": "DFW",
+       "destination": "SEA",
+       "date": "2024-05-22"
+      },
+      {
+       "number": "HAT221",
+       "origin": "SEA",
+       "destination": "DFW",
+       "date": "2024-05-23"
+      }
+     ],
+     "passengers": [
+      [
+       "Sofia",
+       "Kim"
+      ],
+      [
+       "Mia",
+       "Jackson"
+      ],
+      [
+       "Ava",
+       "Kim"
+      ]
+     ],
+     "totalBaggages": 4,
+     "insurance": "no"
+    },
+    {
+     "id": "KA7I60",
+     "origin": "DEN",
+     "destination": "DTW",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT160",
+       "origin": "DEN",
+       "destination": "CLT",
+       "date": "2024-05-26"
+      },
+      {
+       "number": "HAT167",
+       "origin": "CLT",
+       "destination": "DTW",
+       "date": "2024-05-26"
+      },
+      {
+       "number": "HAT191",
+       "origin": "DTW",
+       "destination": "CLT",
+       "date": "2024-05-28"
+      },
+      {
+       "number": "HAT262",
+       "origin": "CLT",
+       "destination": "DEN",
+       "date": "2024-05-28"
+      }
+     ],
+     "passengers": [
+      [
+       "Sofia",
+       "Kim"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "no"
+    },
+    {
+     "id": "OBUT9V",
+     "origin": "IAH",
+     "destination": "DEN",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT078",
+       "origin": "IAH",
+       "destination": "ORD",
+       "date": "2024-05-27"
+      },
+      {
+       "number": "HAT118",
+       "origin": "ORD",
+       "destination": "DEN",
+       "date": "2024-05-27"
+      },
+      {
+       "number": "HAT084",
+       "origin": "DEN",
+       "destination": "LAS",
+       "date": "2024-05-28"
+      },
+      {
+       "number": "HAT266",
+       "origin": "LAS",
+       "destination": "IAH",
+       "date": "2024-05-28"
+      }
+     ],
+     "passengers": [
+      [
+       "Sofia",
+       "Kim"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "no"
+    },
+    {
+     "id": "OI5L9G",
+     "origin": "MCO",
+     "destination": "CLT",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT017",
+       "origin": "MCO",
+       "destination": "BOS",
+       "date": "2024-05-25"
+      },
+      {
+       "number": "HAT277",
+       "origin": "BOS",
+       "destination": "CLT",
+       "date": "2024-05-25"
+      }
+     ],
+     "passengers": [
+      [
+       "Sofia",
+       "Kim"
+      ],
+      [
+       "Mia",
+       "Jackson"
+      ]
+     ],
+     "totalBaggages": 2,
+     "insurance": "no"
+    },
+    {
+     "id": "Q0ZF0J",
+     "origin": "LGA",
+     "destination": "MCO",
+     "cabin": "business",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT201",
+       "origin": "LGA",
+       "destination": "PHX",
+       "date": "2024-05-28"
+      },
+      {
+       "number": "HAT181",
+       "origin": "PHX",
+       "destination": "MCO",
+       "date": "2024-05-28"
+      },
+      {
+       "number": "HAT161",
+       "origin": "MCO",
+       "destination": "PHX",
+       "date": "2024-05-30"
+      },
+      {
+       "number": "HAT066",
+       "origin": "PHX",
+       "destination": "LGA",
+       "date": "2024-05-30"
+      }
+     ],
+     "passengers": [
+      [
+       "Sofia",
+       "Kim"
+      ],
+      [
+       "Ethan",
+       "Patel"
+      ]
+     ],
+     "totalBaggages": 3,
+     "insurance": "no"
+    }
+   ]
+  },
+  {
+   "id": "22",
+   "user": "omar_rossi_1241",
+   "reason": "For your upcoming trip from New York to Chicago, you want to change the passenger to yourself, upgrade it to economy class, and have 3 checked bags.",
+   "writes": [
+    {
+     "name": "update_reservation_flights",
+     "objects": 1,
+     "record": "FQ8APE",
+     "itinerary": [
+      {
+       "number": "HAT056",
+       "date": "2024-05-25",
+       "origin": "EWR",
+       "destination": "IAH"
+      },
+      {
+       "number": "HAT138",
+       "date": "2024-05-25",
+       "origin": "IAH",
+       "destination": "ORD"
+      }
+     ],
+     "passengers": [],
+     "cabin": "economy",
+     "baggages": null
+    },
+    {
+     "name": "update_reservation_passengers",
+     "objects": 1,
+     "record": "FQ8APE",
+     "itinerary": [],
+     "passengers": [
+      [
+       "Omar",
+       "Rossi"
+      ]
+     ],
+     "cabin": "",
+     "baggages": null
+    },
+    {
+     "name": "update_reservation_baggages",
+     "objects": 1,
+     "record": "FQ8APE",
+     "itinerary": [],
+     "passengers": [],
+     "cabin": "",
+     "baggages": 3
+    }
+   ],
+   "records": [
+    {
+     "id": "5RJ7UH",
+     "origin": "LAX",
+     "destination": "SFO",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT034",
+       "origin": "LAX",
+       "destination": "SFO",
+       "date": "2024-05-26"
+      },
+      {
+       "number": "HAT163",
+       "origin": "SFO",
+       "destination": "LAX",
+       "date": "2024-05-29"
+      }
+     ],
+     "passengers": [
+      [
+       "Omar",
+       "Rossi"
+      ],
+      [
+       "Isabella",
+       "Anderson"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "no"
+    },
+    {
+     "id": "FQ8APE",
+     "origin": "EWR",
+     "destination": "ORD",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT056",
+       "origin": "EWR",
+       "destination": "IAH",
+       "date": "2024-05-25"
+      },
+      {
+       "number": "HAT138",
+       "origin": "IAH",
+       "destination": "ORD",
+       "date": "2024-05-25"
+      }
+     ],
+     "passengers": [
+      [
+       "Ivan",
+       "Garcia"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "QKRY03",
+     "origin": "MCO",
+     "destination": "DTW",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT214",
+       "origin": "MCO",
+       "destination": "PHX",
+       "date": "2024-05-24"
+      },
+      {
+       "number": "HAT265",
+       "origin": "PHX",
+       "destination": "DTW",
+       "date": "2024-05-25"
+      }
+     ],
+     "passengers": [
+      [
+       "Omar",
+       "Rossi"
+      ],
+      [
+       "Liam",
+       "Lee"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "UM3OG5",
+     "origin": "SEA",
+     "destination": "DFW",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT113",
+       "origin": "SEA",
+       "destination": "DFW",
+       "date": "2024-05-26"
+      },
+      {
+       "number": "HAT282",
+       "origin": "DFW",
+       "destination": "ATL",
+       "date": "2024-05-28"
+      },
+      {
+       "number": "HAT239",
+       "origin": "ATL",
+       "destination": "SEA",
+       "date": "2024-05-28"
+      }
+     ],
+     "passengers": [
+      [
+       "Omar",
+       "Rossi"
+      ],
+      [
+       "Liam",
+       "Lee"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    }
+   ]
+  },
+  {
+   "id": "23",
+   "user": "mohamed_silva_9265",
+   "reason": "You want to know the sum of gift card balances and the sum of certificate balances.\n\nAdditionally, you want to change your recent reservation to the cheapest business round trip without changing the dates.",
+   "writes": [
+    {
+     "name": "cancel_reservation",
+     "objects": 1,
+     "record": "K1NW8N",
+     "itinerary": [],
+     "passengers": [],
+     "cabin": "",
+     "baggages": null
+    },
+    {
+     "name": "book_reservation",
+     "objects": 1,
+     "record": null,
+     "itinerary": [
+      {
+       "number": "HAT023",
+       "date": "2024-05-26",
+       "origin": "JFK",
+       "destination": "SFO"
+      },
+      {
+       "number": "HAT204",
+       "date": "2024-05-28",
+       "origin": "SFO",
+       "destination": "SEA"
+      },
+      {
+       "number": "HAT100",
+       "date": "2024-05-28",
+       "origin": "SEA",
+       "destination": "JFK"
+      }
+     ],
+     "passengers": [
+      [
+       "Mohamed",
+       "Silva"
+      ]
+     ],
+     "cabin": "business",
+     "baggages": 0
+    },
+    {
+     "name": "book_reservation",
+     "objects": 1,
+     "record": null,
+     "itinerary": [
+      {
+       "number": "HAT023",
+       "date": "2024-05-26",
+       "origin": "JFK",
+       "destination": "SFO"
+      },
+      {
+       "number": "HAT204",
+       "date": "2024-05-28",
+       "origin": "SFO",
+       "destination": "SEA"
+      },
+      {
+       "number": "HAT100",
+       "date": "2024-05-28",
+       "origin": "SEA",
+       "destination": "JFK"
+      }
+     ],
+     "passengers": [
+      [
+       "Raj",
+       "Sanchez"
+      ]
+     ],
+     "cabin": "business",
+     "baggages": 0
+    },
+    {
+     "name": "book_reservation",
+     "objects": 1,
+     "record": null,
+     "itinerary": [
+      {
+       "number": "HAT023",
+       "date": "2024-05-26",
+       "origin": "JFK",
+       "destination": "SFO"
+      },
+      {
+       "number": "HAT204",
+       "date": "2024-05-28",
+       "origin": "SFO",
+       "destination": "SEA"
+      },
+      {
+       "number": "HAT100",
+       "date": "2024-05-28",
+       "origin": "SEA",
+       "destination": "JFK"
+      }
+     ],
+     "passengers": [
+      [
+       "Liam",
+       "Wilson"
+      ]
+     ],
+     "cabin": "business",
+     "baggages": 0
+    }
+   ],
+   "records": [
+    {
+     "id": "K1NW8N",
+     "origin": "JFK",
+     "destination": "SFO",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT023",
+       "origin": "JFK",
+       "destination": "SFO",
+       "date": "2024-05-26"
+      },
+      {
+       "number": "HAT204",
+       "origin": "SFO",
+       "destination": "SEA",
+       "date": "2024-05-28"
+      },
+      {
+       "number": "HAT021",
+       "origin": "SEA",
+       "destination": "JFK",
+       "date": "2024-05-28"
+      }
+     ],
+     "passengers": [
+      [
+       "Mohamed",
+       "Silva"
+      ],
+      [
+       "Raj",
+       "Sanchez"
+      ],
+      [
+       "Liam",
+       "Wilson"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    }
+   ]
+  },
+  {
+   "id": "24",
+   "user": "mia_kim_4397",
+   "reason": "You need to remove a passenger from one of your reservation.\n\nYou are also looking to book a flight form NY to go explore the West Coast.",
+   "writes": [
+    {
+     "name": "book_reservation",
+     "objects": 1,
+     "record": null,
+     "itinerary": [
+      {
+       "number": "HAT069",
+       "date": "2024-05-20",
+       "origin": "JFK",
+       "destination": "SEA"
+      },
+      {
+       "number": "HAT276",
+       "date": "2024-05-25",
+       "origin": "SEA",
+       "destination": "JFK"
+      }
+     ],
+     "passengers": [
+      [
+       "Mia",
+       "Kim"
+      ]
+     ],
+     "cabin": "basic_economy",
+     "baggages": 1
+    }
+   ],
+   "records": [
+    {
+     "id": "C4GP7M",
+     "origin": "MIA",
+     "destination": "ATL",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT198",
+       "origin": "MIA",
+       "destination": "JFK",
+       "date": "2024-05-17"
+      },
+      {
+       "number": "HAT136",
+       "origin": "JFK",
+       "destination": "ATL",
+       "date": "2024-05-17"
+      },
+      {
+       "number": "HAT285",
+       "origin": "ATL",
+       "destination": "JFK",
+       "date": "2024-05-19"
+      },
+      {
+       "number": "HAT060",
+       "origin": "JFK",
+       "destination": "MIA",
+       "date": "2024-05-19"
+      }
+     ],
+     "passengers": [
+      [
+       "Mia",
+       "Kim"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "H9ZU1C",
+     "origin": "MIA",
+     "destination": "IAH",
+     "cabin": "economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT192",
+       "origin": "MIA",
+       "destination": "EWR",
+       "date": "2024-05-24"
+      },
+      {
+       "number": "HAT166",
+       "origin": "EWR",
+       "destination": "IAH",
+       "date": "2024-05-25"
+      }
+     ],
+     "passengers": [
+      [
+       "James",
+       "Moore"
+      ],
+      [
+       "Ethan",
+       "Lopez"
+      ],
+      [
+       "Amelia",
+       "Sanchez"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "XL2C75",
+     "origin": "MSP",
+     "destination": "MSP",
+     "cabin": "business",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT127",
+       "origin": "MSP",
+       "destination": "DTW",
+       "date": "2024-05-16"
+      },
+      {
+       "number": "HAT210",
+       "origin": "DTW",
+       "destination": "MSP",
+       "date": "2024-05-17"
+      },
+      {
+       "number": "HAT248",
+       "origin": "MSP",
+       "destination": "DTW",
+       "date": "2024-05-21"
+      },
+      {
+       "number": "HAT125",
+       "origin": "DTW",
+       "destination": "MSP",
+       "date": "2024-05-21"
+      }
+     ],
+     "passengers": [
+      [
+       "Mia",
+       "Kim"
+      ],
+      [
+       "Ethan",
+       "Lopez"
+      ]
+     ],
+     "totalBaggages": 2,
+     "insurance": "yes"
+    }
+   ]
+  },
+  {
+   "id": "25",
+   "user": "ivan_muller_7015",
+   "reason": "You want to make a reservation for your friend. It should be exactly the same as your current reservation.",
+   "writes": [
+    {
+     "name": "book_reservation",
+     "objects": 1,
+     "record": null,
+     "itinerary": [
+      {
+       "number": "HAT097",
+       "date": "2024-05-17",
+       "origin": "DTW",
+       "destination": "PHX"
+      },
+      {
+       "number": "HAT251",
+       "date": "2024-05-17",
+       "origin": "PHX",
+       "destination": "SEA"
+      }
+     ],
+     "passengers": [
+      [
+       "Ivan",
+       "Smith"
+      ]
+     ],
+     "cabin": "economy",
+     "baggages": 0
+    }
+   ],
+   "records": [
+    {
+     "id": "G72NSF",
+     "origin": "DTW",
+     "destination": "SEA",
+     "cabin": "economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT097",
+       "origin": "DTW",
+       "destination": "PHX",
+       "date": "2024-05-17"
+      },
+      {
+       "number": "HAT251",
+       "origin": "PHX",
+       "destination": "SEA",
+       "date": "2024-05-17"
+      }
+     ],
+     "passengers": [
+      [
+       "Ivan",
+       "Muller"
+      ],
+      [
+       "Isabella",
+       "Moore"
+      ]
+     ],
+     "totalBaggages": 2,
+     "insurance": "yes"
+    }
+   ]
+  },
+  {
+   "id": "26",
+   "user": "amelia_sanchez_4739",
+   "reason": "You want to cancel your flights from MCO to CLT.",
+   "writes": [],
+   "records": [
+    {
+     "id": "3FRNFB",
+     "origin": "MCO",
+     "destination": "CLT",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT028",
+       "origin": "MCO",
+       "destination": "BOS",
+       "date": "2024-05-28"
+      },
+      {
+       "number": "HAT277",
+       "origin": "BOS",
+       "destination": "CLT",
+       "date": "2024-05-28"
+      }
+     ],
+     "passengers": [
+      [
+       "Amelia",
+       "Sanchez"
+      ],
+      [
+       "Ivan",
+       "Martin"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "Q4L9HS",
+     "origin": "EWR",
+     "destination": "SEA",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT213",
+       "origin": "EWR",
+       "destination": "DFW",
+       "date": "2024-05-17"
+      },
+      {
+       "number": "HAT067",
+       "origin": "DFW",
+       "destination": "SEA",
+       "date": "2024-05-17"
+      }
+     ],
+     "passengers": [
+      [
+       "Amelia",
+       "Sanchez"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    }
+   ]
+  },
+  {
+   "id": "27",
+   "user": "ethan_martin_2396",
+   "reason": "You are contacting customer service to complain about your delayed flight HAT039 from ATL to SEA.",
+   "writes": [],
+   "records": [
+    {
+     "id": "3HE6QG",
+     "origin": "SEA",
+     "destination": "ATL",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT220",
+       "origin": "SEA",
+       "destination": "ATL",
+       "date": "2024-05-14"
+      }
+     ],
+     "passengers": [
+      [
+       "Sophia",
+       "Garcia"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "BSSSM3",
+     "origin": "MCO",
+     "destination": "MSP",
+     "cabin": "business",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT298",
+       "origin": "MCO",
+       "destination": "MSP",
+       "date": "2024-05-24"
+      },
+      {
+       "number": "HAT098",
+       "origin": "MSP",
+       "destination": "MCO",
+       "date": "2024-05-25"
+      }
+     ],
+     "passengers": [
+      [
+       "Ethan",
+       "Martin"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "DQST39",
+     "origin": "ORD",
+     "destination": "EWR",
+     "cabin": "business",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT165",
+       "origin": "ORD",
+       "destination": "IAH",
+       "date": "2024-05-18"
+      },
+      {
+       "number": "HAT207",
+       "origin": "IAH",
+       "destination": "EWR",
+       "date": "2024-05-18"
+      },
+      {
+       "number": "HAT166",
+       "origin": "EWR",
+       "destination": "IAH",
+       "date": "2024-05-29"
+      },
+      {
+       "number": "HAT044",
+       "origin": "IAH",
+       "destination": "ORD",
+       "date": "2024-05-29"
+      }
+     ],
+     "passengers": [
+      [
+       "Ethan",
+       "Martin"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "yes"
+    },
+    {
+     "id": "GXWCPN",
+     "origin": "LGA",
+     "destination": "BOS",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT065",
+       "origin": "LGA",
+       "destination": "CLT",
+       "date": "2024-05-27"
+      },
+      {
+       "number": "HAT064",
+       "origin": "CLT",
+       "destination": "BOS",
+       "date": "2024-05-27"
+      },
+      {
+       "number": "HAT260",
+       "origin": "BOS",
+       "destination": "CLT",
+       "date": "2024-05-28"
+      },
+      {
+       "number": "HAT087",
+       "origin": "CLT",
+       "destination": "LGA",
+       "date": "2024-05-28"
+      }
+     ],
+     "passengers": [
+      [
+       "Ethan",
+       "Martin"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "yes"
+    },
+    {
+     "id": "HG8X9P",
+     "origin": "LAX",
+     "destination": "ATL",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT030",
+       "origin": "LAX",
+       "destination": "ORD",
+       "date": "2024-05-20"
+      },
+      {
+       "number": "HAT093",
+       "origin": "ORD",
+       "destination": "ATL",
+       "date": "2024-05-21"
+      },
+      {
+       "number": "HAT252",
+       "origin": "ATL",
+       "destination": "DFW",
+       "date": "2024-05-22"
+      },
+      {
+       "number": "HAT124",
+       "origin": "DFW",
+       "destination": "LAX",
+       "date": "2024-05-22"
+      }
+     ],
+     "passengers": [
+      [
+       "Ethan",
+       "Martin"
+      ],
+      [
+       "Ethan",
+       "Martin"
+      ]
+     ],
+     "totalBaggages": 2,
+     "insurance": "no"
+    },
+    {
+     "id": "M61CQM",
+     "origin": "ORD",
+     "destination": "SEA",
+     "cabin": "economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT223",
+       "origin": "ORD",
+       "destination": "ATL",
+       "date": "2024-05-15"
+      },
+      {
+       "number": "HAT039",
+       "origin": "ATL",
+       "destination": "SEA",
+       "date": "2024-05-15"
+      }
+     ],
+     "passengers": [
+      [
+       "Ethan",
+       "Martin"
+      ],
+      [
+       "Mia",
+       "Thomas"
+      ],
+      [
+       "Liam",
+       "Johnson"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "no"
+    },
+    {
+     "id": "NTIRXF",
+     "origin": "SFO",
+     "destination": "CLT",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT294",
+       "origin": "SFO",
+       "destination": "BOS",
+       "date": "2024-05-13"
+      },
+      {
+       "number": "HAT260",
+       "origin": "BOS",
+       "destination": "CLT",
+       "date": "2024-05-13"
+      }
+     ],
+     "passengers": [
+      [
+       "Ethan",
+       "Martin"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "P824NH",
+     "origin": "DTW",
+     "destination": "MCO",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT111",
+       "origin": "DTW",
+       "destination": "MSP",
+       "date": "2024-05-18"
+      },
+      {
+       "number": "HAT036",
+       "origin": "MSP",
+       "destination": "MCO",
+       "date": "2024-05-18"
+      },
+      {
+       "number": "HAT214",
+       "origin": "MCO",
+       "destination": "PHX",
+       "date": "2024-05-22"
+      },
+      {
+       "number": "HAT073",
+       "origin": "PHX",
+       "destination": "DTW",
+       "date": "2024-05-23"
+      }
+     ],
+     "passengers": [
+      [
+       "Ethan",
+       "Martin"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "RVQC22",
+     "origin": "SEA",
+     "destination": "MCO",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT194",
+       "origin": "SEA",
+       "destination": "BOS",
+       "date": "2024-05-22"
+      },
+      {
+       "number": "HAT182",
+       "origin": "BOS",
+       "destination": "MCO",
+       "date": "2024-05-23"
+      }
+     ],
+     "passengers": [
+      [
+       "Ethan",
+       "Martin"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    }
+   ]
+  },
+  {
+   "id": "28",
+   "user": "amelia_rossi_1297",
+   "reason": "You want to cancel your flights in reservation ID SI5UKW and get a refund.",
+   "writes": [],
+   "records": [
+    {
+     "id": "18YQSL",
+     "origin": "SFO",
+     "destination": "LAS",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT144",
+       "origin": "SFO",
+       "destination": "PHX",
+       "date": "2024-05-25"
+      },
+      {
+       "number": "HAT173",
+       "origin": "PHX",
+       "destination": "LAS",
+       "date": "2024-05-25"
+      },
+      {
+       "number": "HAT284",
+       "origin": "LAS",
+       "destination": "PHX",
+       "date": "2024-05-27"
+      },
+      {
+       "number": "HAT159",
+       "origin": "PHX",
+       "destination": "SFO",
+       "date": "2024-05-27"
+      }
+     ],
+     "passengers": [
+      [
+       "Amelia",
+       "Rossi"
+      ],
+      [
+       "Raj",
+       "Kovacs"
+      ],
+      [
+       "Olivia",
+       "Rossi"
+      ]
+     ],
+     "totalBaggages": 2,
+     "insurance": "yes"
+    },
+    {
+     "id": "71B2PU",
+     "origin": "PHX",
+     "destination": "MCO",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT181",
+       "origin": "PHX",
+       "destination": "MCO",
+       "date": "2024-05-28"
+      },
+      {
+       "number": "HAT214",
+       "origin": "MCO",
+       "destination": "PHX",
+       "date": "2024-05-29"
+      }
+     ],
+     "passengers": [
+      [
+       "Ava",
+       "Wilson"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "9J3E5I",
+     "origin": "PHX",
+     "destination": "LGA",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT256",
+       "origin": "PHX",
+       "destination": "LGA",
+       "date": "2024-05-06"
+      },
+      {
+       "number": "HAT150",
+       "origin": "LGA",
+       "destination": "PHX",
+       "date": "2024-05-14"
+      }
+     ],
+     "passengers": [
+      [
+       "Amelia",
+       "Rossi"
+      ],
+      [
+       "Raj",
+       "Kovacs"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "F48YRY",
+     "origin": "SFO",
+     "destination": "MCO",
+     "cabin": "business",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT294",
+       "origin": "SFO",
+       "destination": "BOS",
+       "date": "2024-05-16"
+      },
+      {
+       "number": "HAT013",
+       "origin": "BOS",
+       "destination": "MCO",
+       "date": "2024-05-16"
+      },
+      {
+       "number": "HAT214",
+       "origin": "MCO",
+       "destination": "PHX",
+       "date": "2024-05-20"
+      },
+      {
+       "number": "HAT283",
+       "origin": "PHX",
+       "destination": "SFO",
+       "date": "2024-05-21"
+      }
+     ],
+     "passengers": [
+      [
+       "Amelia",
+       "Rossi"
+      ],
+      [
+       "Evelyn",
+       "Nguyen"
+      ],
+      [
+       "Juan",
+       "Ahmed"
+      ]
+     ],
+     "totalBaggages": 6,
+     "insurance": "no"
+    },
+    {
+     "id": "I3P269",
+     "origin": "DEN",
+     "destination": "CLT",
+     "cabin": "economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT158",
+       "origin": "DEN",
+       "destination": "PHL",
+       "date": "2024-05-04"
+      },
+      {
+       "number": "HAT016",
+       "origin": "PHL",
+       "destination": "CLT",
+       "date": "2024-05-04"
+      }
+     ],
+     "passengers": [
+      [
+       "Ivan",
+       "Wilson"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "no"
+    },
+    {
+     "id": "SI5UKW",
+     "origin": "MIA",
+     "destination": "PHX",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT062",
+       "origin": "MIA",
+       "destination": "LAS",
+       "date": "2024-05-16"
+      },
+      {
+       "number": "HAT284",
+       "origin": "LAS",
+       "destination": "PHX",
+       "date": "2024-05-17"
+      }
+     ],
+     "passengers": [
+      [
+       "Amelia",
+       "Rossi"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "XYNI64",
+     "origin": "IAH",
+     "destination": "DEN",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT190",
+       "origin": "IAH",
+       "destination": "LAS",
+       "date": "2024-05-28"
+      },
+      {
+       "number": "HAT003",
+       "origin": "LAS",
+       "destination": "DEN",
+       "date": "2024-05-28"
+      }
+     ],
+     "passengers": [
+      [
+       "Raj",
+       "Kovacs"
+      ],
+      [
+       "Ivan",
+       "Johnson"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "Y8UJ5V",
+     "origin": "PHX",
+     "destination": "LAX",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT032",
+       "origin": "PHX",
+       "destination": "SFO",
+       "date": "2024-05-09"
+      },
+      {
+       "number": "HAT257",
+       "origin": "SFO",
+       "destination": "LAX",
+       "date": "2024-05-09"
+      }
+     ],
+     "passengers": [
+      [
+       "Amelia",
+       "Rossi"
+      ],
+      [
+       "Sofia",
+       "Taylor"
+      ],
+      [
+       "Raj",
+       "Kovacs"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "ZJXGO3",
+     "origin": "PHX",
+     "destination": "LAX",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT283",
+       "origin": "PHX",
+       "destination": "SFO",
+       "date": "2024-05-10"
+      },
+      {
+       "number": "HAT273",
+       "origin": "SFO",
+       "destination": "LAX",
+       "date": "2024-05-10"
+      }
+     ],
+     "passengers": [
+      [
+       "Amelia",
+       "Rossi"
+      ],
+      [
+       "Raj",
+       "Kovacs"
+      ],
+      [
+       "Noah",
+       "Lopez"
+      ],
+      [
+       "Evelyn",
+       "Rossi"
+      ]
+     ],
+     "totalBaggages": 2,
+     "insurance": "yes"
+    }
+   ]
+  },
+  {
+   "id": "29",
+   "user": "raj_brown_5782",
+   "reason": "You want to change your upcoming roundtrip flights which are currently DTW to LGA and back.\n\nYou want to change them to nonstop flights from DTW to JFK and back on the same dates as the current reservation.",
+   "writes": [
+    {
+     "name": "cancel_reservation",
+     "objects": 1,
+     "record": "VA5SGQ",
+     "itinerary": [],
+     "passengers": [],
+     "cabin": "",
+     "baggages": null
+    },
+    {
+     "name": "book_reservation",
+     "objects": 1,
+     "record": null,
+     "itinerary": [
+      {
+       "number": "HAT169",
+       "date": "2024-05-17",
+       "origin": "DTW",
+       "destination": "JFK"
+      },
+      {
+       "number": "HAT033",
+       "date": "2024-05-19",
+       "origin": "JFK",
+       "destination": "DTW"
+      }
+     ],
+     "passengers": [
+      [
+       "Raj",
+       "Brown"
+      ]
+     ],
+     "cabin": "economy",
+     "baggages": 1
+    }
+   ],
+   "records": [
+    {
+     "id": "41WSQQ",
+     "origin": "PHL",
+     "destination": "EWR",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT243",
+       "origin": "PHL",
+       "destination": "CLT",
+       "date": "2024-05-19"
+      },
+      {
+       "number": "HAT108",
+       "origin": "CLT",
+       "destination": "EWR",
+       "date": "2024-05-19"
+      },
+      {
+       "number": "HAT215",
+       "origin": "EWR",
+       "destination": "CLT",
+       "date": "2024-05-26"
+      },
+      {
+       "number": "HAT205",
+       "origin": "CLT",
+       "destination": "PHL",
+       "date": "2024-05-26"
+      }
+     ],
+     "passengers": [
+      [
+       "Ethan",
+       "Silva"
+      ],
+      [
+       "Noah",
+       "Ahmed"
+      ],
+      [
+       "Olivia",
+       "Wilson"
+      ]
+     ],
+     "totalBaggages": 2,
+     "insurance": "no"
+    },
+    {
+     "id": "D9R9S0",
+     "origin": "EWR",
+     "destination": "PHL",
+     "cabin": "economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT270",
+       "origin": "EWR",
+       "destination": "CLT",
+       "date": "2024-05-16"
+      },
+      {
+       "number": "HAT205",
+       "origin": "CLT",
+       "destination": "PHL",
+       "date": "2024-05-16"
+      }
+     ],
+     "passengers": [
+      [
+       "Raj",
+       "Brown"
+      ],
+      [
+       "Juan",
+       "Thomas"
+      ]
+     ],
+     "totalBaggages": 2,
+     "insurance": "no"
+    },
+    {
+     "id": "HTGCBX",
+     "origin": "PHL",
+     "destination": "EWR",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT269",
+       "origin": "PHL",
+       "destination": "CLT",
+       "date": "2024-05-13"
+      },
+      {
+       "number": "HAT157",
+       "origin": "CLT",
+       "destination": "EWR",
+       "date": "2024-05-13"
+      }
+     ],
+     "passengers": [
+      [
+       "Raj",
+       "Brown"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "yes"
+    },
+    {
+     "id": "N1EBKX",
+     "origin": "MCO",
+     "destination": "MSP",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT298",
+       "origin": "MCO",
+       "destination": "MSP",
+       "date": "2024-05-15"
+      },
+      {
+       "number": "HAT036",
+       "origin": "MSP",
+       "destination": "MCO",
+       "date": "2024-05-21"
+      }
+     ],
+     "passengers": [
+      [
+       "Raj",
+       "Brown"
+      ],
+      [
+       "Mei",
+       "Lopez"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "Q0K59Y",
+     "origin": "ATL",
+     "destination": "MSP",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT203",
+       "origin": "ATL",
+       "destination": "MCO",
+       "date": "2024-05-12"
+      },
+      {
+       "number": "HAT298",
+       "origin": "MCO",
+       "destination": "MSP",
+       "date": "2024-05-12"
+      }
+     ],
+     "passengers": [
+      [
+       "Raj",
+       "Brown"
+      ],
+      [
+       "Juan",
+       "Thomas"
+      ]
+     ],
+     "totalBaggages": 2,
+     "insurance": "no"
+    },
+    {
+     "id": "VA5SGQ",
+     "origin": "DTW",
+     "destination": "LGA",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT035",
+       "origin": "DTW",
+       "destination": "PHX",
+       "date": "2024-05-17"
+      },
+      {
+       "number": "HAT066",
+       "origin": "PHX",
+       "destination": "LGA",
+       "date": "2024-05-17"
+      },
+      {
+       "number": "HAT002",
+       "origin": "LGA",
+       "destination": "PHX",
+       "date": "2024-05-19"
+      },
+      {
+       "number": "HAT106",
+       "origin": "PHX",
+       "destination": "DTW",
+       "date": "2024-05-20"
+      }
+     ],
+     "passengers": [
+      [
+       "Raj",
+       "Brown"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    }
+   ]
+  },
+  {
+   "id": "30",
+   "user": "james_taylor_7043",
+   "reason": "You want to make modifications to your upcoming one-stop flight from LAS to IAH (HAT266, mention only the flight number if the agent shows it to you first).",
+   "writes": [
+    {
+     "name": "update_reservation_flights",
+     "objects": 1,
+     "record": "1N99U6",
+     "itinerary": [
+      {
+       "number": "HAT266",
+       "date": "2024-05-19",
+       "origin": "LAS",
+       "destination": "IAH"
+      },
+      {
+       "number": "HAT112",
+       "date": "2024-05-27",
+       "origin": "IAH",
+       "destination": "LAS"
+      }
+     ],
+     "passengers": [],
+     "cabin": "economy",
+     "baggages": null
+    }
+   ],
+   "records": [
+    {
+     "id": "1N99U6",
+     "origin": "LAS",
+     "destination": "IAH",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT284",
+       "origin": "LAS",
+       "destination": "PHX",
+       "date": "2024-05-19"
+      },
+      {
+       "number": "HAT152",
+       "origin": "PHX",
+       "destination": "IAH",
+       "date": "2024-05-19"
+      },
+      {
+       "number": "HAT112",
+       "origin": "IAH",
+       "destination": "LAS",
+       "date": "2024-05-27"
+      }
+     ],
+     "passengers": [
+      [
+       "James",
+       "Taylor"
+      ],
+      [
+       "Ivan",
+       "Taylor"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "yes"
+    },
+    {
+     "id": "1R63WQ",
+     "origin": "LGA",
+     "destination": "ORD",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT029",
+       "origin": "LGA",
+       "destination": "PHL",
+       "date": "2024-05-16"
+      },
+      {
+       "number": "HAT197",
+       "origin": "PHL",
+       "destination": "ORD",
+       "date": "2024-05-16"
+      },
+      {
+       "number": "HAT093",
+       "origin": "ORD",
+       "destination": "ATL",
+       "date": "2024-05-20"
+      },
+      {
+       "number": "HAT164",
+       "origin": "ATL",
+       "destination": "LGA",
+       "date": "2024-05-20"
+      }
+     ],
+     "passengers": [
+      [
+       "James",
+       "Taylor"
+      ],
+      [
+       "Chen",
+       "Hernandez"
+      ],
+      [
+       "Ivan",
+       "Taylor"
+      ],
+      [
+       "Ava",
+       "Anderson"
+      ]
+     ],
+     "totalBaggages": 2,
+     "insurance": "yes"
+    },
+    {
+     "id": "UUN48W",
+     "origin": "IAH",
+     "destination": "LAS",
+     "cabin": "business",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT131",
+       "origin": "IAH",
+       "destination": "LAS",
+       "date": "2024-05-23"
+      },
+      {
+       "number": "HAT175",
+       "origin": "LAS",
+       "destination": "IAH",
+       "date": "2024-05-30"
+      }
+     ],
+     "passengers": [
+      [
+       "James",
+       "Taylor"
+      ],
+      [
+       "Lei",
+       "Rossi"
+      ],
+      [
+       "Mason",
+       "Moore"
+      ]
+     ],
+     "totalBaggages": 6,
+     "insurance": "yes"
+    }
+   ]
+  },
+  {
+   "id": "31",
+   "user": "daiki_lee_6144",
+   "reason": "Your cat is really sick and you need to get back home sooner to take care of it. \nYou want to change your upcoming flight from JFK on May 17 to a nonstop flight.",
+   "writes": [],
+   "records": [
+    {
+     "id": "COVE6R",
+     "origin": "MCO",
+     "destination": "BOS",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT017",
+       "origin": "MCO",
+       "destination": "BOS",
+       "date": "2024-05-27"
+      }
+     ],
+     "passengers": [
+      [
+       "Daiki",
+       "Lee"
+      ]
+     ],
+     "totalBaggages": 2,
+     "insurance": "yes"
+    },
+    {
+     "id": "DF89BM",
+     "origin": "JFK",
+     "destination": "DTW",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT079",
+       "origin": "JFK",
+       "destination": "ORD",
+       "date": "2024-05-17"
+      },
+      {
+       "number": "HAT020",
+       "origin": "ORD",
+       "destination": "DTW",
+       "date": "2024-05-17"
+      },
+      {
+       "number": "HAT263",
+       "origin": "DTW",
+       "destination": "JFK",
+       "date": "2024-05-24"
+      }
+     ],
+     "passengers": [
+      [
+       "Daiki",
+       "Lee"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "IIHXDG",
+     "origin": "PHL",
+     "destination": "SFO",
+     "cabin": "economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT199",
+       "origin": "PHL",
+       "destination": "SFO",
+       "date": "2024-05-18"
+      }
+     ],
+     "passengers": [
+      [
+       "Raj",
+       "Muller"
+      ],
+      [
+       "Ivan",
+       "Garcia"
+      ],
+      [
+       "Fatima",
+       "Moore"
+      ]
+     ],
+     "totalBaggages": 3,
+     "insurance": "yes"
+    }
+   ]
+  },
+  {
+   "id": "32",
+   "user": "ivan_rossi_8555",
+   "reason": "You want to change your upcoming flight from EWR on May 21 to a nonstop flight on the same day. \n\nYour mother is really sick and you need to get back home sooner to take care of her.",
+   "writes": [
+    {
+     "name": "update_reservation_flights",
+     "objects": 1,
+     "record": "OWZ4XL",
+     "itinerary": [
+      {
+       "number": "HAT202",
+       "date": "2024-05-21",
+       "origin": "EWR",
+       "destination": "MIA"
+      },
+      {
+       "number": "HAT232",
+       "date": "2024-05-21",
+       "origin": "MIA",
+       "destination": "LAX"
+      }
+     ],
+     "passengers": [],
+     "cabin": "economy",
+     "baggages": null
+    },
+    {
+     "name": "update_reservation_flights",
+     "objects": 1,
+     "record": "OWZ4XL",
+     "itinerary": [
+      {
+       "number": "HAT041",
+       "date": "2024-05-21",
+       "origin": "EWR",
+       "destination": "LAX"
+      }
+     ],
+     "passengers": [],
+     "cabin": "economy",
+     "baggages": null
+    }
+   ],
+   "records": [
+    {
+     "id": "8WMF4C",
+     "origin": "MIA",
+     "destination": "PHX",
+     "cabin": "economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT062",
+       "origin": "MIA",
+       "destination": "LAS",
+       "date": "2024-05-20"
+      },
+      {
+       "number": "HAT284",
+       "origin": "LAS",
+       "destination": "PHX",
+       "date": "2024-05-21"
+      }
+     ],
+     "passengers": [
+      [
+       "Ivan",
+       "Rossi"
+      ],
+      [
+       "Ethan",
+       "Khan"
+      ]
+     ],
+     "totalBaggages": 2,
+     "insurance": "no"
+    },
+    {
+     "id": "F3IQK1",
+     "origin": "PHX",
+     "destination": "MCO",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT181",
+       "origin": "PHX",
+       "destination": "MCO",
+       "date": "2024-05-10"
+      }
+     ],
+     "passengers": [
+      [
+       "Ivan",
+       "Rossi"
+      ],
+      [
+       "Yara",
+       "Garcia"
+      ],
+      [
+       "Anya",
+       "Patel"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "L2H5FP",
+     "origin": "CLT",
+     "destination": "DFW",
+     "cabin": "economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT108",
+       "origin": "CLT",
+       "destination": "EWR",
+       "date": "2024-05-03"
+      },
+      {
+       "number": "HAT213",
+       "origin": "EWR",
+       "destination": "DFW",
+       "date": "2024-05-03"
+      }
+     ],
+     "passengers": [
+      [
+       "Ivan",
+       "Rossi"
+      ],
+      [
+       "Harper",
+       "Muller"
+      ],
+      [
+       "Mason",
+       "Silva"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "OWZ4XL",
+     "origin": "EWR",
+     "destination": "LAX",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT202",
+       "origin": "EWR",
+       "destination": "MIA",
+       "date": "2024-05-21"
+      },
+      {
+       "number": "HAT232",
+       "origin": "MIA",
+       "destination": "LAX",
+       "date": "2024-05-21"
+      }
+     ],
+     "passengers": [
+      [
+       "Ivan",
+       "Rossi"
+      ],
+      [
+       "Olivia",
+       "Santos"
+      ],
+      [
+       "Lei",
+       "Johansson"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    }
+   ]
+  },
+  {
+   "id": "33",
+   "user": "yara_garcia_1905",
+   "reason": "You want to change your upcoming outgoing flight in reservation HXDUBJ to a nonstop flight on the next day (i.e. delay by one day).\n\nYou also want to move back your return from SFO by one day.",
+   "writes": [
+    {
+     "name": "update_reservation_flights",
+     "objects": 1,
+     "record": "HXDUBJ",
+     "itinerary": [
+      {
+       "number": "HAT072",
+       "date": "2024-05-19",
+       "origin": "IAH",
+       "destination": "SFO"
+      },
+      {
+       "number": "HAT278",
+       "date": "2024-05-23",
+       "origin": "SFO",
+       "destination": "IAH"
+      }
+     ],
+     "passengers": [],
+     "cabin": "economy",
+     "baggages": null
+    },
+    {
+     "name": "update_reservation_baggages",
+     "objects": 1,
+     "record": "HXDUBJ",
+     "itinerary": [],
+     "passengers": [],
+     "cabin": "",
+     "baggages": 2
+    }
+   ],
+   "records": [
+    {
+     "id": "46BBSE",
+     "origin": "MCO",
+     "destination": "DTW",
+     "cabin": "economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT214",
+       "origin": "MCO",
+       "destination": "PHX",
+       "date": "2024-05-22"
+      },
+      {
+       "number": "HAT265",
+       "origin": "PHX",
+       "destination": "DTW",
+       "date": "2024-05-23"
+      }
+     ],
+     "passengers": [
+      [
+       "Yara",
+       "Garcia"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "no"
+    },
+    {
+     "id": "DXG8T6",
+     "origin": "PHX",
+     "destination": "MSP",
+     "cabin": "business",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT106",
+       "origin": "PHX",
+       "destination": "DTW",
+       "date": "2024-05-20"
+      },
+      {
+       "number": "HAT237",
+       "origin": "DTW",
+       "destination": "MSP",
+       "date": "2024-05-20"
+      },
+      {
+       "number": "HAT054",
+       "origin": "MSP",
+       "destination": "MCO",
+       "date": "2024-05-24"
+      },
+      {
+       "number": "HAT161",
+       "origin": "MCO",
+       "destination": "PHX",
+       "date": "2024-05-24"
+      }
+     ],
+     "passengers": [
+      [
+       "Yara",
+       "Garcia"
+      ],
+      [
+       "Olivia",
+       "Garcia"
+      ]
+     ],
+     "totalBaggages": 2,
+     "insurance": "no"
+    },
+    {
+     "id": "HXDUBJ",
+     "origin": "IAH",
+     "destination": "SFO",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT085",
+       "origin": "IAH",
+       "destination": "JFK",
+       "date": "2024-05-18"
+      },
+      {
+       "number": "HAT023",
+       "origin": "JFK",
+       "destination": "SFO",
+       "date": "2024-05-18"
+      },
+      {
+       "number": "HAT278",
+       "origin": "SFO",
+       "destination": "IAH",
+       "date": "2024-05-22"
+      }
+     ],
+     "passengers": [
+      [
+       "Yara",
+       "Garcia"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "P9VXUO",
+     "origin": "ORD",
+     "destination": "PHX",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT230",
+       "origin": "ORD",
+       "destination": "DTW",
+       "date": "2024-05-20"
+      },
+      {
+       "number": "HAT035",
+       "origin": "DTW",
+       "destination": "PHX",
+       "date": "2024-05-20"
+      }
+     ],
+     "passengers": [
+      [
+       "James",
+       "Khan"
+      ],
+      [
+       "Sofia",
+       "Kovacs"
+      ]
+     ],
+     "totalBaggages": 2,
+     "insurance": "no"
+    }
+   ]
+  },
+  {
+   "id": "34",
+   "user": "yara_garcia_1905",
+   "reason": "You want to change your upcoming outgoing flight in reservation HXDUBJ to a nonstop flight on the next day (i.e. delay by one day). \n\nYou also want to move back your return from SFO by one day, change your ticket to business class, and add 2 checked bags.",
+   "writes": [],
+   "records": [
+    {
+     "id": "46BBSE",
+     "origin": "MCO",
+     "destination": "DTW",
+     "cabin": "economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT214",
+       "origin": "MCO",
+       "destination": "PHX",
+       "date": "2024-05-22"
+      },
+      {
+       "number": "HAT265",
+       "origin": "PHX",
+       "destination": "DTW",
+       "date": "2024-05-23"
+      }
+     ],
+     "passengers": [
+      [
+       "Yara",
+       "Garcia"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "no"
+    },
+    {
+     "id": "DXG8T6",
+     "origin": "PHX",
+     "destination": "MSP",
+     "cabin": "business",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT106",
+       "origin": "PHX",
+       "destination": "DTW",
+       "date": "2024-05-20"
+      },
+      {
+       "number": "HAT237",
+       "origin": "DTW",
+       "destination": "MSP",
+       "date": "2024-05-20"
+      },
+      {
+       "number": "HAT054",
+       "origin": "MSP",
+       "destination": "MCO",
+       "date": "2024-05-24"
+      },
+      {
+       "number": "HAT161",
+       "origin": "MCO",
+       "destination": "PHX",
+       "date": "2024-05-24"
+      }
+     ],
+     "passengers": [
+      [
+       "Yara",
+       "Garcia"
+      ],
+      [
+       "Olivia",
+       "Garcia"
+      ]
+     ],
+     "totalBaggages": 2,
+     "insurance": "no"
+    },
+    {
+     "id": "HXDUBJ",
+     "origin": "IAH",
+     "destination": "SFO",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT085",
+       "origin": "IAH",
+       "destination": "JFK",
+       "date": "2024-05-18"
+      },
+      {
+       "number": "HAT023",
+       "origin": "JFK",
+       "destination": "SFO",
+       "date": "2024-05-18"
+      },
+      {
+       "number": "HAT278",
+       "origin": "SFO",
+       "destination": "IAH",
+       "date": "2024-05-22"
+      }
+     ],
+     "passengers": [
+      [
+       "Yara",
+       "Garcia"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "P9VXUO",
+     "origin": "ORD",
+     "destination": "PHX",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT230",
+       "origin": "ORD",
+       "destination": "DTW",
+       "date": "2024-05-20"
+      },
+      {
+       "number": "HAT035",
+       "origin": "DTW",
+       "destination": "PHX",
+       "date": "2024-05-20"
+      }
+     ],
+     "passengers": [
+      [
+       "James",
+       "Khan"
+      ],
+      [
+       "Sofia",
+       "Kovacs"
+      ]
+     ],
+     "totalBaggages": 2,
+     "insurance": "no"
+    }
+   ]
+  },
+  {
+   "id": "35",
+   "user": "aarav_ahmed_6699",
+   "reason": "You want to first cancel your upcoming flight on May 22 from JFK to MCO.\n\nYou also want to book a new flight from JFK to SFO on May 24.",
+   "writes": [
+    {
+     "name": "book_reservation",
+     "objects": 1,
+     "record": null,
+     "itinerary": [
+      {
+       "number": "HAT069",
+       "date": "2024-05-24",
+       "origin": "JFK",
+       "destination": "SEA"
+      },
+      {
+       "number": "HAT258",
+       "date": "2024-05-24",
+       "origin": "SEA",
+       "destination": "SFO"
+      }
+     ],
+     "passengers": [
+      [
+       "Aarav",
+       "Ahmed"
+      ]
+     ],
+     "cabin": "economy",
+     "baggages": 0
+    }
+   ],
+   "records": [
+    {
+     "id": "IFOYYZ",
+     "origin": "CLT",
+     "destination": "EWR",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT157",
+       "origin": "CLT",
+       "destination": "EWR",
+       "date": "2024-05-28"
+      },
+      {
+       "number": "HAT215",
+       "origin": "EWR",
+       "destination": "CLT",
+       "date": "2024-05-30"
+      }
+     ],
+     "passengers": [
+      [
+       "Aarav",
+       "Ahmed"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "M20IZO",
+     "origin": "JFK",
+     "destination": "MCO",
+     "cabin": "economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT268",
+       "origin": "JFK",
+       "destination": "ATL",
+       "date": "2024-05-22"
+      },
+      {
+       "number": "HAT010",
+       "origin": "ATL",
+       "destination": "MCO",
+       "date": "2024-05-22"
+      }
+     ],
+     "passengers": [
+      [
+       "Aarav",
+       "Ahmed"
+      ],
+      [
+       "Daiki",
+       "Li"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "no"
+    },
+    {
+     "id": "N6F783",
+     "origin": "IAH",
+     "destination": "EWR",
+     "cabin": "business",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT195",
+       "origin": "IAH",
+       "destination": "EWR",
+       "date": "2024-05-18"
+      },
+      {
+       "number": "HAT166",
+       "origin": "EWR",
+       "destination": "IAH",
+       "date": "2024-05-21"
+      }
+     ],
+     "passengers": [
+      [
+       "Aarav",
+       "Ahmed"
+      ]
+     ],
+     "totalBaggages": 2,
+     "insurance": "no"
+    },
+    {
+     "id": "NQNU5R",
+     "origin": "MCO",
+     "destination": "SEA",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT214",
+       "origin": "MCO",
+       "destination": "PHX",
+       "date": "2024-05-13"
+      },
+      {
+       "number": "HAT045",
+       "origin": "PHX",
+       "destination": "SEA",
+       "date": "2024-05-14"
+      }
+     ],
+     "passengers": [
+      [
+       "Aarav",
+       "Ahmed"
+      ],
+      [
+       "Aarav",
+       "Patel"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "no"
+    }
+   ]
+  },
+  {
+   "id": "36",
+   "user": "lucas_brown_4047",
+   "reason": "You want to change the date of a flight in reservation EUJUY6. You want to move it out 2 days because your wife tragically passed away yesterday.",
+   "writes": [],
+   "records": [
+    {
+     "id": "800DQL",
+     "origin": "LAS",
+     "destination": "LGA",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT061",
+       "origin": "LAS",
+       "destination": "ATL",
+       "date": "2024-05-11"
+      },
+      {
+       "number": "HAT110",
+       "origin": "ATL",
+       "destination": "LGA",
+       "date": "2024-05-11"
+      }
+     ],
+     "passengers": [
+      [
+       "Lucas",
+       "Brown"
+      ],
+      [
+       "Emma",
+       "Li"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "EUJUY6",
+     "origin": "ORD",
+     "destination": "LAS",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT238",
+       "origin": "ORD",
+       "destination": "DEN",
+       "date": "2024-05-14"
+      },
+      {
+       "number": "HAT290",
+       "origin": "DEN",
+       "destination": "LAS",
+       "date": "2024-05-14"
+      },
+      {
+       "number": "HAT266",
+       "origin": "LAS",
+       "destination": "IAH",
+       "date": "2024-05-16"
+      },
+      {
+       "number": "HAT044",
+       "origin": "IAH",
+       "destination": "ORD",
+       "date": "2024-05-16"
+      }
+     ],
+     "passengers": [
+      [
+       "Lucas",
+       "Brown"
+      ],
+      [
+       "Daiki",
+       "Thomas"
+      ],
+      [
+       "Daiki",
+       "Lopez"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "ODH78Z",
+     "origin": "PHL",
+     "destination": "EWR",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT122",
+       "origin": "PHL",
+       "destination": "CLT",
+       "date": "2024-05-14"
+      },
+      {
+       "number": "HAT157",
+       "origin": "CLT",
+       "destination": "EWR",
+       "date": "2024-05-14"
+      },
+      {
+       "number": "HAT270",
+       "origin": "EWR",
+       "destination": "CLT",
+       "date": "2024-05-21"
+      },
+      {
+       "number": "HAT205",
+       "origin": "CLT",
+       "destination": "PHL",
+       "date": "2024-05-21"
+      }
+     ],
+     "passengers": [
+      [
+       "Daiki",
+       "Lopez"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "Q4TE65",
+     "origin": "IAH",
+     "destination": "DTW",
+     "cabin": "business",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT116",
+       "origin": "IAH",
+       "destination": "ORD",
+       "date": "2024-05-23"
+      },
+      {
+       "number": "HAT020",
+       "origin": "ORD",
+       "destination": "DTW",
+       "date": "2024-05-23"
+      },
+      {
+       "number": "HAT169",
+       "origin": "DTW",
+       "destination": "JFK",
+       "date": "2024-05-28"
+      },
+      {
+       "number": "HAT279",
+       "origin": "JFK",
+       "destination": "IAH",
+       "date": "2024-05-28"
+      }
+     ],
+     "passengers": [
+      [
+       "Lucas",
+       "Brown"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "UX0R03",
+     "origin": "ORD",
+     "destination": "LGA",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT289",
+       "origin": "ORD",
+       "destination": "PHL",
+       "date": "2024-05-22"
+      },
+      {
+       "number": "HAT135",
+       "origin": "PHL",
+       "destination": "LGA",
+       "date": "2024-05-22"
+      }
+     ],
+     "passengers": [
+      [
+       "Lucas",
+       "Brown"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "WYT8OO",
+     "origin": "MIA",
+     "destination": "SEA",
+     "cabin": "economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT288",
+       "origin": "MIA",
+       "destination": "LAS",
+       "date": "2024-05-16"
+      },
+      {
+       "number": "HAT047",
+       "origin": "LAS",
+       "destination": "SEA",
+       "date": "2024-05-17"
+      }
+     ],
+     "passengers": [
+      [
+       "Olivia",
+       "Khan"
+      ],
+      [
+       "Daiki",
+       "Lopez"
+      ],
+      [
+       "Isabella",
+       "Rossi"
+      ],
+      [
+       "Evelyn",
+       "Ahmed"
+      ]
+     ],
+     "totalBaggages": 3,
+     "insurance": "yes"
+    }
+   ]
+  },
+  {
+   "id": "37",
+   "user": "aarav_ahmed_6699",
+   "reason": "You want to cancel two of your upcoming reservations (IFOYYZ and NQNU5R) and upgrade a third (M20IZO) to business class.",
+   "writes": [
+    {
+     "name": "update_reservation_flights",
+     "objects": 1,
+     "record": "M20IZO",
+     "itinerary": [
+      {
+       "number": "HAT268",
+       "date": "2024-05-22",
+       "origin": "JFK",
+       "destination": "ATL"
+      },
+      {
+       "number": "HAT010",
+       "date": "2024-05-22",
+       "origin": "ATL",
+       "destination": "MCO"
+      }
+     ],
+     "passengers": [],
+     "cabin": "business",
+     "baggages": null
+    }
+   ],
+   "records": [
+    {
+     "id": "IFOYYZ",
+     "origin": "CLT",
+     "destination": "EWR",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT157",
+       "origin": "CLT",
+       "destination": "EWR",
+       "date": "2024-05-28"
+      },
+      {
+       "number": "HAT215",
+       "origin": "EWR",
+       "destination": "CLT",
+       "date": "2024-05-30"
+      }
+     ],
+     "passengers": [
+      [
+       "Aarav",
+       "Ahmed"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "M20IZO",
+     "origin": "JFK",
+     "destination": "MCO",
+     "cabin": "economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT268",
+       "origin": "JFK",
+       "destination": "ATL",
+       "date": "2024-05-22"
+      },
+      {
+       "number": "HAT010",
+       "origin": "ATL",
+       "destination": "MCO",
+       "date": "2024-05-22"
+      }
+     ],
+     "passengers": [
+      [
+       "Aarav",
+       "Ahmed"
+      ],
+      [
+       "Daiki",
+       "Li"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "no"
+    },
+    {
+     "id": "N6F783",
+     "origin": "IAH",
+     "destination": "EWR",
+     "cabin": "business",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT195",
+       "origin": "IAH",
+       "destination": "EWR",
+       "date": "2024-05-18"
+      },
+      {
+       "number": "HAT166",
+       "origin": "EWR",
+       "destination": "IAH",
+       "date": "2024-05-21"
+      }
+     ],
+     "passengers": [
+      [
+       "Aarav",
+       "Ahmed"
+      ]
+     ],
+     "totalBaggages": 2,
+     "insurance": "no"
+    },
+    {
+     "id": "NQNU5R",
+     "origin": "MCO",
+     "destination": "SEA",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT214",
+       "origin": "MCO",
+       "destination": "PHX",
+       "date": "2024-05-13"
+      },
+      {
+       "number": "HAT045",
+       "origin": "PHX",
+       "destination": "SEA",
+       "date": "2024-05-14"
+      }
+     ],
+     "passengers": [
+      [
+       "Aarav",
+       "Ahmed"
+      ],
+      [
+       "Aarav",
+       "Patel"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "no"
+    }
+   ]
+  },
+  {
+   "id": "38",
+   "user": "noah_muller_9847",
+   "reason": "You contact customer service because you are frustrated with the delayed flight in your most recent reservation.",
+   "writes": [],
+   "records": [
+    {
+     "id": "4OG6T3",
+     "origin": "BOS",
+     "destination": "LAS",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT006",
+       "origin": "BOS",
+       "destination": "SEA",
+       "date": "2024-05-11"
+      },
+      {
+       "number": "HAT018",
+       "origin": "SEA",
+       "destination": "LAS",
+       "date": "2024-05-11"
+      },
+      {
+       "number": "HAT040",
+       "origin": "LAS",
+       "destination": "SEA",
+       "date": "2024-05-17"
+      },
+      {
+       "number": "HAT253",
+       "origin": "SEA",
+       "destination": "BOS",
+       "date": "2024-05-17"
+      }
+     ],
+     "passengers": [
+      [
+       "Noah",
+       "Muller"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "SDZQKO",
+     "origin": "LAX",
+     "destination": "MIA",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT228",
+       "origin": "LAX",
+       "destination": "EWR",
+       "date": "2024-05-27"
+      },
+      {
+       "number": "HAT202",
+       "origin": "EWR",
+       "destination": "MIA",
+       "date": "2024-05-28"
+      },
+      {
+       "number": "HAT192",
+       "origin": "MIA",
+       "destination": "EWR",
+       "date": "2024-05-28"
+      },
+      {
+       "number": "HAT041",
+       "origin": "EWR",
+       "destination": "LAX",
+       "date": "2024-05-29"
+      }
+     ],
+     "passengers": [
+      [
+       "Noah",
+       "Muller"
+      ],
+      [
+       "Lucas",
+       "Anderson"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    }
+   ]
+  },
+  {
+   "id": "39",
+   "user": "amelia_davis_8890",
+   "reason": "You want to cancel all of your upcoming flights.",
+   "writes": [
+    {
+     "name": "cancel_reservation",
+     "objects": 1,
+     "record": "8C8K4E",
+     "itinerary": [],
+     "passengers": [],
+     "cabin": "",
+     "baggages": null
+    },
+    {
+     "name": "cancel_reservation",
+     "objects": 1,
+     "record": "LU15PA",
+     "itinerary": [],
+     "passengers": [],
+     "cabin": "",
+     "baggages": null
+    },
+    {
+     "name": "cancel_reservation",
+     "objects": 1,
+     "record": "MSJ4OA",
+     "itinerary": [],
+     "passengers": [],
+     "cabin": "",
+     "baggages": null
+    }
+   ],
+   "records": [
+    {
+     "id": "4XGCCM",
+     "origin": "IAH",
+     "destination": "DTW",
+     "cabin": "business",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT116",
+       "origin": "IAH",
+       "destination": "ORD",
+       "date": "2024-05-03"
+      },
+      {
+       "number": "HAT020",
+       "origin": "ORD",
+       "destination": "DTW",
+       "date": "2024-05-03"
+      },
+      {
+       "number": "HAT169",
+       "origin": "DTW",
+       "destination": "JFK",
+       "date": "2024-05-04"
+      },
+      {
+       "number": "HAT279",
+       "origin": "JFK",
+       "destination": "IAH",
+       "date": "2024-05-04"
+      }
+     ],
+     "passengers": [
+      [
+       "Amelia",
+       "Davis"
+      ]
+     ],
+     "totalBaggages": 2,
+     "insurance": "yes"
+    },
+    {
+     "id": "8C8K4E",
+     "origin": "BOS",
+     "destination": "DEN",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT247",
+       "origin": "BOS",
+       "destination": "MIA",
+       "date": "2024-05-24"
+      },
+      {
+       "number": "HAT193",
+       "origin": "MIA",
+       "destination": "DEN",
+       "date": "2024-05-24"
+      }
+     ],
+     "passengers": [
+      [
+       "Amelia",
+       "Davis"
+      ],
+      [
+       "Amelia",
+       "Jackson"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "I6M8JQ",
+     "origin": "LAS",
+     "destination": "EWR",
+     "cabin": "economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT115",
+       "origin": "LAS",
+       "destination": "MIA",
+       "date": "2024-05-09"
+      },
+      {
+       "number": "HAT192",
+       "origin": "MIA",
+       "destination": "EWR",
+       "date": "2024-05-09"
+      }
+     ],
+     "passengers": [
+      [
+       "Amelia",
+       "Davis"
+      ],
+      [
+       "Juan",
+       "Sanchez"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "LU15PA",
+     "origin": "SFO",
+     "destination": "SFO",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT144",
+       "origin": "SFO",
+       "destination": "PHX",
+       "date": "2024-05-23"
+      },
+      {
+       "number": "HAT009",
+       "origin": "PHX",
+       "destination": "SFO",
+       "date": "2024-05-23"
+      }
+     ],
+     "passengers": [
+      [
+       "Amelia",
+       "Davis"
+      ],
+      [
+       "Amelia",
+       "Jackson"
+      ]
+     ],
+     "totalBaggages": 4,
+     "insurance": "no"
+    },
+    {
+     "id": "MSJ4OA",
+     "origin": "DFW",
+     "destination": "SFO",
+     "cabin": "economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT099",
+       "origin": "DFW",
+       "destination": "SEA",
+       "date": "2024-05-22"
+      },
+      {
+       "number": "HAT274",
+       "origin": "SEA",
+       "destination": "SFO",
+       "date": "2024-05-22"
+      }
+     ],
+     "passengers": [
+      [
+       "Amelia",
+       "Jackson"
+      ],
+      [
+       "Anya",
+       "Brown"
+      ],
+      [
+       "Mei",
+       "Wilson"
+      ]
+     ],
+     "totalBaggages": 3,
+     "insurance": "yes"
+    },
+    {
+     "id": "UDMOP1",
+     "origin": "SFO",
+     "destination": "SFO",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT134",
+       "origin": "SFO",
+       "destination": "PHX",
+       "date": "2024-05-28"
+      },
+      {
+       "number": "HAT032",
+       "origin": "PHX",
+       "destination": "SFO",
+       "date": "2024-05-28"
+      },
+      {
+       "number": "HAT280",
+       "origin": "SFO",
+       "destination": "PHL",
+       "date": "2024-05-29"
+      },
+      {
+       "number": "HAT199",
+       "origin": "PHL",
+       "destination": "SFO",
+       "date": "2024-05-29"
+      }
+     ],
+     "passengers": [
+      [
+       "Amelia",
+       "Davis"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "XAZ3C0",
+     "origin": "ATL",
+     "destination": "CLT",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT110",
+       "origin": "ATL",
+       "destination": "LGA",
+       "date": "2024-05-27"
+      },
+      {
+       "number": "HAT272",
+       "origin": "LGA",
+       "destination": "CLT",
+       "date": "2024-05-27"
+      }
+     ],
+     "passengers": [
+      [
+       "Fatima",
+       "Johnson"
+      ],
+      [
+       "Amelia",
+       "Jackson"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    }
+   ]
+  },
+  {
+   "id": "40",
+   "user": "anya_garcia_5901",
+   "reason": "You booked the flight  and you want to change the passenger name on the reservation.",
+   "writes": [
+    {
+     "name": "update_reservation_passengers",
+     "objects": 1,
+     "record": "3RK2T9",
+     "itinerary": [],
+     "passengers": [
+      [
+       "Anya",
+       "Garcia"
+      ],
+      [
+       "Mei",
+       "Garcia"
+      ]
+     ],
+     "cabin": "",
+     "baggages": null
+    }
+   ],
+   "records": [
+    {
+     "id": "3RK2T9",
+     "origin": "MCO",
+     "destination": "SFO",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT214",
+       "origin": "MCO",
+       "destination": "PHX",
+       "date": "2024-05-19"
+      },
+      {
+       "number": "HAT009",
+       "origin": "PHX",
+       "destination": "SFO",
+       "date": "2024-05-20"
+      }
+     ],
+     "passengers": [
+      [
+       "Anya",
+       "Garcia"
+      ],
+      [
+       "Mei",
+       "Lee"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "790JYN",
+     "origin": "BOS",
+     "destination": "LGA",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT260",
+       "origin": "BOS",
+       "destination": "CLT",
+       "date": "2024-05-28"
+      },
+      {
+       "number": "HAT087",
+       "origin": "CLT",
+       "destination": "LGA",
+       "date": "2024-05-28"
+      },
+      {
+       "number": "HAT065",
+       "origin": "LGA",
+       "destination": "CLT",
+       "date": "2024-05-30"
+      },
+      {
+       "number": "HAT064",
+       "origin": "CLT",
+       "destination": "BOS",
+       "date": "2024-05-30"
+      }
+     ],
+     "passengers": [
+      [
+       "Anya",
+       "Garcia"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "82K959",
+     "origin": "LAX",
+     "destination": "DEN",
+     "cabin": "business",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT090",
+       "origin": "LAX",
+       "destination": "ORD",
+       "date": "2024-05-18"
+      },
+      {
+       "number": "HAT049",
+       "origin": "ORD",
+       "destination": "DEN",
+       "date": "2024-05-18"
+      },
+      {
+       "number": "HAT130",
+       "origin": "DEN",
+       "destination": "MIA",
+       "date": "2024-05-24"
+      },
+      {
+       "number": "HAT120",
+       "origin": "MIA",
+       "destination": "LAX",
+       "date": "2024-05-24"
+      }
+     ],
+     "passengers": [
+      [
+       "Anya",
+       "Garcia"
+      ],
+      [
+       "Mei",
+       "Lee"
+      ]
+     ],
+     "totalBaggages": 2,
+     "insurance": "no"
+    },
+    {
+     "id": "BE2L57",
+     "origin": "LAX",
+     "destination": "MIA",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT228",
+       "origin": "LAX",
+       "destination": "EWR",
+       "date": "2024-05-17"
+      },
+      {
+       "number": "HAT202",
+       "origin": "EWR",
+       "destination": "MIA",
+       "date": "2024-05-18"
+      }
+     ],
+     "passengers": [
+      [
+       "Anya",
+       "Garcia"
+      ],
+      [
+       "Sophia",
+       "Hernandez"
+      ]
+     ],
+     "totalBaggages": 3,
+     "insurance": "yes"
+    },
+    {
+     "id": "CXBB4L",
+     "origin": "DTW",
+     "destination": "LAS",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT275",
+       "origin": "DTW",
+       "destination": "PHX",
+       "date": "2024-05-27"
+      },
+      {
+       "number": "HAT259",
+       "origin": "PHX",
+       "destination": "LAS",
+       "date": "2024-05-27"
+      }
+     ],
+     "passengers": [
+      [
+       "Anya",
+       "Garcia"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "JMO1MG",
+     "origin": "DEN",
+     "destination": "MIA",
+     "cabin": "economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT255",
+       "origin": "DEN",
+       "destination": "MIA",
+       "date": "2024-05-16"
+      }
+     ],
+     "passengers": [
+      [
+       "Anya",
+       "Garcia"
+      ],
+      [
+       "Raj",
+       "Jackson"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "yes"
+    },
+    {
+     "id": "Q4MCUF",
+     "origin": "SEA",
+     "destination": "LGA",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT121",
+       "origin": "SEA",
+       "destination": "PHX",
+       "date": "2024-05-13"
+      },
+      {
+       "number": "HAT256",
+       "origin": "PHX",
+       "destination": "LGA",
+       "date": "2024-05-13"
+      },
+      {
+       "number": "HAT114",
+       "origin": "LGA",
+       "destination": "PHX",
+       "date": "2024-05-18"
+      },
+      {
+       "number": "HAT156",
+       "origin": "PHX",
+       "destination": "SEA",
+       "date": "2024-05-19"
+      }
+     ],
+     "passengers": [
+      [
+       "Anya",
+       "Garcia"
+      ],
+      [
+       "Harper",
+       "Kim"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "TAMSDK",
+     "origin": "JFK",
+     "destination": "PHX",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT033",
+       "origin": "JFK",
+       "destination": "DTW",
+       "date": "2024-05-20"
+      },
+      {
+       "number": "HAT035",
+       "origin": "DTW",
+       "destination": "PHX",
+       "date": "2024-05-20"
+      },
+      {
+       "number": "HAT156",
+       "origin": "PHX",
+       "destination": "SEA",
+       "date": "2024-05-24"
+      },
+      {
+       "number": "HAT100",
+       "origin": "SEA",
+       "destination": "JFK",
+       "date": "2024-05-24"
+      }
+     ],
+     "passengers": [
+      [
+       "Mei",
+       "Lee"
+      ],
+      [
+       "Mason",
+       "Santos"
+      ],
+      [
+       "Isabella",
+       "Moore"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "VAOW1B",
+     "origin": "PHX",
+     "destination": "JFK",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT045",
+       "origin": "PHX",
+       "destination": "SEA",
+       "date": "2024-05-07"
+      },
+      {
+       "number": "HAT276",
+       "origin": "SEA",
+       "destination": "JFK",
+       "date": "2024-05-08"
+      },
+      {
+       "number": "HAT212",
+       "origin": "JFK",
+       "destination": "DTW",
+       "date": "2024-05-08"
+      },
+      {
+       "number": "HAT097",
+       "origin": "DTW",
+       "destination": "PHX",
+       "date": "2024-05-08"
+      }
+     ],
+     "passengers": [
+      [
+       "Anya",
+       "Garcia"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "yes"
+    }
+   ]
+  },
+  {
+   "id": "41",
+   "user": "amelia_davis_8890",
+   "reason": "You want to cancel all of your upcoming flights that only have one passenger on the reservation.",
+   "writes": [],
+   "records": [
+    {
+     "id": "4XGCCM",
+     "origin": "IAH",
+     "destination": "DTW",
+     "cabin": "business",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT116",
+       "origin": "IAH",
+       "destination": "ORD",
+       "date": "2024-05-03"
+      },
+      {
+       "number": "HAT020",
+       "origin": "ORD",
+       "destination": "DTW",
+       "date": "2024-05-03"
+      },
+      {
+       "number": "HAT169",
+       "origin": "DTW",
+       "destination": "JFK",
+       "date": "2024-05-04"
+      },
+      {
+       "number": "HAT279",
+       "origin": "JFK",
+       "destination": "IAH",
+       "date": "2024-05-04"
+      }
+     ],
+     "passengers": [
+      [
+       "Amelia",
+       "Davis"
+      ]
+     ],
+     "totalBaggages": 2,
+     "insurance": "yes"
+    },
+    {
+     "id": "8C8K4E",
+     "origin": "BOS",
+     "destination": "DEN",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT247",
+       "origin": "BOS",
+       "destination": "MIA",
+       "date": "2024-05-24"
+      },
+      {
+       "number": "HAT193",
+       "origin": "MIA",
+       "destination": "DEN",
+       "date": "2024-05-24"
+      }
+     ],
+     "passengers": [
+      [
+       "Amelia",
+       "Davis"
+      ],
+      [
+       "Amelia",
+       "Jackson"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "I6M8JQ",
+     "origin": "LAS",
+     "destination": "EWR",
+     "cabin": "economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT115",
+       "origin": "LAS",
+       "destination": "MIA",
+       "date": "2024-05-09"
+      },
+      {
+       "number": "HAT192",
+       "origin": "MIA",
+       "destination": "EWR",
+       "date": "2024-05-09"
+      }
+     ],
+     "passengers": [
+      [
+       "Amelia",
+       "Davis"
+      ],
+      [
+       "Juan",
+       "Sanchez"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "LU15PA",
+     "origin": "SFO",
+     "destination": "SFO",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT144",
+       "origin": "SFO",
+       "destination": "PHX",
+       "date": "2024-05-23"
+      },
+      {
+       "number": "HAT009",
+       "origin": "PHX",
+       "destination": "SFO",
+       "date": "2024-05-23"
+      }
+     ],
+     "passengers": [
+      [
+       "Amelia",
+       "Davis"
+      ],
+      [
+       "Amelia",
+       "Jackson"
+      ]
+     ],
+     "totalBaggages": 4,
+     "insurance": "no"
+    },
+    {
+     "id": "MSJ4OA",
+     "origin": "DFW",
+     "destination": "SFO",
+     "cabin": "economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT099",
+       "origin": "DFW",
+       "destination": "SEA",
+       "date": "2024-05-22"
+      },
+      {
+       "number": "HAT274",
+       "origin": "SEA",
+       "destination": "SFO",
+       "date": "2024-05-22"
+      }
+     ],
+     "passengers": [
+      [
+       "Amelia",
+       "Jackson"
+      ],
+      [
+       "Anya",
+       "Brown"
+      ],
+      [
+       "Mei",
+       "Wilson"
+      ]
+     ],
+     "totalBaggages": 3,
+     "insurance": "yes"
+    },
+    {
+     "id": "UDMOP1",
+     "origin": "SFO",
+     "destination": "SFO",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT134",
+       "origin": "SFO",
+       "destination": "PHX",
+       "date": "2024-05-28"
+      },
+      {
+       "number": "HAT032",
+       "origin": "PHX",
+       "destination": "SFO",
+       "date": "2024-05-28"
+      },
+      {
+       "number": "HAT280",
+       "origin": "SFO",
+       "destination": "PHL",
+       "date": "2024-05-29"
+      },
+      {
+       "number": "HAT199",
+       "origin": "PHL",
+       "destination": "SFO",
+       "date": "2024-05-29"
+      }
+     ],
+     "passengers": [
+      [
+       "Amelia",
+       "Davis"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "XAZ3C0",
+     "origin": "ATL",
+     "destination": "CLT",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT110",
+       "origin": "ATL",
+       "destination": "LGA",
+       "date": "2024-05-27"
+      },
+      {
+       "number": "HAT272",
+       "origin": "LGA",
+       "destination": "CLT",
+       "date": "2024-05-27"
+      }
+     ],
+     "passengers": [
+      [
+       "Fatima",
+       "Johnson"
+      ],
+      [
+       "Amelia",
+       "Jackson"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    }
+   ]
+  },
+  {
+   "id": "42",
+   "user": "sophia_martin_4574",
+   "reason": "You had a mixup with your assistant and booked multiple flights for the same day.",
+   "writes": [
+    {
+     "name": "cancel_reservation",
+     "objects": 1,
+     "record": "FDZ0T5",
+     "itinerary": [],
+     "passengers": [],
+     "cabin": "",
+     "baggages": null
+    },
+    {
+     "name": "cancel_reservation",
+     "objects": 1,
+     "record": "HSR97W",
+     "itinerary": [],
+     "passengers": [],
+     "cabin": "",
+     "baggages": null
+    }
+   ],
+   "records": [
+    {
+     "id": "5BGGWZ",
+     "origin": "EWR",
+     "destination": "DFW",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT231",
+       "origin": "EWR",
+       "destination": "DFW",
+       "date": "2024-05-10"
+      },
+      {
+       "number": "HAT142",
+       "origin": "DFW",
+       "destination": "EWR",
+       "date": "2024-05-17"
+      }
+     ],
+     "passengers": [
+      [
+       "Sophia",
+       "Martin"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "yes"
+    },
+    {
+     "id": "FDZ0T5",
+     "origin": "JFK",
+     "destination": "PHL",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT079",
+       "origin": "JFK",
+       "destination": "ORD",
+       "date": "2024-05-17"
+      },
+      {
+       "number": "HAT289",
+       "origin": "ORD",
+       "destination": "PHL",
+       "date": "2024-05-17"
+      }
+     ],
+     "passengers": [
+      [
+       "Sophia",
+       "Martin"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "no"
+    },
+    {
+     "id": "HSR97W",
+     "origin": "ORD",
+     "destination": "SFO",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT289",
+       "origin": "ORD",
+       "destination": "PHL",
+       "date": "2024-05-22"
+      },
+      {
+       "number": "HAT199",
+       "origin": "PHL",
+       "destination": "SFO",
+       "date": "2024-05-22"
+      }
+     ],
+     "passengers": [
+      [
+       "Sophia",
+       "Martin"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "HTR26G",
+     "origin": "MSP",
+     "destination": "DFW",
+     "cabin": "economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT300",
+       "origin": "MSP",
+       "destination": "EWR",
+       "date": "2024-05-16"
+      },
+      {
+       "number": "HAT231",
+       "origin": "EWR",
+       "destination": "DFW",
+       "date": "2024-05-16"
+      }
+     ],
+     "passengers": [
+      [
+       "Sophia",
+       "Martin"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "no"
+    },
+    {
+     "id": "MFRB94",
+     "origin": "MCO",
+     "destination": "LGA",
+     "cabin": "business",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT214",
+       "origin": "MCO",
+       "destination": "PHX",
+       "date": "2024-05-27"
+      },
+      {
+       "number": "HAT256",
+       "origin": "PHX",
+       "destination": "LGA",
+       "date": "2024-05-28"
+      },
+      {
+       "number": "HAT219",
+       "origin": "LGA",
+       "destination": "PHX",
+       "date": "2024-05-30"
+      },
+      {
+       "number": "HAT181",
+       "origin": "PHX",
+       "destination": "MCO",
+       "date": "2024-05-30"
+      }
+     ],
+     "passengers": [
+      [
+       "Sophia",
+       "Martin"
+      ]
+     ],
+     "totalBaggages": 2,
+     "insurance": "yes"
+    },
+    {
+     "id": "PUNERT",
+     "origin": "BOS",
+     "destination": "DEN",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT086",
+       "origin": "BOS",
+       "destination": "MIA",
+       "date": "2024-05-22"
+      },
+      {
+       "number": "HAT148",
+       "origin": "MIA",
+       "destination": "DEN",
+       "date": "2024-05-22"
+      }
+     ],
+     "passengers": [
+      [
+       "Sophia",
+       "Martin"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "SE9KEL",
+     "origin": "LAX",
+     "destination": "BOS",
+     "cabin": "business",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT034",
+       "origin": "LAX",
+       "destination": "SFO",
+       "date": "2024-05-17"
+      },
+      {
+       "number": "HAT026",
+       "origin": "SFO",
+       "destination": "BOS",
+       "date": "2024-05-17"
+      },
+      {
+       "number": "HAT247",
+       "origin": "BOS",
+       "destination": "MIA",
+       "date": "2024-05-29"
+      },
+      {
+       "number": "HAT250",
+       "origin": "MIA",
+       "destination": "LAX",
+       "date": "2024-05-29"
+      }
+     ],
+     "passengers": [
+      [
+       "Ivan",
+       "Brown"
+      ],
+      [
+       "Emma",
+       "Li"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    }
+   ]
+  },
+  {
+   "id": "43",
+   "user": "mohamed_hernandez_5188",
+   "reason": "You are contacting customer support because you have booked two flights for the same day.",
+   "writes": [],
+   "records": [
+    {
+     "id": "35V5SM",
+     "origin": "LAX",
+     "destination": "SFO",
+     "cabin": "business",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT155",
+       "origin": "LAX",
+       "destination": "SFO",
+       "date": "2024-05-24"
+      },
+      {
+       "number": "HAT163",
+       "origin": "SFO",
+       "destination": "LAX",
+       "date": "2024-05-29"
+      }
+     ],
+     "passengers": [
+      [
+       "Yusuf",
+       "Lee"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "9HBUV8",
+     "origin": "DEN",
+     "destination": "BOS",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT130",
+       "origin": "DEN",
+       "destination": "MIA",
+       "date": "2024-05-17"
+      },
+      {
+       "number": "HAT184",
+       "origin": "MIA",
+       "destination": "BOS",
+       "date": "2024-05-17"
+      }
+     ],
+     "passengers": [
+      [
+       "Mohamed",
+       "Hernandez"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "D1EW9B",
+     "origin": "ATL",
+     "destination": "JFK",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT285",
+       "origin": "ATL",
+       "destination": "JFK",
+       "date": "2024-05-17"
+      }
+     ],
+     "passengers": [
+      [
+       "Mohamed",
+       "Hernandez"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "DGZSYX",
+     "origin": "JFK",
+     "destination": "LAS",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT014",
+       "origin": "JFK",
+       "destination": "MIA",
+       "date": "2024-05-06"
+      },
+      {
+       "number": "HAT288",
+       "origin": "MIA",
+       "destination": "LAS",
+       "date": "2024-05-06"
+      }
+     ],
+     "passengers": [
+      [
+       "Mohamed",
+       "Hernandez"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "no"
+    },
+    {
+     "id": "V5EMZH",
+     "origin": "CLT",
+     "destination": "BOS",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT064",
+       "origin": "CLT",
+       "destination": "BOS",
+       "date": "2024-05-27"
+      },
+      {
+       "number": "HAT277",
+       "origin": "BOS",
+       "destination": "CLT",
+       "date": "2024-05-29"
+      }
+     ],
+     "passengers": [
+      [
+       "Mohamed",
+       "Hernandez"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "XXDC1M",
+     "origin": "DEN",
+     "destination": "PHX",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT084",
+       "origin": "DEN",
+       "destination": "LAS",
+       "date": "2024-05-21"
+      },
+      {
+       "number": "HAT244",
+       "origin": "LAS",
+       "destination": "PHX",
+       "date": "2024-05-21"
+      },
+      {
+       "number": "HAT027",
+       "origin": "PHX",
+       "destination": "LAS",
+       "date": "2024-05-22"
+      },
+      {
+       "number": "HAT162",
+       "origin": "LAS",
+       "destination": "DEN",
+       "date": "2024-05-22"
+      }
+     ],
+     "passengers": [
+      [
+       "Mohamed",
+       "Hernandez"
+      ],
+      [
+       "Olivia",
+       "Smith"
+      ],
+      [
+       "Harper",
+       "Li"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    }
+   ]
+  },
+  {
+   "id": "44",
+   "user": "sophia_silva_7557",
+   "reason": "You want to cancel all your future reservations that contain any flights that are longer than 4 hours. \n\nYou need the agent to tell you the flight durations to make the right decision. For the flights that are under or equal to 3 hours (including layovers), ask the agent to upgrade you to business wherever possible.",
+   "writes": [
+    {
+     "name": "update_reservation_flights",
+     "objects": 1,
+     "record": "NM1VX1",
+     "itinerary": [
+      {
+       "number": "HAT300",
+       "date": "2024-05-25",
+       "origin": "MSP",
+       "destination": "EWR"
+      },
+      {
+       "number": "HAT208",
+       "date": "2024-05-27",
+       "origin": "EWR",
+       "destination": "MSP"
+      }
+     ],
+     "passengers": [],
+     "cabin": "business",
+     "baggages": null
+    },
+    {
+     "name": "update_reservation_flights",
+     "objects": 1,
+     "record": "H8Q05L",
+     "itinerary": [
+      {
+       "number": "HAT268",
+       "date": "2024-05-24",
+       "origin": "JFK",
+       "destination": "ATL"
+      }
+     ],
+     "passengers": [],
+     "cabin": "business",
+     "baggages": null
+    },
+    {
+     "name": "update_reservation_flights",
+     "objects": 1,
+     "record": "KC18K6",
+     "itinerary": [
+      {
+       "number": "HAT300",
+       "date": "2024-05-21",
+       "origin": "MSP",
+       "destination": "EWR"
+      },
+      {
+       "number": "HAT215",
+       "date": "2024-05-21",
+       "origin": "EWR",
+       "destination": "CLT"
+      }
+     ],
+     "passengers": [],
+     "cabin": "business",
+     "baggages": null
+    }
+   ],
+   "records": [
+    {
+     "id": "H8Q05L",
+     "origin": "JFK",
+     "destination": "ATL",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT268",
+       "origin": "JFK",
+       "destination": "ATL",
+       "date": "2024-05-24"
+      }
+     ],
+     "passengers": [
+      [
+       "Harper",
+       "Kovacs"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "KC18K6",
+     "origin": "MSP",
+     "destination": "CLT",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT300",
+       "origin": "MSP",
+       "destination": "EWR",
+       "date": "2024-05-21"
+      },
+      {
+       "number": "HAT215",
+       "origin": "EWR",
+       "destination": "CLT",
+       "date": "2024-05-21"
+      }
+     ],
+     "passengers": [
+      [
+       "Sophia",
+       "Silva"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "NM1VX1",
+     "origin": "MSP",
+     "destination": "EWR",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT300",
+       "origin": "MSP",
+       "destination": "EWR",
+       "date": "2024-05-25"
+      },
+      {
+       "number": "HAT208",
+       "origin": "EWR",
+       "destination": "MSP",
+       "date": "2024-05-27"
+      }
+     ],
+     "passengers": [
+      [
+       "Yara",
+       "Silva"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "S61CZX",
+     "origin": "LAX",
+     "destination": "CLT",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT228",
+       "origin": "LAX",
+       "destination": "EWR",
+       "date": "2024-05-23"
+      },
+      {
+       "number": "HAT043",
+       "origin": "EWR",
+       "destination": "CLT",
+       "date": "2024-05-24"
+      },
+      {
+       "number": "HAT157",
+       "origin": "CLT",
+       "destination": "EWR",
+       "date": "2024-05-24"
+      },
+      {
+       "number": "HAT041",
+       "origin": "EWR",
+       "destination": "LAX",
+       "date": "2024-05-25"
+      }
+     ],
+     "passengers": [
+      [
+       "Harper",
+       "Jackson"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "yes"
+    },
+    {
+     "id": "WUNA5K",
+     "origin": "ORD",
+     "destination": "PHL",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT271",
+       "origin": "ORD",
+       "destination": "PHL",
+       "date": "2024-05-10"
+      },
+      {
+       "number": "HAT197",
+       "origin": "PHL",
+       "destination": "ORD",
+       "date": "2024-05-11"
+      }
+     ],
+     "passengers": [
+      [
+       "Sophia",
+       "Silva"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "no"
+    }
+   ]
+  },
+  {
+   "id": "45",
+   "user": "sophia_taylor_9065",
+   "reason": "You need to cancel your flight as soon as possible because of a family emergency.",
+   "writes": [],
+   "records": [
+    {
+     "id": "6NSXQU",
+     "origin": "EWR",
+     "destination": "MIA",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT202",
+       "origin": "EWR",
+       "destination": "MIA",
+       "date": "2024-05-27"
+      }
+     ],
+     "passengers": [
+      [
+       "Sophia",
+       "Taylor"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "J3SAZF",
+     "origin": "LGA",
+     "destination": "LGA",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT002",
+       "origin": "LGA",
+       "destination": "PHX",
+       "date": "2024-05-18"
+      },
+      {
+       "number": "HAT256",
+       "origin": "PHX",
+       "destination": "LGA",
+       "date": "2024-05-19"
+      }
+     ],
+     "passengers": [
+      [
+       "Sophia",
+       "Taylor"
+      ],
+      [
+       "Lucas",
+       "Davis"
+      ],
+      [
+       "Mason",
+       "Khan"
+      ]
+     ],
+     "totalBaggages": 6,
+     "insurance": "yes"
+    },
+    {
+     "id": "NABCQ2",
+     "origin": "BOS",
+     "destination": "MSP",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT235",
+       "origin": "BOS",
+       "destination": "MCO",
+       "date": "2024-05-15"
+      },
+      {
+       "number": "HAT298",
+       "origin": "MCO",
+       "destination": "MSP",
+       "date": "2024-05-16"
+      }
+     ],
+     "passengers": [
+      [
+       "Sophia",
+       "Taylor"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "PEP4E0",
+     "origin": "CLT",
+     "destination": "PHX",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT176",
+       "origin": "CLT",
+       "destination": "DTW",
+       "date": "2024-05-20"
+      },
+      {
+       "number": "HAT097",
+       "origin": "DTW",
+       "destination": "PHX",
+       "date": "2024-05-20"
+      }
+     ],
+     "passengers": [
+      [
+       "Sophia",
+       "Taylor"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    }
+   ]
+  },
+  {
+   "id": "46",
+   "user": "sophia_silva_7557",
+   "reason": "You want to get a refund for the insurance you purchased for your flight  but you don't want to cancel the flight itself.",
+   "writes": [],
+   "records": [
+    {
+     "id": "H8Q05L",
+     "origin": "JFK",
+     "destination": "ATL",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT268",
+       "origin": "JFK",
+       "destination": "ATL",
+       "date": "2024-05-24"
+      }
+     ],
+     "passengers": [
+      [
+       "Harper",
+       "Kovacs"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "KC18K6",
+     "origin": "MSP",
+     "destination": "CLT",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT300",
+       "origin": "MSP",
+       "destination": "EWR",
+       "date": "2024-05-21"
+      },
+      {
+       "number": "HAT215",
+       "origin": "EWR",
+       "destination": "CLT",
+       "date": "2024-05-21"
+      }
+     ],
+     "passengers": [
+      [
+       "Sophia",
+       "Silva"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "NM1VX1",
+     "origin": "MSP",
+     "destination": "EWR",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT300",
+       "origin": "MSP",
+       "destination": "EWR",
+       "date": "2024-05-25"
+      },
+      {
+       "number": "HAT208",
+       "origin": "EWR",
+       "destination": "MSP",
+       "date": "2024-05-27"
+      }
+     ],
+     "passengers": [
+      [
+       "Yara",
+       "Silva"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "S61CZX",
+     "origin": "LAX",
+     "destination": "CLT",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT228",
+       "origin": "LAX",
+       "destination": "EWR",
+       "date": "2024-05-23"
+      },
+      {
+       "number": "HAT043",
+       "origin": "EWR",
+       "destination": "CLT",
+       "date": "2024-05-24"
+      },
+      {
+       "number": "HAT157",
+       "origin": "CLT",
+       "destination": "EWR",
+       "date": "2024-05-24"
+      },
+      {
+       "number": "HAT041",
+       "origin": "EWR",
+       "destination": "LAX",
+       "date": "2024-05-25"
+      }
+     ],
+     "passengers": [
+      [
+       "Harper",
+       "Jackson"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "yes"
+    },
+    {
+     "id": "WUNA5K",
+     "origin": "ORD",
+     "destination": "PHL",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT271",
+       "origin": "ORD",
+       "destination": "PHL",
+       "date": "2024-05-10"
+      },
+      {
+       "number": "HAT197",
+       "origin": "PHL",
+       "destination": "ORD",
+       "date": "2024-05-11"
+      }
+     ],
+     "passengers": [
+      [
+       "Sophia",
+       "Silva"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "no"
+    }
+   ]
+  },
+  {
+   "id": "47",
+   "user": "sophia_silva_7557",
+   "reason": "You want to cancel your flight  because the flight coincides with your best friend's birthday.",
+   "writes": [],
+   "records": [
+    {
+     "id": "H8Q05L",
+     "origin": "JFK",
+     "destination": "ATL",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT268",
+       "origin": "JFK",
+       "destination": "ATL",
+       "date": "2024-05-24"
+      }
+     ],
+     "passengers": [
+      [
+       "Harper",
+       "Kovacs"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "KC18K6",
+     "origin": "MSP",
+     "destination": "CLT",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT300",
+       "origin": "MSP",
+       "destination": "EWR",
+       "date": "2024-05-21"
+      },
+      {
+       "number": "HAT215",
+       "origin": "EWR",
+       "destination": "CLT",
+       "date": "2024-05-21"
+      }
+     ],
+     "passengers": [
+      [
+       "Sophia",
+       "Silva"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "NM1VX1",
+     "origin": "MSP",
+     "destination": "EWR",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT300",
+       "origin": "MSP",
+       "destination": "EWR",
+       "date": "2024-05-25"
+      },
+      {
+       "number": "HAT208",
+       "origin": "EWR",
+       "destination": "MSP",
+       "date": "2024-05-27"
+      }
+     ],
+     "passengers": [
+      [
+       "Yara",
+       "Silva"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "S61CZX",
+     "origin": "LAX",
+     "destination": "CLT",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT228",
+       "origin": "LAX",
+       "destination": "EWR",
+       "date": "2024-05-23"
+      },
+      {
+       "number": "HAT043",
+       "origin": "EWR",
+       "destination": "CLT",
+       "date": "2024-05-24"
+      },
+      {
+       "number": "HAT157",
+       "origin": "CLT",
+       "destination": "EWR",
+       "date": "2024-05-24"
+      },
+      {
+       "number": "HAT041",
+       "origin": "EWR",
+       "destination": "LAX",
+       "date": "2024-05-25"
+      }
+     ],
+     "passengers": [
+      [
+       "Harper",
+       "Jackson"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "yes"
+    },
+    {
+     "id": "WUNA5K",
+     "origin": "ORD",
+     "destination": "PHL",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT271",
+       "origin": "ORD",
+       "destination": "PHL",
+       "date": "2024-05-10"
+      },
+      {
+       "number": "HAT197",
+       "origin": "PHL",
+       "destination": "ORD",
+       "date": "2024-05-11"
+      }
+     ],
+     "passengers": [
+      [
+       "Sophia",
+       "Silva"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "no"
+    }
+   ]
+  },
+  {
+   "id": "48",
+   "user": "anya_garcia_5901",
+   "reason": "You booked the flight this morning by mistake and you want to cancel it.",
+   "writes": [],
+   "records": [
+    {
+     "id": "3RK2T9",
+     "origin": "MCO",
+     "destination": "SFO",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT214",
+       "origin": "MCO",
+       "destination": "PHX",
+       "date": "2024-05-19"
+      },
+      {
+       "number": "HAT009",
+       "origin": "PHX",
+       "destination": "SFO",
+       "date": "2024-05-20"
+      }
+     ],
+     "passengers": [
+      [
+       "Anya",
+       "Garcia"
+      ],
+      [
+       "Mei",
+       "Lee"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "790JYN",
+     "origin": "BOS",
+     "destination": "LGA",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT260",
+       "origin": "BOS",
+       "destination": "CLT",
+       "date": "2024-05-28"
+      },
+      {
+       "number": "HAT087",
+       "origin": "CLT",
+       "destination": "LGA",
+       "date": "2024-05-28"
+      },
+      {
+       "number": "HAT065",
+       "origin": "LGA",
+       "destination": "CLT",
+       "date": "2024-05-30"
+      },
+      {
+       "number": "HAT064",
+       "origin": "CLT",
+       "destination": "BOS",
+       "date": "2024-05-30"
+      }
+     ],
+     "passengers": [
+      [
+       "Anya",
+       "Garcia"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "82K959",
+     "origin": "LAX",
+     "destination": "DEN",
+     "cabin": "business",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT090",
+       "origin": "LAX",
+       "destination": "ORD",
+       "date": "2024-05-18"
+      },
+      {
+       "number": "HAT049",
+       "origin": "ORD",
+       "destination": "DEN",
+       "date": "2024-05-18"
+      },
+      {
+       "number": "HAT130",
+       "origin": "DEN",
+       "destination": "MIA",
+       "date": "2024-05-24"
+      },
+      {
+       "number": "HAT120",
+       "origin": "MIA",
+       "destination": "LAX",
+       "date": "2024-05-24"
+      }
+     ],
+     "passengers": [
+      [
+       "Anya",
+       "Garcia"
+      ],
+      [
+       "Mei",
+       "Lee"
+      ]
+     ],
+     "totalBaggages": 2,
+     "insurance": "no"
+    },
+    {
+     "id": "BE2L57",
+     "origin": "LAX",
+     "destination": "MIA",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT228",
+       "origin": "LAX",
+       "destination": "EWR",
+       "date": "2024-05-17"
+      },
+      {
+       "number": "HAT202",
+       "origin": "EWR",
+       "destination": "MIA",
+       "date": "2024-05-18"
+      }
+     ],
+     "passengers": [
+      [
+       "Anya",
+       "Garcia"
+      ],
+      [
+       "Sophia",
+       "Hernandez"
+      ]
+     ],
+     "totalBaggages": 3,
+     "insurance": "yes"
+    },
+    {
+     "id": "CXBB4L",
+     "origin": "DTW",
+     "destination": "LAS",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT275",
+       "origin": "DTW",
+       "destination": "PHX",
+       "date": "2024-05-27"
+      },
+      {
+       "number": "HAT259",
+       "origin": "PHX",
+       "destination": "LAS",
+       "date": "2024-05-27"
+      }
+     ],
+     "passengers": [
+      [
+       "Anya",
+       "Garcia"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "JMO1MG",
+     "origin": "DEN",
+     "destination": "MIA",
+     "cabin": "economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT255",
+       "origin": "DEN",
+       "destination": "MIA",
+       "date": "2024-05-16"
+      }
+     ],
+     "passengers": [
+      [
+       "Anya",
+       "Garcia"
+      ],
+      [
+       "Raj",
+       "Jackson"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "yes"
+    },
+    {
+     "id": "Q4MCUF",
+     "origin": "SEA",
+     "destination": "LGA",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT121",
+       "origin": "SEA",
+       "destination": "PHX",
+       "date": "2024-05-13"
+      },
+      {
+       "number": "HAT256",
+       "origin": "PHX",
+       "destination": "LGA",
+       "date": "2024-05-13"
+      },
+      {
+       "number": "HAT114",
+       "origin": "LGA",
+       "destination": "PHX",
+       "date": "2024-05-18"
+      },
+      {
+       "number": "HAT156",
+       "origin": "PHX",
+       "destination": "SEA",
+       "date": "2024-05-19"
+      }
+     ],
+     "passengers": [
+      [
+       "Anya",
+       "Garcia"
+      ],
+      [
+       "Harper",
+       "Kim"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "TAMSDK",
+     "origin": "JFK",
+     "destination": "PHX",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT033",
+       "origin": "JFK",
+       "destination": "DTW",
+       "date": "2024-05-20"
+      },
+      {
+       "number": "HAT035",
+       "origin": "DTW",
+       "destination": "PHX",
+       "date": "2024-05-20"
+      },
+      {
+       "number": "HAT156",
+       "origin": "PHX",
+       "destination": "SEA",
+       "date": "2024-05-24"
+      },
+      {
+       "number": "HAT100",
+       "origin": "SEA",
+       "destination": "JFK",
+       "date": "2024-05-24"
+      }
+     ],
+     "passengers": [
+      [
+       "Mei",
+       "Lee"
+      ],
+      [
+       "Mason",
+       "Santos"
+      ],
+      [
+       "Isabella",
+       "Moore"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "VAOW1B",
+     "origin": "PHX",
+     "destination": "JFK",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT045",
+       "origin": "PHX",
+       "destination": "SEA",
+       "date": "2024-05-07"
+      },
+      {
+       "number": "HAT276",
+       "origin": "SEA",
+       "destination": "JFK",
+       "date": "2024-05-08"
+      },
+      {
+       "number": "HAT212",
+       "origin": "JFK",
+       "destination": "DTW",
+       "date": "2024-05-08"
+      },
+      {
+       "number": "HAT097",
+       "origin": "DTW",
+       "destination": "PHX",
+       "date": "2024-05-08"
+      }
+     ],
+     "passengers": [
+      [
+       "Anya",
+       "Garcia"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "yes"
+    }
+   ]
+  },
+  {
+   "id": "49",
+   "user": "anya_garcia_5901",
+   "reason": "You booked the flight and you also purchased insurance for it. You cannot make the flight because you're sick and you want to cancel the flight and get a refund for the flight",
+   "writes": [],
+   "records": [
+    {
+     "id": "3RK2T9",
+     "origin": "MCO",
+     "destination": "SFO",
+     "cabin": "basic_economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT214",
+       "origin": "MCO",
+       "destination": "PHX",
+       "date": "2024-05-19"
+      },
+      {
+       "number": "HAT009",
+       "origin": "PHX",
+       "destination": "SFO",
+       "date": "2024-05-20"
+      }
+     ],
+     "passengers": [
+      [
+       "Anya",
+       "Garcia"
+      ],
+      [
+       "Mei",
+       "Lee"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "790JYN",
+     "origin": "BOS",
+     "destination": "LGA",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT260",
+       "origin": "BOS",
+       "destination": "CLT",
+       "date": "2024-05-28"
+      },
+      {
+       "number": "HAT087",
+       "origin": "CLT",
+       "destination": "LGA",
+       "date": "2024-05-28"
+      },
+      {
+       "number": "HAT065",
+       "origin": "LGA",
+       "destination": "CLT",
+       "date": "2024-05-30"
+      },
+      {
+       "number": "HAT064",
+       "origin": "CLT",
+       "destination": "BOS",
+       "date": "2024-05-30"
+      }
+     ],
+     "passengers": [
+      [
+       "Anya",
+       "Garcia"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "82K959",
+     "origin": "LAX",
+     "destination": "DEN",
+     "cabin": "business",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT090",
+       "origin": "LAX",
+       "destination": "ORD",
+       "date": "2024-05-18"
+      },
+      {
+       "number": "HAT049",
+       "origin": "ORD",
+       "destination": "DEN",
+       "date": "2024-05-18"
+      },
+      {
+       "number": "HAT130",
+       "origin": "DEN",
+       "destination": "MIA",
+       "date": "2024-05-24"
+      },
+      {
+       "number": "HAT120",
+       "origin": "MIA",
+       "destination": "LAX",
+       "date": "2024-05-24"
+      }
+     ],
+     "passengers": [
+      [
+       "Anya",
+       "Garcia"
+      ],
+      [
+       "Mei",
+       "Lee"
+      ]
+     ],
+     "totalBaggages": 2,
+     "insurance": "no"
+    },
+    {
+     "id": "BE2L57",
+     "origin": "LAX",
+     "destination": "MIA",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT228",
+       "origin": "LAX",
+       "destination": "EWR",
+       "date": "2024-05-17"
+      },
+      {
+       "number": "HAT202",
+       "origin": "EWR",
+       "destination": "MIA",
+       "date": "2024-05-18"
+      }
+     ],
+     "passengers": [
+      [
+       "Anya",
+       "Garcia"
+      ],
+      [
+       "Sophia",
+       "Hernandez"
+      ]
+     ],
+     "totalBaggages": 3,
+     "insurance": "yes"
+    },
+    {
+     "id": "CXBB4L",
+     "origin": "DTW",
+     "destination": "LAS",
+     "cabin": "business",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT275",
+       "origin": "DTW",
+       "destination": "PHX",
+       "date": "2024-05-27"
+      },
+      {
+       "number": "HAT259",
+       "origin": "PHX",
+       "destination": "LAS",
+       "date": "2024-05-27"
+      }
+     ],
+     "passengers": [
+      [
+       "Anya",
+       "Garcia"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "no"
+    },
+    {
+     "id": "JMO1MG",
+     "origin": "DEN",
+     "destination": "MIA",
+     "cabin": "economy",
+     "flightType": "one_way",
+     "flights": [
+      {
+       "number": "HAT255",
+       "origin": "DEN",
+       "destination": "MIA",
+       "date": "2024-05-16"
+      }
+     ],
+     "passengers": [
+      [
+       "Anya",
+       "Garcia"
+      ],
+      [
+       "Raj",
+       "Jackson"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "yes"
+    },
+    {
+     "id": "Q4MCUF",
+     "origin": "SEA",
+     "destination": "LGA",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT121",
+       "origin": "SEA",
+       "destination": "PHX",
+       "date": "2024-05-13"
+      },
+      {
+       "number": "HAT256",
+       "origin": "PHX",
+       "destination": "LGA",
+       "date": "2024-05-13"
+      },
+      {
+       "number": "HAT114",
+       "origin": "LGA",
+       "destination": "PHX",
+       "date": "2024-05-18"
+      },
+      {
+       "number": "HAT156",
+       "origin": "PHX",
+       "destination": "SEA",
+       "date": "2024-05-19"
+      }
+     ],
+     "passengers": [
+      [
+       "Anya",
+       "Garcia"
+      ],
+      [
+       "Harper",
+       "Kim"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "TAMSDK",
+     "origin": "JFK",
+     "destination": "PHX",
+     "cabin": "basic_economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT033",
+       "origin": "JFK",
+       "destination": "DTW",
+       "date": "2024-05-20"
+      },
+      {
+       "number": "HAT035",
+       "origin": "DTW",
+       "destination": "PHX",
+       "date": "2024-05-20"
+      },
+      {
+       "number": "HAT156",
+       "origin": "PHX",
+       "destination": "SEA",
+       "date": "2024-05-24"
+      },
+      {
+       "number": "HAT100",
+       "origin": "SEA",
+       "destination": "JFK",
+       "date": "2024-05-24"
+      }
+     ],
+     "passengers": [
+      [
+       "Mei",
+       "Lee"
+      ],
+      [
+       "Mason",
+       "Santos"
+      ],
+      [
+       "Isabella",
+       "Moore"
+      ]
+     ],
+     "totalBaggages": 0,
+     "insurance": "yes"
+    },
+    {
+     "id": "VAOW1B",
+     "origin": "PHX",
+     "destination": "JFK",
+     "cabin": "economy",
+     "flightType": "round_trip",
+     "flights": [
+      {
+       "number": "HAT045",
+       "origin": "PHX",
+       "destination": "SEA",
+       "date": "2024-05-07"
+      },
+      {
+       "number": "HAT276",
+       "origin": "SEA",
+       "destination": "JFK",
+       "date": "2024-05-08"
+      },
+      {
+       "number": "HAT212",
+       "origin": "JFK",
+       "destination": "DTW",
+       "date": "2024-05-08"
+      },
+      {
+       "number": "HAT097",
+       "origin": "DTW",
+       "destination": "PHX",
+       "date": "2024-05-08"
+      }
+     ],
+     "passengers": [
+      [
+       "Anya",
+       "Garcia"
+      ]
+     ],
+     "totalBaggages": 1,
+     "insurance": "yes"
+    }
+   ]
+  }
+ ]
+}

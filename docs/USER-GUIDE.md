@@ -7399,3 +7399,52 @@ the airline domain, after teaching the parser its five write tools and three wor
 corpus, and the census will then be a measurement of the fit. If the first two rows of that table are where your misses
 are, more words cannot help: the contract has to change, and that is a design decision you can price at zero before you
 spend anything on it.
+
+### 32.84 Before you settle on the record, check that your requests name one
+
+Section 32.83 ends with advice: if the misses are "the ask names a record, not an action", settle on the record. That
+advice is right about the *direction* and it is not sufficient, and this project learned the difference by measuring
+it on the domain that motivated the advice.
+
+**The record rule, spelled out.** An item is settled when a receipt touches the record the ask names, whatever family
+that receipt is in. "Names" has to be defined before you look, or the definition is a description of the result:
+
+| grade | the request… | what it costs you |
+|---|---|---|
+| `id` | states the record's code (`EHGLP3`) | almost nothing to check, and almost never true |
+| `unique` | states a token only one of the user's records carries (`Sophia`, `LAS`, `HAT266`) | needs the user's other records to be known, which the manifest can carry |
+| `pair` | states two identity tokens together (`from ATL to PHL`, `JFK on May 17`) | the loosest rule that can still identify a route or a leg |
+
+Two things make the reading honest and both are cheap:
+
+- **keep class out of identity.** Cabin, flight type, baggage count and insurance are in the record and a request can
+  ask to change them; counting them raises the reading by matching `economy` to `economy`. Identity is code, route
+  (as a code *and* as the city a user says — `JFK` is New York), flight numbers, dates and passenger names.
+- **normalise dates on both sides.** The request says "May 20" and the record stores `2024-05-20`, and a tokeniser that
+  drops numbers drops the whole date. Naming a date is one of the few ways this corpus identifies a leg.
+
+**What this project measured with it, on the airline domain.** 27 of 50 graded writes (**54.0%**) at the loosest
+grade, 25 (50.0%) at `unique`, 7 (14.0%) by code — against a bar of 0.75. With the family rule counted beside it, 30
+of 50 (**60.0%**). The rule is not viable there, and the misses say why in a way that generalises:
+
+| what the request says | why no token rule reaches it | what to do instead |
+|---|---|---|
+| "cancel all of your upcoming flights" | the reference is a **set** defined by a predicate over state (upcoming, same day, longer than four hours) | bind items to the records the episode **reads**, not to the words |
+| "the cheapest business round trip" | the object is chosen by **policy** and does not exist when the user speaks | the same: the read resolves it, the request cannot name it |
+| "change the passenger name on the reservation", nine reservations on the account | the record is genuinely unnamed | settle nothing, and report the item as open |
+| "downgrade all business flights to economy" | cabin is class, not identity, and six records share it | a set rule again |
+
+**The general lesson, which is the reason this section exists.** A census tells you whether the *corpus* can support a
+contract, and it is not the same question as whether the contract is good. Family recall said the domain needed record
+settlement; record recall then said the domain's requests do not name records, they *describe queries over state*. Both
+readings cost zero, both were taken before any dispatch was armed, and together they saved a purchase — which is what
+this lane means by pricing a design decision rather than arguing about it.
+
+```bash
+python3 eval/tools/record_census.py --goals eval/manifests/airline-records.json --family-found 15
+```
+
+To apply it to your own domain you need two things and no model: the requests with the writes their evaluator requires,
+and each user's own records in the fields a read returns. `scripts/build_airline_records.py` is the forty-line
+projection that produced this one from a 7 MB database, and it records the source's sha256 so the table can be rebuilt
+from the bytes it was made from.

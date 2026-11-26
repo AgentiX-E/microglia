@@ -190,9 +190,19 @@ jobs:
           # in a paragraph is a rule nobody re-ran.
           python3 -m coverage run --append --branch --include="*/eval/tools/resolution.py" \
             eval/tools/resolution.py --self-test
+          # R227. Does the request name the record its write touches? This is the census the round's bar is written
+          # over, and its ground truth is the domain's own database rather than a call name. It is under the floor
+          # because it is the file that decides whether ¥16 is spent: an arithmetic in a paragraph is arithmetic
+          # nobody re-ran, and this lane has already bought one instrument it turned out could not report.
+          python3 -m coverage run --append --branch --include="*/eval/tools/record_census.py" \
+            eval/tools/record_census.py --self-test
+          # The projection the census reads: the 50 tasks' users, their reservations, and the evaluator's own writes.
+          # It carries the source's sha256 because a manifest without one is a table of claims.
+          python3 -m coverage run --append --branch --include="*/scripts/build_airline_records.py" \
+            scripts/build_airline_records.py --self-test
           python3 -m coverage json -o coverage-python.json
           python3 scripts/check-python-coverage.py --self-test
-          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 22
+          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 24
 
       - name: The rounds this project owes, and the date each one was registered for
         # The failure this prevents is not a wrong number, it is a round that quietly stops being planned: R216b's
@@ -202,6 +212,33 @@ jobs:
         run: |
           python3 eval/tools/round_clock.py
           python3 eval/tools/serving_defaults.py
+
+      - name: Does the request name the record, which is R227's bar and the reason the grid is still unbought
+        # R227. R217a refused the airline grid because the family rule found 30.0% of its writes. The successor
+        # rewrites the contract — settle by the record the ask names, whatever family the receipt is in — and its
+        # registration puts a bar of 0.75 on that recall, measured before any money is spent. This step measures it
+        # against the domain's own database and pins the ladder, so a later round that changes the rule has to change
+        # this line on purpose rather than by drifting.
+        run: |
+          set -euo pipefail
+          python3 eval/tools/record_census.py --goals eval/manifests/airline-records.json --family-found 15 --json > "${RUNNER_TEMP}/records.json"
+          python3 - "${RUNNER_TEMP}/records.json" <<'CHECK'
+          import json, sys
+
+          reading = json.load(open(sys.argv[1]))
+          assert reading["tasks"] == 50, reading["tasks"]
+          assert reading["writes"] == 50, reading["writes"]
+          assert (reading["writing"], reading["refusing"]) == (27, 23), (reading["writing"], reading["refusing"])
+          assert reading["idOnly"] == 7, reading["idOnly"]
+          assert reading["single"] == 25, reading["single"]
+          assert reading["pair"] == 27, reading["pair"]
+          assert reading["familyFound"] == 15, reading["familyFound"]
+          assert reading["unionFound"] == 30, reading["unionFound"]
+          assert reading["pairRecall"] < 0.75, reading["pairRecall"]
+          print(f"ok  {reading['pair']}/{reading['writes']} graded writes are named by their record "
+                f"({reading['pairRecall']:.1%}) against the 0.75 bar; {reading['unionFound']}/{reading['writes']} "
+                f"with the family rule the round retires — the refusal R227 turns on")
+          CHECK
 
       - name: The parser in a second domain, which is a measured number and not a hope
         # R217a. The board is a retail parser, and R217 would dispatch it into airline. A block whose items never
@@ -230,6 +267,13 @@ jobs:
           assert airline["tasks"] == 50, airline["tasks"]
           assert airline["required"] == 50, airline["required"]
           assert airline["found"] == 15, airline["found"]
+          # R227. The split between tasks that had work to do and tasks whose correct outcome is that nothing happens.
+          # Retail's seven were copied into the airline manifest's note as its own count (AUDIT 34.317), so both are
+          # pinned here: a shared sentence cannot move a number nobody looked at again.
+          assert (retail["writingTasks"], retail["refusingTasks"]) == (107, 7), (retail["writingTasks"], retail["refusingTasks"])
+          assert retail["spuriousOnRefusing"] == 16, retail["spuriousOnRefusing"]
+          assert (airline["writingTasks"], airline["refusingTasks"]) == (27, 23), (airline["writingTasks"], airline["refusingTasks"])
+          assert airline["spuriousOnRefusing"] == 29, airline["spuriousOnRefusing"]
           print(f"ok  retail {retail['found']}/{retail['required']} objects at {retail['familyRecall']:.1%} of "
                 f"families; airline {airline['found']}/{airline['required']} at {airline['familyRecall']:.1%} — the "
                 f"gap R217a was registered to find")

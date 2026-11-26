@@ -2848,3 +2848,26 @@ a reader who does not. The cuts are **not** independent — thresholds a few uni
 the binomial treats the family as more multiplied than it is, which errs in the direction that makes a claim harder.
 Every screen this project reports now carries it; R225's two families read `+1.04σ` over 565 cuts, and R223's read
 `−2.81σ` over 385, which is how a negative result stops being an argument.
+
+**Record-naming** — whether a request states enough of a record's **identity** for a rule to bind that record to it.
+Three grades are reported and they nest: `id` (the reservation code appears), `unique` (a token appears that exactly
+one of the user's records carries — a route end, a passenger, a flight number, a date), and `pair` (two identity tokens
+together, which is how this corpus writes a route it does not code). Identity is deliberately narrower than the record:
+cabin, flight type, baggage count and insurance are excluded, because a request can ask to change them and a match on
+them is a match on the question. The measure exists because "settle by the record the ask names" is only a contract if
+requests name records, and on the airline corpus they do not — 27 of 50 graded writes at the loosest grade (**54.0%**),
+against a bar of 0.75.
+
+**Predicate ask** — an ask whose reference is a *set of records selected by a condition* rather than a record:
+"cancel all of your upcoming flights", "your future reservations that contain flights longer than four hours",
+"multiple flights for the same day". The predicate is computed **from** the records (cabin, duration, date-equality),
+so no token in the request names its extension and a token rule cannot bind it. Thirteen of R227's twenty-three missed
+writes are this shape, which is why the settlement anchor moves from the request to the **read**: the extension of a
+predicate ask is the set of records the episode actually opened.
+
+**Refusal task** — a graded task whose correct outcome is that **nothing changes**. The user still states an ask
+("cancel reservation EHGLP3"), the policy forbids the action, and the evaluator requires no write. The distinction
+matters to every census that counts spare asks: an ask on a refusal task that never settles is the board working, not
+noise, and in the airline manifest 29 of 52 spare asks sit on the 23 refusal tasks. Retail has seven such tasks and the
+airline note carried that seven across as its own count for a month (AUDIT 34.317), which is why both are now pinned
+in CI rather than described in prose.
