@@ -217,7 +217,7 @@ jobs:
           python3 eval/tools/round_clock.py
           python3 eval/tools/serving_defaults.py
 
-      - name: The five readings the anchor rounds were judged on, and whether their parts add up
+      - name: The six readings the anchor rounds were judged on, and whether their parts add up
         # R228 asked whether binding an item to the record the episode **read** settles more of the work than binding it
         # to the request's words; R229 asked whether the two can be joined; R230 asked whether a later turn can be
         # admitted by its position alone; R231 asked whether the requirement can be reached inside the turn that
@@ -234,6 +234,7 @@ jobs:
           python3 eval/tools/read_anchor.py --check eval/manifests/r230-reading.json
           python3 eval/tools/read_anchor.py --check eval/manifests/r231-reading.json
           python3 eval/tools/read_anchor.py --check eval/manifests/r232-reading.json
+          python3 eval/tools/read_anchor.py --check eval/manifests/r233-reading.json
           # The figure's own loader, over the same file: a rendering of a reading that does not add up is a figure
           # nobody should publish, and this is the only place the two are read together.
           python3 scripts/display.py --self-test
@@ -245,9 +246,10 @@ jobs:
           r230 = json.load(open("eval/manifests/r230-reading.json"))
           r231 = json.load(open("eval/manifests/r231-reading.json"))
           r232 = json.load(open("eval/manifests/r232-reading.json"))
-          assert (r228["scope"], r229["scope"], r230["scope"], r231["scope"], r232["scope"]) == (
-              "strict", "ask", "admitted", "clause", "displayed"), (
-                  r228["scope"], r229["scope"], r230["scope"], r231["scope"], r232["scope"])
+          r233 = json.load(open("eval/manifests/r233-reading.json"))
+          assert (r228["scope"], r229["scope"], r230["scope"], r231["scope"], r232["scope"], r233["scope"]) == (
+              "strict", "ask", "admitted", "clause", "displayed", "ordered"), (
+                  r228["scope"], r229["scope"], r230["scope"], r231["scope"], r232["scope"], r233["scope"])
           reading = r228["reading"]
           boards = reading["boards"]
           # The reading R228 was refused on: the read board settles 98.5% of the discharged writes and opens 2.53
@@ -336,6 +338,23 @@ jobs:
           assert fifth["replication"]["display"]["clause"]["displayed"] == 602
           assert fifth["replication"]["display"]["clause"]["hidden"] == 19
           assert fifth["replication"]["bar"]["B3_displayTax"]["holds"] is False
+          # R233: the ordering. It removes ten of the fourteen hidden writes and costs the contract nothing, and it
+          # still fails its own bar by three writes — which is the round, so all four numbers are pinned: the ordered
+          # clause level (632), the shipped level beside it (622), the residue (4) and the floor (463 = 463).
+          sixth = r233["reading"]
+          ordered_clause = sixth["display"]["clause"]
+          assert (ordered_clause["reached"], ordered_clause["displayed"], ordered_clause["hidden"]) == (636, 632, 4)
+          assert abs(ordered_clause["hiddenShare"] - 4 / 636) < 1e-9
+          assert fifth["display"]["clause"]["other"] == ordered_clause["displayed"]
+          assert ordered_clause["other"] == fifth["display"]["clause"]["displayed"]
+          assert sixth["bar"]["B1_displayed"]["holds"] is False, "R233 was refused on its coverage bar"
+          assert sixth["bar"]["B1_displayed"]["rates"]["clause"] == 632 / 654
+          assert sixth["bar"]["B2_contract"]["holds"] is True
+          assert sixth["bar"]["B2_contract"]["floor"] == 463
+          assert sixth["bar"]["B3_hidden"]["holds"] is True
+          # The replication refuses a second bar as well: 7 hidden of 621 is 1.1%, over the tenth this round registered.
+          assert sixth["replication"]["display"]["clause"]["displayed"] == 614
+          assert sixth["replication"]["bar"]["B3_hidden"]["holds"] is False
           print(f"ok  read {boards['strict']['coverage']:.1%} vs request {boards['request']['coverage']:.1%}; "
                 f"ask {second['boards']['ask']['coverage']:.1%} with 155/232 misses disclosed after turn one; "
                 f"admitted {admitted['coverage']:.1%} recovering {third['bar']['B1_recovery']['recovered']}/155 with "
@@ -345,7 +364,9 @@ jobs:
                 f"displayed {shown_clause['displayed']}/{shown_clause['required']} "
                 f"({shown_clause['displayed'] / shown_clause['required']:.1%}) with "
                 f"{shown_clause['hidden']} hidden of {shown_clause['reached']} reached, "
-                f"contract tax {fifth['bar']['B3_displayTax']['tax']:+d}")
+                f"contract tax {fifth['bar']['B3_displayTax']['tax']:+d}; "
+                f"open-first {ordered_clause['displayed']}/{ordered_clause['required']} with "
+                f"{ordered_clause['hidden']} hidden against a bar of 97.0%")
           CHECK
 
       - name: Does the request name the record, which is R227's bar and the reason the grid is still unbought

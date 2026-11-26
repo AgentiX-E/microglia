@@ -23,6 +23,7 @@
     "hidden": 14,
     "hiddenShare": 0.0220125786163522,
     "holds": true,
+    "passed": true,
     "reached": 636,
     "scope": "clause"
    },
@@ -200,6 +201,7 @@
     "hidden": 14,
     "hiddenShare": 0.0220125786163522,
     "itemsPerCall": 8.098428453267164,
+    "other": 632,
     "reached": 636,
     "required": 654,
     "shownShare": 0.9510703363914373
@@ -209,6 +211,7 @@
     "hidden": 0,
     "hiddenShare": 0.0,
     "itemsPerCall": 2.4069478908188584,
+    "other": 463,
     "reached": 463,
     "required": 654,
     "shownShare": 0.7079510703363915
@@ -247,6 +250,7 @@
      "hidden": 19,
      "hiddenShare": 0.030595813204508857,
      "holds": true,
+     "passed": true,
      "reached": 621,
      "scope": "clause"
     },
@@ -424,6 +428,7 @@
      "hidden": 19,
      "hiddenShare": 0.030595813204508857,
      "itemsPerCall": 7.722152428810718,
+     "other": 614,
      "reached": 621,
      "required": 643,
      "shownShare": 0.9362363919129082
@@ -433,6 +438,7 @@
      "hidden": 1,
      "hiddenShare": 0.0022522522522522522,
      "itemsPerCall": 2.3542713567839195,
+     "other": 443,
      "reached": 444,
      "required": 643,
      "shownShare": 0.6889580093312597

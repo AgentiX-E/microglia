@@ -139,6 +139,20 @@ DISPLAY_TAX = 4
 #: admission rule and not the rendering.
 DISPLAY_SCOPES = ("request", "clause")
 
+#: R233's bars, registered in `prereg/R233-the-order.md` before the reading. The coverage bar rises from 73.6% to 97.0%
+#: because an ordering that still hides twenty writes has failed the purpose it was registered for, and the hidden bar
+#: falls to a tenth of R232's. The third bar changes **kind**: from a tolerance around a difference to a floor, because
+#: an ordering can only be judged against the board it reorders. The registration writes the floor as 463 — R232's
+#: measured level on the control grid — and the code expresses it per grid as "at least its own statement-order level",
+#: which is 463 there and is the same sentence on a grid where 463 means nothing.
+ORDER_COVERAGE = 0.97
+ORDER_HIDDEN = 0.01
+
+#: The two orders a block can be rendered in. `statement` is the product's: asks appear in the order they were stated.
+#: `open` is R233's candidate: open items first, settled after, statement order preserved inside each group. Both are
+#: pure functions of the item list, so the difference between two readings is the order and nothing else.
+ORDERS = ("statement", "open")
+
 
 def _siblings() -> str:
     """Put this file's own directory on `sys.path`, and answer it.
@@ -480,7 +494,8 @@ def board(entry: dict, scope: str = "strict") -> dict:
     }
 
 
-def ask_board(entry: dict, messages, scope: str = "request", cap=None, later: bool = True) -> dict:
+def ask_board(entry: dict, messages, scope: str = "request", cap=None, later: bool = True,
+              order: str = "statement") -> dict:
     """R229's rule: an item is an **ask**, and the read supplies only the binding.
 
     R228 measured the two anchors' failures as a trade rather than as a deficit: the request board attributes 63.6% of
@@ -507,6 +522,9 @@ def ask_board(entry: dict, messages, scope: str = "request", cap=None, later: bo
         # Named rather than defaulted: an unknown scope used to fall through to the request board, which would make a
         # typo on the command line a quiet re-run of the previous round.
         raise ValueError(f"unknown ask scope {scope!r}")
+    if order not in ORDERS:
+        # Same reason as the scope: an order nobody implements must not be the statement order by accident.
+        raise ValueError(f"unknown order {order!r}")
     if scope == "admitted":
         admission = admitted_asks(messages)
     elif scope == "clause":
@@ -579,6 +597,12 @@ def ask_board(entry: dict, messages, scope: str = "request", cap=None, later: bo
         }
         for ask, position in zip(asks, [settled.get(index) for index in range(len(asks))])
     ]
+    # R233: the rendering order, applied to the items and before the cut. A stable partition rather than a sort, so
+    # that "statement order inside each group" is the identity on each group and the only thing that changed is which
+    # group comes first. Nothing about the board's *content* moves: the same asks, the same settlements, one different
+    # arrangement — which is what makes the round's difference attributable to the order alone.
+    if order == "open":
+        items = [item for item in items if not item["settled"]] + [item for item in items if item["settled"]]
     # R232: the block is rendered as `items[:CAP]`. The cut is applied last and to the **items only** — a settled ask
     # below the fold is still settled, so the credited, unaccounted and unbound columns are properties of the rule and
     # not of the window. `itemsAll` keeps the uncut count so that a reading can say how much of the board the cut hid.
@@ -647,7 +671,7 @@ def discharge(writes: list, required: list) -> dict:
     return {"byPosition": matched, "discharged": len(matched), "unmatched": len(required) - len(matched)}
 
 
-def moment(entry: dict, messages, upto: int, scope: str) -> dict:
+def moment(entry: dict, messages, upto: int, scope: str, order: str = "statement") -> dict:
     """The block as the product served it **before the assistant message at `upto`**, uncut.
 
     Two cuts, and both are the point. The **messages** end before the message that carries the call, because a block is
@@ -661,10 +685,10 @@ def moment(entry: dict, messages, upto: int, scope: str) -> dict:
     not read yet, and a moment board that consults them is not a measurement of the moment.
     """
     stop = bisect.bisect_left(entry["at"], upto)
-    return ask_board({**entry, "events": entry["events"][:stop]}, messages[:upto], scope, later=False)
+    return ask_board({**entry, "events": entry["events"][:stop]}, messages[:upto], scope, later=False, order=order)
 
 
-def visibility(entry: dict, messages, done: dict, scope: str, cap: int = CAP) -> dict:
+def visibility(entry: dict, messages, done: dict, scope: str, cap: int = CAP, order: str = "statement") -> dict:
     """Of the writes the evaluator requires, how many had an open ask of their family **on the rendered block**.
 
     Every board this lane has measured so far is a property of the finished transcript. This one is a property of the
@@ -678,7 +702,8 @@ def visibility(entry: dict, messages, done: dict, scope: str, cap: int = CAP) ->
     stop_of = {payload: index for index, (kind, payload) in enumerate(entry["events"]) if kind == "write"}
     cache: dict = {}
     reached = 0
-    displayed = 0
+    shown = 0
+    stated = 0
     for position in done["byPosition"]:
         stop = stop_of.get(position)
         if stop is None:
@@ -688,26 +713,40 @@ def visibility(entry: dict, messages, done: dict, scope: str, cap: int = CAP) ->
         if board is None:
             # Cached by message rather than by call, because the cache is a consequence of the measurement and not an
             # economy: two calls in one message are answered by one block, and a recomputation could only disagree.
+            # Built once and read in both orders, because the order is a partition of the same list: R233's comparison
+            # is two windows on one board, and a second board would be a second measurement of something else.
             board = cache[upto] = moment(entry, messages, upto, scope)
         family = entry["writes"][position].get("family")
-        if not any(item["family"] == family and not item["settled"] for item in board["items"]):
+        open_items = [item for item in board["items"] if not item["settled"]]
+        if not any(item["family"] == family for item in open_items):
             continue
         reached += 1
+        # The two windows, on one board. `board["items"][:cap]` is the product's rendering — statement order. Under
+        # open-before-settled the first `cap` elements are exactly `open_items[:cap]` when there are that many open
+        # items, and every open item otherwise, so the second test needs no second board and no second partition.
+        # The statement window must contain an **open** instance: a settled line of the same family is visible and
+        # says the work is done, which is the opposite of what the test asks.
         if any(item["family"] == family and not item["settled"] for item in board["items"][:cap]):
-            displayed += 1
+            stated += 1
+        if any(item["family"] == family for item in open_items[:cap]):
+            shown += 1
+    # `order` decides which of the two windows the scope reports and which one the bars read. `stated` is always
+    # available, so a reading can say what the product ships beside what the round is testing.
+    displayed, other = (shown, stated) if order == "open" else (stated, shown)
     hidden = reached - displayed
     return {
         "required": len(done["byPosition"]),
         "reached": reached,
         "displayed": displayed,
         "hidden": hidden,
+        "other": other,
         "shownShare": (displayed / len(done["byPosition"])) if done["byPosition"] else None,
         "hiddenShare": (hidden / reached) if reached else None,
         "itemsPerCall": (sum(one["itemsAll"] for one in cache.values()) / len(cache)) if cache else None,
     }
 
 
-def episode(document_task, simulation: dict, display: bool = False) -> dict:
+def episode(document_task, simulation: dict, display: bool = False, order: str = "statement") -> dict:
     """One episode, read three ways: the read board at both scopes and the request board.
 
     Returned as raw counts rather than rates so that the aggregation can pair episodes and report an interval over the
@@ -828,8 +867,8 @@ def episode(document_task, simulation: dict, display: bool = False) -> dict:
     if display:
         # R232: the two boards the round compares, each measured at the moment of every graded write. Keyed by the
         # admission rule rather than by the cap, because the cap is a property of the rendering and the round compares
-        # two rules under one rendering.
-        out["display"] = {scope: visibility(entry, messages, done, scope) for scope in DISPLAY_SCOPES}
+        # two rules under one rendering. The order travels the same way, so R233's reading is R232's with one argument.
+        out["display"] = {scope: visibility(entry, messages, done, scope, order=order) for scope in DISPLAY_SCOPES}
     return out
 
 
@@ -848,7 +887,8 @@ def compare(document: dict, scope: str = "strict") -> dict:
         if not (simulation.get("messages") or []):
             skipped += 1
             continue
-        row = episode(tasks.get(str(simulation.get("task_id"))), simulation, display=scope == "displayed")
+        row = episode(tasks.get(str(simulation.get("task_id"))), simulation,
+                      display=scope in ("displayed", "ordered"), order="open" if scope == "ordered" else "statement")
         rows.append(row)
     graded = [row for row in rows if row["discharged"]]
     summary: dict = {
@@ -911,7 +951,7 @@ def compare(document: dict, scope: str = "strict") -> dict:
     # R232 reads a rendering, not a rule: the round's comparison is `request` against `clause` under one cap, so the
     # paired columns are taken against the rule whose coverage the round is asking about — R231's — and the displayed
     # columns carry the rendering. Taking `request` against itself would report a delta of zero and call it a reading.
-    measured = "clause" if scope == "displayed" else scope
+    measured = "clause" if scope in ("displayed", "ordered") else scope
     chosen = summary["boards"][measured]
     requested = summary["boards"]["request"]
     summary["paired"] = {
@@ -932,12 +972,12 @@ def compare(document: dict, scope: str = "strict") -> dict:
             and row["boards"]["request"]["covered"] == row["discharged"]
         ),
     }
-    if scope == "displayed":
+    if scope in ("displayed", "ordered"):
         graded_display = [row for row in graded if row.get("display")]
         summary["display"] = {
             name: {
                 key: sum(row["display"][name][key] for row in graded_display)
-                for key in ("required", "reached", "displayed", "hidden")
+                for key in ("required", "reached", "displayed", "hidden", "other")
             }
             for name in DISPLAY_SCOPES
         }
@@ -947,7 +987,10 @@ def compare(document: dict, scope: str = "strict") -> dict:
             one["itemsPerCall"] = (
                 sum(row["display"][name]["itemsPerCall"] or 0.0 for row in graded_display) / len(graded_display)
             ) if graded_display else None
-        summary["bar"] = display_bar(summary)
+        summary["bar"] = (
+            display_bar(summary, ORDER_COVERAGE, ORDER_HIDDEN, floor=True) if scope == "ordered"
+            else display_bar(summary)
+        )
     elif scope == "admitted":
         summary["bar"] = admit_bar(summary)
     elif scope == "clause":
@@ -1124,7 +1167,8 @@ def clause_bar(graded: list, summary: dict) -> dict:
     }
 
 
-def display_bar(summary: dict) -> dict:
+def display_bar(summary: dict, coverage: float = DISPLAY_COVERAGE, hidden: float = DISPLAY_HIDDEN,
+                floor=None, tax: int = DISPLAY_TAX) -> dict:
     """R232's three bars, evaluated where the registration wrote them.
 
     The round has no new rule, so none of these can be satisfied by a rule being itself. They are written over one
@@ -1151,42 +1195,66 @@ def display_bar(summary: dict) -> dict:
     if not required or not summary["graded"]:
         return {"holds": False, "reason": "no episode discharged a required write, so no bar can be evaluated"}
     rates = {name: display[name]["displayed"] / required for name in DISPLAY_SCOPES}
-    passers = [name for name in DISPLAY_SCOPES if rates[name] >= DISPLAY_COVERAGE]
+    passers = [name for name in DISPLAY_SCOPES if rates[name] >= coverage]
     b1 = bool(passers)
-    chosen = max(passers, key=lambda name: (display[name]["displayed"], -display[name]["hidden"])) if passers else None
-    b2 = chosen is not None and (display[chosen]["hiddenShare"] or 0.0) <= DISPLAY_HIDDEN
+    # The visibility test needs a subject even when the coverage bar refused both scopes, or a round that fails B1
+    # reports its cost column as `None` and a reader cannot tell "hidden nothing" from "not evaluated". So the subject
+    # is the best scope that passed, and failing that the best scope there is — and `passers` says which case it is.
+    best = max(DISPLAY_SCOPES, key=lambda name: (display[name]["displayed"], -display[name]["hidden"]))
+    chosen = max(passers, key=lambda name: (display[name]["displayed"], -display[name]["hidden"])) if passers else best
+    b2 = (display[chosen]["hiddenShare"] or 0.0) <= hidden
     full = summary["boards"]["request"]["covered"]
-    tax = display["request"]["displayed"] - full
-    b3 = abs(tax) <= DISPLAY_TAX
-    return {
+    difference = display["request"]["displayed"] - full
+    # Two forms, because two registrations ask different questions of the same column. R232 asked whether the *window*
+    # moved the contract, and a tolerance around a difference is the right shape for that — it was the reference, not
+    # the shape, that was wrong. R233 asks whether an *ordering* cost the contract anything, and the right shape for
+    # that is a floor at the level the previous reading measured: an ordering can only be judged against the board it
+    # reorders, and a tolerance around zero would let it lose three writes without a finding.
+    base = display["request"]["other"]
+    b3 = (display["request"]["displayed"] >= base) if floor is not None else (abs(difference) <= tax)
+    hiddenTest = {
+        "holds": b2,
+        "scope": chosen,
+        "passed": bool(passers),
+        "hidden": display[chosen]["hidden"],
+        "reached": display[chosen]["reached"],
+        "hiddenShare": display[chosen]["hiddenShare"],
+        "bar": hidden,
+    }
+    reading_ = {
         "B1_displayed": {
             "holds": b1,
             "rates": rates,
-            "bar": DISPLAY_COVERAGE,
+            "bar": coverage,
             "required": required,
             "passers": passers,
         },
-        "B2_hidden": {
-            "holds": b2,
-            "scope": chosen,
-            "hidden": display[chosen]["hidden"] if chosen else None,
-            "reached": display[chosen]["reached"] if chosen else None,
-            "hiddenShare": display[chosen]["hiddenShare"] if chosen else None,
-            "bar": DISPLAY_HIDDEN,
-        },
-        "B3_displayTax": {
+    }
+    if floor is None:
+        reading_["B2_hidden"] = hiddenTest
+        reading_["B3_displayTax"] = {
             "holds": b3,
             "displayed": display["request"]["displayed"],
             "against": full,
-            "tax": tax,
-            "bar": DISPLAY_TAX,
+            "tax": difference,
+            "bar": tax,
             # The attribution column, and the reason B3 can be read at all: `reached` is the same board **without** the
             # cut, so a tax that is entirely `reached - displayed` is the cap, and a gap between `reached` and `full`
             # is the moment the board was built rather than the window it was rendered in.
             "moment": display["request"]["reached"],
-        },
-        "holds": b1 and b2 and b3,
-    }
+        }
+    else:
+        reading_["B2_contract"] = {
+            "holds": b3,
+            "displayed": display["request"]["displayed"],
+            "against": full,
+            "tax": difference,
+            "floor": base,
+            "moment": display["request"]["reached"],
+        }
+        reading_["B3_hidden"] = hiddenTest
+    reading_["holds"] = b1 and b2 and b3
+    return reading_
 
 
 def render(reading: dict, scope: str = "strict") -> str:
@@ -1205,7 +1273,7 @@ def render(reading: dict, scope: str = "strict") -> str:
     # R232 reads a rendering: its chosen board is R231's, because the round's claim is about *that* rule's coverage and
     # the displayed columns carry the cut. `boards["displayed"]` does not exist and never will — a rendering is not a
     # board, and pretending otherwise would put a column in the table that no transcript can produce.
-    chosen = boards["clause" if scope == "displayed" else scope]
+    chosen = boards["clause" if scope in ("displayed", "ordered") else scope]
     requested = boards["request"]
     paired = reading["paired"]
     bar = reading["bar"]
@@ -1259,19 +1327,33 @@ def render(reading: dict, scope: str = "strict") -> str:
             f"{bar['B1_displayed']['required']} required write(s) shown, against a bar of "
             f"{bar['B1_displayed']['bar']:.3f})"
         )
-        chosen_scope = bar["B2_hidden"]["scope"]
-        lines.append(
-            f"B2 hidden     {'holds' if bar['B2_hidden']['holds'] else 'FAILS'} "
-            f"({bar['B2_hidden']['hidden']} of {bar['B2_hidden']['reached']} reached write(s) hidden on "
-            f"{chosen_scope or 'no scope that passed B1'}, "
-            f"{share(bar['B2_hidden']['hiddenShare'])}, against a bar of {bar['B2_hidden']['bar']:.2f})"
-        )
-        lines.append(
-            f"B3 display tax {'holds' if bar['B3_displayTax']['holds'] else 'FAILS'} "
-            f"({bar['B3_displayTax']['tax']:+d} write(s) on the contract: {bar['B3_displayTax']['displayed']} shown "
-            f"against {bar['B3_displayTax']['against']} covered uncut, {bar['B3_displayTax']['moment']} reached "
-            f"without the cut, within {bar['B3_displayTax']['bar']})"
-        )
+        def visibility_line(one: dict, letter: str) -> str:
+            scope_name = one["scope"] or "no scope"
+            return (
+                f"{letter} hidden     {'holds' if one['holds'] else 'FAILS'} "
+                f"({one['hidden']} of {one['reached']} reached write(s) hidden on {scope_name}, "
+                f"{share(one['hiddenShare'])}, against a bar of {one['bar']:.2f}"
+                f"{'' if one['passed'] else '; no scope cleared the coverage bar, so this is the best one'})"
+            )
+
+        if "B2_contract" in bar:
+            second = bar["B2_contract"]
+            lines.append(
+                f"B2 contract   {'holds' if second['holds'] else 'FAILS'} "
+                f"({second['displayed']} shown against a floor of {second['floor']}, tax {second['tax']:+d}, "
+                f"{second['moment']} reached without the cut)"
+            )
+        else:
+            lines.append(visibility_line(bar["B2_hidden"], "B2"))
+        third = bar.get("B3_displayTax")
+        if third is not None:
+            lines.append(
+                f"B3 display tax {'holds' if third['holds'] else 'FAILS'} "
+                f"({third['tax']:+d} write(s) on the contract: {third['displayed']} shown against "
+                f"{third['against']} covered uncut, {third['moment']} reached without the cut, within {third['bar']})"
+            )
+        else:
+            lines.append(visibility_line(bar["B3_hidden"], "B3"))
     elif "B2_efficiency" in bar:
         # R231's bars, printed with their own denominators. The efficiency line is the one the round was built around,
         # so it is printed as a ratio and a budget together: a reader who saw only the ratio could not tell whether a
@@ -1460,11 +1542,29 @@ def check_manifest(reading: dict) -> list:
             problems.append("B1 displayed: the passing scopes are not the ones over the bar")
         if bar["B1_displayed"]["holds"] != bool(bar["B1_displayed"]["passers"]):
             problems.append("B1 displayed: holds disagrees with whether any scope passed")
-        tax = display["request"]["displayed"] - (reading.get("boards", {}).get("request", {}).get("covered") or 0)
-        if bar["B3_displayTax"]["tax"] != tax:
-            problems.append("B3 display tax: the tax is not the contract's shown writes less its full coverage")
-        if bar["B3_displayTax"]["holds"] != (abs(tax) <= bar["B3_displayTax"]["bar"]):
-            problems.append("B3 display tax: holds disagrees with the absolute difference")
+        difference = display["request"]["displayed"] - (
+            reading.get("boards", {}).get("request", {}).get("covered") or 0)
+        tax_bar = bar.get("B3_displayTax")
+        if tax_bar is not None:
+            if tax_bar["tax"] != difference:
+                problems.append("B3 display tax: the tax is not the contract's shown writes less its full coverage")
+            if tax_bar["holds"] != (abs(difference) <= tax_bar["bar"]):
+                problems.append("B3 display tax: holds disagrees with the absolute difference")
+        contract = bar.get("B2_contract")
+        if contract is not None:
+            if contract["tax"] != difference:
+                problems.append("B2 contract: the tax is not the contract's shown writes less its full coverage")
+            if contract["holds"] != (display["request"]["displayed"] >= contract["floor"]):
+                problems.append("B2 contract: holds disagrees with the floor")
+        # Indexed rather than guarded: both registrations carry one, under one name or the other, so a bar without a
+        # hidden test would be a bar this checker has never been given — and the KeyError says so where a silent
+        # `if` would have reported a reading that adds up.
+        hidden_bar = bar["B2_hidden"] if "B2_hidden" in bar else bar["B3_hidden"]
+        one = display[hidden_bar["scope"]]
+        if one["hiddenShare"] is not None and abs(hidden_bar["hiddenShare"] - one["hiddenShare"]) > 1e-9:
+            problems.append("the hidden share under test is not the chosen scope's")
+        if hidden_bar["hidden"] != one["hidden"]:
+            problems.append("the hidden count under test is not the chosen scope's")
     return problems
 
 
@@ -2226,7 +2326,10 @@ def self_test() -> int:
             reached, shown = pair
             return {"required": required, "reached": reached, "displayed": shown, "hidden": reached - shown,
                     "shownShare": (shown / required) if required else None,
-                    "hiddenShare": ((reached - shown) / reached) if reached else None, "itemsPerCall": CAP}
+                    "hiddenShare": ((reached - shown) / reached) if reached else None, "itemsPerCall": CAP,
+                    # The two orders coincide unless a test says otherwise, which is the honest default: an ordering
+                    # is a permutation of a list, and a permutation that changes nothing is the identity.
+                    "other": shown}
         return {"graded": 1 if required else 0, "discharged": required,
                 "display": {"request": one(request), "clause": one(clause)},
                 "boards": {"request": {"covered": full}}}
@@ -2322,6 +2425,111 @@ def self_test() -> int:
         check("a grid with nothing graded fails the displayed bar and exits one",
               quiet(["--document", empty_path, "--scope", "displayed", "--bar"]) == 1)
 
+    # R233. The ordering, on a fixture where the two orders disagree by construction: a settled ask stated first, an
+    # open one stated second, and a cap of one line.
+    address_after_cancel = [
+        {"role": "user", "content": "Please cancel my order #W1234567."},
+        _call("get_order_details", order_id="#W1234567"),
+        _result(order),
+        _call("cancel_pending_order", order_id="#W1234567", reason="customer asked"),
+        _result("{}"),
+        {"role": "assistant", "content": "Cancelled. Anything else?"},
+        {"role": "user", "content": "Yes, please change my address to 1 Main St, Chicago 60614."},
+        _call("get_user_details", user_id="mia_garcia_4516"),
+        _result('{"user_id": "mia_garcia_4516", "orders": ["#W1234567"]}'),
+        _call("modify_user_address", user_id="mia_garcia_4516", address1="1 Main St", city="Chicago", zip="60614"),
+        _result("{}"),
+    ]
+    ordered_entry = ledger(address_after_cancel)
+    # The **moment** board, not the finished one: on the finished board both asks are settled and the two orders agree,
+    # which is the whole reason the round had to be measured at the call.
+    by_statement = moment(ordered_entry, address_after_cancel, 9, "clause")
+    by_open = moment(ordered_entry, address_after_cancel, 9, "clause", order="open")
+    check("the statement order puts the settled ask first",
+          [(item["family"], item["settled"]) for item in by_statement["items"]] == [("cancel", True),
+                                                                                   ("address", False)])
+    check("and the open-first order reverses the two without moving the settlements",
+          [(item["family"], item["settled"]) for item in by_open["items"]] == [("address", False), ("cancel", True)])
+    check("the ordering changes no count on the board but the arrangement",
+          (by_open["credited"], by_open["unaccounted"], by_open["itemsAll"])
+          == (by_statement["credited"], by_statement["unaccounted"], by_statement["itemsAll"]))
+    refused_order = False
+    try:
+        ask_board(ordered_entry, address_after_cancel, "clause", order="recency")
+    except ValueError:
+        refused_order = True
+    check("an order nobody implements is refused rather than defaulted to the statement's", refused_order)
+    address_task = {"id": "4", "evaluation_criteria": {"actions": [
+        {"name": "modify_user_address", "arguments": {"user_id": "mia_garcia_4516"}}]}}
+    address_done = discharge(ordered_entry["writes"], required_writes(address_task))
+    tight_statement = visibility(ordered_entry, address_after_cancel, address_done, "clause", cap=1)
+    tight_open = visibility(ordered_entry, address_after_cancel, address_done, "clause", cap=1, order="open")
+    check("under the shipped order one line is spent on work already done, and the write is hidden",
+          (tight_statement["reached"], tight_statement["displayed"], tight_statement["hidden"]) == (1, 0, 1))
+    check("under open-first the same one line is the open ask, and the write is shown",
+          (tight_open["reached"], tight_open["displayed"], tight_open["hidden"]) == (1, 1, 0))
+    check("and the reading keeps the other order beside the one it reports",
+          (tight_open["other"], tight_statement["other"]) == (0, 1))
+
+    # R233's bars. The third bar changes shape with the registration: a floor at the contract's measured level rather
+    # than a tolerance around its difference, and the hidden test keeps a subject even when coverage is refused.
+    ordered_grid = compare({"tasks": [address_task],
+                            "simulations": [{"id": "s", "task_id": "4", "messages": address_after_cancel}]}, "ordered")
+    check("the ordered reading reports the contract's level as a floor rather than as a tolerance",
+          ordered_grid["bar"]["B2_contract"]["floor"] == ordered_grid["display"]["request"]["other"]
+          and ordered_grid["bar"]["B2_contract"]["displayed"] == ordered_grid["display"]["request"]["displayed"])
+    check("and adds up", check_manifest(ordered_grid) == [])
+    # The floor form's three claims, each doctored once. The checker has to walk both shapes or a reading taken under
+    # one registration would be checked by the other's arithmetic — which is 34.328's defect in miniature.
+    for label, mutate in (
+        ("a tax that is not the difference", lambda one: one.__setitem__("tax", 99)),
+        # A floor raised above the level it is supposed to admit: the reading then says it holds about a comparison
+        # that fails, which is the direction a hand-edited document errs in.
+        ("a hold the floor contradicts", lambda one: one.__setitem__("floor", one["displayed"] + 5)),
+    ):
+        doctored = json.loads(json.dumps(ordered_grid))
+        mutate(doctored["bar"]["B2_contract"])
+        check(f"an ordered reading with {label} is caught", check_manifest(doctored) != [])
+    wrong_hidden = json.loads(json.dumps(ordered_grid))
+    wrong_hidden["bar"]["B3_hidden"]["hidden"] = 9
+    check("an ordered reading whose hidden count is not its scope's is caught", check_manifest(wrong_hidden) != [])
+    ordered_text = render(ordered_grid, "ordered")
+    for name in ("B1 displayed", "B2 contract", "B3 hidden"):
+        check(f"the ordered reading prints its bar line ({name})", name in ordered_text)
+    check("a scope that clears the coverage bar is named rather than assumed",
+          display_bar(display_summary(100, (74, 74), (100, 80), 70), 0.5, 0.2, floor=True)["B1_displayed"]["passers"]
+          == ["request", "clause"])
+    floor_summary = display_summary(100, (74, 74), (100, 74), 70)
+    floor_form = display_bar(floor_summary, 0.97, 0.01, floor=True)
+    check("the contract's floor is its own statement-order level, per grid",
+          floor_form["B2_contract"]["floor"] == floor_summary["display"]["request"]["other"])
+    check("and holds when the ordering costs it nothing", floor_form["B2_contract"]["holds"] is True)
+    # One write lost to the ordering is a loss, and the floor form says so where a tolerance around zero would not.
+    lossy = display_summary(100, (74, 73), (100, 74), 70)
+    lossy["display"]["request"]["other"] = 74
+    check("and one write under it fails", display_bar(lossy, 0.97, 0.01, floor=True)["B2_contract"]["holds"] is False)
+    # A round that fails its coverage bar still has a cost column, and the column names the scope it priced: the one
+    # that displayed the most writes, flagged as not having cleared coverage rather than quietly reported as a pass.
+    unpased = display_bar(display_summary(100, (74, 70), (100, 74), 70), 0.97, 0.01, floor=True)
+    check("the hidden test reports a scope even when no scope cleared coverage",
+          unpased["B3_hidden"]["scope"] == "clause" and unpased["B3_hidden"]["passed"] is False)
+    check("and the same scope is the one B1 lists as having fallen short", unpased["B1_displayed"]["passers"] == [])
+    check("a hidden share exactly at the bar holds",
+          display_bar(display_summary(100, (74, 74), (100, 99), 70), 0.97, 0.01, floor=True)["B3_hidden"]["holds"]
+          is True)
+    check("and one write more fails",
+          display_bar(display_summary(100, (74, 74), (100, 98), 70), 0.97, 0.01, floor=True)["B3_hidden"]["holds"]
+          is False)
+    with tempfile.TemporaryDirectory() as temporary:
+        path = os.path.join(temporary, "ordered-doc.json")
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump({"tasks": [address_task],
+                       "simulations": [{"id": "s", "task_id": "4", "messages": address_after_cancel}]}, handle)
+        saved_path = os.path.join(temporary, "ordered.json")
+        check("the ordered scope runs from the command line",
+              quiet(["--document", path, "--scope", "ordered", "--save", saved_path]) == 0)
+        check("and its reading adds up", quiet(["--check", saved_path]) == 0)
+
     check("the reporter on an empty list exits zero", quiet_report([]) == 0)
     check("the reporter on a failure exits one", quiet_report(["negative control (must fail)"]) == 1)
     return _report(failed)
@@ -2334,8 +2542,8 @@ def main(argv: list) -> int:
     parser.add_argument(
         "--scope",
         default="strict",
-        choices=("strict", "loose", "ask", "admitted", "clause", "displayed"),
-        help="which board the bars are evaluated over; `displayed` measures the rendered block instead",
+        choices=("strict", "loose", "ask", "admitted", "clause", "displayed", "ordered"),
+        help="which board the bars are evaluated over; `displayed` measures the rendered block, `ordered` reorders it",
     )
     parser.add_argument("--bar", action="store_true", help="exit non-zero when a registered bar fails")
     parser.add_argument("--save", default="", help="write the reading to this path, for the documents to quote")

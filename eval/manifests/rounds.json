@@ -1034,7 +1034,7 @@
   {
    "id": "R233",
    "title": "order the eight: open before settled",
-   "status": "registered",
+   "status": "read",
    "dispatchBy": "2026-12-28T12:00:00Z",
    "prereg": "prereg/R233-the-order.md",
    "instrument": "python3 eval/tools/read_anchor.py --document <grid>/control.json --replicate <grid>/front.json --scope ordered",
@@ -1048,7 +1048,28 @@
     "R232"
    ],
    "why": "R232 measured the rendered block and found the cut costs 2.2% rather than the fifth its prereg feared, so the display is not the binding constraint. What remains is that the 14 hidden writes were not hidden by the cap but by the order: the block lists asks in the order they were stated, so a settled ask stated early outranks an open one stated late, and the inspected case needs line nine to be seen. The ordering rule is content-free - open items before settled ones, statement order within each group - so it costs nothing to price and cannot smuggle a model into a measurement that has so far had none.",
-   "bar": "registered in prereg/R233-the-order.md before the reading; not yet read"
+   "bar": "registered in prereg/R233-the-order.md before the reading: the clause board shows an open ask for at least 634 of 654 required writes (97.0%), the contract's ordered level is at least its own statement-order level, and the clause board's hidden share falls to 1.0% or less",
+   "readAt": "2026-11-26T14:58:00Z",
+   "outcome": "REFUTED on B1 by three writes, and the three writes are the finding. `open before settled` lifts the clause board from 622 to 632 of the 654 required writes (96.6% against a bar of 97.0%), removes ten of R232's fourteen hidden writes (14 to 4, hidden share 2.2% to 0.6%), and costs the contract nothing (463 shown against its own 463 statement-order level, B2 holds). B3 holds on the control grid at 0.6% and fails on the replication at 7 of 621 (1.1%), so the round is refused on both grids and on different bars. The mechanism the prereg named in advance is the one that fired: reach is unchanged at 636, so the residue is bounded by the cap and not by the order - every one of the four is a `modify` ask sitting behind 9 to 39 open asks of other families, and the block that holds 39 open items is 41 items long, nine of them `address`. The successor is therefore `one line per family` rather than `MAX_ITEMS`: a grouping removes the duplication that fills the window, where raising the cap would pay for it. What the round establishes independently of its verdict is that the ordering is free and positive - ten writes recovered, no write lost, no new content, no model - which makes it the first change in this lane that a product could adopt on the rendering alone."
+  },
+  {
+   "id": "R234",
+   "title": "one line per family: the block that fills its window with repetition",
+   "status": "registered",
+   "dispatchBy": "2026-12-29T12:00:00Z",
+   "prereg": "prereg/R234-one-line.md",
+   "instrument": "python3 eval/tools/read_anchor.py --document <grid>/control.json --replicate <grid>/front.json --scope grouped",
+   "arms": [
+    "none"
+   ],
+   "episodes": 0,
+   "estimateUsd": 0.0,
+   "actualUsd": 0.0,
+   "dependsOn": [
+    "R233"
+   ],
+   "why": "R233 removed ten of the fourteen hidden writes and left four, and all four are the same shape: a `modify` ask behind nine to thirty-nine **open** asks of other families, in one case nine of them `address`. The cap is binding on openness rather than on settlement, and the material filling it is repetition - one family stated six times because the user restated it. A block that shows one line per family is the same block with the duplicates folded, which is a rendering rule like R233's and costs nothing to price.",
+   "bar": "registered in prereg/R234-one-line.md before the reading; not yet read"
   }
  ]
 }

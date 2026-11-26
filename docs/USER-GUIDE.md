@@ -7672,3 +7672,49 @@ python3 eval/tools/read_anchor.py --document control.json --replicate front.json
 # B2 hidden     holds (14 of 636 reached write(s) hidden on clause, 2.2%, against a bar of 0.20)
 # B3 display tax FAILS (+47 write(s) on the contract: 463 shown against 416 covered uncut, 463 reached without the cut)
 ```
+
+### 32.89 Put open items before settled ones: it is free, and it recovers most of what the cap hides
+
+32.88 measured the block and found fourteen writes hidden below the fold. This section is the one-line repair, and the
+result that made it worth telling: **two thirds of the hidden writes were behind work already done.**
+
+**The rule.**
+
+```python
+items = [i for i in items if not i.settled] + [i for i in items if i.settled]   # stable, in both halves
+```
+
+No model, no score, no vocabulary, no change to any count on the board — a stable partition of a list you have already
+built. On the same 456 episodes: the clause board goes from **622 to 632** of 654 shown (95.1% → 96.6%), the hidden set
+from **14 to 4** (2.2% → 0.6%), and the shipped contract board does not move (**463 → 463**), which is the bar that
+matters if you are changing a renderer in production.
+
+**What is left is not an ordering problem, and this is the part worth internalising.** All four residual writes are one
+family (`modify`) sitting behind **9 to 39 open asks of other families**. One block holds 39 open items, nine of them
+`address`; another holds eight `address` and three `exchange`. Your user restated one obligation across nine turns and
+your board is right to record nine obligations — the question it answers is *which obligations exist*, not *which are
+distinct*. The window then shows one obligation nine times and the distinct one zero times.
+
+So the next repair is not a bigger cap:
+
+```python
+items = [first open item of each family]        # fold the repeats, then cut
+```
+
+**Three things to check before you adopt any of this.**
+
+1. **Both windows on one board.** Report the shipped order and the candidate order from the same items, as the tool does
+   (`shown` and `other`). An ordering is a permutation; a reading that recomputes the board for each order is reading
+   two boards.
+2. **A floor, not a tolerance, when you reorder.** "The contract may not lose three writes" is a bar an ordering can pass
+   by losing three writes. Express it as "at least its own statement-order level" and it means the same thing on every
+   grid.
+3. **Do not raise the cap to fit repetition.** A block that is 41 items long because nine of them are the same ask is a
+   duplication problem; paying for it in tokens buys the ninth copy of a line the model already has.
+
+```bash
+python3 eval/tools/read_anchor.py --document control.json --replicate front.json --scope ordered
+# B1 displayed  FAILS (request 70.8%, clause 96.6% of 654 required write(s) shown, against a bar of 0.970)
+# B2 contract   holds (463 shown against a floor of 463, tax +47, 463 reached without the cut)
+# B3 hidden     holds (4 of 636 reached write(s) hidden on clause, 0.6%, against a bar of 0.01)
+```

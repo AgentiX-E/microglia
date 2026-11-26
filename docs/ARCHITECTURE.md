@@ -5472,3 +5472,52 @@ lane has.
 python3 eval/tools/read_anchor.py --document control.json --replicate front.json --scope displayed
 python3 scripts/display.py --out-svg docs/benchmarks/display.svg
 ```
+
+### 8.108 Open before settled recovers ten of the fourteen, and the four that remain are repetition
+
+R232 left fourteen graded writes whose ask was on the moment board and below the fold. R233 tests one ordering against
+them — `open items first, settled items after, statement order preserved inside each group` — and it is the cheapest rule
+this lane has measured: a stable partition of a list, no model, no vocabulary, no change to any count on the board.
+
+| | statement order (the product) | **open before settled** |
+|---|---|---|
+| reached (family open anywhere) | 636 | 636 |
+| shown within eight lines | 622 (95.1%) | **632 (96.6%)** |
+| hidden | 14 (2.2%) | **4 (0.6%)** |
+| contract's own level | 463 | 463 |
+
+**It holds two of its three bars and misses the third by three writes.** B2 — the ordering must not cost the shipped
+board — is exact: 463 against its own 463. B3 — a hidden share of at most 1.0% — holds at 0.6% on the control grid and
+fails at 1.1% on the replication, so the round is refused on different bars on different grids. B1 asked for 97.0% and
+got 96.6%, and the three writes that separate them are the round's actual result, because they say what the cap is
+binding on.
+
+**The residue is four `modify` asks behind nine to thirty-nine open asks of other families.**
+
+| episode | position among open asks | open asks on the block | block length |
+|---|---|---|---|
+| a4beb7a0 | 10 | 15 | 15 |
+| c7a5a0cf | 9 | 11 | 11 |
+| 2c110c2f | 10 | 39 | 41 |
+| a3d01c11 | 11 | 16 | 16 |
+
+The families in front of them are not diverse. The 41-item block holds nine `address` asks and the 15-item block eight
+`address` and three `exchange`: the user restates an obligation across turns, the parser records each statement, and the
+board answers the question it was asked — which obligations exist. The window then spends eight lines on one obligation
+stated nine times. That is **repetition**, and repetition is what a fold removes: `one line per family` lifts the
+`modify` ask from position 10 to position 2 in the widest case, which is R234.
+
+**Why the ordering is worth having even though the round is refused.** It recovers ten writes, loses none, adds no
+content, and needs no dispatch. Nothing else in this lane's seven refusals has that property: every previous rule bought
+coverage with items. A product can adopt the ordering on the rendering alone, and the reading reports both windows on one
+board so that the change is auditable line by line:
+
+```
+python3 eval/tools/read_anchor.py --document control.json --scope ordered
+# display   required reached shown hidden hidden% items/call
+# request        654     463   463      0    0.0%       2.41
+# clause         654     636   632      4    0.6%       8.10
+# B1 displayed  FAILS (request 70.8%, clause 96.6% of 654 required write(s) shown, against a bar of 0.970)
+# B2 contract   holds (463 shown against a floor of 463, tax +47, 463 reached without the cut)
+# B3 hidden     holds (4 of 636 reached write(s) hidden on clause, 0.6%, against a bar of 0.01)
+```

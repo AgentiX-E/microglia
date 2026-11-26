@@ -2952,3 +2952,18 @@ is computed: a board can reach every write and show none of them.
 it at four writes on the contract and measured **+47**, which is impossible for a cut to cause; the round's attribution
 column shows the same board reaching 463 with and without the cap. A tax is only a tax when both sides are the same
 settlement rule.
+
+**Rendering order** — the arrangement of a block's items before the cap is applied. Two exist: **statement order**, the
+product's, which lists asks in the order the user stated them, and **open before settled**, which puts every unsettled
+ask ahead of every settled one and preserves statement order inside each group. It is a stable partition, so it changes
+no count on the board — only which eight lines a model reads: **632** shown instead of 622 on the retail grid, and **4**
+hidden instead of 14.
+
+**The other window** — the same block read under the order the reading is *not* reporting. Every displayed reading
+carries it (`other`), so a product's shipped level and a candidate's are two numbers from one board rather than two
+measurements: 463 against 463 for the contract, 622 against 632 for the clause board.
+
+**Fold (one line per family)** — the rendering rule R234 registers: of the open items, keep the first of each family.
+It targets repetition rather than breadth — one retail block holds nine `address` asks because the user restated an
+obligation across nine turns — and it is the successor to the ordering because the four writes the ordering could not
+lift sit behind nine to thirty-nine open asks of *other* families, not behind settled ones.

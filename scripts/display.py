@@ -49,6 +49,8 @@ def load(path: pathlib.Path) -> dict:
             raise SystemExit(f"{name}: hidden is not reached less shown")
         if one["displayed"] > one["reached"]:
             raise SystemExit(f"{name}: more shown than reached")
+        if one["other"] > one["reached"]:
+            raise SystemExit(f"{name}: more shown under the other order than reached")
     return reading
 
 
@@ -82,14 +84,22 @@ def svg(reading: dict) -> str:
                      f'fill="{COLOURS[name]}" opacity="0.28"/>')
         parts.append(f'<rect x="{left}" y="{y}" width="{one["displayed"] * scale:.1f}" height="{bar_height}" '
                      f'fill="{COLOURS[name]}" opacity="0.92"/>')
+        # R233's overlay: the writes open-before-settled would add, drawn on top of the shipped order in the same
+        # colour at half strength. One board, two windows — the difference is the order and nothing else.
+        if one["other"] > one["displayed"]:
+            parts.append(f'<rect x="{left + one["displayed"] * scale:.1f}" y="{y}" '
+                         f'width="{(one["other"] - one["displayed"]) * scale:.1f}" height="{bar_height}" '
+                         f'fill="{COLOURS[name]}" opacity="0.45"/>')
         parts.append(f'<text class="n" x="{left + one["displayed"] * scale - 8:.1f}" '
                      f'y="{y + bar_height / 2 + 4}" text-anchor="end" fill="#ffffff">'
                      f'{one["displayed"]} shown</text>')
         hidden = one["hidden"]
+        gain = one["other"] - one["displayed"]
         note = f'{hidden} hidden' if hidden else "nothing hidden"
         parts.append(f'<text class="s" x="{left + one["reached"] * scale + 8:.1f}" '
                      f'y="{y + bar_height / 2 + 4}">{note} of {one["reached"]} reached'
-                     f'{" " + format(one["hiddenShare"], ".1%") if hidden else ""}</text>')
+                     f'{" " + format(one["hiddenShare"], ".1%") if hidden else ""}'
+                     f'{f" · +{gain} open-first" if gain else ""}</text>')
         parts.append(f'<text class="s" x="{left}" y="{y - 6}">{one["itemsPerCall"]:.2f} items a call</text>')
     bar_x = left + required * reading["bar"]["B1_displayed"]["bar"] * scale
     parts.append(f'<line x1="{bar_x:.1f}" y1="{top - 16}" x2="{bar_x:.1f}" y2="{top + 2 * bar_height + gap}" '
@@ -124,18 +134,23 @@ def _png(reading: dict, path: pathlib.Path) -> None:
     for index, name in enumerate(SCOPES):
         one = display[name]
         axes.barh(index, one["displayed"], color=COLOURS[name], height=0.42, zorder=3)
-        axes.barh(index, one["hidden"], left=one["displayed"], color="#f6c7c3", height=0.42, zorder=3)
+        axes.barh(index, one["other"] - one["displayed"], left=one["displayed"], color=COLOURS[name], alpha=0.45,
+                  height=0.42, zorder=3)
+        axes.barh(index, one["hidden"], left=one["other"], color="#f6c7c3", height=0.42, zorder=3)
         axes.text(one["displayed"] / 2, index, f'{one["displayed"]} shown', ha="center", va="center",
                   color="white", fontsize=10)
-        axes.text(one["reached"] + 6, index, f'{one["hidden"]} hidden of {one["reached"]} reached'
-                  f' ({one["hiddenShare"]:.1%})' if one["hidden"] else
-                  f'nothing hidden of {one["reached"]} reached', va="center", fontsize=9.5, color="#3c4043")
+        gain = one["other"] - one["displayed"]
+        note = (f'{one["hidden"]} hidden of {one["reached"]} reached ({one["hiddenShare"]:.1%})'
+                if one["hidden"] else f'nothing hidden of {one["reached"]} reached')
+        if gain:
+            note += f'\n+{gain} under open-first'
+        axes.text(one["reached"] + 6, index, note, va="center", fontsize=9.5, color="#3c4043")
     axes.axvline(required * reading["bar"]["B1_displayed"]["bar"], color="#b3261e", linestyle="--", linewidth=1.2)
     axes.set_yticks(range(len(SCOPES)))
     axes.set_yticklabels([f'{name}\n{display[name]["itemsPerCall"]:.2f} items a call' for name in SCOPES], fontsize=10)
     axes.set_xlim(0, required * 1.02)
     axes.set_xlabel(f"of {required} required writes the evaluator grades", fontsize=10)
-    axes.set_title("R232: what survived the eight-line cut", fontsize=11)
+    axes.set_title("R232/R233: what survived the eight-line cut, in both orders", fontsize=11)
     axes.grid(axis="x", alpha=0.18)
     for spine in ("top", "right", "left"):
         axes.spines[spine].set_visible(False)
@@ -200,6 +215,8 @@ def self_test() -> int:
     markup = svg(reading)
     check("the markup carries both scopes", all(f">{name}<" in markup for name in SCOPES))
     check("and the bar it was judged against", "73.6%" in markup)
+    check("and the ordered overlay where the two windows differ",
+          "+10 open-first" in markup and reading["display"]["clause"]["other"] > reading["display"]["clause"]["displayed"])
     check("and closes", markup.rstrip().endswith("</svg>"))
     with tempfile.TemporaryDirectory() as temporary:
         doctored = json.loads((here / "eval" / "manifests" / "r232-reading.json").read_text())
