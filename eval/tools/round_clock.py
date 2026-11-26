@@ -190,7 +190,12 @@ def self_test() -> int:
     expect("and of a dirty one names each failure",
            summary(2, 1, ["FAIL b"]) == "1/2 assertions\nFAIL b\n1 failure(s)")
 
-    now = moment_of("2026-11-25T14:00:00Z")
+    #: One moment for the whole suite, and the reason is a defect this suite shipped: the function-level assertions
+    #: read this constant while three command-line assertions read the **wall clock**, so a fixture dated "tomorrow"
+    #: passed on the day it was written and failed the next day, at the hour the date had named. A test that reads
+    #: the real clock is a test with an expiry date.
+    moment = "2026-11-25T14:00:00Z"
+    now = moment_of(moment)
 
     # --- timestamps ------------------------------------------------------------------------------------------
     expect("a Z timestamp is UTC", moment_of("2026-11-25T14:00:00Z").hour == 14)
@@ -243,11 +248,11 @@ def self_test() -> int:
         line.strip().startswith("LATE") for line in report(debt, late, now) if " RAN " in line))
 
     path = registry(of=[{"id": "OWED", "status": "registered", "dispatchBy": "2026-11-25T13:00:00Z"}])
-    expect("an overdue registry exits one", _capture(["--registry", str(path)], 1))
+    expect("an overdue registry exits one", _capture(["--registry", str(path), "--now", moment], 1))
     clear = registry(of=[{"id": "SOON", "status": "registered", "dispatchBy": "2026-11-26T13:00:00Z"}])
-    expect("a registry that owes nothing exits zero", _capture(["--registry", str(clear)], 0))
+    expect("a registry that owes nothing exits zero", _capture(["--registry", str(clear), "--now", moment], 0))
     expect("the json reading names the late round",
-           json.loads(_capture(["--registry", str(path), "--json"]))["late"] == ["OWED"])
+           json.loads(_capture(["--registry", str(path), "--json", "--now", moment]))["late"] == ["OWED"])
     expect("a refused registry exits two", _capture(["--registry", "/nonexistent/x.json"], 2))
     expect("--now reads the clock it is given",
            _capture(["--registry", str(path), "--now", "2026-11-25T12:00:00Z"], 0))
