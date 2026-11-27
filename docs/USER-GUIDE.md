@@ -7842,3 +7842,38 @@ block. Before you quote them as a result, serve the block and check three things
 census reports the scope and the rung you dispatched, that the block's mean length is inside your ceiling, and that
 some turn found the block unchanged (a block rewritten every turn is not reordered, it is re-billed). A rule that is
 right on paper and unserved in the driver is the most expensive kind of correct.
+
+### 32.93 Check what your memory carries that nothing needed — and split the number before you believe it
+
+The published evidence on memory is uncomfortable: `MemTrapBench` (arXiv 2608.20202) plants memories that are
+accurate and relevant but applied past the conditions that made them true, and finds **every** memory strategy it
+tests worse than no memory at all — by 11 to 30 points, with the largest drop arriving the moment any memory is
+added. If your memory is a similarity search over text, that result is about you.
+
+There is one reader for this question here, and it costs nothing to run:
+
+```bash
+python3 eval/tools/memory_traps.py --document eval/results/working-memory/control.json --scope clause --sample 4
+```
+
+Four numbers come back, and they answer different questions:
+
+| column | what it means | what to do with it |
+|---|---|---|
+| `settled` | finished asks the renderer removed from inside the line budget | if this is zero, your settlement rule is not firing and your block is stale |
+| `unused` | shown lines the call at that moment did not name | a high share is prompt you are paying for on every turn |
+| `fixation` | a call repeated unchanged after the environment refused it | if this is above zero, look for a retry loop, not a memory bug |
+| `rejected` | the family-level staleness count, and how it splits | read the split before quoting either half |
+
+**The trap is in the fourth row, and it is a trap for the person reading the report.** "The block calls a family
+outstanding after a successful write of that family" is a rate over **families**, and a family is what your board
+settles by; an **ask** is what your model reads. On one 456-episode grid the family count is 11.4% of shown lines —
+and it splits into 6.8% where no ask of that family ever settled (a real defect: the board settles on a record the
+episode *opened*, so a write to an order you never looked up settles nothing) and the rest, which are several
+products of one family with one done and one still outstanding, exactly as they should be. One number, two findings,
+and only the split tells them apart. `--sample` prints the windows so you can see which you have.
+
+**A test you can run on any block in five minutes.** Take the windows where an ask was still shown after a
+successful write of its family, and check whether any line of that family in the same window shows as settled. If
+none does, the settlement rule never fired for that family and the block is asking for finished work; if one does,
+the open line is a different product and the block is right.

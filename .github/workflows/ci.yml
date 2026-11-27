@@ -230,9 +230,16 @@ jobs:
           # …and the reading it took for nothing, on the 456 control transcripts, re-checked so the numbers the
           # amendment quotes cannot drift from the tool that produced them.
           python3 eval/tools/board_mechanism.py --check eval/manifests/r236-replay.json
+          # R237. The two MemTrapBench families, read off our own transcripts with no model call: `settled`, `unused`,
+          # `fixation`, and the family-level quantity that was computed and then refuted. Under the floor because the
+          # number the refutation rests on has to be recomputable - an argument that a rate is over the wrong unit is
+          # worth nothing if the rate cannot be re-derived.
+          python3 -m coverage run --append --branch --include="*/eval/tools/memory_traps.py" \
+            eval/tools/memory_traps.py --self-test
+          python3 eval/tools/memory_traps.py --check eval/manifests/r237-traps.json
           python3 -m coverage json -o coverage-python.json
           python3 scripts/check-python-coverage.py --self-test
-          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 28
+          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 29
 
       - name: The rounds this project owes, and the date each one was registered for
         # The failure this prevents is not a wrong number, it is a round that quietly stops being planned: R216b's

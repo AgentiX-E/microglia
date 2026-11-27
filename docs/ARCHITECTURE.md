@@ -5692,3 +5692,50 @@ cheap enough to be mistaken for a serving path. The cheap check is to make the s
 the replay calls, and then to assert in the driver that the arm *ran* with the values the dispatch *asked* for:
 `scope`, `display` and `placement` are three fields of the census and of the per-episode dose record, so an
 environment that lost one of them is a build failure rather than a flat result.
+
+### 8.112 What a memory carries when nothing needs it, and a number that was taken on the wrong unit
+
+`MemTrapBench` (arXiv 2608.20202) is the first benchmark to price the failure this project has been arguing about
+from the other side. It plants a memory that is faithfully recorded and semantically relevant, then changes the
+conditions under which it applies, and measures what the memory does to the answer. **All five of its strategies
+lose to the no-memory control** — FullText −24.5, MemOS −24.5, SimpleMem −30.5, LightMem −15.1, EverMemOS −14.0
+points on Gemini-3-Flash, and −10.8 to −19.0 on Qwen3-30B — and the loss survives a length ablation: the largest
+drop (92.3 → 36.0) happens the moment *any* memory is added, not as it grows. Its two families are **Reasoning
+Fixation** (a past strategy applied past the conditions that made it work) and **Belief Distortion** (a memory
+changes what the model treats as true).
+
+**Why this project should expect a different number, and why that is not a claim.** Those five strategies are text,
+retrieved by similarity. The block here is a list of **outstanding work**, and an item is removed when a receipt
+discharges it. A text memory cannot notice that the work it describes is finished; a receipt-bound one removes it by
+construction. So the interesting question is not whether the block is clever but what it still carries — which is
+decidable from transcripts at zero model calls, and `eval/tools/memory_traps.py` decides it:
+
+    settled    finished asks inside the line budget that the renderer removes      117 over 575 windows (0.20 a window)
+    unused     open asks the call at that moment did not name                   2,131 of 4,447 lines (47.9%)
+    fixation   a write repeating an earlier refused call's family and arguments         0 of 456 episodes (11 refusals)
+
+The `settled` column is what the settlement rule is *worth* in lines rather than what it prevents; `unused` is the
+prompt the block spends on lines the call did not use (7.73 lines a window against one family a call); `fixation` is
+the only in-lane form of Reasoning Fixation a receipt can decide, and on 456 episodes it does not happen — the model
+does not retry a refused call unchanged, so this lane's memory is not producing that trap.
+
+**The number that was wrong, and how it was caught.** The obvious in-lane form of Belief Distortion is "the block
+calls a family outstanding after a successful write of that family", and it reads **507 of 4,447 shown lines
+(11.4%)** — a defect the size of the round. It is not one number. `--sample` prints the windows behind it, and the
+split decides the reading: **304 (6.8%)** sit in a family where **no ask ever settled**, and **203** sit beside a
+settled line of the same family — several products of one family, one done and one still outstanding, which is
+exactly what the block should show. Only the first half is a defect, and it has a mechanical cause worth knowing:
+the board settles an ask only when the write touches a **record the episode opened**, so a successful call to an
+order the episode never looked up settles nothing and the ask stands. The rate is right, the unit was a family where
+the model reads an ask, and publishing the 11.4% would have been the fifth time this repository took a margin from
+the wrong quantity (AUDIT 34.332, 34.336).
+
+**What the fix needs, and it is the same thing the measurement needs.** Both the unsettled half and an ask-level
+measure require a binding from an ask's words to the identifiers a write carries — the product lookups in a
+transcript return the name and the id together, so the binding is recoverable and is not built yet. Until it is, the
+reader reports the split, prints its sample, and refuses to call either half an effect.
+
+**What this does not claim.** No accuracy number, and no ranking against MemTrapBench: that benchmark's items are
+its own, and our zero fixation rate is a statement about *our* transcripts under *our* board, not a score on its
+leaderboard. The claim is narrower and checkable: the block's stale lines are countable, the count splits, and one
+half of it is a settlement defect with a named cause.

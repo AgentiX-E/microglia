@@ -3033,3 +3033,23 @@ and this project had it in four places before it was a field of `serving-default
 `limit ?? 8`, the parser's `MAX_ITEMS`, the instrument's `CAP`, and a registration's arithmetic. Four copies of a
 constant is four chances to change one, and a window that is eight lines in the measurement and nine in the product
 is a number that has stopped being about the shipped artefact.
+
+**Memory trap** — a memory that is accurate and relevant and still makes the current answer worse, because the
+conditions it was learned under no longer hold. Named and measured by `MemTrapBench` (arXiv 2608.20202), where all
+five tested strategies score below the no-memory control. The two families are **Reasoning Fixation** — a past
+strategy applied past the conditions that made it work — and **Belief Distortion** — a memory that changes what the
+model treats as true. In this repository the same phenomena are read off transcripts at zero model calls
+(`eval/tools/memory_traps.py`): a block that still shows finished work, a block that spends lines a call does not
+use, and a call re-issued unchanged after a refusal.
+
+**Settlement rule** — what removes an ask from the block: a **successful** write of that ask's family to a record the
+episode **opened**. Both halves matter. A refused write changes nothing and removes nothing; and a write to an order
+the episode never looked up cannot be credited to an ask, which is why such an ask stays open after the work is done
+— the one stale-line defect this project has measured a cause for. The rule's worth is reported as `settled`: the
+finished asks that sat inside the line budget and were removed instead of shown.
+
+**Refuted quantity** — a number this project computed, published the refutation of, and kept computable. The first
+is family-level staleness: 11.4% of shown lines on the control grid, which splits into a real defect (6.8%, no ask of
+the family ever settled) and a correct behaviour (several products of one family). Keeping it in the manifest rather
+than deleting it is deliberate — a number that was computed and then argued against is evidence about the
+instrument, and a reader can re-derive both halves with `--sample`.
