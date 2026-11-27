@@ -359,21 +359,23 @@ jobs:
           assert fourth["replication"]["bar"]["B2_efficiency"]["holds"] is False
           # R232: the rendered block. Two bars hold and the third fails on its reference quantity, and all three
           # numbers are pinned because the round's finding is the *difference* between them: 622 shown, 636 reached,
-          # 463 shown against 416 covered uncut. A later round that quotes 95.1% without the 14 hidden, or the +47
-          # without the 463 reached beside it, would be quoting the favourable half of a trade.
+          # 461 shown against 416 covered uncut. A later round that quotes 95.1% without the 14 hidden, or the +45
+          # without the 461 reached beside it, would be quoting the favourable half of a trade. R239 moved the
+          # contract's request board from 463 to 461 by settling on the serving rule; the clause column and both
+          # registered verdicts are unchanged.
           fifth = r232["reading"]
           shown_clause = fifth["display"]["clause"]
           assert shown_clause["required"] == 654, shown_clause["required"]
           assert (shown_clause["reached"], shown_clause["displayed"], shown_clause["hidden"]) == (636, 622, 14)
           assert abs(shown_clause["hiddenShare"] - 14 / 636) < 1e-9
           shown_request = fifth["display"]["request"]
-          assert (shown_request["reached"], shown_request["displayed"]) == (463, 463), shown_request
+          assert (shown_request["reached"], shown_request["displayed"]) == (461, 461), shown_request
           assert fifth["bar"]["B1_displayed"]["holds"] is True
           assert fifth["bar"]["B1_displayed"]["passers"] == ["clause"]
           assert fifth["bar"]["B2_hidden"]["holds"] is True
           assert fifth["bar"]["B2_hidden"]["scope"] == "clause"
           assert fifth["bar"]["B3_displayTax"]["holds"] is False, "R232 was refused on its display tax"
-          assert fifth["bar"]["B3_displayTax"]["tax"] == 47
+          assert fifth["bar"]["B3_displayTax"]["tax"] == 45
           assert fifth["bar"]["B3_displayTax"]["against"] == 416
           # The attribution that makes the refusal readable: the cap costs the contract nothing, so the +47 is a
           # settlement-rule difference and not a display tax.
@@ -383,7 +385,8 @@ jobs:
           assert fifth["replication"]["bar"]["B3_displayTax"]["holds"] is False
           # R233: the ordering. It removes ten of the fourteen hidden writes and costs the contract nothing, and it
           # still fails its own bar by three writes — which is the round, so all four numbers are pinned: the ordered
-          # clause level (632), the shipped level beside it (622), the residue (4) and the floor (463 = 463).
+          # clause level (632), the shipped level beside it (622), the residue (4) and the floor (461 = 461).
+          # R239 moved both sides of that floor from 463 to 461; the comparison it makes is unchanged.
           sixth = r233["reading"]
           ordered_clause = sixth["display"]["clause"]
           assert (ordered_clause["reached"], ordered_clause["displayed"], ordered_clause["hidden"]) == (636, 632, 4)
@@ -393,27 +396,32 @@ jobs:
           assert sixth["bar"]["B1_displayed"]["holds"] is False, "R233 was refused on its coverage bar"
           assert sixth["bar"]["B1_displayed"]["rates"]["clause"] == 632 / 654
           assert sixth["bar"]["B2_contract"]["holds"] is True
-          assert sixth["bar"]["B2_contract"]["floor"] == 463
+          assert sixth["bar"]["B2_contract"]["floor"] == 461
           assert sixth["bar"]["B3_hidden"]["holds"] is True
-          # The replication refuses a second bar as well: 7 hidden of 621 is 1.1%, over the tenth this round registered.
-          assert sixth["replication"]["display"]["clause"]["displayed"] == 614
-          assert sixth["replication"]["bar"]["B3_hidden"]["holds"] is False
+          # The replication's second bar. R239 moved one hidden write out of the window: 6 of 621 is 0.97%, inside
+          # the registered hundredth, so B3 now holds — but the scope still fails B1's coverage bar, so the reading
+          # remains a refusal. Pin the number that moved rather than the verdict that happened to precede it.
+          assert sixth["replication"]["display"]["clause"]["displayed"] == 615
+          assert sixth["replication"]["display"]["clause"]["hidden"] == 6
+          assert sixth["replication"]["bar"]["B3_hidden"]["holds"] is True
+          assert sixth["replication"]["bar"]["B1_displayed"]["holds"] is False
           # R234: the fold. All four numbers are pinned for the same reason R233's were — the round is a trade, and
           # the trade is these counts: the fold shows every write the board reached (636 of 636, 0 hidden, from 632
-          # and 4), adds no item (8.10 a call, unchanged), and costs the shipped board nothing (463 against its own
-          # 463, measured without the fold). It still fails its coverage bar, and that failure is the finding rather
+          # and 4), adds no item (8.10 a call, unchanged), and costs the shipped board nothing (461 against its own
+          # 461, measured without the fold). It still fails its coverage bar, and that failure is the finding rather
           # than a shortfall: 645 was registered above 636, which is the ceiling any rendering rule can reach.
+          # R239 moved the contract's request level (and the floor built on it) from 463 to 461.
           seventh = r234["reading"]
           folded_clause = seventh["display"]["clause"]
           assert (folded_clause["reached"], folded_clause["displayed"], folded_clause["hidden"]) == (636, 636, 0)
           assert folded_clause["hiddenShare"] == 0.0
           assert abs(folded_clause["itemsPerCall"] - sixth["display"]["clause"]["itemsPerCall"]) < 1e-9
-          assert seventh["display"]["request"]["displayed"] == 463
-          assert seventh["unfolded"] == 463
+          assert seventh["display"]["request"]["displayed"] == 461
+          assert seventh["unfolded"] == 461
           assert seventh["bar"]["B1_displayed"]["holds"] is False, "R234's B1 was registered above the reachable set"
           assert seventh["bar"]["B1_displayed"]["rates"]["clause"] == 636 / 654
           assert seventh["bar"]["B2_contract"]["holds"] is True
-          assert seventh["bar"]["B2_contract"]["floor"] == seventh["unfolded"] == 463
+          assert seventh["bar"]["B2_contract"]["floor"] == seventh["unfolded"] == 461
           assert seventh["bar"]["B3_hidden"]["holds"] is True
           assert seventh["bar"]["B3_hidden"]["hidden"] == 0
           # The invariant that makes the three rendering rounds one chain rather than three readings: the fold's
@@ -421,7 +429,7 @@ jobs:
           assert seventh["display"]["clause"]["displayed"] == sixth["display"]["clause"]["reached"]
           assert seventh["replication"]["display"]["clause"]["displayed"] == 621
           assert seventh["replication"]["display"]["clause"]["hidden"] == 0
-          assert seventh["replication"]["bar"]["B2_contract"]["floor"] == 443
+          assert seventh["replication"]["bar"]["B2_contract"]["floor"] == 438
           # R236/R237. The plan's two external replications, priced from the card the dispatchers bill against.
           # These three lines are the whole argument that the twenty-dollar line was wrong, so they are pinned:
           # LoCoMo's 1,986 questions over ten conversations move 0.27M tokens at the miss rate and 53.35M at the

@@ -6,14 +6,15 @@ writes the evaluator grades, how many had an open ask of their family **on the e
 moment of the call**? The reading answers it twice, for the contract's board and for R231's clause board, and the two
 answers are the round:
 
-    request   reaches 463, shows 463, hides 0        (2.41 items a call)
+    request   reaches 461, shows 461, hides 0        (2.41 items a call)
     clause    reaches 636, shows 622, hides 14       (8.10 items a call)
 
 The figure draws them against the same denominator, because the round's claim is a rate and a reader who saw 622 and 14
 as counts would not see that they are 95.1% and 2.2% of one set. The second panel draws the contract's three levels —
-416 covered by the finished board, 463 reached at the moment, 463 shown through the cut — because the round was refused
+416 covered by the finished board, 461 reached at the moment, 461 shown through the cut — because the round was refused
 on the difference between the first two and the third is the reason: a cut removes items, so the cap contributes zero
-and the +47 belongs to the settlement rule.
+and the +45 belongs to the settlement rule. (R239 moved the contract's request level from 463 to 461 by settling on
+the serving rule; the clause column and both registered verdicts are unchanged.)
 
 No timestamps, no network, no sampling: both panels read `eval/manifests/r232-reading.json`, which carries the grid's
 sha256. Output: `docs/benchmarks/display.svg` under this repository and a raster for the docs repository.
