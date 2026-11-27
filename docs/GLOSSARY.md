@@ -3053,3 +3053,22 @@ is family-level staleness: 11.4% of shown lines on the control grid, which split
 the family ever settled) and a correct behaviour (several products of one family). Keeping it in the manifest rather
 than deleting it is deliberate — a number that was computed and then argued against is evidence about the
 instrument, and a reader can re-derive both halves with `--sample`.
+
+**Record grade** — the third and weakest way a receipt can settle an ask: the ask's clause names an identifier the
+receipt carried (`#W5481803`), and the receipt named **no product at all**. It exists because some writes are
+order-level — `cancel_pending_order`, `modify_pending_order_address` — and an order-level write can never match a
+product, so an ask naming one of that order's products would stay open after the order was cancelled. The guard is on
+the receipt: when a write did carry products, a mismatch is a refusal and an order id must not overrule it. Counted per
+board as `byRecord`, so a reading whose ticks are mostly records is visible as such.
+
+**Surface form** — how a word is spelled in one particular place: the ask says `sneaker`, the catalogue says
+`Sneakers (size 6, black)`. A matcher that compares surface forms treats those as different products and refuses the
+settlement, which leaves a finished ask standing in the block. The board stems both sides before comparing (`bus`,
+`glass` and `shoes` are the three shapes it deliberately leaves alone), because a one-sided stemmer is a matcher that
+works only for catalogues that spell their names the way the users do.
+
+**Served-stale line** — a line in the block the product renders that names work a successful write **of its family**
+already carried, keyed by the record the ask itself names. The quantity is the mechanical part of the memory's negative
+effect and it is decidable at zero model calls. Its companion `rejected` quantity is the same question asked of the
+**family** on the read-anchored board, and the two differ by an order of magnitude on the same transcripts — which is
+the reason the unit is part of the definition rather than a footnote to it.

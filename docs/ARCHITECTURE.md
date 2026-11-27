@@ -5739,3 +5739,57 @@ reader reports the split, prints its sample, and refuses to call either half an 
 its own, and our zero fixation rate is a statement about *our* transcripts under *our* board, not a score on its
 leaderboard. The claim is narrower and checkable: the block's stale lines are countable, the count splits, and one
 half of it is a settlement defect with a named cause.
+
+### 8.113 One settlement rule, three grades, and the two ways a block asks for work already done
+
+**The dispatch read out.** R236's probe ran on 27 Nov 04:11 UTC over the thirty tasks Amendment 2 registered, two
+trials, one arm (`clause`), `git 3a769455`, **$0.34726 / ¥2.47** for sixty episodes. Both bars held:
+
+    B1 wired   59/60 (98.3% ±3.2%)   bar 80%                         419 extra asks carried
+    B2 acted   50/52 (96.2% ±5.2%)   bar 88.8% (ceiling 97.8% − 9pp)  100/104 writes named a carried family
+
+B1 says the wider window is genuinely served — an arm that reads a clause board reaches families the request board
+never carried on 59 of 60 episodes, against 0 of 456 for an environment that lost the switch. B2 says the wider window
+did not make the model worse: the share of graded writes naming a family the window carried fell 1.6 points, inside the
+9-point resolution the replay ceiling implies. Accuracy on the same sixty episodes was 78.3% pass^1 and 60.0% pass^2 —
+and no accuracy claim is made from it, because thirty tasks cannot separate 78% from the grid's 85%.
+
+**Two ways a block asks for work already done.** A block is stale when it shows an ask whose work a receipt already
+did. There are exactly two mechanical forms, and they were separated this round:
+
+    surface form   the ask says "sneaker", the catalogue says "Sneakers (size 6, black)"
+                   a matcher comparing surface forms refuses the tick, and the ask stands after the return
+    record form    the ask says "cancel the entire order #W5481803 (both the boots and the kettle)"
+                   the write is `cancel_pending_order`, which carries the order and no product at all, so every
+                   name grade refuses it and the family rule is excluded because the ask names a product
+
+Both are now closed by the settlement rule itself rather than by a reader's patch. `grade_of` stems both sides with
+three named exceptions (`bus`, `glass`, `shoes`), and `settlement` has a third grade — **`record`** — which fires only
+when the receipt carried **no product at all** and the ask's clause names an identifier the receipt carried. The guard
+is on the receipt, not on the ask: when a write carried products, a mismatch is a refusal and an order id must not
+overrule it; when it carried none, the order id is the only evidence there is.
+
+**What it was worth, measured on the same 456 episodes and the same definition.**
+
+    served-stale, before   32 of 3,483 shown lines (0.92%)
+    served-stale, after    10 of 3,479 shown lines (0.29%)      22 closed, 69% of the class
+    family-stale           447 → 440 of the same window (12.8% → 12.6%)
+
+The ten that remain are all `return` asks that are narrower or wider than the write — "return all five items" against a
+write that returned three, "item 6704763132 from order #W8528674" against a write that touched another item of the same
+order. An order-level identifier cannot decide those, and the reader now prints them rather than counting them into a
+defect. The family column barely moved, which is the third independent sign that a family was never the right unit.
+
+**Why the old number was 6.8%.** R237a published 304 lines (6.8%) as "a settlement defect with a named cause". The
+cause was real; the number was the **distance between two settlement rules**, not a defect count. `read_anchor.moment`
+— the instrument — settles a receipt against an ask of its family only if the episode had *opened* the record it
+touched, and `goal_board` — the renderer the model reads — settles by product name, free-text value, or (now) record
+id. They disagree on 133 of 4,968 item-moments in this grid, every one of them inside a family. A count over families
+cannot see an attribution difference, so the whole distance was published as defect. AUDIT 34.339 records the
+refutation; the served column in `eval/tools/memory_traps.py` exists so the two can never be quoted as one again.
+
+**What is still split, stated rather than papered over.** The two rules are still two implementations: the reader's
+`moment` and the product's `board_of`. R236 unified scope, rung, window and fold; settlement is the part it did not
+unify, and the 133 item-moments are what is left of that gap. Closing it means making `moment` call `board_of` and
+deleting the read-anchored settlement from the reading path — a change that moves three published manifests at once,
+and it is registered as R239 rather than smuggled into this round's numbers.

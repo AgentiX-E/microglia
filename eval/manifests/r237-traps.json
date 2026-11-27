@@ -26,6 +26,49 @@
   "unit": "family",
   "why": "a family is what the board settles by and an ask is what the model reads; see --sample"
  },
+ "served": {
+  "shown": 3479,
+  "stale": 10,
+  "familyStale": 440,
+  "share": 0.002874389192296637,
+  "familyShare": 0.12647312446105202,
+  "unit": "ask",
+  "why": "an open ask whose clause names a record a successful write of its family already carried",
+  "samples": [
+   {
+    "message": 24,
+    "family": "return",
+    "clause": "the return to proceed for order #W4689314",
+    "records": [
+     "#w4689314"
+    ]
+   },
+   {
+    "message": 25,
+    "family": "return",
+    "clause": "About the return for #W6289770: I want to return all five items",
+    "records": [
+     "#w6289770"
+    ]
+   },
+   {
+    "message": 23,
+    "family": "return",
+    "clause": "1) Return item 6704763132 from order #W8528674",
+    "records": [
+     "#w8528674"
+    ]
+   },
+   {
+    "message": 30,
+    "family": "return",
+    "clause": "Can you help me start the return for order #W2692684",
+    "records": [
+     "#w2692684"
+    ]
+   }
+  ]
+ },
  "fixation": {
   "episodes": 456,
   "withFixation": 0,
@@ -295,7 +338,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 6,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "4",
@@ -312,7 +359,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 0,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "3",
@@ -329,7 +380,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 3,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "0",
@@ -346,7 +401,11 @@
    "staleMulti": 0,
    "unused": 4,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "2",
@@ -363,7 +422,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 8,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "5",
@@ -507,7 +570,11 @@
    "staleMulti": 0,
    "unused": 11,
    "used": 9,
-   "crowded": 1
+   "crowded": 1,
+   "servedShown": 20,
+   "servedStale": 0,
+   "servedFamilyStale": 6,
+   "servedSamples": []
   },
   {
    "task": "10",
@@ -524,7 +591,11 @@
    "staleMulti": 0,
    "unused": 5,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 6,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "9",
@@ -541,7 +612,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 0,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "6",
@@ -558,7 +633,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "11",
@@ -575,7 +654,11 @@
    "staleMulti": 0,
    "unused": 4,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "7",
@@ -592,7 +675,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 5,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 7,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "8",
@@ -609,7 +696,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "12",
@@ -626,7 +717,11 @@
    "staleMulti": 0,
    "unused": 5,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 6,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "15",
@@ -643,7 +738,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "13",
@@ -660,7 +759,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 8,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "17",
@@ -677,7 +780,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 2,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "14",
@@ -752,7 +859,11 @@
    "staleMulti": 5,
    "unused": 7,
    "used": 15,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 14,
+   "servedStale": 0,
+   "servedFamilyStale": 5,
+   "servedSamples": []
   },
   {
    "task": "16",
@@ -769,7 +880,11 @@
    "staleMulti": 0,
    "unused": 13,
    "used": 11,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "20",
@@ -786,7 +901,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 0,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "18",
@@ -803,7 +922,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 2,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "19",
@@ -820,7 +943,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 5,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "23",
@@ -837,7 +964,11 @@
    "staleMulti": 0,
    "unused": 10,
    "used": 11,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 7,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "22",
@@ -908,7 +1039,11 @@
    "staleMulti": 5,
    "unused": 4,
    "used": 11,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 11,
+   "servedStale": 0,
+   "servedFamilyStale": 5,
+   "servedSamples": []
   },
   {
    "task": "21",
@@ -925,7 +1060,11 @@
    "staleMulti": 0,
    "unused": 3,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 5,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "24",
@@ -942,7 +1081,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 0,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "25",
@@ -959,7 +1102,11 @@
    "staleMulti": 0,
    "unused": 5,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 6,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "26",
@@ -976,7 +1123,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 5,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "27",
@@ -1112,7 +1263,11 @@
    "staleMulti": 0,
    "unused": 16,
    "used": 8,
-   "crowded": 1
+   "crowded": 1,
+   "servedShown": 20,
+   "servedStale": 0,
+   "servedFamilyStale": 2,
+   "servedSamples": []
   },
   {
    "task": "33",
@@ -1129,7 +1284,11 @@
    "staleMulti": 0,
    "unused": 6,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "28",
@@ -1249,7 +1408,11 @@
    "staleMulti": 0,
    "unused": 15,
    "used": 14,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 29,
+   "servedStale": 0,
+   "servedFamilyStale": 8,
+   "servedSamples": []
   },
   {
    "task": "29",
@@ -1266,7 +1429,11 @@
    "staleMulti": 0,
    "unused": 6,
    "used": 10,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "30",
@@ -1388,7 +1555,11 @@
    "staleMulti": 2,
    "unused": 12,
    "used": 9,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 21,
+   "servedStale": 0,
+   "servedFamilyStale": 7,
+   "servedSamples": []
   },
   {
    "task": "31",
@@ -1491,7 +1662,11 @@
    "staleMulti": 7,
    "unused": 8,
    "used": 5,
-   "crowded": 1
+   "crowded": 1,
+   "servedShown": 13,
+   "servedStale": 0,
+   "servedFamilyStale": 7,
+   "servedSamples": []
   },
   {
    "task": "32",
@@ -1583,7 +1758,11 @@
    "staleMulti": 5,
    "unused": 4,
    "used": 9,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 14,
+   "servedStale": 0,
+   "servedFamilyStale": 6,
+   "servedSamples": []
   },
   {
    "task": "34",
@@ -1600,7 +1779,11 @@
    "staleMulti": 0,
    "unused": 6,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "35",
@@ -1670,7 +1853,11 @@
    "staleMulti": 0,
    "unused": 8,
    "used": 7,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 15,
+   "servedStale": 0,
+   "servedFamilyStale": 4,
+   "servedSamples": []
   },
   {
    "task": "37",
@@ -1687,7 +1874,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 3,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "36",
@@ -1704,7 +1895,11 @@
    "staleMulti": 0,
    "unused": 10,
    "used": 0,
-   "crowded": 2
+   "crowded": 2,
+   "servedShown": 10,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "40",
@@ -1721,7 +1916,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 1,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "38",
@@ -1738,7 +1937,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "39",
@@ -1755,7 +1958,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 6,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 6,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "41",
@@ -1806,7 +2013,11 @@
    "staleMulti": 1,
    "unused": 10,
    "used": 9,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 12,
+   "servedStale": 0,
+   "servedFamilyStale": 1,
+   "servedSamples": []
   },
   {
    "task": "42",
@@ -1823,7 +2034,11 @@
    "staleMulti": 0,
    "unused": 5,
    "used": 9,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 6,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "44",
@@ -1840,7 +2055,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 3,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "43",
@@ -1857,7 +2076,11 @@
    "staleMulti": 0,
    "unused": 3,
    "used": 5,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "45",
@@ -1874,7 +2097,11 @@
    "staleMulti": 0,
    "unused": 5,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 6,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "46",
@@ -1891,7 +2118,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 8,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "47",
@@ -1908,7 +2139,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 6,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 6,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "50",
@@ -1925,7 +2160,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 0,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "48",
@@ -1942,7 +2181,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 6,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 6,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "49",
@@ -1959,7 +2202,11 @@
    "staleMulti": 0,
    "unused": 3,
    "used": 5,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "52",
@@ -1976,7 +2223,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 6,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "53",
@@ -1993,7 +2244,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 6,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 6,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "51",
@@ -2065,7 +2320,20 @@
    "staleMulti": 0,
    "unused": 8,
    "used": 6,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 14,
+   "servedStale": 1,
+   "servedFamilyStale": 6,
+   "servedSamples": [
+    {
+     "message": 24,
+     "family": "return",
+     "clause": "the return to proceed for order #W4689314",
+     "records": [
+      "#w4689314"
+     ]
+    }
+   ]
   },
   {
    "task": "54",
@@ -2082,7 +2350,11 @@
    "staleMulti": 0,
    "unused": 10,
    "used": 5,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 5,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "55",
@@ -2224,7 +2496,11 @@
    "staleMulti": 0,
    "unused": 12,
    "used": 20,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 16,
+   "servedStale": 0,
+   "servedFamilyStale": 1,
+   "servedSamples": []
   },
   {
    "task": "56",
@@ -2241,7 +2517,11 @@
    "staleMulti": 0,
    "unused": 4,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 5,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "57",
@@ -2258,7 +2538,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 0,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "61",
@@ -2275,7 +2559,11 @@
    "staleMulti": 0,
    "unused": 3,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 6,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "60",
@@ -2292,7 +2580,11 @@
    "staleMulti": 0,
    "unused": 3,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 6,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "58",
@@ -2309,7 +2601,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 3,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "59",
@@ -2388,7 +2684,11 @@
    "staleMulti": 0,
    "unused": 10,
    "used": 6,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 16,
+   "servedStale": 0,
+   "servedFamilyStale": 2,
+   "servedSamples": []
   },
   {
    "task": "62",
@@ -2405,7 +2705,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 0,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "63",
@@ -2422,7 +2726,11 @@
    "staleMulti": 0,
    "unused": 6,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 7,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "66",
@@ -2439,7 +2747,11 @@
    "staleMulti": 0,
    "unused": 6,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "65",
@@ -2456,7 +2768,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 0,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "64",
@@ -2473,7 +2789,11 @@
    "staleMulti": 0,
    "unused": 5,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "68",
@@ -2490,7 +2810,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 0,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "67",
@@ -2507,7 +2831,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 0,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "69",
@@ -2524,7 +2852,11 @@
    "staleMulti": 0,
    "unused": 4,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 7,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "73",
@@ -2585,7 +2917,11 @@
    "staleMulti": 5,
    "unused": 5,
    "used": 5,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 10,
+   "servedStale": 0,
+   "servedFamilyStale": 5,
+   "servedSamples": []
   },
   {
    "task": "75",
@@ -2602,7 +2938,11 @@
    "staleMulti": 0,
    "unused": 3,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 6,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "71",
@@ -2682,7 +3022,11 @@
    "staleMulti": 0,
    "unused": 9,
    "used": 7,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 16,
+   "servedStale": 0,
+   "servedFamilyStale": 2,
+   "servedSamples": []
   },
   {
    "task": "72",
@@ -2766,7 +3110,11 @@
    "staleMulti": 0,
    "unused": 9,
    "used": 7,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 16,
+   "servedStale": 0,
+   "servedFamilyStale": 4,
+   "servedSamples": []
   },
   {
    "task": "74",
@@ -2835,7 +3183,20 @@
    "staleMulti": 0,
    "unused": 17,
    "used": 5,
-   "crowded": 1
+   "crowded": 1,
+   "servedShown": 22,
+   "servedStale": 1,
+   "servedFamilyStale": 4,
+   "servedSamples": [
+    {
+     "message": 25,
+     "family": "return",
+     "clause": "About the return for #W6289770: I want to return all five items",
+     "records": [
+      "#w6289770"
+     ]
+    }
+   ]
   },
   {
    "task": "70",
@@ -2852,7 +3213,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "77",
@@ -2869,7 +3234,11 @@
    "staleMulti": 0,
    "unused": 3,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 5,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "79",
@@ -2886,7 +3255,11 @@
    "staleMulti": 0,
    "unused": 5,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "81",
@@ -2903,7 +3276,11 @@
    "staleMulti": 0,
    "unused": 4,
    "used": 12,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "80",
@@ -2920,7 +3297,11 @@
    "staleMulti": 0,
    "unused": 4,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "82",
@@ -2937,7 +3318,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 3,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "78",
@@ -3060,7 +3445,11 @@
    "staleMulti": 1,
    "unused": 14,
    "used": 6,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 20,
+   "servedStale": 0,
+   "servedFamilyStale": 4,
+   "servedSamples": []
   },
   {
    "task": "76",
@@ -3077,7 +3466,11 @@
    "staleMulti": 0,
    "unused": 8,
    "used": 8,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "84",
@@ -3094,7 +3487,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 5,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 5,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "83",
@@ -3111,7 +3508,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 5,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 5,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "86",
@@ -3181,7 +3582,11 @@
    "staleMulti": 2,
    "unused": 8,
    "used": 6,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 13,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "88",
@@ -3198,7 +3603,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 0,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "85",
@@ -3215,7 +3624,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 3,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "87",
@@ -3232,7 +3645,11 @@
    "staleMulti": 0,
    "unused": 4,
    "used": 20,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 6,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "89",
@@ -3249,7 +3666,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 5,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "90",
@@ -3266,7 +3687,11 @@
    "staleMulti": 0,
    "unused": 5,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "92",
@@ -3283,7 +3708,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 10,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 5,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "93",
@@ -3300,7 +3729,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 7,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "94",
@@ -3317,7 +3750,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 7,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "91",
@@ -3334,7 +3771,11 @@
    "staleMulti": 0,
    "unused": 9,
    "used": 7,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "97",
@@ -3421,7 +3862,11 @@
    "staleMulti": 0,
    "unused": 10,
    "used": 6,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 16,
+   "servedStale": 0,
+   "servedFamilyStale": 2,
+   "servedSamples": []
   },
   {
    "task": "95",
@@ -3475,7 +3920,11 @@
    "staleMulti": 5,
    "unused": 0,
    "used": 11,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 11,
+   "servedStale": 0,
+   "servedFamilyStale": 5,
+   "servedSamples": []
   },
   {
    "task": "96",
@@ -3564,7 +4013,11 @@
    "staleMulti": 0,
    "unused": 11,
    "used": 5,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 16,
+   "servedStale": 0,
+   "servedFamilyStale": 1,
+   "servedSamples": []
   },
   {
    "task": "98",
@@ -3581,7 +4034,11 @@
    "staleMulti": 0,
    "unused": 13,
    "used": 11,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "99",
@@ -3598,7 +4055,11 @@
    "staleMulti": 0,
    "unused": 8,
    "used": 8,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "100",
@@ -3615,7 +4076,11 @@
    "staleMulti": 0,
    "unused": 14,
    "used": 10,
-   "crowded": 1
+   "crowded": 1,
+   "servedShown": 16,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "101",
@@ -3739,7 +4204,11 @@
    "staleMulti": 0,
    "unused": 16,
    "used": 8,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 24,
+   "servedStale": 0,
+   "servedFamilyStale": 8,
+   "servedSamples": []
   },
   {
    "task": "102",
@@ -3861,7 +4330,11 @@
    "staleMulti": 2,
    "unused": 16,
    "used": 7,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 23,
+   "servedStale": 0,
+   "servedFamilyStale": 8,
+   "servedSamples": []
   },
   {
    "task": "103",
@@ -4056,7 +4529,11 @@
    "staleMulti": 5,
    "unused": 18,
    "used": 10,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 20,
+   "servedStale": 0,
+   "servedFamilyStale": 9,
+   "servedSamples": []
   },
   {
    "task": "106",
@@ -4073,7 +4550,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 0,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "105",
@@ -4090,7 +4571,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 5,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "104",
@@ -4198,7 +4683,11 @@
    "staleMulti": 3,
    "unused": 14,
    "used": 10,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 18,
+   "servedStale": 0,
+   "servedFamilyStale": 3,
+   "servedSamples": []
   },
   {
    "task": "108",
@@ -4215,7 +4704,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 8,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "107",
@@ -4232,7 +4725,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 2,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "109",
@@ -4249,7 +4746,11 @@
    "staleMulti": 0,
    "unused": 7,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "110",
@@ -4266,7 +4767,11 @@
    "staleMulti": 0,
    "unused": 11,
    "used": 5,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "113",
@@ -4283,7 +4788,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 3,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "111",
@@ -4416,7 +4925,11 @@
    "staleMulti": 0,
    "unused": 15,
    "used": 9,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 24,
+   "servedStale": 0,
+   "servedFamilyStale": 7,
+   "servedSamples": []
   },
   {
    "task": "0",
@@ -4433,7 +4946,11 @@
    "staleMulti": 0,
    "unused": 3,
    "used": 5,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "112",
@@ -4512,7 +5029,11 @@
    "staleMulti": 0,
    "unused": 16,
    "used": 8,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 16,
+   "servedStale": 0,
+   "servedFamilyStale": 5,
+   "servedSamples": []
   },
   {
    "task": "2",
@@ -4529,7 +5050,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 8,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "3",
@@ -4546,7 +5071,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 2,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "1",
@@ -4563,7 +5092,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 7,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "4",
@@ -4580,7 +5113,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "7",
@@ -4597,7 +5134,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "8",
@@ -4614,7 +5155,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "6",
@@ -4631,7 +5176,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 7,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "9",
@@ -4648,7 +5197,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 0,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "5",
@@ -4665,7 +5218,11 @@
    "staleMulti": 0,
    "unused": 6,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "10",
@@ -4682,7 +5239,11 @@
    "staleMulti": 0,
    "unused": 3,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "13",
@@ -4699,7 +5260,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "11",
@@ -4716,7 +5281,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 8,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 5,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "12",
@@ -4733,7 +5302,11 @@
    "staleMulti": 0,
    "unused": 7,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "14",
@@ -4750,7 +5323,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 14,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "15",
@@ -4767,7 +5344,11 @@
    "staleMulti": 0,
    "unused": 3,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 7,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "16",
@@ -4784,7 +5365,11 @@
    "staleMulti": 0,
    "unused": 11,
    "used": 7,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 6,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "17",
@@ -4801,7 +5386,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 1,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "20",
@@ -4818,7 +5407,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 1,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "19",
@@ -4835,7 +5428,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 0,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "18",
@@ -4852,7 +5449,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "22",
@@ -4942,7 +5543,11 @@
    "staleMulti": 8,
    "unused": 2,
    "used": 18,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 10,
+   "servedStale": 0,
+   "servedFamilyStale": 4,
+   "servedSamples": []
   },
   {
    "task": "21",
@@ -4959,7 +5564,11 @@
    "staleMulti": 0,
    "unused": 3,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "24",
@@ -4976,7 +5585,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 0,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "25",
@@ -4993,7 +5606,11 @@
    "staleMulti": 0,
    "unused": 6,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "23",
@@ -5100,7 +5717,11 @@
    "staleMulti": 7,
    "unused": 8,
    "used": 11,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 18,
+   "servedStale": 0,
+   "servedFamilyStale": 6,
+   "servedSamples": []
   },
   {
    "task": "26",
@@ -5117,7 +5738,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 8,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "27",
@@ -5242,7 +5867,11 @@
    "staleMulti": 0,
    "unused": 13,
    "used": 10,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 23,
+   "servedStale": 0,
+   "servedFamilyStale": 6,
+   "servedSamples": []
   },
   {
    "task": "28",
@@ -5259,7 +5888,11 @@
    "staleMulti": 0,
    "unused": 12,
    "used": 12,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "29",
@@ -5276,7 +5909,11 @@
    "staleMulti": 0,
    "unused": 4,
    "used": 12,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "30",
@@ -5395,7 +6032,11 @@
    "staleMulti": 6,
    "unused": 9,
    "used": 9,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 19,
+   "servedStale": 0,
+   "servedFamilyStale": 8,
+   "servedSamples": []
   },
   {
    "task": "32",
@@ -5485,7 +6126,11 @@
    "staleMulti": 5,
    "unused": 6,
    "used": 6,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 14,
+   "servedStale": 0,
+   "servedFamilyStale": 7,
+   "servedSamples": []
   },
   {
    "task": "34",
@@ -5502,7 +6147,11 @@
    "staleMulti": 0,
    "unused": 7,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "31",
@@ -5606,7 +6255,11 @@
    "staleMulti": 6,
    "unused": 10,
    "used": 6,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 15,
+   "servedStale": 0,
+   "servedFamilyStale": 8,
+   "servedSamples": []
   },
   {
    "task": "33",
@@ -5623,7 +6276,11 @@
    "staleMulti": 0,
    "unused": 7,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "35",
@@ -5695,7 +6352,20 @@
    "staleMulti": 0,
    "unused": 10,
    "used": 6,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 16,
+   "servedStale": 1,
+   "servedFamilyStale": 5,
+   "servedSamples": [
+    {
+     "message": 23,
+     "family": "return",
+     "clause": "1) Return item 6704763132 from order #W8528674",
+     "records": [
+      "#w8528674"
+     ]
+    }
+   ]
   },
   {
    "task": "36",
@@ -5712,7 +6382,11 @@
    "staleMulti": 0,
    "unused": 4,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 5,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "40",
@@ -5729,7 +6403,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "38",
@@ -5746,7 +6424,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 5,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "37",
@@ -5763,7 +6445,11 @@
    "staleMulti": 0,
    "unused": 6,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 7,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "41",
@@ -5780,7 +6466,11 @@
    "staleMulti": 0,
    "unused": 13,
    "used": 11,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "44",
@@ -5797,7 +6487,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 2,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "42",
@@ -5868,7 +6562,11 @@
    "staleMulti": 4,
    "unused": 13,
    "used": 18,
-   "crowded": 1
+   "crowded": 1,
+   "servedShown": 14,
+   "servedStale": 0,
+   "servedFamilyStale": 3,
+   "servedSamples": []
   },
   {
    "task": "43",
@@ -5903,7 +6601,11 @@
    "staleMulti": 1,
    "unused": 2,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 5,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "45",
@@ -5920,7 +6622,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 1,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "46",
@@ -5937,7 +6643,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 8,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "47",
@@ -5954,7 +6664,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 8,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "48",
@@ -5971,7 +6685,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 5,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 5,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "50",
@@ -5988,7 +6706,11 @@
    "staleMulti": 0,
    "unused": 4,
    "used": 0,
-   "crowded": 1
+   "crowded": 1,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "49",
@@ -6005,7 +6727,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 7,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "51",
@@ -6022,7 +6748,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "39",
@@ -6039,7 +6769,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "52",
@@ -6056,7 +6790,11 @@
    "staleMulti": 0,
    "unused": 3,
    "used": 5,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "53",
@@ -6073,7 +6811,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 7,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "57",
@@ -6090,7 +6832,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 0,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "56",
@@ -6107,7 +6853,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 3,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "54",
@@ -6124,7 +6874,11 @@
    "staleMulti": 0,
    "unused": 12,
    "used": 6,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 6,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "55",
@@ -6141,7 +6895,11 @@
    "staleMulti": 0,
    "unused": 12,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "60",
@@ -6158,7 +6916,11 @@
    "staleMulti": 0,
    "unused": 4,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 6,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "58",
@@ -6175,7 +6937,11 @@
    "staleMulti": 0,
    "unused": 4,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "61",
@@ -6192,7 +6958,11 @@
    "staleMulti": 0,
    "unused": 3,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 5,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "59",
@@ -6209,7 +6979,11 @@
    "staleMulti": 0,
    "unused": 10,
    "used": 6,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "62",
@@ -6226,7 +7000,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 0,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "64",
@@ -6243,7 +7021,11 @@
    "staleMulti": 0,
    "unused": 4,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 6,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "66",
@@ -6260,7 +7042,11 @@
    "staleMulti": 0,
    "unused": 5,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 7,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "63",
@@ -6277,7 +7063,11 @@
    "staleMulti": 0,
    "unused": 4,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 5,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "65",
@@ -6294,7 +7084,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 0,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "67",
@@ -6311,7 +7105,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 0,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "68",
@@ -6328,7 +7126,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 0,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "69",
@@ -6345,7 +7147,11 @@
    "staleMulti": 0,
    "unused": 3,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 5,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "70",
@@ -6362,7 +7168,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 3,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "72",
@@ -6379,7 +7189,11 @@
    "staleMulti": 0,
    "unused": 8,
    "used": 8,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "73",
@@ -6396,7 +7210,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 8,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "71",
@@ -6447,7 +7265,11 @@
    "staleMulti": 2,
    "unused": 3,
    "used": 5,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 2,
+   "servedSamples": []
   },
   {
    "task": "74",
@@ -6464,7 +7286,11 @@
    "staleMulti": 0,
    "unused": 8,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 6,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "75",
@@ -6481,7 +7307,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 3,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "76",
@@ -6498,7 +7328,11 @@
    "staleMulti": 0,
    "unused": 4,
    "used": 12,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "77",
@@ -6515,7 +7349,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 2,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "78",
@@ -6631,7 +7469,11 @@
    "staleMulti": 2,
    "unused": 14,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 18,
+   "servedStale": 0,
+   "servedFamilyStale": 2,
+   "servedSamples": []
   },
   {
    "task": "81",
@@ -6648,7 +7490,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 6,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "79",
@@ -6665,7 +7511,11 @@
    "staleMulti": 0,
    "unused": 6,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "80",
@@ -6682,7 +7532,11 @@
    "staleMulti": 0,
    "unused": 3,
    "used": 5,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "83",
@@ -6699,7 +7553,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 8,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "82",
@@ -6716,7 +7574,11 @@
    "staleMulti": 0,
    "unused": 8,
    "used": 0,
-   "crowded": 1
+   "crowded": 1,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "87",
@@ -6733,7 +7595,11 @@
    "staleMulti": 0,
    "unused": 4,
    "used": 16,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 5,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "84",
@@ -6750,7 +7616,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 5,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 5,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "85",
@@ -6767,7 +7637,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 2,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "86",
@@ -6784,7 +7658,11 @@
    "staleMulti": 0,
    "unused": 4,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 3,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "88",
@@ -6801,7 +7679,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 5,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "89",
@@ -6818,7 +7700,11 @@
    "staleMulti": 0,
    "unused": 8,
    "used": 0,
-   "crowded": 1
+   "crowded": 1,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "90",
@@ -6835,7 +7721,11 @@
    "staleMulti": 0,
    "unused": 4,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "92",
@@ -6852,7 +7742,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 14,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "93",
@@ -6869,7 +7763,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "91",
@@ -6886,7 +7784,11 @@
    "staleMulti": 0,
    "unused": 9,
    "used": 7,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "94",
@@ -6903,7 +7805,11 @@
    "staleMulti": 0,
    "unused": 3,
    "used": 5,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "95",
@@ -6971,7 +7877,11 @@
    "staleMulti": 4,
    "unused": 6,
    "used": 9,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 15,
+   "servedStale": 0,
+   "servedFamilyStale": 4,
+   "servedSamples": []
   },
   {
    "task": "96",
@@ -7053,7 +7963,11 @@
    "staleMulti": 0,
    "unused": 10,
    "used": 6,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 16,
+   "servedStale": 0,
+   "servedFamilyStale": 5,
+   "servedSamples": []
   },
   {
    "task": "97",
@@ -7130,7 +8044,11 @@
    "staleMulti": 0,
    "unused": 10,
    "used": 6,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 16,
+   "servedStale": 0,
+   "servedFamilyStale": 4,
+   "servedSamples": []
   },
   {
    "task": "99",
@@ -7147,7 +8065,11 @@
    "staleMulti": 0,
    "unused": 6,
    "used": 10,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "98",
@@ -7164,7 +8086,11 @@
    "staleMulti": 0,
    "unused": 15,
    "used": 9,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "101",
@@ -7230,7 +8156,11 @@
    "staleMulti": 3,
    "unused": 14,
    "used": 9,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 15,
+   "servedStale": 0,
+   "servedFamilyStale": 5,
+   "servedSamples": []
   },
   {
    "task": "100",
@@ -7296,7 +8226,11 @@
    "staleMulti": 0,
    "unused": 17,
    "used": 6,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 15,
+   "servedStale": 0,
+   "servedFamilyStale": 4,
+   "servedSamples": []
   },
   {
    "task": "102",
@@ -7494,7 +8428,11 @@
    "staleMulti": 0,
    "unused": 25,
    "used": 7,
-   "crowded": 1
+   "crowded": 1,
+   "servedShown": 32,
+   "servedStale": 0,
+   "servedFamilyStale": 16,
+   "servedSamples": []
   },
   {
    "task": "105",
@@ -7570,7 +8508,11 @@
    "staleMulti": 0,
    "unused": 11,
    "used": 5,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 16,
+   "servedStale": 0,
+   "servedFamilyStale": 4,
+   "servedSamples": []
   },
   {
    "task": "104",
@@ -7587,7 +8529,11 @@
    "staleMulti": 0,
    "unused": 8,
    "used": 12,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 10,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "103",
@@ -7746,7 +8692,11 @@
    "staleMulti": 9,
    "unused": 13,
    "used": 13,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 20,
+   "servedStale": 0,
+   "servedFamilyStale": 8,
+   "servedSamples": []
   },
   {
    "task": "106",
@@ -7763,7 +8713,11 @@
    "staleMulti": 0,
    "unused": 4,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "107",
@@ -7780,7 +8734,11 @@
    "staleMulti": 0,
    "unused": 4,
    "used": 12,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "108",
@@ -7797,7 +8755,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 6,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 6,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "109",
@@ -7878,7 +8840,11 @@
    "staleMulti": 0,
    "unused": 13,
    "used": 11,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 16,
+   "servedStale": 0,
+   "servedFamilyStale": 5,
+   "servedSamples": []
   },
   {
    "task": "113",
@@ -7895,7 +8861,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 3,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "111",
@@ -7912,7 +8882,11 @@
    "staleMulti": 0,
    "unused": 6,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 3,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "0",
@@ -7929,7 +8903,11 @@
    "staleMulti": 0,
    "unused": 4,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "1",
@@ -7946,7 +8924,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 7,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "112",
@@ -7963,7 +8945,11 @@
    "staleMulti": 0,
    "unused": 3,
    "used": 5,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "2",
@@ -7980,7 +8966,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 5,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "110",
@@ -8126,7 +9116,11 @@
    "staleMulti": 0,
    "unused": 20,
    "used": 12,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 24,
+   "servedStale": 0,
+   "servedFamilyStale": 10,
+   "servedSamples": []
   },
   {
    "task": "3",
@@ -8143,7 +9137,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 2,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "4",
@@ -8160,7 +9158,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 6,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 3,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "9",
@@ -8177,7 +9179,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 3,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "8",
@@ -8194,7 +9200,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 0,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "7",
@@ -8211,7 +9221,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 8,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "5",
@@ -8228,7 +9242,11 @@
    "staleMulti": 0,
    "unused": 4,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "6",
@@ -8305,7 +9323,11 @@
    "staleMulti": 0,
    "unused": 7,
    "used": 7,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 14,
+   "servedStale": 0,
+   "servedFamilyStale": 6,
+   "servedSamples": []
   },
   {
    "task": "10",
@@ -8322,7 +9344,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 3,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "12",
@@ -8339,7 +9365,11 @@
    "staleMulti": 0,
    "unused": 4,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 6,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "14",
@@ -8356,7 +9386,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 6,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "11",
@@ -8373,7 +9407,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 8,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 5,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "15",
@@ -8390,7 +9428,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 3,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "13",
@@ -8407,7 +9449,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 8,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "16",
@@ -8424,7 +9470,11 @@
    "staleMulti": 0,
    "unused": 7,
    "used": 5,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "17",
@@ -8441,7 +9491,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 1,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "18",
@@ -8458,7 +9512,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 2,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "20",
@@ -8475,7 +9533,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 2,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "19",
@@ -8525,7 +9587,11 @@
    "staleMulti": 2,
    "unused": 4,
    "used": 5,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 9,
+   "servedStale": 0,
+   "servedFamilyStale": 2,
+   "servedSamples": []
   },
   {
    "task": "22",
@@ -8587,7 +9653,11 @@
    "staleMulti": 5,
    "unused": 1,
    "used": 13,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 9,
+   "servedStale": 0,
+   "servedFamilyStale": 4,
+   "servedSamples": []
   },
   {
    "task": "21",
@@ -8604,7 +9674,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "23",
@@ -8621,7 +9695,11 @@
    "staleMulti": 0,
    "unused": 12,
    "used": 12,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "24",
@@ -8638,7 +9716,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 0,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "25",
@@ -8655,7 +9737,11 @@
    "staleMulti": 0,
    "unused": 4,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 5,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "26",
@@ -8672,7 +9758,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 5,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "27",
@@ -8745,7 +9835,11 @@
    "staleMulti": 0,
    "unused": 16,
    "used": 8,
-   "crowded": 1
+   "crowded": 1,
+   "servedShown": 16,
+   "servedStale": 0,
+   "servedFamilyStale": 3,
+   "servedSamples": []
   },
   {
    "task": "29",
@@ -8762,7 +9856,11 @@
    "staleMulti": 0,
    "unused": 6,
    "used": 10,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "28",
@@ -8858,7 +9956,11 @@
    "staleMulti": 5,
    "unused": 9,
    "used": 9,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 16,
+   "servedStale": 0,
+   "servedFamilyStale": 3,
+   "servedSamples": []
   },
   {
    "task": "31",
@@ -8917,7 +10019,11 @@
    "staleMulti": 3,
    "unused": 4,
    "used": 6,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 10,
+   "servedStale": 0,
+   "servedFamilyStale": 3,
+   "servedSamples": []
   },
   {
    "task": "30",
@@ -8997,7 +10103,28 @@
    "staleMulti": 6,
    "unused": 6,
    "used": 8,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 14,
+   "servedStale": 2,
+   "servedFamilyStale": 6,
+   "servedSamples": [
+    {
+     "message": 30,
+     "family": "return",
+     "clause": "Can you help me start the return for order #W2692684",
+     "records": [
+      "#w2692684"
+     ]
+    },
+    {
+     "message": 38,
+     "family": "return",
+     "clause": "Can you help me start the return for order #W2692684",
+     "records": [
+      "#w2692684"
+     ]
+    }
+   ]
   },
   {
    "task": "33",
@@ -9014,7 +10141,11 @@
    "staleMulti": 0,
    "unused": 4,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 7,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "34",
@@ -9031,7 +10162,11 @@
    "staleMulti": 0,
    "unused": 4,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 7,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "32",
@@ -9146,7 +10281,11 @@
    "staleMulti": 4,
    "unused": 10,
    "used": 11,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 21,
+   "servedStale": 0,
+   "servedFamilyStale": 7,
+   "servedSamples": []
   },
   {
    "task": "35",
@@ -9163,7 +10302,11 @@
    "staleMulti": 0,
    "unused": 8,
    "used": 8,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "37",
@@ -9180,7 +10323,11 @@
    "staleMulti": 0,
    "unused": 6,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 7,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "36",
@@ -9197,7 +10344,11 @@
    "staleMulti": 0,
    "unused": 6,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "40",
@@ -9214,7 +10365,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 2,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "38",
@@ -9231,7 +10386,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "39",
@@ -9314,7 +10473,11 @@
    "staleMulti": 0,
    "unused": 7,
    "used": 9,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 16,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "41",
@@ -9331,7 +10494,11 @@
    "staleMulti": 0,
    "unused": 12,
    "used": 16,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 7,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "44",
@@ -9348,7 +10515,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 3,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "42",
@@ -9365,7 +10536,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 9,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "43",
@@ -9446,7 +10621,11 @@
    "staleMulti": 0,
    "unused": 9,
    "used": 7,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 16,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "47",
@@ -9526,7 +10705,11 @@
    "staleMulti": 0,
    "unused": 8,
    "used": 8,
-   "crowded": 1
+   "crowded": 1,
+   "servedShown": 13,
+   "servedStale": 0,
+   "servedFamilyStale": 5,
+   "servedSamples": []
   },
   {
    "task": "46",
@@ -9543,7 +10726,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 8,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "45",
@@ -9560,7 +10747,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 5,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "50",
@@ -9577,7 +10768,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 0,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "48",
@@ -9594,7 +10789,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 6,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 6,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "49",
@@ -9611,7 +10810,11 @@
    "staleMulti": 0,
    "unused": 7,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "53",
@@ -9628,7 +10831,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 5,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 5,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "51",
@@ -9645,7 +10852,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 5,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "52",
@@ -9662,7 +10873,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 6,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "56",
@@ -9679,7 +10894,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 0,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "57",
@@ -9696,7 +10915,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 0,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "54",
@@ -9713,7 +10936,11 @@
    "staleMulti": 0,
    "unused": 8,
    "used": 7,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 5,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "60",
@@ -9730,7 +10957,11 @@
    "staleMulti": 0,
    "unused": 3,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 7,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "58",
@@ -9747,7 +10978,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 5,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 7,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "55",
@@ -9893,7 +11128,11 @@
    "staleMulti": 0,
    "unused": 14,
    "used": 18,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 16,
+   "servedStale": 0,
+   "servedFamilyStale": 2,
+   "servedSamples": []
   },
   {
    "task": "61",
@@ -9910,7 +11149,11 @@
    "staleMulti": 0,
    "unused": 5,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 7,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "59",
@@ -9927,7 +11170,11 @@
    "staleMulti": 0,
    "unused": 10,
    "used": 6,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "62",
@@ -9944,7 +11191,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 0,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "65",
@@ -9961,7 +11212,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 0,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "64",
@@ -9978,7 +11233,11 @@
    "staleMulti": 0,
    "unused": 3,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "66",
@@ -9995,7 +11254,11 @@
    "staleMulti": 0,
    "unused": 6,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "67",
@@ -10012,7 +11275,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 0,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "63",
@@ -10029,7 +11296,11 @@
    "staleMulti": 0,
    "unused": 7,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "69",
@@ -10046,7 +11317,11 @@
    "staleMulti": 0,
    "unused": 6,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "70",
@@ -10063,7 +11338,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "68",
@@ -10080,7 +11359,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 0,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "71",
@@ -10157,7 +11440,11 @@
    "staleMulti": 0,
    "unused": 9,
    "used": 7,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 16,
+   "servedStale": 0,
+   "servedFamilyStale": 4,
+   "servedSamples": []
   },
   {
    "task": "73",
@@ -10174,7 +11461,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "74",
@@ -10191,7 +11482,11 @@
    "staleMulti": 0,
    "unused": 7,
    "used": 3,
-   "crowded": 1
+   "crowded": 1,
+   "servedShown": 5,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "72",
@@ -10208,7 +11503,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 0,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "75",
@@ -10225,7 +11524,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 2,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "76",
@@ -10242,7 +11545,11 @@
    "staleMulti": 0,
    "unused": 8,
    "used": 8,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "77",
@@ -10259,7 +11566,11 @@
    "staleMulti": 0,
    "unused": 5,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "78",
@@ -10318,7 +11629,11 @@
    "staleMulti": 1,
    "unused": 12,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 10,
+   "servedStale": 0,
+   "servedFamilyStale": 1,
+   "servedSamples": []
   },
   {
    "task": "79",
@@ -10335,7 +11650,11 @@
    "staleMulti": 0,
    "unused": 6,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "81",
@@ -10352,7 +11671,11 @@
    "staleMulti": 0,
    "unused": 4,
    "used": 8,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 6,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "82",
@@ -10369,7 +11692,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 5,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 5,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "84",
@@ -10386,7 +11713,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 7,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "83",
@@ -10403,7 +11734,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 8,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "80",
@@ -10420,7 +11755,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 6,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "85",
@@ -10437,7 +11776,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 2,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "86",
@@ -10454,7 +11797,11 @@
    "staleMulti": 0,
    "unused": 8,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 6,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "87",
@@ -10471,7 +11818,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 16,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "88",
@@ -10488,7 +11839,11 @@
    "staleMulti": 0,
    "unused": 4,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "90",
@@ -10505,7 +11860,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "89",
@@ -10522,7 +11881,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 2,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "92",
@@ -10539,7 +11902,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 16,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "91",
@@ -10556,7 +11923,11 @@
    "staleMulti": 0,
    "unused": 7,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "93",
@@ -10573,7 +11944,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 6,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "95",
@@ -10611,7 +11986,11 @@
    "staleMulti": 1,
    "unused": 4,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 7,
+   "servedStale": 0,
+   "servedFamilyStale": 1,
+   "servedSamples": []
   },
   {
    "task": "94",
@@ -10628,7 +12007,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 6,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "96",
@@ -10706,7 +12089,11 @@
    "staleMulti": 0,
    "unused": 7,
    "used": 7,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 14,
+   "servedStale": 0,
+   "servedFamilyStale": 4,
+   "servedSamples": []
   },
   {
    "task": "98",
@@ -10723,7 +12110,11 @@
    "staleMulti": 0,
    "unused": 8,
    "used": 0,
-   "crowded": 1
+   "crowded": 1,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "97",
@@ -10807,7 +12198,11 @@
    "staleMulti": 0,
    "unused": 12,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 16,
+   "servedStale": 0,
+   "servedFamilyStale": 2,
+   "servedSamples": []
   },
   {
    "task": "99",
@@ -10824,7 +12219,11 @@
    "staleMulti": 0,
    "unused": 6,
    "used": 10,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "101",
@@ -10882,7 +12281,11 @@
    "staleMulti": 4,
    "unused": 4,
    "used": 9,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 13,
+   "servedStale": 0,
+   "servedFamilyStale": 4,
+   "servedSamples": []
   },
   {
    "task": "100",
@@ -10948,7 +12351,11 @@
    "staleMulti": 2,
    "unused": 12,
    "used": 3,
-   "crowded": 1
+   "crowded": 1,
+   "servedShown": 15,
+   "servedStale": 0,
+   "servedFamilyStale": 2,
+   "servedSamples": []
   },
   {
    "task": "102",
@@ -11042,7 +12449,11 @@
    "staleMulti": 4,
    "unused": 8,
    "used": 5,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 13,
+   "servedStale": 0,
+   "servedFamilyStale": 4,
+   "servedSamples": []
   },
   {
    "task": "108",
@@ -11059,7 +12470,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 6,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "105",
@@ -11076,7 +12491,11 @@
    "staleMulti": 0,
    "unused": 7,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "107",
@@ -11131,7 +12550,11 @@
    "staleMulti": 3,
    "unused": 3,
    "used": 5,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 3,
+   "servedSamples": []
   },
   {
    "task": "106",
@@ -11148,7 +12571,11 @@
    "staleMulti": 0,
    "unused": 4,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "104",
@@ -11340,7 +12767,28 @@
    "staleMulti": 8,
    "unused": 13,
    "used": 12,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 25,
+   "servedStale": 3,
+   "servedFamilyStale": 11,
+   "servedSamples": [
+    {
+     "message": 22,
+     "family": "return",
+     "clause": "confirm return those two items from #W6239298",
+     "records": [
+      "#w6239298"
+     ]
+    },
+    {
+     "message": 30,
+     "family": "return",
+     "clause": "confirm return those two items from #W6239298",
+     "records": [
+      "#w6239298"
+     ]
+    }
+   ]
   },
   {
    "task": "103",
@@ -11509,7 +12957,11 @@
    "staleMulti": 10,
    "unused": 15,
    "used": 10,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 22,
+   "servedStale": 0,
+   "servedFamilyStale": 8,
+   "servedSamples": []
   },
   {
    "task": "113",
@@ -11526,7 +12978,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 3,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "109",
@@ -11601,7 +13057,11 @@
    "staleMulti": 0,
    "unused": 13,
    "used": 11,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 16,
+   "servedStale": 0,
+   "servedFamilyStale": 4,
+   "servedSamples": []
   },
   {
    "task": "110",
@@ -11684,7 +13144,11 @@
    "staleMulti": 0,
    "unused": 15,
    "used": 9,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 16,
+   "servedStale": 0,
+   "servedFamilyStale": 4,
+   "servedSamples": []
   },
   {
    "task": "0",
@@ -11701,7 +13165,11 @@
    "staleMulti": 0,
    "unused": 3,
    "used": 5,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "112",
@@ -11771,7 +13239,11 @@
    "staleMulti": 2,
    "unused": 7,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 7,
+   "servedStale": 0,
+   "servedFamilyStale": 1,
+   "servedSamples": []
   },
   {
    "task": "111",
@@ -11845,7 +13317,11 @@
    "staleMulti": 0,
    "unused": 11,
    "used": 5,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 16,
+   "servedStale": 0,
+   "servedFamilyStale": 2,
+   "servedSamples": []
   },
   {
    "task": "1",
@@ -11862,7 +13338,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 6,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "4",
@@ -11879,7 +13359,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 8,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "3",
@@ -11896,7 +13380,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "2",
@@ -11913,7 +13401,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 8,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "5",
@@ -11930,7 +13422,11 @@
    "staleMulti": 0,
    "unused": 6,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "10",
@@ -11947,7 +13443,11 @@
    "staleMulti": 0,
    "unused": 3,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "6",
@@ -11964,7 +13464,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 3,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "8",
@@ -11981,7 +13485,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 7,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "7",
@@ -11998,7 +13506,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 6,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "9",
@@ -12015,7 +13527,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 3,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "11",
@@ -12032,7 +13548,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 6,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 3,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "12",
@@ -12049,7 +13569,11 @@
    "staleMulti": 0,
    "unused": 7,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "13",
@@ -12066,7 +13590,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 16,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "14",
@@ -12083,7 +13611,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 16,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "17",
@@ -12100,7 +13632,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 1,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "16",
@@ -12117,7 +13653,11 @@
    "staleMulti": 0,
    "unused": 12,
    "used": 9,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 7,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "15",
@@ -12134,7 +13674,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 5,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "20",
@@ -12151,7 +13695,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 1,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "18",
@@ -12168,7 +13716,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "19",
@@ -12185,7 +13737,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 3,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "22",
@@ -12235,7 +13791,11 @@
    "staleMulti": 3,
    "unused": 1,
    "used": 7,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 6,
+   "servedStale": 0,
+   "servedFamilyStale": 3,
+   "servedSamples": []
   },
   {
    "task": "23",
@@ -12252,7 +13812,11 @@
    "staleMulti": 0,
    "unused": 11,
    "used": 7,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 6,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "21",
@@ -12269,7 +13833,11 @@
    "staleMulti": 0,
    "unused": 3,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 6,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "24",
@@ -12286,7 +13854,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 0,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "25",
@@ -12303,7 +13875,11 @@
    "staleMulti": 0,
    "unused": 7,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "26",
@@ -12320,7 +13896,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 7,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 7,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "27",
@@ -12442,7 +14022,11 @@
    "staleMulti": 0,
    "unused": 16,
    "used": 8,
-   "crowded": 1
+   "crowded": 1,
+   "servedShown": 24,
+   "servedStale": 0,
+   "servedFamilyStale": 6,
+   "servedSamples": []
   },
   {
    "task": "28",
@@ -12459,7 +14043,11 @@
    "staleMulti": 0,
    "unused": 6,
    "used": 18,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "31",
@@ -12510,7 +14098,11 @@
    "staleMulti": 2,
    "unused": 6,
    "used": 5,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 11,
+   "servedStale": 0,
+   "servedFamilyStale": 2,
+   "servedSamples": []
   },
   {
    "task": "29",
@@ -12527,7 +14119,11 @@
    "staleMulti": 0,
    "unused": 8,
    "used": 8,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "33",
@@ -12544,7 +14140,11 @@
    "staleMulti": 0,
    "unused": 7,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "34",
@@ -12561,7 +14161,11 @@
    "staleMulti": 0,
    "unused": 5,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "30",
@@ -12677,7 +14281,28 @@
    "staleMulti": 2,
    "unused": 9,
    "used": 10,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 19,
+   "servedStale": 2,
+   "servedFamilyStale": 8,
+   "servedSamples": [
+    {
+     "message": 30,
+     "family": "return",
+     "clause": "please proceed with the return for order #W2692684",
+     "records": [
+      "#w2692684"
+     ]
+    },
+    {
+     "message": 40,
+     "family": "return",
+     "clause": "please proceed with the return for order #W2692684",
+     "records": [
+      "#w2692684"
+     ]
+    }
+   ]
   },
   {
    "task": "32",
@@ -12714,7 +14339,11 @@
    "staleMulti": 1,
    "unused": 2,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 5,
+   "servedStale": 0,
+   "servedFamilyStale": 2,
+   "servedSamples": []
   },
   {
    "task": "35",
@@ -12731,7 +14360,11 @@
    "staleMulti": 0,
    "unused": 10,
    "used": 6,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "36",
@@ -12748,7 +14381,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 2,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "38",
@@ -12765,7 +14402,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 3,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "37",
@@ -12782,7 +14423,11 @@
    "staleMulti": 0,
    "unused": 3,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "40",
@@ -12799,7 +14444,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 3,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "41",
@@ -12915,7 +14564,11 @@
    "staleMulti": 2,
    "unused": 11,
    "used": 9,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 13,
+   "servedStale": 0,
+   "servedFamilyStale": 1,
+   "servedSamples": []
   },
   {
    "task": "44",
@@ -12932,7 +14585,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 3,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "42",
@@ -13053,7 +14710,11 @@
    "staleMulti": 10,
    "unused": 3,
    "used": 15,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 14,
+   "servedStale": 0,
+   "servedFamilyStale": 2,
+   "servedSamples": []
   },
   {
    "task": "43",
@@ -13122,7 +14783,11 @@
    "staleMulti": 5,
    "unused": 8,
    "used": 7,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 15,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "39",
@@ -13139,7 +14804,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 5,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "46",
@@ -13156,7 +14825,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 7,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "45",
@@ -13173,7 +14846,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 1,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "50",
@@ -13190,7 +14867,11 @@
    "staleMulti": 0,
    "unused": 7,
    "used": 0,
-   "crowded": 1
+   "crowded": 1,
+   "servedShown": 7,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "48",
@@ -13207,7 +14888,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 3,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "47",
@@ -13282,7 +14967,11 @@
    "staleMulti": 0,
    "unused": 7,
    "used": 9,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 16,
+   "servedStale": 0,
+   "servedFamilyStale": 7,
+   "servedSamples": []
   },
   {
    "task": "49",
@@ -13356,7 +15045,11 @@
    "staleMulti": 0,
    "unused": 11,
    "used": 4,
-   "crowded": 1
+   "crowded": 1,
+   "servedShown": 14,
+   "servedStale": 0,
+   "servedFamilyStale": 3,
+   "servedSamples": []
   },
   {
    "task": "52",
@@ -13373,7 +15066,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 5,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "51",
@@ -13450,7 +15147,11 @@
    "staleMulti": 0,
    "unused": 10,
    "used": 6,
-   "crowded": 1
+   "crowded": 1,
+   "servedShown": 16,
+   "servedStale": 0,
+   "servedFamilyStale": 6,
+   "servedSamples": []
   },
   {
    "task": "53",
@@ -13537,7 +15238,11 @@
    "staleMulti": 0,
    "unused": 8,
    "used": 6,
-   "crowded": 1
+   "crowded": 1,
+   "servedShown": 14,
+   "servedStale": 0,
+   "servedFamilyStale": 8,
+   "servedSamples": []
   },
   {
    "task": "54",
@@ -13554,7 +15259,11 @@
    "staleMulti": 0,
    "unused": 11,
    "used": 7,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 6,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "56",
@@ -13571,7 +15280,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 2,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "57",
@@ -13588,7 +15301,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 0,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "55",
@@ -13605,7 +15322,11 @@
    "staleMulti": 0,
    "unused": 4,
    "used": 8,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 6,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "58",
@@ -13622,7 +15343,11 @@
    "staleMulti": 0,
    "unused": 4,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 7,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "61",
@@ -13639,7 +15364,11 @@
    "staleMulti": 0,
    "unused": 4,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 7,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "60",
@@ -13656,7 +15385,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 3,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "59",
@@ -13673,7 +15406,11 @@
    "staleMulti": 0,
    "unused": 9,
    "used": 7,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "62",
@@ -13690,7 +15427,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 0,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "65",
@@ -13707,7 +15448,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 0,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "63",
@@ -13724,7 +15469,11 @@
    "staleMulti": 0,
    "unused": 12,
    "used": 1,
-   "crowded": 1
+   "crowded": 1,
+   "servedShown": 13,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "66",
@@ -13741,7 +15490,11 @@
    "staleMulti": 0,
    "unused": 4,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 6,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "64",
@@ -13758,7 +15511,11 @@
    "staleMulti": 0,
    "unused": 6,
    "used": 0,
-   "crowded": 1
+   "crowded": 1,
+   "servedShown": 6,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "68",
@@ -13775,7 +15532,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 0,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "67",
@@ -13792,7 +15553,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 2,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "69",
@@ -13809,7 +15574,11 @@
    "staleMulti": 0,
    "unused": 4,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 6,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "70",
@@ -13826,7 +15595,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "72",
@@ -13843,7 +15616,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 0,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "73",
@@ -13860,7 +15637,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 8,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "75",
@@ -13877,7 +15658,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "71",
@@ -13956,7 +15741,11 @@
    "staleMulti": 0,
    "unused": 8,
    "used": 8,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 16,
+   "servedStale": 0,
+   "servedFamilyStale": 3,
+   "servedSamples": []
   },
   {
    "task": "74",
@@ -13973,7 +15762,11 @@
    "staleMulti": 0,
    "unused": 11,
    "used": 5,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "77",
@@ -13990,7 +15783,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 3,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "76",
@@ -14007,7 +15804,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 8,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "78",
@@ -14024,7 +15825,11 @@
    "staleMulti": 0,
    "unused": 4,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "82",
@@ -14041,7 +15846,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 8,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "79",
@@ -14058,7 +15867,11 @@
    "staleMulti": 0,
    "unused": 7,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "80",
@@ -14075,7 +15888,11 @@
    "staleMulti": 0,
    "unused": 3,
    "used": 5,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "81",
@@ -14092,7 +15909,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 10,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 6,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "83",
@@ -14109,7 +15930,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 6,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 6,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "84",
@@ -14126,7 +15951,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "85",
@@ -14143,7 +15972,11 @@
    "staleMulti": 0,
    "unused": 1,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 2,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "87",
@@ -14160,7 +15993,11 @@
    "staleMulti": 0,
    "unused": 4,
    "used": 20,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 6,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "88",
@@ -14177,7 +16014,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "86",
@@ -14194,7 +16035,11 @@
    "staleMulti": 0,
    "unused": 7,
    "used": 5,
-   "crowded": 1
+   "crowded": 1,
+   "servedShown": 6,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "89",
@@ -14247,7 +16092,11 @@
    "staleMulti": 4,
    "unused": 4,
    "used": 6,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 9,
+   "servedStale": 0,
+   "servedFamilyStale": 3,
+   "servedSamples": []
   },
   {
    "task": "90",
@@ -14264,7 +16113,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 2,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 4,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "92",
@@ -14342,7 +16195,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 16,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 16,
+   "servedStale": 0,
+   "servedFamilyStale": 8,
+   "servedSamples": []
   },
   {
    "task": "91",
@@ -14359,7 +16216,11 @@
    "staleMulti": 0,
    "unused": 7,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "94",
@@ -14376,7 +16237,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 6,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "93",
@@ -14450,7 +16315,11 @@
    "staleMulti": 0,
    "unused": 9,
    "used": 7,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 16,
+   "servedStale": 0,
+   "servedFamilyStale": 5,
+   "servedSamples": []
   },
   {
    "task": "97",
@@ -14467,7 +16336,11 @@
    "staleMulti": 0,
    "unused": 10,
    "used": 6,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "95",
@@ -14544,7 +16417,11 @@
    "staleMulti": 0,
    "unused": 4,
    "used": 12,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 16,
+   "servedStale": 0,
+   "servedFamilyStale": 4,
+   "servedSamples": []
   },
   {
    "task": "96",
@@ -14694,7 +16571,11 @@
    "staleMulti": 0,
    "unused": 20,
    "used": 4,
-   "crowded": 1
+   "crowded": 1,
+   "servedShown": 24,
+   "servedStale": 0,
+   "servedFamilyStale": 4,
+   "servedSamples": []
   },
   {
    "task": "100",
@@ -14711,7 +16592,11 @@
    "staleMulti": 0,
    "unused": 12,
    "used": 4,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "99",
@@ -14728,7 +16613,11 @@
    "staleMulti": 0,
    "unused": 8,
    "used": 8,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "98",
@@ -14745,7 +16634,11 @@
    "staleMulti": 0,
    "unused": 17,
    "used": 7,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "101",
@@ -14864,7 +16757,11 @@
    "staleMulti": 1,
    "unused": 14,
    "used": 7,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 21,
+   "servedStale": 0,
+   "servedFamilyStale": 5,
+   "servedSamples": []
   },
   {
    "task": "102",
@@ -14934,7 +16831,11 @@
    "staleMulti": 1,
    "unused": 12,
    "used": 9,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 14,
+   "servedStale": 0,
+   "servedFamilyStale": 3,
+   "servedSamples": []
   },
   {
    "task": "107",
@@ -14951,7 +16852,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 0,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 0,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "103",
@@ -15103,7 +17008,11 @@
    "staleMulti": 7,
    "unused": 13,
    "used": 10,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 23,
+   "servedStale": 0,
+   "servedFamilyStale": 8,
+   "servedSamples": []
   },
   {
    "task": "106",
@@ -15120,7 +17029,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 3,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 3,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "104",
@@ -15334,7 +17247,11 @@
    "staleMulti": 0,
    "unused": 21,
    "used": 19,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 24,
+   "servedStale": 0,
+   "servedFamilyStale": 7,
+   "servedSamples": []
   },
   {
    "task": "105",
@@ -15351,7 +17268,11 @@
    "staleMulti": 0,
    "unused": 8,
    "used": 0,
-   "crowded": 1
+   "crowded": 1,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "108",
@@ -15368,7 +17289,11 @@
    "staleMulti": 0,
    "unused": 0,
    "used": 7,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 7,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "109",
@@ -15385,7 +17310,11 @@
    "staleMulti": 0,
    "unused": 13,
    "used": 11,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "113",
@@ -15402,7 +17331,11 @@
    "staleMulti": 0,
    "unused": 2,
    "used": 8,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 5,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "110",
@@ -15419,7 +17352,11 @@
    "staleMulti": 0,
    "unused": 13,
    "used": 11,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "112",
@@ -15436,7 +17373,11 @@
    "staleMulti": 0,
    "unused": 7,
    "used": 1,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 8,
+   "servedStale": 0,
+   "servedFamilyStale": 0,
+   "servedSamples": []
   },
   {
    "task": "111",
@@ -15564,7 +17505,11 @@
    "staleMulti": 0,
    "unused": 17,
    "used": 7,
-   "crowded": 0
+   "crowded": 0,
+   "servedShown": 16,
+   "servedStale": 0,
+   "servedFamilyStale": 3,
+   "servedSamples": []
   }
  ],
  "document": {

@@ -166,6 +166,11 @@ STOP = frozenset(
 #: value is turned into words: `#W2378156` in an address argument would otherwise make every address ask unsettleable.
 ID = re.compile(r"#?[A-Za-z]?\d{6,}")
 
+#: A record identifier as a **user** writes it: `#W7449508`. Narrower than `ID` on purpose — an ask naming an order
+#: is naming a record, and a bare number in a sentence ("the 2 items") is not, so the record grade requires the
+#: `#` and a short letter prefix that the corpus's order ids all carry.
+RECORD = re.compile(r"#[A-Za-z]{1,3}\d{3,}")
+
 #: A clause boundary. `and`, `but`, `then`, `also` and a bare comma each start a new ask in this corpus —
 #: "return the cleaner, headphone, and smart watch" is three asks and one call, which is the case the board exists
 #: to keep visible. Named for what it does rather than for what it cuts, because `CLAUSE` is the scope and a name that
@@ -565,6 +570,18 @@ def name_table(messages) -> dict:
     return table
 
 
+def records_in(text: str) -> set:
+    """The record identifiers an ask spells, lowercased so that a comparison cannot fail on a capital.
+
+    An ask's words are the content words of its clause and they carry no identifier — `words_of` drops numbers on
+    purpose — so the record grade has to read the clause itself. That is the only place in this module where an ask is
+    read as text rather than as a word set, and it is bounded: an identifier, or nothing.
+    """
+    if not isinstance(text, str):
+        return set()
+    return {found.lower() for found in RECORD.findall(text)}
+
+
 def _id_values(value, found: list) -> None:
     """Every identifier-shaped string in a tool call's arguments, at any depth."""
     if isinstance(value, str):
@@ -655,13 +672,41 @@ def receipts_of(messages) -> list[dict]:
     return receipts
 
 
+def stem(word: str) -> str:
+    """A word with a regular English plural removed, and nothing else.
+
+    The board compares an ask's words against a catalogue's names, and the two spell one product differently: the user
+    writes "the sneaker", the item is called "Sneakers (size 6, black)". A surface comparison refuses that settlement,
+    the ask stays open, and the block asks for work the receipt already did — the cheapest possible form of the
+    negative effect this project is measuring, and one that no amount of retrieval quality can fix (AUDIT 34.339).
+
+    Three shapes are deliberately **not** plurals and are left alone: a word of three letters or fewer (`bus`), a word
+    ending in a double s (`glass`), and anything whose `-es` follows a vowel (`shoes` → `shoe`, not `sho`). The rule
+    is a stemmer of the corpus rather than of the language, and it is stated as one because a general stemmer would be
+    a dependency whose behaviour this file could not check on the two hundred names the corpus actually contains.
+    """
+    if len(word) > 3 and word.endswith("ies"):
+        return word[:-3] + "y"
+    if len(word) > 4 and word.endswith("es") and word[:-2].endswith(("s", "x", "z", "ch", "sh")):
+        return word[:-2]
+    if len(word) > 3 and word.endswith("s") and not word.endswith("ss"):
+        return word[:-1]
+    return word
+
+
 def grade_of(name_words: set, words: set) -> str:
     """The grade of a match between a product's name and an ask's words: `"name"`, `"overlap"`, or `""`.
 
     One function for both callers, because `settles` and `names_a_product` have to agree: if the board can tick an
     ask it does not consider to name a product, then the same ask is both settled and a set, and the two rules would
     fight over it in the order the loop happens to run.
+
+    Both sides are stemmed before they are compared (R238). Stemming one side only would make the rule asymmetric —
+    "sneaker" would settle against "Sneakers" but not the reverse — and an asymmetric matcher is a bug waiting for a
+    catalogue that spells its names the other way round.
     """
+    name_words = {stem(word) for word in name_words}
+    words = {stem(word) for word in words}
     if not name_words or not words:
         return ""
     if name_words <= words or words <= name_words:
@@ -698,20 +743,40 @@ def settlement(item: dict, receipt: dict, table: dict) -> str:
     if not words:
         return ""
     named = [table[identifier] for identifier in receipt.get("ids") or [] if identifier in table]
-    if named:
-        grade = ""
-        for name in named:
-            found = grade_of(set(words_of(name)), words)
-            if found == "name":
-                return "name"
-            grade = grade or found
-        return grade
+    grade = ""
+    for name in named:
+        found = grade_of(set(words_of(name)), words)
+        if found == "name":
+            return "name"
+        grade = grade or found
     # The free-text branch runs the other way round: an ask's words have to be spelled by the receipt, because a
     # receipt that names a place or a value names it in full, and a superset is a receipt about this ask.
-    free = set()
-    for text in receipt.get("free") or []:
-        free.update(words_of(text))
-    return "name" if words <= free else ""
+    if not grade:
+        free = set()
+        for text in receipt.get("free") or []:
+            free.update(words_of(text))
+        if words <= free:
+            return "name"
+    # R238. The record grade. An ask can name its object by **identifier** rather than by product — "I need an exchange
+    # on order #W5056519", "return just the sneaker from order #W7449508" — and the receipt carries that identifier
+    # whether or not the episode ever read the order. Without this branch the family rule below settles whichever ask
+    # of the family stands first, so a receipt is credited to work nobody did and this ask keeps asking for work that
+    # was done; that is the mechanism the trap reader counted, and it is the one branch here whose evidence is an
+    # identifier rather than a product.
+    #
+    # It runs **after** both name grades, and the condition it needs is the one thing the two grades cannot supply:
+    # the receipt names **no product at all**. That is not the same as "the ask names no product", and the difference
+    # is a whole family of defects: `cancel_pending_order` and `modify_pending_order_address` carry an order id and
+    # nothing else, so an ask that names one of the order's products ("cancel the entire order #W5481803 (both the
+    # boots and the kettle)") has a product the receipt can never touch, is refused by every name grade, and is
+    # excluded from the family rule by `names_a_product` — open for ever, after the order was cancelled. Guarding on
+    # the receipt instead of the ask says the right thing: when the write carried products, a mismatch is a refusal and
+    # an order id must not overrule it; when it carried none, the order id is the only evidence there is.
+    if not grade and not named and records_in(item.get("clause") or "") & {
+        str(identifier).lower() for identifier in receipt.get("ids") or []
+    }:
+        return "record"
+    return grade
 
 
 def settles(item: dict, receipt: dict, table: dict) -> bool:
@@ -852,6 +917,10 @@ def board_of(messages, scope: str = REQUEST) -> dict:
     sets = {index for index, item in enumerate(unique) if settles_by_family(item, table)}
     absorbing = {index for index, item in enumerate(unique) if absorbs_receipts(item, table)}
     loose = 0
+    # R238. How many ticks came from the record grade — the weakest of the three, and the only one whose evidence is an
+    # identifier rather than a product. Counted for the same reason `loose` is: a reading whose ticks are mostly
+    # records is a reading about a rule that trusts the ask's own spelling of its order.
+    by_record = 0
     # R228. Which receipt settled which ask, by **position** in `receipts_of`'s list. The block a reader sees needs the
     # name (`settled_by`); a measurement that asks "did this board account for the call the evaluator required" needs
     # the position, because the call's family and the ask's family are the only thing a name can be compared on and a
@@ -869,6 +938,7 @@ def board_of(messages, scope: str = REQUEST) -> dict:
                 settled[index] = receipt
                 settled_index[index] = position
                 loose += 1 if grade == "overlap" else 0
+                by_record += 1 if grade == "record" else 0
                 hit = True
         if not hit:
             # An ask that names no product ("cancel the order", "return everything from my two most recent orders")
@@ -941,6 +1011,7 @@ def board_of(messages, scope: str = REQUEST) -> dict:
         # a looser rule than the one that was registered, and the number is here so that can be said rather than
         # discovered (see `settlement`).
         "loose": loose,
+        "byRecord": by_record,
         "receipts": len(receipts),
         "names": len(table),
     }
@@ -1516,6 +1587,19 @@ def self_test() -> int:
     check("words dedupe", words_of("lamp lamp") == ["lamp"])
     check("words of a non-string", words_of(None) == [])
 
+    # R238. The corpus spells one product twice: the ask in the singular, the catalogue in the plural. A matcher that
+    # compares surface forms refuses the settlement and the block keeps asking for work that was done — which is what
+    # the trap reader counted as a defect before this round (AUDIT 34.339).
+    check("a plural name settles a singular ask", grade_of({"sneakers"}, {"sneaker"}) == "name")
+    check("and a singular name settles a plural ask", grade_of({"sneaker"}, {"sneakers"}) == "name")
+    check("ies is y", grade_of({"batteries"}, {"battery"}) == "name")
+    check("es after a sibilant strips whole", grade_of({"boxes"}, {"box"}) == "name")
+    check("es after a vowel strips only the s", grade_of({"shoes"}, {"shoe"}) == "name")
+    # The three shapes a naive `rstrip("s")` would merge into something else. Each is a product this catalogue sells.
+    check("a three-letter word keeps its s", grade_of({"bus"}, {"bu"}) == "")
+    check("a double s is not a plural", grade_of({"glass"}, {"glas"}) == "")
+    check("a stem never empties a word", grade_of({"s"}, {"s"}) == "name")
+
     # Families.
     check("exchange is a family", family_of("exchange the keyboard") == "exchange")
     check("swap is an exchange", family_of("swap it") == "exchange")
@@ -1801,6 +1885,37 @@ def self_test() -> int:
           grade_of({"garden", "hose"}, {"hose", "garden", "green"}) == "name")
     check("no shared word is no grade", grade_of({"desk", "lamp"}, {"kettle"}) == "")
     check("an empty side is no grade", grade_of(set(), {"lamp"}) == "")
+
+    # R238. The record grade: the ask names an order the receipt carries, and the ask names no product the episode has
+    # read — so a product name cannot settle it and the family rule below would settle whichever ask of the family came
+    # first. `#W7449508` is a real order id from the lane's control grid, and "sneaker" is how its own user asked.
+    sneaker = {"family": "return", "words": ["sneaker"], "clause": "return just the sneaker from order #W7449508"}
+    return_receipt = {"family": "return", "ok": True, "ids": ["#W7449508", "6477915553"], "free": []}
+    check("an ask that names the receipt's record is settled at the record grade",
+          settlement(sneaker, return_receipt, {}) == "record")
+    check("a receipt for another order settles nothing",
+          settlement(sneaker, {**return_receipt, "ids": ["#W9319364"]}, {}) == "")
+    check("an ask that names no record is not settled at that grade",
+          settlement({"family": "return", "words": ["sneaker"], "clause": "return the sneaker"},
+                     return_receipt, {}) == "")
+    check("a product name in the table still settles at the name grade, not the record grade",
+          settlement({**sneaker, "words": ["sneakers"]}, return_receipt, {"6477915553": "Sneakers"}) == "name")
+    check("and a product the table holds is refused by a receipt for a different product",
+          settlement({"family": "return", "words": ["espresso", "machine"],
+                      "clause": "return the espresso machine from order #W7449508"},
+                     return_receipt, {"6477915553": "Sneakers", "6200867091": "Espresso Machine"}) == "")
+    # An order-level write: `cancel_pending_order` carries the order and nothing else, so a product-naming ask about
+    # that order has nothing to be compared against and would otherwise stay open after the order was cancelled.
+    cancel_order = {"family": "cancel", "ok": True, "ids": ["#W5481803"], "free": []}
+    check("an order-level receipt settles a product-naming ask that names its order",
+          settlement({"family": "cancel", "words": ["boot"], "clause": "cancel the entire order #W5481803 (both the boots"},
+                     cancel_order, {"6200867091": "Hiking Boots"}) == "record")
+    check("and the same receipt settles nothing about another order",
+          settlement({"family": "cancel", "words": ["boot"], "clause": "cancel the entire order #W1111111"},
+                     cancel_order, {"6200867091": "Hiking Boots"}) == "")
+    check("a receipt that carries a product is still refused by name",
+          settlement({"family": "cancel", "words": ["boot"], "clause": "cancel order #W5481803"},
+                     {**cancel_order, "ids": ["#W5481803", "6200867091"]}, {"6200867091": "Kettle"}) == "")
 
     check("a named product is found in the table",
           names_a_product({"family": "return", "words": ["mechanical", "keyboard"]}, table) is True)

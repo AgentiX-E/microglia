@@ -7877,3 +7877,54 @@ and only the split tells them apart. `--sample` prints the windows so you can se
 successful write of its family, and check whether any line of that family in the same window shows as settled. If
 none does, the settlement rule never fired for that family and the block is asking for finished work; if one does,
 the open line is a different product and the block is right.
+
+### 32.94 Why your block keeps asking for work you already did, and the two ways to fix it
+
+There are exactly two mechanical reasons a working-memory block shows an ask whose work a receipt already did. Both
+are cheap to look for and neither is a model problem.
+
+**One: your matcher compares surface forms.** Your user writes "return the sneaker"; your catalogue calls it
+"Sneakers (size 6, black)". A matcher that compares words refuses the tick, and the ask stands in the block after the
+return was processed. The fix is a stemmer, and it has to be applied to **both** sides — an asymmetric one settles
+"sneaker" against "Sneakers" but not the reverse, and one catalogue that spells its names the other way round turns
+that into a bug report.
+
+Three shapes are not plurals and must be left alone, or your stemmer will merge products that are not the same:
+
+    bus     →  bu     a word of three letters keeps its s
+    glass   →  glas   a double s is not a plural
+    shoes   →  sho    -es after a vowel strips only the s
+
+**Two: the write carries no product at all.** `cancel_pending_order` and `modify_pending_order_address` carry an order
+id and nothing else. An ask that names one of that order's products ("cancel the entire order #W5481803, both the
+boots and the kettle") has a product no name grade can ever match, and if your board only settles product-naming asks
+by name, that ask is open for ever — after the order was cancelled. The fix is a third grade that settles on the
+**record** the ask names, guarded by the receipt rather than by the ask:
+
+```python
+if not grade and not named and records_in(item["clause"]) & receipt_ids:
+    return "record"
+```
+
+`named` is the list of products the receipt resolved to; `not named` means the write carried no product, so there is
+nothing for an order id to overrule. When the write *did* carry products, a mismatch stays a refusal — that is what
+keeps a return of the boots from closing an ask about the kettle.
+
+**Measure it before and after, on your own transcripts.** The reader reports both units, and the two numbers are not
+interchangeable:
+
+```bash
+python3 eval/tools/memory_traps.py --document your-run.json --scope clause --sample 4
+```
+
+    served:    10 of 3479 shown line(s) name work a write of their family already carried (0.29%)
+    rejected:  family-level staleness 507 of 4447 (11.4%), of which 304 in a family where no ask ever settled
+
+The first line is the block your product renders, counted over **asks**; the second is a different board — the
+read-anchored one — counted over **families**, and it is kept only as a refuted quantity. On this grid the same
+phenomenon reads 0.29% and 11.4%, which is why the two must never be quoted as one number.
+
+**What is left after both fixes, and why it is correct.** The ten remaining lines are all `return` asks that are
+narrower or wider than the write: "return all five items" against a write that returned three, or "return item
+6704763132 from order #W8528674" against a write that touched a different item of that order. An order id cannot tell
+those apart, and closing them would mean showing the wrong thing — the ask is genuinely still outstanding.
