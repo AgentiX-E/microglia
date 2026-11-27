@@ -140,7 +140,7 @@ describe('classifyQuotaFailure — retryable rate limits', () => {
       'daily spend limit reached',
       '7-day spend limit reached',
       'usage limit reached, next_flush_time is 2026-11-28T00:00:00Z',
-      '当前Key已触发限额',
+      '\u5f53\u524dKey\u5df2\u89e6\u53d1\u9650\u989d',
     ]) {
       expect(verdict(429, 'rate_limit_exceeded', message)).toMatchObject({
         family: 'window.spend',

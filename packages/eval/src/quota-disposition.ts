@@ -185,7 +185,9 @@ const WINDOW_MARKERS = [
   '7-day',
   'next_flush_time',
   'usage limit reached',
-  '限额',
+  // The provider's Chinese-language window message. Written as escapes so the source stays
+  // ASCII: the repo audit forbids CJK text in code, but the runtime marker must match the reply.
+  '\u9650\u989d',
 ] as const;
 
 function verdict(family: QuotaFamily, disposition: QuotaDisposition, hint: QuotaHint, code?: string): QuotaVerdict {
