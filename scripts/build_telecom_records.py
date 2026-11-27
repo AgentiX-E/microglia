@@ -518,13 +518,16 @@ def self_test() -> int:
         except ValueError as error:
             refused = str(error)
         expect(name, refused is not None and "line" in refused)
-    try:
-        import tomllib as reference
-    except ImportError:
-        reference = None
-    if reference is not None:
-        expect("the inline reader agrees with tomllib on this file's own fixture",
-               toml_of(_DB) == reference.loads(_DB))
+    # The reader against a **golden** document rather than against `tomllib`: the floor checker refuses that import
+    # anywhere in the tree, and rightly — a guarded import is still an import for a reader that has to run on the
+    # lane's interpreter. The golden pair is the substitute a 3.10 runner can hold: every production in one document,
+    # with the expected parse written out.
+    golden = ('[plan]\nid = "P1"\nlimit = 5.0\n[[line]]\nid = "L1"\nflags = ["a", "b"]\n'
+              '[[line]]\nid = "L2"\n[line.meta]\nk = true\n')
+    expect("the reader reproduces a golden document", toml_of(golden) == {
+        "plan": {"id": "P1", "limit": 5.0},
+        "line": [{"id": "L1", "flags": ["a", "b"]}, {"id": "L2", "meta": {"k": True}}],
+    })
 
     # The reporter, because a check that cannot fail is not a check: this one is meant to fail, and the counter is
     # wound back so that it does not. R238 shipped a tamper that had stopped tampering, and the lesson was that the
