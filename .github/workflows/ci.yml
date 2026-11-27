@@ -274,8 +274,13 @@ jobs:
           # from them, and the product's own functions are bound to the same reading by state-role-manifest.test.ts.
           python3 -m coverage run --append --branch --include="*/state_role.py" \
             eval/tools/state_role.py --self-test
-          python3 eval/tools/state_role.py --check --manifest eval/manifests/state-role.json
-          python3 eval/tools/state_role.py --verify --manifest eval/manifests/state-role.json --fixture eval/fixtures/state-role-store.json
+          # check and verify run under coverage too: the self-test drives check()/verify() as functions but not the
+          # argparse branches of main(), so leaving these two as plain python would count 93% locally-passing code as
+          # the reader's floor and fail here — the local-pass/CI-fail drift this gate exists to end.
+          python3 -m coverage run --append --branch --include="*/state_role.py" \
+            eval/tools/state_role.py --check --manifest eval/manifests/state-role.json
+          python3 -m coverage run --append --branch --include="*/state_role.py" \
+            eval/tools/state_role.py --verify --manifest eval/manifests/state-role.json --fixture eval/fixtures/state-role-store.json
           python3 -m coverage json -o coverage-python.json
           python3 scripts/check-python-coverage.py --self-test
           python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 31
