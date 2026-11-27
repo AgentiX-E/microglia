@@ -8094,3 +8094,32 @@ instrument.
 
 **Cost.** ¥0. Every number above is arithmetic over a corpus and a rule; no model is called, and `--verify` re-derives
 the whole block from the two source files whose digests sit in the manifest.
+
+## 32.99 Why adding more memory words made things worse — and what we did instead (R242)
+
+A natural fix for "the instrument cannot see the third domain's asks" is to add words. This round measured that idea
+and rejected it, and it is worth reading because the reason generalises to any memory system.
+
+**What we tried.** Six ask families had no vocabulary: `suspend`, `resume`, `roaming`, `refuel`, `plan`, `credit`. We
+added each one and counted, in three domains, how many real writes it reached and how many asks it invented.
+
+**What happened.** Four words reached nothing — not because the rule was wrong, but because the requests never use
+them. Telecom callers describe a symptom ("my data is slow", "No Service"); which action fixes it is decided by policy.
+`refuel` was the only word present, and only inside "you are willing to refuel 2 GB **if necessary**" — a concession,
+not a request. Recognising it as an ask bought one real write and created thirteen phantom ones. `credit` was worse:
+harmless in telecom, but in retail "credit card" made it invent ten asks that were never made. **None of the six was
+worth shipping.**
+
+**The useful repair was smaller.** The word `return` was being read as "refund" forty times on sentences like "the
+speed test returns excellent internet speed" — where it means "restores". We taught the parser to ignore `return`
+when it is immediately followed by a state word (excellent, poor, fair, good, updated, better, worse, normal). The
+forty phantom asks disappeared, and the real return/refund asks in retail and airline were untouched.
+
+**The takeaway for your own corpus.** Before you add a word to a memory or ask vocabulary, ask two questions the
+instrument can answer: (1) does the word name something the user actually requested, or only something they mentioned
+in passing? (2) does it change the reading in any *other* domain? A word that invents asks, or that fires on a second
+meaning elsewhere, is a regression no matter how correct it looks in isolation. Both counts are reported side by side
+in the census so you can see the trade before you ship it.
+
+**Cost.** ¥0. No model is called. The three-domain reading is stored in `eval/manifests/telecom-asks.json` and can be
+re-derived from its source bytes with `--verify`; both files touched this round are at 99% statement coverage.

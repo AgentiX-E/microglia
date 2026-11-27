@@ -6010,3 +6010,43 @@ returns. `goal_board`'s self-test now asserts its four return values against the
 reads the same manifest, and the third domain's nine write tools are in `FAMILIES` so a receipt from it is visible
 at all. What is *not* shipped is a cue list for those families: recognising "my data is slow" as an ask is a separate
 axis, R217a's, and it is named in the manifest's `notYet` rather than left as a silent gap.
+
+## 8.118 The ask vocabulary, measured and mostly refused (R242)
+
+The previous section left one axis unmeasured: the nine third-domain write tools are in `FAMILIES` (so a receipt is
+visible), but no cue recognised the asks themselves. R242 closes that axis with the same instrument R217a used for
+airline — add a candidate cue, read the census, compare all three domains — and reaches the opposite conclusion.
+
+**A family is the shape of an ask; a cue is the vocabulary that recognises it.** They are separate. Six families had
+no cue: `suspend`, `resume`, `roaming`, `refuel`, `plan`, `credit`. Added one at a time to the shipped, guarded cue
+table and read through `goal_board.census` over the 20-task telecom sample plus the retail and airline goals, none is
+admissible:
+
+| cue | telecom found / required | telecom spurious | retail spurious | effect |
+|---|---|---|---|---|
+| suspend / resume / roaming / plan | 0 / 10 | 0 | 235 | the words occur zero times in the requests |
+| refuel | 1 / 10 | 13 | 235 | one write for thirteen false asks — the token is a concession, not a request |
+| credit | 0 / 10 | 0 | 245 | retail "credit card" adds ten false asks |
+
+The requests name symptoms ("data not working", "No Service"), not actions; the action is a consequence of policy.
+This is the same contract finding as R217a (airline) and R227 (record rule), now measured in the third domain too. No
+cue ships.
+
+**The one repair shipped was not a cue but a guard.** The retail `return` cue fired 40 times on telecom conditionals
+("the speed test returns excellent internet speed", "the tool call does not return updated status") — all spurious,
+because `return` means "restore a state" here rather than "send a product back". A negative lookahead on eight closed
+state words resolves the collision:
+
+```python
+r"\b(return\w*|refund\w*)\b(?!\s+(?:excellent|poor|fair|good|updated|better|worse|normal)\b)"
+```
+
+The word list is closed and corpus-independent, so the guard is not a parser fitted to the sample. Measured: telecom
+spurious 40→0, retail 235→235 with 176 found unchanged, airline 52→52 with 15 found unchanged. Every domain's found
+count is untouched; only the false asks disappear.
+
+**Provenance is enforced, not asserted.** `eval/manifests/telecom-asks.json` (`microglia/telecom-asks@1`) records the
+sha256 of three sources and the verdicts `shippedGuard=true`, `shippedCues=[]`. `--check` re-adds the arithmetic;
+`--verify` re-derives the whole reading from those bytes. The builder imports `goal_board.census` rather than copying
+it, temporary cue tables are restored in a `finally`, and both touched files sit at 99% statement coverage with no
+uncovered lines.

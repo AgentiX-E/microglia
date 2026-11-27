@@ -1,0 +1,152 @@
+{
+ "note": "R242. The third domain's ask vocabulary, measured and mostly refused. The six cue-less families (suspend, resume, roaming, refuel, plan, credit) are added one at a time to the shipped, guarded goal_board table and read through goal_board.census on the domain's own 20 tasks and on the retail and airline goals. Four reach no required write; refuel buys one write for thirteen spurious asks (the token appears in the concession 'willing to refuel if necessary', not in a request); credit adds ten spurious retail asks ('credit card'). None is admissible, so no cue ships. The one repair that does ship is a negative lookahead on the return cue: 'the speed test returns excellent' and 'the tool call does not return updated status' were read as refund asks 40 times on the telecom sample, all spurious; the guard clears all 40 and moves neither retail's 176 nor airline's 15.",
+ "reading": {
+  "afterGuard": {
+   "airline": {
+    "found": 15,
+    "spurious": 52
+   },
+   "retail": {
+    "found": 176,
+    "spurious": 235
+   },
+   "telecom": {
+    "found": 0,
+    "required": 10,
+    "spurious": 0,
+    "tasksCovered": 13
+   }
+  },
+  "beforeGuard": {
+   "airline": {
+    "found": 15,
+    "spurious": 52
+   },
+   "retail": {
+    "found": 176,
+    "spurious": 235
+   },
+   "telecom": {
+    "found": 0,
+    "required": 10,
+    "spurious": 40,
+    "tasksCovered": 13
+   }
+  },
+  "cues": [
+   {
+    "addsSpurious": false,
+    "admissible": false,
+    "airlineSpurious": 52,
+    "name": "suspend",
+    "pattern": "\\b(suspend\\w*|freez\\w*)\\b",
+    "reachesNewWrite": false,
+    "retailSpurious": 235,
+    "telecom": {
+     "found": 0,
+     "required": 10,
+     "spurious": 0,
+     "tasksCovered": 13
+    }
+   },
+   {
+    "addsSpurious": false,
+    "admissible": false,
+    "airlineSpurious": 52,
+    "name": "resume",
+    "pattern": "\\b(resum\\w*|reactivat\\w*)\\b",
+    "reachesNewWrite": false,
+    "retailSpurious": 235,
+    "telecom": {
+     "found": 0,
+     "required": 10,
+     "spurious": 0,
+     "tasksCovered": 13
+    }
+   },
+   {
+    "addsSpurious": false,
+    "admissible": false,
+    "airlineSpurious": 52,
+    "name": "roaming",
+    "pattern": "\\b(roam\\w*)\\b",
+    "reachesNewWrite": false,
+    "retailSpurious": 235,
+    "telecom": {
+     "found": 0,
+     "required": 10,
+     "spurious": 0,
+     "tasksCovered": 13
+    }
+   },
+   {
+    "addsSpurious": true,
+    "admissible": false,
+    "airlineSpurious": 52,
+    "name": "refuel",
+    "pattern": "\\b(refuel\\w*|recharg\\w*|top.?up\\w*)\\b",
+    "reachesNewWrite": true,
+    "retailSpurious": 235,
+    "telecom": {
+     "found": 1,
+     "required": 10,
+     "spurious": 13,
+     "tasksCovered": 14
+    }
+   },
+   {
+    "addsSpurious": false,
+    "admissible": false,
+    "airlineSpurious": 52,
+    "name": "plan",
+    "pattern": "\\b(plan\\w*)\\b",
+    "reachesNewWrite": false,
+    "retailSpurious": 235,
+    "telecom": {
+     "found": 0,
+     "required": 10,
+     "spurious": 0,
+     "tasksCovered": 13
+    }
+   },
+   {
+    "addsSpurious": true,
+    "admissible": false,
+    "airlineSpurious": 52,
+    "name": "credit",
+    "pattern": "\\b(credit\\w*|reimburse\\w*)\\b",
+    "reachesNewWrite": false,
+    "retailSpurious": 245,
+    "telecom": {
+     "found": 0,
+     "required": 10,
+     "spurious": 0,
+     "tasksCovered": 13
+    }
+   }
+  ],
+  "shippedCues": [],
+  "shippedGuard": true
+ },
+ "schema": "microglia/telecom-asks@1",
+ "sources": [
+  {
+   "bytes": 83833,
+   "path": "telecom-tasks-small.json",
+   "role": "tasks",
+   "sha256": "c8ea6f75adc18a8ad363974292cbd26b6e8b0e348ec87d265a4188e0088a8f24"
+  },
+  {
+   "bytes": 64847,
+   "path": "retail-goals.json",
+   "role": "retail",
+   "sha256": "00f3ff14bde5d676ef128d90e3631d492554db8684469cae6aa8687cb0599c8a"
+  },
+  {
+   "bytes": 17250,
+   "path": "airline-goals.json",
+   "role": "airline",
+   "sha256": "54c59e8ba56cb68d86fcd650cc58e1e19d73a56f523c9c3a5b22cfab30d20860"
+  }
+ ]
+}

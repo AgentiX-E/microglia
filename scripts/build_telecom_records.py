@@ -395,6 +395,132 @@ def request_of(task: dict) -> str:
     return "\n".join(parts)
 
 
+# --- R242: the third domain's ask vocabulary, measured and mostly refused -------------------------------
+#
+# R241 settled the *record* question without a cue: a graded write was compared against the request's own text, not
+# against a parsed ask. R242 asks the question R217a paid for on airline and could not then pay here — whether six
+# cues would let the board *see* the third domain's asks. The six candidates are the families in `goal_board.FAMILIES`
+# that had no cue (suspend, resume, roaming, refuel, plan, credit); `payment` and `transfer` already have retail cues.
+#
+# The measurement is over the domain's own 20-task sample, through the shipped `goal_board.census`, and read on a
+# document whose `reason` is exactly `request_of` and whose `writes` are the graded writes named by tool. It is scored
+# on two axes — found (a required object the board has an ask for) and spurious (an ask no required object accounts
+# for) — in two other domains as well, because R217a's whole claim was that appended cues change no retail parse.
+ASK_CUES = (
+    ("suspend", r"\b(suspend\w*|freez\w*)\b"),
+    ("resume", r"\b(resum\w*|reactivat\w*)\b"),
+    ("roaming", r"\b(roam\w*)\b"),
+    ("refuel", r"\b(refuel\w*|recharg\w*|top.?up\w*)\b"),
+    ("plan", r"\b(plan\w*)\b"),
+    ("credit", r"\b(credit\w*|reimburse\w*)\b"),
+)
+
+#: R242's one shipped repair. A return/refund immediately followed by a state word is not a request to send a product
+#: back: "speed test returns excellent internet speed" and "the tool call does not return updated status" are
+#: conditionals about a reading. The guard is a negative lookahead on the return cue, and it is measured to remove all
+#: forty spurious asks on the telecom sample while leaving retail's 176 found and airline's 15 found untouched.
+RETURN_GUARD = r"\b(return\w*|refund\w*)\b(?!\s+(?:excellent|poor|fair|good|updated|better|worse|normal)\b)"
+STATE_WORDS = ("excellent", "poor", "fair", "good", "updated", "better", "worse", "normal")
+#: The pre-R242 return cue, reconstructed rather than read from a file, so the "before" arm of the guard can be
+#: measured on a checkout where the shipped table already carries the guard. It is the old pattern verbatim.
+OLD_RETURN = r"\b(return\w*|refund\w*)\b"
+
+#: The census-format document for the third domain. `reason` is the same text the board reads (R215's rule), and
+#: `writes` are the evaluator's own writes named by the tool that performs them — a family the census maps through
+#: `goal_board.FAMILIES`. Built from the task set by `ask_document`, never copied into a second table.
+def ask_document(tasks: list) -> dict:
+    """The telecom tasks as a census document: request text in, graded writes as family-bearing tools."""
+    inverse: dict = {}
+    for tool, family in WRITES.items():
+        inverse.setdefault(family, tool)
+    return {
+        "tasks": [
+            {
+                "id": task.get("id") or "",
+                "reason": request_of(task),
+                "writes": [
+                    {"name": inverse.get(write["family"], ""), "objects": 1}
+                    for write in graded_writes(task)
+                ],
+            }
+            for task in tasks
+        ]
+    }
+
+
+def derive_cues(guarded: bool, extra: tuple = ()) -> tuple:
+    """A cue table with R242's return guard applied or removed, plus a candidate set appended.
+
+    `goal_board.CUES` now ships with the guard, so the "after" arm is the table as shipped and the "before" arm is
+    rebuilt by putting the old return pattern back. Rebuilding it verbatim is what lets this script measure the
+    guard's effect on a checkout whose product already carries it. `goal_board.CUES` is module state, so a caller
+    must restore it — `_census_with` does so in a `finally`. Returning a table rather than mutating one here is what
+    makes the two readings independent of the order they are taken in.
+    """
+    if guarded:
+        base = goal_board.CUES
+    else:
+        base = tuple((name, OLD_RETURN if name == "return" else pattern) for name, pattern in goal_board.CUES)
+    return base + tuple(extra)
+
+
+def _census_with(cues: tuple, doc: dict) -> dict:
+    """A census taken with a chosen cue table, restored afterwards whether it succeeds or fails."""
+    saved = goal_board.CUES
+    try:
+        goal_board.CUES = cues
+        return goal_board.census(doc)
+    finally:
+        goal_board.CUES = saved
+
+
+def ask_reading(tasks: list, retail: dict, airline: dict) -> dict:
+    """The whole R242 reading: the guard's effect, then each candidate cue's marginal, on all three domains.
+
+    Every number comes from `goal_board.census` on a real document; none is typed. The guard is measured against the
+    shipped cue table, and each cue is measured as an addition to the *guarded* table, so the six marginals are about
+    the product as it will ship rather than about a pre-guard parser nobody runs.
+    """
+    doc = ask_document(tasks)
+    bare = derive_cues(guarded=False)
+    guarded = derive_cues(guarded=True)
+
+    def snap(cues: tuple) -> dict:
+        return {
+            "telecom": {k: _census_with(cues, doc).get(k) for k in ("found", "required", "spurious", "tasksCovered")},
+            "retail": {k: _census_with(cues, retail).get(k) for k in ("found", "spurious")},
+            "airline": {k: _census_with(cues, airline).get(k) for k in ("found", "spurious")},
+        }
+
+    before, after = snap(bare), snap(guarded)
+    cues_out = []
+    for name, pattern in ASK_CUES:
+        with_cue = snap(derive_cues(guarded=True, extra=((name, pattern),)))
+        cues_out.append({
+            "name": name,
+            "pattern": pattern,
+            "telecom": with_cue["telecom"],
+            "retailSpurious": with_cue["retail"]["spurious"],
+            "airlineSpurious": with_cue["airline"]["spurious"],
+            # A cue is admissible only if it reaches a required write without adding noise in any domain. Every one
+            # fails one of the two: four reach nothing, refuel buys one write for thirteen spurious asks (a concession
+            # "willing to refuel if necessary", not a request), and credit adds ten spurious retail asks ("credit card").
+            "reachesNewWrite": with_cue["telecom"]["found"] > after["telecom"]["found"],
+            "addsSpurious": (with_cue["telecom"]["spurious"] > after["telecom"]["spurious"]
+                             or with_cue["retail"]["spurious"] > after["retail"]["spurious"]
+                             or with_cue["airline"]["spurious"] > after["airline"]["spurious"]),
+        })
+    for cue in cues_out:
+        cue["admissible"] = cue["reachesNewWrite"] and not cue["addsSpurious"]
+    return {
+        "beforeGuard": before,
+        "afterGuard": after,
+        "cues": cues_out,
+        "shippedCues": [cue["name"] for cue in cues_out if cue["admissible"]],
+        "shippedGuard": True,
+    }
+
+
 def reading(db: dict, tasks: list) -> dict:
     """The four numbers, over every graded write in the task set, plus what each rule costs in over-credit.
 
@@ -808,6 +934,150 @@ def self_test() -> int:
         expect("the json branch prints the manifest a file would hold",
                json.loads(printed.getvalue())["schema"] == "microglia/telecom-records@1")
 
+    # --- R242: the ask vocabulary ---------------------------------------------------------------------------
+    # The six cues are the families in FAMILIES that had no cue. Assert the set rather than a count: a seventh family
+    # added to the domain later has to say whether it carries a cue, and this line is where that decision is forced.
+    expect("the six candidate cues are exactly the cue-less third-domain families",
+           {name for name, _ in ASK_CUES} == {"suspend", "resume", "roaming", "refuel", "plan", "credit"})
+
+    # The document is built from the domain's own tasks by the same walker that produced the record reading: a graded
+    # write is a tool name the census can map through FAMILIES, and the reason is the text the board reads.
+    small = json.loads((HERE / "eval" / "fixtures" / "telecom" / "telecom-tasks-small.json").read_text(encoding="utf-8"))
+    adoc = ask_document(small)
+    expect("the ask document has one row per task", len(adoc["tasks"]) == len(small))
+    expect("a graded tool is named, never a bare family",
+           all(w["name"] in WRITES for t in adoc["tasks"] for w in t["writes"]))
+    expect("the ten graded writes are read from the task set",
+           sum(len(t["writes"]) for t in adoc["tasks"]) == 10)
+
+    # Rebuilding the pre-guard table and appending candidates must not leak into the shipped table: a reading taken
+    # afterwards sees exactly the cues the product ships, in the same order.
+    expect("derive_cues appends without mutating the shipped table",
+           len(derive_cues(guarded=True, extra=ASK_CUES)) == len(goal_board.CUES) + 6
+           and goal_board.CUES[1] == ("return", RETURN_GUARD)
+           and derive_cues(guarded=False)[1] == ("return", OLD_RETURN))
+
+    retail_manifest = json.loads((HERE / "eval" / "manifests" / "retail-goals.json").read_text(encoding="utf-8"))
+    airline_manifest = json.loads((HERE / "eval" / "manifests" / "airline-goals.json").read_text(encoding="utf-8"))
+    aread = ask_reading(small, retail_manifest, airline_manifest)
+
+    # The guard: every one of the forty telecom return-asks is spurious, and removing them costs no real ask in any
+    # domain. These are the numbers the shipped repair rests on, so they are pinned rather than merely bounded.
+    expect("the guard clears all forty spurious telecom asks",
+           aread["beforeGuard"]["telecom"]["spurious"] == 40 and aread["afterGuard"]["telecom"]["spurious"] == 0)
+    expect("and finds nothing to un-settle in any domain",
+           aread["beforeGuard"]["telecom"]["found"] == aread["afterGuard"]["telecom"]["found"] == 0
+           and aread["beforeGuard"]["retail"]["found"] == aread["afterGuard"]["retail"]["found"] == 176
+           and aread["beforeGuard"]["airline"]["found"] == aread["afterGuard"]["airline"]["found"] == 15)
+    expect("the guard's retail and airline spurious counts do not move",
+           aread["beforeGuard"]["retail"]["spurious"] == aread["afterGuard"]["retail"]["spurious"] == 235
+           and aread["beforeGuard"]["airline"]["spurious"] == aread["afterGuard"]["airline"]["spurious"] == 52)
+
+    # The six cues: four reach nothing, refuel buys one write for thirteen spurious asks, credit adds ten retail ones.
+    by_name = {cue["name"]: cue for cue in aread["cues"]}
+    expect("no cue reaches a required write except refuel",
+           [name for name, cue in by_name.items() if cue["reachesNewWrite"]] == ["refuel"])
+    expect("refuel buys its one write with thirteen spurious asks",
+           by_name["refuel"]["telecom"]["found"] == 1 and by_name["refuel"]["telecom"]["spurious"] == 13)
+    expect("credit adds ten spurious retail asks", by_name["credit"]["retailSpurious"] == 245)
+    expect("every cue fails admissibility, so none ships",
+           aread["shippedCues"] == [] and all(not cue["admissible"] for cue in aread["cues"]))
+    expect("the guard, unlike the cues, ships", aread["shippedGuard"] is True)
+
+    # The command line for the ask reading: generate, check, verify, and refuse a tampered manifest. Every branch is
+    # driven here, not in CI, because CI counts the coverage of this self-test only — an ask branch that ran only in
+    # a dispatch would be a manifest nobody's floor had ever measured.
+    with tempfile.TemporaryDirectory() as room:
+        root = pathlib.Path(room)
+        ask_out = root / "asks.json"
+        # Use the real corpus through --sources, so the generation path resolves the two goals files it needs.
+        with contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(io.StringIO()):
+            code = main(["--asks", "--out", str(ask_out), "--sources", str(HERE / "eval" / "fixtures" / "telecom")])
+        saved = json.loads(ask_out.read_text(encoding="utf-8"))
+        expect("the ask writer exits zero", code == 0)
+        expect("and the ask manifest is schema-tagged", saved["schema"] == "microglia/telecom-asks@1")
+        expect("its check passes", check_asks(saved) == [])
+        expect("and its verify re-derives from the three sources",
+               verify_asks(saved, HERE / "eval" / "fixtures" / "telecom") == [])
+        with contextlib.redirect_stdout(io.StringIO()) as printed:
+            main(["--check-asks", str(ask_out)])
+        expect("the check-asks branch reports the guard and zero cues",
+               "guard ships" in printed.getvalue() and "0 of 6" in printed.getvalue())
+        with contextlib.redirect_stdout(io.StringIO()) as printed:
+            main(["--verify-asks", str(ask_out), "--sources", str(HERE / "eval" / "fixtures" / "telecom")])
+        expect("the verify-asks branch reports the re-derived guard",
+               "40 → 0" in printed.getvalue())
+        with contextlib.redirect_stdout(io.StringIO()) as printed:
+            main(["--asks", "--json", "--sources", str(HERE / "eval" / "fixtures" / "telecom")])
+        expect("the ask json branch prints the manifest",
+               json.loads(printed.getvalue())["schema"] == "microglia/telecom-asks@1")
+        with contextlib.redirect_stdout(io.StringIO()) as printed:
+            main(["--asks", "--tasks", str(HERE / "eval" / "fixtures" / "telecom" / "telecom-tasks-small.json"),
+                  "--sources", str(HERE / "eval" / "fixtures" / "telecom")])
+        expect("the ask human branch prints each cue's verdict",
+               "refuel" in printed.getvalue() and "guard=yes" in printed.getvalue())
+        # Tamper: flip admissibility on a row without touching its flags, and check_asks must reject it.
+        tampered = json.loads(json.dumps(saved))
+        tampered["reading"]["cues"][0]["admissible"] = True
+        expect("a cue flipped admissible without a flag is refused",
+               any("admissible" in problem for problem in check_asks(tampered)))
+        tampered2 = json.loads(json.dumps(saved))
+        tampered2["reading"]["shippedCues"] = ["suspend"]
+        expect("a shipped-cue claim that contradicts the rows is refused",
+               any("shippedCues" in problem for problem in check_asks(tampered2)))
+        tampered3 = json.loads(json.dumps(saved))
+        tampered3["reading"]["beforeGuard"]["telecom"]["spurious"] = 39
+        expect("a moved guard column is refused",
+               any("guard" in problem for problem in check_asks(tampered3)))
+        # A source that is not the file the reading was taken from must fail verify even when check passes.
+        tampered4 = json.loads(json.dumps(saved))
+        tampered4["sources"][0]["sha256"] = "0" * 64
+        expect("a changed source digest is refused by verify",
+               any("not the file" in problem for problem in verify_asks(tampered4, HERE / "eval" / "fixtures" / "telecom")))
+        # The remaining defensive branches: a missing source, a source whose path is absent, a renamed cue set, a
+        # guard that moves in a second domain, a guard flag unset, and a field/cue row that cannot be re-derived. Each
+        # is a distinct way a manifest can claim a reading it never took, so each gets its own rejection.
+        missing = json.loads(json.dumps(saved))
+        missing["sources"] = [s for s in missing["sources"] if s["role"] != "retail"]
+        expect("a manifest missing a source is refused",
+               any("no retail" in problem for problem in verify_asks(missing, HERE / "eval" / "fixtures" / "telecom")))
+        absent = json.loads(json.dumps(saved))
+        for source in absent["sources"]:
+            if source["role"] == "retail":
+                source["path"] = "not-here.json"
+        expect("a source path that is absent is refused",
+               any("not in this checkout" in problem for problem in verify_asks(absent, HERE / "eval" / "fixtures" / "telecom")))
+        renamed = json.loads(json.dumps(saved))
+        renamed["reading"]["cues"][0]["name"] = "suspendt"
+        expect("a renamed cue is refused",
+               any("six candidates" in problem for problem in check_asks(renamed)))
+        moved = json.loads(json.dumps(saved))
+        moved["reading"]["afterGuard"]["retail"]["found"] = 175
+        expect("a guard that moves a second domain is refused",
+               any("retail moved" in problem for problem in check_asks(moved)))
+        unshipped = json.loads(json.dumps(saved))
+        unshipped["reading"]["shippedGuard"] = False
+        expect("an unshipped guard is refused",
+               any("shippedGuard" in problem for problem in check_asks(unshipped)))
+        drift = json.loads(json.dumps(saved))
+        drift["reading"]["afterGuard"]["telecom"]["found"] = 1
+        expect("a guard field that cannot be re-derived is refused",
+               any("afterGuard" in problem for problem in verify_asks(drift, HERE / "eval" / "fixtures" / "telecom")))
+        cuedrift = json.loads(json.dumps(saved))
+        cuedrift["reading"]["cues"][2]["admissible"] = True
+        expect("a cue row that cannot be re-derived is refused",
+               any("cues" in problem for problem in verify_asks(cuedrift, HERE / "eval" / "fixtures" / "telecom")))
+        # The print loops in the check/verify failure paths: drive a bad manifest through the CLI so the FAIL lines
+        # execute rather than remaining the only unreachable lines in the file.
+        bad = root / "bad.json"
+        bad.write_text(json.dumps(unshipped), encoding="utf-8")
+        with contextlib.redirect_stdout(io.StringIO()) as printed:
+            main(["--check-asks", str(bad)])
+        expect("the check-asks failure branch prints the refusal", "FAIL" in printed.getvalue())
+        with contextlib.redirect_stdout(io.StringIO()) as printed:
+            main(["--verify-asks", str(bad), "--sources", str(HERE / "eval" / "fixtures" / "telecom")])
+        expect("the verify-asks failure branch prints the refusal", "FAIL" in printed.getvalue())
+
     if failures == 0:
         # The count is printed from the counter rather than typed, because a typed count is a claim about the file
         # that stops being true the first time a check is added.
@@ -823,6 +1093,9 @@ def main(argv: list) -> int:
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--check", default="", help="check that a saved reading adds up")
     parser.add_argument("--verify", default="", help="re-derive a saved reading from the sources it names")
+    parser.add_argument("--asks", action="store_true", help="write the R242 ask-vocabulary reading (six cues + guard)")
+    parser.add_argument("--check-asks", default="", help="check the R242 ask manifest's arithmetic")
+    parser.add_argument("--verify-asks", default="", help="re-derive the R242 ask manifest from its sources")
     #: Where the sources named by a manifest are looked for. A parameter rather than a constant because the self-test
     #: writes its own corpus to a temporary directory, and a reader that could only ever look in one place would have
     #: to be trusted about the place it looks.
@@ -831,6 +1104,70 @@ def main(argv: list) -> int:
     args = parser.parse_args(argv)
     if args.self_test:
         return 1 if self_test() else 0
+    if args.check_asks:
+        saved = json.loads(pathlib.Path(args.check_asks).read_text(encoding="utf-8"))
+        problems = check_asks(saved)
+        for problem in problems:
+            print(f"FAIL {problem}")
+        if not problems:
+            shipped = saved["reading"]["shippedCues"]
+            print(f"ok  {pathlib.Path(args.check_asks).name}: guard ships, {len(shipped)} of 6 cues ship")
+        return 1 if problems else 0
+    if args.verify_asks:
+        saved = json.loads(pathlib.Path(args.verify_asks).read_text(encoding="utf-8"))
+        problems = check_asks(saved) + verify_asks(saved, pathlib.Path(args.sources))
+        for problem in problems:
+            print(f"FAIL {problem}")
+        if not problems:
+            print(f"ok  {pathlib.Path(args.verify_asks).name}: re-derived from its own bytes — "
+                  f"{saved['reading']['beforeGuard']['telecom']['spurious']} → "
+                  f"{saved['reading']['afterGuard']['telecom']['spurious']} telecom spurious asks under the guard")
+        return 1 if problems else 0
+    if args.asks:
+        task_path = pathlib.Path(args.tasks) if args.tasks else pathlib.Path(args.sources) / "telecom-tasks-small.json"
+        root = pathlib.Path(args.sources)
+        retail_path = root.parent.parent / "manifests" / "retail-goals.json"
+        airline_path = root.parent.parent / "manifests" / "airline-goals.json"
+        tasks = json.loads(task_path.read_text(encoding="utf-8"))
+        retail = json.loads(retail_path.read_text(encoding="utf-8"))
+        airline = json.loads(airline_path.read_text(encoding="utf-8"))
+        document = {
+            "schema": "microglia/telecom-asks@1",
+            "note": (
+                "R242. The third domain's ask vocabulary, measured and mostly refused. The six cue-less families "
+                "(suspend, resume, roaming, refuel, plan, credit) are added one at a time to the shipped, guarded "
+                "goal_board table and read through goal_board.census on the domain's own 20 tasks and on the retail "
+                "and airline goals. Four reach no required write; refuel buys one write for thirteen spurious asks "
+                "(the token appears in the concession 'willing to refuel if necessary', not in a request); credit "
+                "adds ten spurious retail asks ('credit card'). None is admissible, so no cue ships. The one repair "
+                "that does ship is a negative lookahead on the return cue: 'the speed test returns excellent' and "
+                "'the tool call does not return updated status' were read as refund asks 40 times on the telecom "
+                "sample, all spurious; the guard clears all 40 and moves neither retail's 176 nor airline's 15."
+            ),
+            "sources": [
+                {"role": "tasks", **digest(task_path)},
+                {"role": "retail", **digest(retail_path)},
+                {"role": "airline", **digest(airline_path)},
+            ],
+            "reading": ask_reading(tasks, retail, airline),
+        }
+        text = json.dumps(document, indent=1, sort_keys=True)
+        if args.out:
+            pathlib.Path(args.out).write_text(text + "\n", encoding="utf-8")
+            print(f"wrote {args.out}", file=sys.stderr)
+        if args.json:
+            print(text)
+        else:
+            aread = document["reading"]
+            print(f"guard  {aread['beforeGuard']['telecom']['spurious']} → "
+                  f"{aread['afterGuard']['telecom']['spurious']} telecom spurious asks (shipped)")
+            for cue in aread["cues"]:
+                print(f"cue    {cue['name']:9s} telecom {cue['telecom']['found']}/{cue['telecom']['required']} "
+                      f"spurious {cue['telecom']['spurious']:2d} "
+                      f"retail-spurious {cue['retailSpurious']} → "
+                      f"{'ADMIT' if cue['admissible'] else 'refuse'}")
+            print(f"ship   guard=yes, cues={aread['shippedCues']}")
+        return 0
     if args.check:
         saved = json.loads(pathlib.Path(args.check).read_text(encoding="utf-8"))
         problems = checked(saved)
@@ -891,6 +1228,87 @@ def main(argv: list) -> int:
 
 
 FIXTURES = HERE / "eval" / "fixtures" / "telecom"
+
+
+def check_asks(saved: dict) -> list:
+    """A saved R242 reading's arithmetic, re-added — independently of the bytes it came from.
+
+    This is the same discipline `checked` applies to the record reading, and it is needed for the same reason: a
+    manifest that only asserts "zero cues ship" could say that about any table. The check re-derives admissibility
+    from the two flags (`reachesNewWrite`, `addsSpurious`) on each row and from the before/after guard columns, so a
+    row edited to make a rejected cue look admissible fails even if nothing re-reads the corpus.
+    """
+    problems: list = []
+    reading = saved.get("reading") or {}
+    before = reading.get("beforeGuard") or {}
+    after = reading.get("afterGuard") or {}
+    cues = reading.get("cues") or []
+    if {cue.get("name") for cue in cues} != {name for name, _ in ASK_CUES}:
+        problems.append("cues: the manifest does not name exactly the six candidates")
+    # The guard claims rest on pinned numbers. A manifest whose guard column cannot be re-derived from these counts
+    # is a claim about a corpus it never measured.
+    bt, at = before.get("telecom") or {}, after.get("telecom") or {}
+    if bt.get("spurious") != 40 or at.get("spurious") != 0:
+        problems.append(f"guard: expected 40 -> 0 telecom spurious, got {bt.get('spurious')} -> {at.get('spurious')}")
+    for domain in ("retail", "airline"):
+        b, a = before.get(domain) or {}, after.get(domain) or {}
+        if b.get("found") != a.get("found") or b.get("spurious") != a.get("spurious"):
+            problems.append(f"guard: {domain} moved under the guard")
+    for cue in cues:
+        name = cue.get("name")
+        reach, noise = cue.get("reachesNewWrite"), cue.get("addsSpurious")
+        if cue.get("admissible") is not (bool(reach) and not bool(noise)):
+            problems.append(f"{name}: admissible contradicts its own two flags")
+    shipped = [cue.get("name") for cue in cues if cue.get("admissible")]
+    if reading.get("shippedCues") != shipped:
+        problems.append(f"shippedCues: {reading.get('shippedCues')} against {shipped}")
+    if reading.get("shippedGuard") is not True:
+        problems.append("shippedGuard: the guard is the only R242 repair and must be recorded as shipped")
+    return problems
+
+
+def verify_asks(saved: dict, root: pathlib.Path = FIXTURES) -> list:
+    """Re-derive the whole R242 reading from the manifest's own named sources, byte for byte.
+
+    `check_asks` re-adds arithmetic; this is the other half — it cannot tell whether the arithmetic was ever about
+    these tasks. The tasks file, the retail goals and the airline goals are all named with digests and all live in
+    this repository, so the reading is recomputed from them and compared field by field. Without this, a manifest
+    could assert "eleven cues, none shipped" about a corpus nobody opened.
+    """
+    problems: list = []
+    sources = {source.get("role"): source for source in saved.get("sources") or []}
+    loaded: dict = {}
+    for role in ("tasks", "retail", "airline"):
+        source = sources.get(role)
+        if not source:
+            problems.append(f"no {role} among the sources")
+            continue
+        # The tasks file lives under eval/fixtures/telecom; the two goals files live under eval/manifests. Resolve the
+        # role to its directory rather than assuming one shared root — the two are deliberately in different places.
+        base = root if role == "tasks" else root.parent.parent / "manifests"
+        path = base / str(source.get("path") or "")
+        if not path.is_file():
+            problems.append(f"{role}: {path} is not in this checkout")
+            continue
+        data = path.read_bytes()
+        if hashlib.sha256(data).hexdigest() != source.get("sha256"):
+            problems.append(f"{role}: {source.get('path')} is not the file this reading was taken from")
+            continue
+        loaded[role] = json.loads(data.decode("utf-8"))
+    if len(loaded) != 3:
+        return problems
+    fresh = ask_reading(loaded["tasks"], loaded["retail"], loaded["airline"])
+    stored = saved.get("reading") or {}
+    # Compare the structural fields, not the prose note. Any drift in a guard column or a cue's two flags fails.
+    for field in ("beforeGuard", "afterGuard", "shippedCues", "shippedGuard"):
+        if fresh.get(field) != stored.get(field):
+            problems.append(f"{field}: the {field} block does not come back from these bytes")
+    fresh_cues = [(cue["name"], cue["reachesNewWrite"], cue["addsSpurious"], cue["admissible"]) for cue in fresh["cues"]]
+    stored_cues = [(cue.get("name"), cue.get("reachesNewWrite"), cue.get("addsSpurious"), cue.get("admissible"))
+                   for cue in stored.get("cues") or []]
+    if fresh_cues != stored_cues:
+        problems.append("cues: the six rows do not come back from these bytes")
+    return problems
 
 
 def verified(saved: dict, root: pathlib.Path = FIXTURES) -> list:

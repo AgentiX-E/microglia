@@ -3142,3 +3142,21 @@ its other bills. A settlement rule that credits a sibling passes every reach cou
 asking, which is why every rule in this lane is scored on **two** axes — the writes it reaches and the records it
 wrongly credits. R241 measures the third domain at 8 of 8 reached and one line of nine credited, against the
 ambiguity-blind table's three.
+
+**Negative-lookahead guard (R242)** — a cue refinement that refuses a match when a specific, closed set of words
+follows it, rather than when a learned model says so. R242's `return` guard is
+`return\w*|refund\w*` not followed by one of eight state words (excellent, poor, fair, good, updated, better, worse,
+normal). It is a guard rather than a narrower cue because the excluded words are a closed list independent of any
+corpus, so the rule cannot silently become a parser fitted to the sample. Measured effect: forty spurious asks in the
+telecom domain removed, with every domain's reached-write count unchanged.
+
+**Admissible cue (R242)** — a candidate vocabulary item that is *both* necessary and safe, judged on two axes: it
+must reach at least one required write that the shipped table misses (`reachesNewWrite`), and it must add no spurious
+ask in any domain (`addsSpurious` is false). The verdict is mechanical — `admissible = reachesNewWrite and not
+addsSpurious` — and is recomputed by the manifest checker, so a row edited to look admissible without a matching flag
+is refused. All six third-domain candidates failed one axis or the other; zero shipped.
+
+**Domain collision (R217a, R242)** — one spelling naming two different things in two domains, so a rule correct in
+one is wrong in the other. `return` is a refund in retail but a restoration of state in telecom ("speed returns
+excellent"); the same pattern fired forty false asks in telecom. R242 is the first round to *fix* a collision with a
+guard rather than only record it; the vocabulary hypothesis itself was refused in all three domains.

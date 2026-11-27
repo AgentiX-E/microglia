@@ -151,7 +151,12 @@ FAMILIES = {
 #: corpus is a parser fitted to the corpus, and the census in `--census` would then be a measurement of the fit.
 CUES = (
     ("exchange", r"\b(exchang\w*|swap\w*|replac\w*)\b"),
-    ("return", r"\b(return\w*|refund\w*)\b"),
+    # R242. A return/refund names an ask only when it is not immediately followed by a state word. "The speed test
+    # returns excellent internet speed" and "the tool call does not return updated status" are conditionals about a
+    # reading in the third domain, not a request to send a product back; without this guard the return cue fired 40
+    # times on the telecom sample and all 40 were spurious. The retail refunds are untouched by the guard: "return the
+    # lamp", "refund each order" still parse, and R242's census asserts retail's found/spurious are byte-identical.
+    ("return", r"\b(return\w*|refund\w*)\b(?!\s+(?:excellent|poor|fair|good|updated|better|worse|normal)\b)"),
     ("cancel", r"\b(cancel\w*)\b"),
     ("address", r"\baddress\b"),
     ("payment", r"\bpayment\b"),
@@ -1845,6 +1850,14 @@ def self_test() -> int:
     check("swap is an exchange", family_of("swap it") == "exchange")
     check("return is a family", family_of("return the lamp") == "return")
     check("refund is a return", family_of("refund it") == "return")
+    # R242. A return/refund that is immediately followed by a state word is not an ask to send a product back: in the
+    # third domain "the speed test returns excellent internet speed" and "the tool call does not return updated status"
+    # are conditionals about a reading, not a refund. Before this guard the return cue fired 40 times on the telecom
+    # sample and every one was spurious. These assertions are written before the guard so the guard has to earn them.
+    check("a speed that returns excellent is not a refund", family_of("speed test returns excellent internet speed") == "")
+    check("a call that returns updated status is not a refund", family_of("the tool call does not return updated status") == "")
+    check("a call that returns poor is not a refund", family_of("if it returns poor, fair or good") == "")
+    check("but a refund of an order still is", family_of("refund each order to the other payment method") == "return")
     check("cancel is a family", family_of("cancel the order") == "cancel")
     check("address before modify", family_of("change my address") == "address")
     check("payment is a family", family_of("use another payment") == "payment")
