@@ -202,3 +202,24 @@ claim available is the negative one (a wider window did not make the model worse
 window the model actually read. What would have happened without the amendment is the thing worth writing down:
 sixty episodes bought, B1 read at 89.5% against a 95% bar, and a round that reported "the board was not served" about
 an arm that served it perfectly.
+
+## Amendment 2 — which thirty tasks, registered before the dispatch
+
+The design says "30 tasks × 2 trials, drawn from the same 114-task retail grid". It does not say **which** thirty, and
+the omission is not repairable after the fact: a subset picked by anything measured — the tasks R234 wired, the tasks
+whose write the board already reached, the tasks that passed before — is a selection on the outcome, and B1's 94.5%
+would become a lower bound on a sample chosen to be high.
+
+The rule, stated before the first episode:
+
+> The thirty tasks are positions **floor(i × 114 / 30)** for i = 0…29 in the bank's own id order — a systematic sample
+> over the ordered frame, taken every 3.8 tasks — which is
+> `0,3,7,11,15,19,22,26,30,34,38,41,45,49,53,57,60,64,68,72,76,79,83,87,91,95,98,102,106,110`.
+
+Two reasons for a stride rather than a prefix: the bank's ids are contiguous and its task types are not shuffled, so
+"the first thirty" is a slice of whatever the first quarter of the file happens to be; and a stride is fixed by the
+frame size alone, so no quantity measured on any episode can move it. Trials are two (`--trials 2`), the seed set is
+`400` as in every previous round, so the grid is thirty tasks twice = **sixty episodes**.
+
+Nothing else changes. The bars, the stopping rule and the price are the ones above, and the estimate the window guard
+will be armed with is `(1 × 30 × 2 × 26) / 3 / 60 + 10 = 18` minutes, which is what the dispatch will be held to.
