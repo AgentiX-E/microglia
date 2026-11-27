@@ -2255,7 +2255,10 @@ def self_test() -> int:
     covered_over["boards"]["request"]["covered"] = 99
     check("more covered writes than credited calls is caught", check_manifest(covered_over) != [])
     miscounted = json.loads(json.dumps(reading))
-    miscounted["boards"]["request"]["coverage"] = 0.5
+    # Computed from the reading rather than written as a literal. `0.5` was wrong for this document until R238 changed
+    # the settlement rule, at which point the document's own coverage became 0.5 and the tamper stopped tampering —
+    # a test that expires when the thing it tests improves. The offset is what makes the assertion about the check.
+    miscounted["boards"]["request"]["coverage"] = (reading["boards"]["request"]["coverage"] or 0.0) + 0.25
     check("a coverage that is not covered over discharged is caught", check_manifest(miscounted) != [])
     open_heavy = json.loads(json.dumps(reading))
     open_heavy["boards"]["request"]["open"] = open_heavy["boards"]["request"]["items"] + 1
