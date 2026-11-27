@@ -3107,3 +3107,20 @@ finding: **no token-table repair exists** for a domain whose only handle is ambi
 **Reach (of a settlement grade)** — the share of graded writes a grade can actually settle on a domain, measured
 before any dispatch. Telecom's record grade reaches **0 of 8** writes under the rule as it shipped, which is why the
 third domain's settlement handle is a design question rather than a parser tuning.
+
+**Cost ladder** — a dispatch priced as a set of rungs, each `(tasks, arms, attempts)`, rather than as one product.
+The product form is why a plan can quote "¥93.5" for four rounds without anyone being able to say which factor they
+would refuse; the ladder form makes each factor refusable. Every rung carries its resolution, its cost, **and its
+floor** — because shrinking the sample raises the floor, so the cheapest rung is the bluntest ruler, not a discount.
+
+**Rung kind (paired delta vs absolute score)** — what a rung's resolution *is*. Two arms buy a **paired delta**,
+`2.802 × √(a/m + b) / √N`, which is a difference between treatments. One arm buys an **absolute score's
+half-width**, `2.802 × √(p(1−p)/Nm)`, which is a distance from a number to its estimate. They are not the same
+measurement, and a tool that priced a one-armed run with the paired formula would quote a resolution that run cannot
+deliver.
+
+**Gate (of a dispatch)** — one step in a spend order, with a price and a stopping rule. Gate 0 is reachability at
+zero cost: if a domain's settlement grade reaches none of its graded writes, no dispatch in it is worth pricing. The
+gates that follow buy the sign, then the size with a control, then a publishable score — in that order, because each
+one can cancel the next. A registration names the first *paid* gate, and the manifest check refuses a registration
+whose figure is not that rung's own price.

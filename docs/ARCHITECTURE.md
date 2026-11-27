@@ -5887,3 +5887,55 @@ window carried), and R239's audit asserted byte-identity by `diff`-ing the manif
 which is a tautology, not a check. R240 regenerates it and records the correction here; the invariant that would have
 caught it is the one this round added: a manifest is verified against a **re-derivation**, never against its own
 history.
+
+### 8.116 A price quoted as a product cannot be argued with — so the dispatch is carried as a ladder
+
+`278 tasks × 2 arms × 4 attempts = 2,224 episodes` at the measured `$0.00584` is **¥93.51**, and every factor in
+that product is correct. What is not correct is the *shape*: a product lets a reader accept or refuse the whole
+purchase, and the three factors buy three different things.
+
+| factor | what it buys | needed to answer "does this treatment help?" |
+|---|---|---|
+| × 278 tasks | the denominator the effect is divided by | no — more tasks divide the effect *smaller* |
+| × 2 arms | a control to pair against | no — the control half is usually already on disk |
+| × 4 attempts | the floor 6.72pp → 4.30pp | no — that is a **published score's** precision |
+
+**The ladder is the same ruler read at more lengths, and that is checked rather than claimed.** The fit is
+`var(m) = 0.20248/m + 0.014962`, taken from the retail grid, and it reproduces the three numbers this project has
+quoted since R235: a floor of **3.21pp** at 114 tasks, **6.72pp** at four attempts on the same tasks, and **4.30pp**
+at four attempts on 278. A ladder that did not reproduce them would be a second price rather than a second reading.
+
+| tasks | arms | m | episodes | CNY | resolves | floor | kind |
+|---|---|---|---|---|---|---|---|
+| 278 | 2 | 4 | 2,224 | **93.51** | 4.30pp | 2.06pp | paired delta |
+| 114 | 2 | 4 | 912 | 38.35 | 6.72pp | 3.21pp | paired delta |
+| 114 | 1 | 1 | 114 | 4.79 | 13.12pp | — | absolute score |
+| 50 | 2 | 2 | 200 | 8.41 | 13.51pp | 4.85pp | paired delta |
+| 40 | 1 | 1 | 40 | **1.68** | 22.15pp | — | absolute score |
+| 24 | 1 | 1 | 24 | 1.01 | 28.60pp | — | absolute score |
+
+**Two measurements, and they are not interchangeable.** A one-armed dispatch cannot produce a paired delta — there
+is nothing to pair it with — so it is priced as an **absolute score's half-width**, `2.802 × √(p(1−p)/Nm)`, at a
+pass rate of one half, which maximises `p(1−p)` and is therefore the conservative bound. Pricing a one-armed
+dispatch with the paired formula would quote a resolution nothing in it can deliver.
+
+**A cheap rung is a blunt ruler, and the floor column says so.** The floor rises as the root of the task ratio:
+**5.42pp** at forty tasks against **2.06pp** at two hundred and seventy-eight. So the cheap rungs are not a
+discount — they answer a different question, in a domain where the effect is expected to be large. A precision
+dispatch moves only the asks whose answer is already in the candidate set but ranked low; on the full domain that
+subset's effect is diluted into the low single digits, and the dilution is exactly what the 2,224-episode product
+was buying its way back out of. Measured on the subset, the same effect is large, so forty episodes resolve the
+**sign** — and a negative sign cancels the rest.
+
+**What the ladder does not buy.** A subset's effect is not a domain score. Reporting one as the other is the
+failure mode that makes cheap rungs dangerous, so a prereg that uses gate 1 states the boundary: gate 3 is bought
+only when a publishable number is what is wanted, and it is priced again at the cache before it is bought.
+
+**The gates, in the order they must be spent.** Gate 0 is reachability at ¥0 — if a domain's settlement grade
+reaches nothing (R240 measured telecom at 0 of 8 graded writes), the candidate set holds no correct answer and no
+rung is worth its price. Gate 1 is the sign at ¥1.68, gate 2 the size with a control at ¥8.41, gate 3 a
+publishable score at ¥93.51.
+
+Every rung is re-derived from its own factors in CI (`resolution.py --check-tiers`), and the manifest check refuses a
+rung whose cost is not its three factors times the price, a gate whose price is not its own rung's, or a
+registration that does not match the first paid gate it claims.

@@ -194,6 +194,11 @@ jobs:
           # in a paragraph is a rule nobody re-ran.
           python3 -m coverage run --append --branch --include="*/eval/tools/resolution.py" \
             eval/tools/resolution.py --self-test
+          # …and the plan's ladder, re-derived rather than trusted. R242 replaced a product (278 x 2 x 4 as one
+          # number) with nine rungs, and a rung is a figure in a document unless the build recomputes it from its
+          # own factors. This is the same rule R240 established for manifests: verified against a re-derivation,
+          # never against its own history.
+          python3 eval/tools/resolution.py --check-tiers eval/manifests/plan-costs.json
           # R227. Does the request name the record its write touches? This is the census the round's bar is written
           # over, and its ground truth is the domain's own database rather than a call name. It is under the floor
           # because it is the file that decides whether ¥16 is spent: an arithmetic in a paragraph is arithmetic

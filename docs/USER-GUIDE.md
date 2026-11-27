@@ -7995,3 +7995,49 @@ design, not a wider pattern — and it is the next round's work here rather than
 **Cost.** ¥0: the database and the tasks are static, no model is called, and the reading is eight rows. The rule
 change itself ships with a gate that re-derives every published manifest, because a settlement rule that moves a
 published number is a regression until it is regenerated and recorded.
+
+### 32.97 Price your next experiment as a ladder, not as a product
+
+You will eventually write a line like this: *"the next experiment costs ¥93.5."* It is usually derived honestly —
+tasks × arms × attempts × the price an episode actually cost — and it is still the least useful form the number can
+take. A product lets a reader accept or refuse the whole purchase. A ladder lets them refuse one factor.
+
+**Take it apart before you take it or leave it.** Three factors are hiding in that product, and each buys something
+different:
+
+1. **Task count** buys a denominator. Adding tasks does not raise your resolution much — it *divides the effect*
+   smaller, which is why a treatment that looks strong on forty items looks like noise on three hundred.
+2. **A second arm** buys a control. If you have run the untreated arm on the same tasks before, you may already own
+   half of this line.
+3. **Attempts** buy variance reduction, and they buy it with diminishing returns. Asking what the floor is — the
+   error left when attempts go to infinity — tells you when more attempts stop helping. That floor cannot be bought.
+
+**Then price the rungs you would actually accept.**
+
+```bash
+$ python3 eval/tools/resolution.py --control control.json --treatment front.json \
+    --tier 278:2:4 --tier 50:2:2 --tier 40:1:1
+ tasks arms   m  episodes     CNY      MDE    floor  USD/pp  kind
+   278    2   4      2224   93.51   4.30pp   2.06pp   3.018  paired-delta
+    50    2   2       200    8.41  13.51pp   4.85pp   0.086  paired-delta
+    40    1   1        40    1.68  22.15pp        —   0.011  absolute-score
+```
+
+**Read three things in that table, in this order.** The **MDE** is what the rung can see. The **floor** is what no
+amount of money at that task count can see. The **kind** tells you whether you are looking at a paired delta or at an
+absolute score's half-width — a one-armed run cannot produce a delta, and a tool that reported one anyway would be
+quoting a resolution the run cannot deliver.
+
+**The cheap rung is blunt, and that is not a discount.** Forty tasks have a floor of 5.42pp against 2.06pp at two
+hundred and seventy-eight: the floor rises as the *root* of the task ratio. So the cheap rung answers a different
+question — "is the sign positive, on the subset this treatment can actually move?" — and it is honest only if you
+write that boundary down. A subset effect is not a domain score, and reporting one as the other is how a ¥1.68
+reading becomes a false claim.
+
+**Spend in gate order.** Measure reachability first, at zero cost: if your settlement rule reaches none of the graded
+writes in the domain, no dispatch is worth pricing. Then buy the sign, then the size with a control, and only last the
+publishable score — and re-price that last rung at your provider's cache rate before you buy it, because the price an
+episode has cost you is a measured average over dispatches that may not have shared a prefix.
+
+**Cost.** ¥0 to produce the ladder: it is arithmetic over a fit on a grid you already have. What changes is not the
+total — it is that a reader can now disagree with one rung instead of with the whole line.

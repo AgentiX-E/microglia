@@ -1,13 +1,16 @@
 """Draw the plan's price, before and after three corrections of reference.
 
 A waterfall is the right shape for this and a bar chart is not: the claim is not that the plan is cheap, it is that
-**four lines were each wrong in a nameable way** and that the corrections are attributable one at a time. A reader
+**four lines were each wrong in a nameable way** and that the corrections are attributable one at a time. The fifth
+line was not wrong — it was the wrong *shape*: a product quoted as one number, replaced by a ladder. A reader
 who sees a total fall from ¥92 to ¥5.3 learns nothing; a reader who sees which line moved, by how much, and what the
 wrong quantity was, can disagree with a specific correction.
 
-So this file reads `eval/manifests/plan-costs.json` — the one place the four lines live — checks it against the two
+So this file reads `eval/manifests/plan-costs.json` — the one place the five lines live — checks it against the
 manifests that own their numbers, and draws. It does not compute a cost of its own: a drawing that re-derives a
-number is a second source for it, and this project has already audited what a second source costs.
+number is a second source for it, and this project has already audited what a second source costs. The fifth line
+is the one that is not a price at all: it is a ladder, and each of its rungs is re-multiplied from its own factors
+because the cheapest rungs are exactly the ones nobody re-checks.
 """
 
 from __future__ import annotations
@@ -58,6 +61,43 @@ def checked(plan: dict, budget: dict) -> list:
         if by[identifier]["nowCny"] != 0.0:
             problems.append(f"{identifier}: cancelled or already bought, and priced at {by[identifier]['nowCny']}")
 
+    # A line carried as a ladder is checked rung by rung, because that is the form in which a reader can
+    # refuse one factor at a time. The product that preceded it — 278x2x4 as one number — could not be
+    # argued with, and the cheapest rungs are exactly the ones nobody re-multiplies.
+    for item in plan["items"]:
+        rows = item.get("tiers") or []
+        if not rows:
+            continue
+        price = item.get("episodeUsd", plan["episodeUsd"])
+        for row in rows:
+            expect = row["tasks"] * row["arms"] * row["attempts"] * price * plan["cnyPerUsd"]
+            if abs(row["cny"] - expect) > 0.02:
+                problems.append(f"{item['id']}: {row['tasks']}x{row['arms']}x{row['attempts']} costs "
+                                f"{row['cny']} against {expect:.2f} from its own factors")
+        gates = item.get("gates") or []
+        for gate in gates:
+            rung = gate.get("rung")
+            if rung is None:
+                continue
+            try:
+                spec = tuple(int(part) for part in rung.split(":"))
+            except ValueError:
+                problems.append(f"{item['id']}: {gate['id']} names a rung that is not three integers — {rung}")
+                continue
+            match = [row for row in rows
+                     if (row["tasks"], row["arms"], row["attempts"]) == spec]
+            if not match:
+                problems.append(f"{item['id']}: {gate['id']} names {rung}, which the ladder does not carry")
+            elif abs(gate["cny"] - match[0]["cny"]) > 0.02:
+                problems.append(f"{item['id']}: {gate['id']} is priced at {gate['cny']} against the "
+                                f"ladder's {match[0]['cny']} for {rung}")
+        # What is registered is the first gate that costs anything, and it is checked against that rung:
+        # a registration that named a gate and a different price would be two claims wearing one line.
+        paid = next((gate for gate in gates if gate.get("cny", 0.0) > 0.0), None)
+        if paid is not None and abs(item["nowCny"] - paid["cny"]) > 0.02:
+            problems.append(f"{item['id']}: registered at {item['nowCny']} against {paid['id']}'s "
+                            f"{paid['cny']}")
+
     total = sum(item["nowCny"] for item in plan["items"])
     if abs(plan["totalNowCny"] - total) > 0.02:
         problems.append(f"totalNowCny is {plan['totalNowCny']} against {total:.2f}")
@@ -91,10 +131,10 @@ def order_of_magnitude(plan: dict) -> bool:
 
 
 def waterfall(plan: dict, out: pathlib.Path) -> None:
-    """The four lines as one descending cascade, starting from what the plan used to cost.
+    """The five lines as one descending cascade, starting from what the plan used to cost.
 
-    The direction is the whole figure: a waterfall that started at zero would draw four savings stacked from the
-    floor and leave a reader unable to see that R236 *adds* ¥2.52 while the other three subtract. So the cascade
+    The direction is the whole figure: a waterfall that started at zero would draw the savings stacked from the
+    floor and leave a reader unable to see that R236 and R240b *add* while the other three subtract. So the cascade
     starts at the old total and steps through every line in order, which is the only arrangement in which the last
     step lands on the new total and the intermediate heights mean something.
     """
@@ -142,8 +182,8 @@ def waterfall(plan: dict, out: pathlib.Path) -> None:
     axes.set_ylabel("CNY", fontsize=10)
     axes.set_ylim(-2, plan["totalWasCny"] * 1.12)
     axes.set_xlim(-0.75, len(plan["items"]) - 0.25)
-    axes.set_title("The plan was ¥92 and is ¥5.34: every correction is a rate applied to the wrong quantity",
-                   fontsize=11.5)
+    axes.set_title(f"The plan was ¥{plan['totalWasCny']:.2f} and is ¥{plan['totalNowCny']:.2f}: "
+                   "every correction is a rate applied to the wrong quantity", fontsize=11.5)
     axes.grid(axis="y", alpha=0.16)
     for spine in ("top", "right", "bottom"):
         axes.spines[spine].set_visible(False)
@@ -154,6 +194,9 @@ def waterfall(plan: dict, out: pathlib.Path) -> None:
         "R237 is ¥2.82 because 99.5% of a long-context set is one shared prefix, billed at 1/50 the miss rate.",
         "What survives buys an external ladder position and a mechanism probe — not a retail accuracy gain.",
         "The floor is registered, not hoped for: R236 stops at fifteen episodes if B1 is already decided either way.",
+        "R240b is ¥1.68 because what is registered is the first gate of a ladder, not the 278x2x4 product it replaced.",
+        "Each of its rungs is re-multiplied from its own factors on every push, and its floor rises as its task "
+        "count falls.",
     ]
     figure.text(0.012, -0.03, "\n".join(notes), fontsize=8.6, color="#3c4043", va="top", family="DejaVu Sans")
 
@@ -196,8 +239,20 @@ def self_test() -> int:
 
     plan, budget = load(), json.loads(BUDGET.read_text(encoding="utf-8"))
     check("the plan's own numbers agree with the manifests that own them", checked(plan, budget) == [])
-    check("four lines, two of them cancelled or already bought",
-          len(plan["items"]) == 4 and sum(1 for item in plan["items"] if item["nowCny"] == 0) == 2)
+    check("five lines, two of them cancelled or already bought",
+          len(plan["items"]) == 5 and sum(1 for item in plan["items"] if item["nowCny"] == 0) == 2)
+    ladder_item = next(item for item in plan["items"] if item["id"] == "R240b")
+    check("and one of them is carried as a ladder rather than as a product",
+          len(ladder_item["tiers"]) == 10 and ladder_item["tiers"][0]["tasks"] == 278)
+    # The ladder's reason for existing, asserted: its rungs must answer different questions at different
+    # prices, or the table is decoration around one number.
+    prices = sorted(row["cny"] for row in ladder_item["tiers"])
+    resolutions = sorted(row["mde"] for row in ladder_item["tiers"])
+    check("its cheapest rung is not its sharpest, and its sharpest is not its cheapest",
+          prices[0] < prices[-1] / 50 and resolutions[0] < resolutions[-1] / 3)
+    check("shrinking the sample raises the floor, which is why a cheap rung is not a free one",
+          ladder_item["tiers"][-1]["floor"] is None
+          or all(row["floor"] is None or row["floor"] > 0 for row in ladder_item["tiers"]))
 
     doctored = json.loads(json.dumps(plan))
     doctored["items"][2]["nowCny"] = 20.0
@@ -225,6 +280,33 @@ def self_test() -> int:
     doctored["totalWasCny"] = 100.0
     check("an opening total that is not the sum of what the plan used to cost is caught",
           any("totalWasCny" in problem for problem in checked(doctored, budget)))
+
+    # The ladder's four ways to lie, each doctored into the same plan the build checks.
+    doctored = json.loads(json.dumps(plan))
+    ladder = next(item for item in doctored["items"] if item["id"] == "R240b")
+    ladder["tiers"][5]["cny"] = 0.5
+    check("a rung that is not its own factors times the price is caught",
+          any("costs" in problem for problem in checked(doctored, budget)))
+    doctored = json.loads(json.dumps(plan))
+    ladder = next(item for item in doctored["items"] if item["id"] == "R240b")
+    ladder["gates"][1]["cny"] = 12.0
+    check("a gate priced away from its own rung is caught",
+          any("against the" in problem and "ladder's" in problem for problem in checked(doctored, budget)))
+    doctored = json.loads(json.dumps(plan))
+    ladder = next(item for item in doctored["items"] if item["id"] == "R240b")
+    ladder["gates"][1]["rung"] = "41:1:1"
+    check("a gate that names a rung the ladder does not carry is caught",
+          any("does not carry" in problem for problem in checked(doctored, budget)))
+    doctored = json.loads(json.dumps(plan))
+    ladder = next(item for item in doctored["items"] if item["id"] == "R240b")
+    ladder["gates"][1]["rung"] = "forty"
+    check("and a rung that is not three integers is named rather than crashed into",
+          any("not three integers" in problem for problem in checked(doctored, budget)))
+    doctored = json.loads(json.dumps(plan))
+    ladder = next(item for item in doctored["items"] if item["id"] == "R240b")
+    ladder["nowCny"] = 50.0
+    check("a registration that does not match the gate it claims is caught",
+          any("registered at" in problem for problem in checked(doctored, budget)))
     check("the caption's arithmetic holds on the plan as it stands", order_of_magnitude(plan) is True)
     check("and a plan that only halved is not described as an order of magnitude",
           order_of_magnitude({"totalNowCny": 40.0, "totalWasCny": 92.2}) is False)
@@ -253,6 +335,16 @@ def self_test() -> int:
         code, printed = command()
         check("and a plain run prints every line and the two totals",
               code == 0 and "R236" in printed and "total" in printed)
+
+        # The bracket is an option rather than a shape every plan has: a plan with one line that cannot stop
+        # early has a price, not an interval, and both paths have to be drawn rather than only the one the
+        # repository happens to be in.
+        bare = json.loads(json.dumps(plan))
+        del bare["totalFloorCny"]
+        check("a plan with no floor is still checked against its ceiling", checked(bare, budget) == [])
+        bare_out = pathlib.Path(temporary) / "bare.png"
+        waterfall(bare, bare_out)
+        check("and draws its ceiling without inventing a floor", bare_out.exists() and bare_out.stat().st_size > 8000)
 
         # A plan that does not add up is refused by the command line, not only by the checker: this is the path a
         # build takes, and a check that only the test can reach is a check that runs nowhere.
