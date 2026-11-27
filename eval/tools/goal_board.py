@@ -76,6 +76,30 @@ SCHEMA = "microglia.goal-board/3"
 REQUEST = "request"
 CONVERSATION = "conversation"
 
+#: R231's admission, as a **scope** rather than as a second board: the contract's turn read whole, and every turn after
+#: it read only through the clauses that **name their own family**. The distinction is where the parser's inheritance
+#: rule may reach, so the vocabulary, the sentence split and the settlement rules are the same ones, and the difference
+#: between this board and `REQUEST` is exactly which turns are allowed to contribute an ask.
+#:
+#: It exists because a requirement and the answer to the agent's question share a turn: of 2,453 user turns in this
+#: corpus, 1,893 (77.2%) follow an assistant question, so a whole-turn filter cannot keep the requirement without also
+#: keeping the answer — and inside an answer the inheritance rule manufactures an ask out of a value ("yes, the purple
+#: one" inherits the exchange the agent proposed). Restricting the rule's reach keeps the requirement and drops the
+#: value. R231 measured the trade, R232-R234 measured what a window of eight lines can show of it, and R236 is the round
+#: that serves it: a rule read off a transcript and a rule a model is shown are two different claims.
+CLAUSE = "clause"
+
+#: Every scope a board may be built at. Checked rather than defaulted: an unknown scope that falls through to the
+#: request board turns a typo in a dispatch into a quiet re-run of the previous round.
+SCOPES = (REQUEST, CONVERSATION, CLAUSE)
+
+#: The orders a block can be rendered in — the ladder R233 and R234 climbed, as three names rather than two switches:
+#: `statement` is the product's, asks in the order they were stated; `open` puts the unresolved asks first; `grouped`
+#: then spends the window on one line per family. Each rung **contains** the one before it, which is why the rung is
+#: named rather than assembled from a pair of flags that could disagree — and it is why the product's level and the
+#: instrument's level can be compared as one string.
+DISPLAYS = ("statement", "open", "grouped")
+
 #: The tag the block is injected under. Distinct from the knowledge tag because a reader that could not tell the
 #: two apart could not say which channel a movement belonged to, and because `is_pack_message` has to remove the
 #: previous copy of *this* block on every turn.
@@ -144,8 +168,9 @@ ID = re.compile(r"#?[A-Za-z]?\d{6,}")
 
 #: A clause boundary. `and`, `but`, `then`, `also` and a bare comma each start a new ask in this corpus —
 #: "return the cleaner, headphone, and smart watch" is three asks and one call, which is the case the board exists
-#: to keep visible.
-CLAUSE = re.compile(r"(?<=[.!?;])\s+|\s*,?\s+(?:and|but|then|also)\s+|,\s*", re.IGNORECASE)
+#: to keep visible. Named for what it does rather than for what it cuts, because `CLAUSE` is the scope and a name that
+#: means two things in one module is a name that will eventually be passed to the wrong one.
+CLAUSE_SPLIT = re.compile(r"(?<=[.!?;])\s+|\s*,?\s+(?:and|but|then|also)\s+|,\s*", re.IGNORECASE)
 
 #: Words that end the object phrase inside an ask. After one of these the clause is talking about a condition
 #: ("if it is not possible"), a preference ("prefer battery over usb") or a substitute ("for the same one"), and
@@ -240,7 +265,7 @@ def items_of(text: str, inherit: bool = True) -> list[dict]:
     for sentence in re.split(r"(?<=[.!?])\s+|;\s*", text):
         family = ""
         sentence_items: list[dict] = []
-        for clause in CLAUSE.split(sentence):
+        for clause in CLAUSE_SPLIT.split(sentence):
             clause = (clause or "").strip()
             if not clause:
                 continue
@@ -325,6 +350,113 @@ def _folded(items: list) -> list:
         seen.add(key)
         unique.append(item)
     return unique
+
+
+def clause_items(messages) -> dict:
+    """R231's admission: the items the contract states, plus the items later turns **name themselves**.
+
+    The contract is the first turn that states an ask — not turn one, which is a greeting on 52 of 403 episodes — and
+    it is read whole, so the board's item set provably **contains** the request board's. Every later turn contributes
+    only its self-naming clauses: no cue of its own, no ask, whatever precedes it. That is the parser's own
+    inheritance rule with its reach restricted, not a second vocabulary.
+
+    What it gives up is the price of the rule and is reported rather than hidden: an object list continued across
+    clauses ("return the lamp and the chair") keeps only the first object, because only inheritance reaches the
+    second, and `offered - kept` is that cost as a count.
+
+    The diagnostics travel with the items because they are how a reading says *why* a board holds what it holds, and
+    because the same function serves the product's rendering and the instrument's measurement — a rule written twice
+    is a rule that can disagree with itself, and a block a model was shown that the reading cannot reproduce is a
+    measurement of something else.
+    """
+    turns: list = []
+    seen = 0
+    for message in messages:
+        if role_of(message) not in ("user", "human"):
+            continue
+        content = _field(message, "content")
+        text = content if isinstance(content, str) else ""
+        position = seen
+        seen += 1
+        if not text.strip():
+            # Counted and not read: a turn that stated nothing is an event in the conversation, and two rules whose
+            # turn counts disagree cannot be compared on the denominator they share.
+            continue
+        turns.append({"position": position, "whole": items_of(text), "own": items_of(text, inherit=False)})
+    contract = next((turn["position"] for turn in turns if turn["whole"]), None)
+    asks: list = []
+    whole: list = []
+    partial: list = []
+    offered = kept = 0
+    for turn in turns:
+        take = turn["whole"] if turn["position"] == contract else turn["own"]
+        offered += len(turn["whole"])
+        kept += len(take)
+        if turn["position"] == contract:
+            whole.append(turn["position"])
+        elif len(turn["own"]) < len(turn["whole"]):
+            partial.append(turn["position"])
+        asks.extend(take)
+    return {
+        "asks": _folded(asks),
+        "turns": seen,
+        "contract": contract,
+        "wholeTurns": whole,
+        "partialTurns": partial,
+        "offered": offered,
+        "kept": kept,
+        "refusedInherited": offered - kept,
+        "containsContract": contract is not None,
+    }
+
+
+def order_open(items: list, is_settled=None) -> list:
+    """R233's order: the unresolved asks first, the settled ones after, statement order inside each group.
+
+    A stable partition rather than a sort, so "statement order inside each group" is the identity on each group and
+    the only thing that moved is which group comes first. `is_settled` is a parameter because the two callers carry the
+    tick differently — the product's items carry the receipt's name, the instrument's carry a boolean — and a rule that
+    could only read one of the two shapes would be two rules again.
+    """
+    settled = is_settled or (lambda item: bool(item.get("settled_by")))
+    return [item for item in items if not settled(item)] + [item for item in items if settled(item)]
+
+
+def fold_family(items: list) -> list:
+    """R234's fold: one line per family, in the order the families were first stated.
+
+    A stable two-bucket partition and nothing else. The first bucket is the first item of each family, the second is
+    every other item, both in the order they arrived — so the rule's only input is a field every ask already carries
+    and its only effect is which of two positions an item occupies. Nothing is removed and nothing is settled: the
+    block has the same lines in it, it spends its first eight on distinct obligations instead of on nine restatements
+    of one (R234: 636 of 654 writes reached, none hidden, against 632 and 4 before the fold).
+    """
+    firsts: list = []
+    rest: list = []
+    seen: set = set()
+    for item in items:
+        family = item.get("family")
+        if family in seen:
+            rest.append(item)
+        else:
+            seen.add(family)
+            firsts.append(item)
+    return firsts + rest
+
+
+def displayed(items: list, level: str = "statement", is_settled=None) -> list:
+    """The item list as a block of `MAX_ITEMS` lines would show it, at one rung of the ladder.
+
+    The fold is applied **after** the order and **before** the cut, which is the only place it can be applied without
+    becoming a different rule: before the order it would decide which items the partition sees, and after the cut it
+    would decide nothing at all because the eight lines would already have been chosen.
+    """
+    if level not in DISPLAYS:
+        raise ValueError(f"unknown display {level!r}")
+    if level == "statement":
+        return list(items)
+    ordered = order_open(items, is_settled)
+    return fold_family(ordered) if level == "grouped" else ordered
 
 
 def pattern_for(family: str) -> str:
@@ -695,7 +827,11 @@ def board_of(messages, scope: str = REQUEST) -> dict:
     asks from turns after the first — see `request_of` and PROGRESS 244.2 for the measurement that rule comes from.
     """
     items: list[dict] = []
-    if scope == CONVERSATION:
+    if scope not in SCOPES:
+        raise ValueError(f"unknown board scope {scope!r}")
+    if scope == CLAUSE:
+        items.extend(clause_items(messages)["asks"])
+    elif scope == CONVERSATION:
         for message in messages:
             if role_of(message) in ("user", "human"):
                 content = _field(message, "content")
@@ -777,7 +913,11 @@ def board_of(messages, scope: str = REQUEST) -> dict:
         family_asked = any(item["family"] == receipt["family"] for item in unique)
         (unattributed if family_asked else unrequested).append(receipt)
     return {
-        "scope": REQUEST if scope != CONVERSATION else CONVERSATION,
+        "scope": scope,
+        # R236. The rung the board renders at travels with the board, so a board built at the clause scope renders at
+        # the clause rung without its caller repeating the pair — one value read by two functions rather than two
+        # switches that can disagree, which is how an arm ends up being a third treatment nobody registered.
+        "display": "grouped" if scope == CLAUSE else "statement",
         "items": [
             {
                 **item,
@@ -806,7 +946,7 @@ def board_of(messages, scope: str = REQUEST) -> dict:
     }
 
 
-def render(board: dict, state_only: bool = False) -> str:
+def render(board: dict, state_only: bool = False, display: str = "") -> str:
     """The block the agent reads: the asks, the ones a receipt settled, and what could not be attributed.
 
     Written as a status list rather than as advice, because the thing being measured is whether *state* helps. An
@@ -831,17 +971,31 @@ def render(board: dict, state_only: bool = False) -> str:
     `state_only` is therefore the admission rule, kept here as a rendering switch rather than as a second renderer:
     the block admits the asks and their ticks and refuses to admit either refusal. The counters in `board_of` keep
     counting both, because a reading still has to be able to see what the arm did not say.
+
+    `display` is the third switch and the same kind of thing: the *rung* the items are shown at, defaulting to the one
+    the board was built with. It moves no content — the same asks, the same ticks — and it can only change which of
+    them the eight-line window holds. R233 and R234 measured it on transcripts; R236 is the round that shows a model
+    the result, so the level a block was rendered at has to be a value this function reads and not a claim its caller
+    makes.
     """
     items = board.get("items") or []
+    level = display or board.get("display") or "statement"
     unrequested = [] if state_only else (board.get("unrequested") or [])
     unattributed = [] if state_only else (board.get("unattributed") or [])
     if not items and not (unrequested or unattributed):
         return ""
-    where = "from the request" if board.get("scope", REQUEST) == REQUEST else "from the conversation"
+    # The window is filled in the order the rung decides, and the copy is taken before the cut so that `hidden` keeps
+    # counting the same board: the fold moves lines out of the window, it does not remove them from the board.
+    shown = displayed(items, level)
+    where = {
+        REQUEST: "from the request",
+        CONVERSATION: "from the conversation",
+        CLAUSE: "from the request and its later turns",
+    }.get(board.get("scope", REQUEST), "from the request")
     # The header promises lines, so it is only printed when there are some: a block that opens "Open asks" and then
     # says nothing about asks is a block a reader has to decode.
     lines = [f"Open asks {where} — a line is ticked only when a tool receipt names it:"] if items else []
-    for item in items[:MAX_ITEMS]:
+    for item in shown[:MAX_ITEMS]:
         mark = "x" if item.get("settled_by") else " "
         line = f"[{mark}] {item['family']}: {' '.join(item['words'][:8])}"
         # A set ask that absorbed calls says so, because the count is the only visible difference between "the board
@@ -850,7 +1004,7 @@ def render(board: dict, state_only: bool = False) -> str:
         if item.get("absorbed"):
             line += f" (+{item['absorbed']} call{'s' if item['absorbed'] > 1 else ''})"
         lines.append(line)
-    hidden = len(items) - MAX_ITEMS
+    hidden = len(shown) - MAX_ITEMS
     if hidden > 0:
         lines.append(f"… and {hidden} more ask(s) not shown")
     if unrequested:
@@ -1779,6 +1933,88 @@ def self_test() -> int:
     check("the board bounds its length", len(long_board) <= BOARD_MAX_CHARS)
     check("the unattributed line is bounded", "Not attributed" in render({"items": board["items"], "unattributed": [
         {"name": "a"}, {"name": "b"}, {"name": "c"}, {"name": "d"}]}))
+
+    # R236. The clause scope and the display ladder, as the product's own renderer reads them. Three rounds measured the
+    # admission (R231), the order (R233) and the fold (R234) on transcripts; this round is the one that shows a model
+    # the result, so every assertion below is about the *served* block and not about a reading of it.
+    talked = [
+        {"role": "user", "content": "I want to exchange the mechanical keyboard."},
+        {"role": "assistant", "content": "Which keycap set would you like?"},
+        {"role": "user", "content": "not that one, return the lamp, and the chair"},
+    ]
+    by_clause = board_of(talked, CLAUSE)
+    by_every = board_of(talked, CONVERSATION)
+    check("the clause board drops the object an answer only inherited",
+          [item["words"] for item in by_clause["items"]] == [["mechanical", "keyboard"], ["lamp"]])
+    check("and reading every turn keeps it", len(by_every["items"]) == 3)
+    check("the clause board contains the request's asks",
+          {(item["family"], tuple(item["words"])) for item in board_of(talked)["items"]}
+          <= {(item["family"], tuple(item["words"])) for item in by_clause["items"]})
+    boundary = clause_items(talked)
+    check("the boundary counts what only inheritance reached",
+          (boundary["offered"], boundary["kept"], boundary["refusedInherited"]) == (3, 2, 1))
+    check("and names the turn that stated the contract", boundary["contract"] == 0)
+    quiet_contract = [
+        {"role": "user", "content": "Hello!"},
+        {"role": "assistant", "content": "Hi — how can I help?"},
+        {"role": "user", "content": "cancel the order I placed yesterday"},
+    ]
+    check("the contract is the first turn that states an ask, not turn one",
+          clause_items(quiet_contract)["contract"] == 1)
+    blank_first = clause_items([{"role": "user", "content": "   "}, {"role": "user", "content": "cancel the order"}])
+    check("a blank turn is counted and contributes no ask, so the contract is the turn after it",
+          (blank_first["turns"], blank_first["contract"], len(blank_first["asks"])) == (2, 1, 1))
+    check("a clause board carries the rung it renders at", by_clause["display"] == "grouped")
+    check("and a request board carries the shipped one", board_of(talked)["display"] == "statement")
+    check("the block says where its asks came from", "later turns" in render(by_clause))
+    refused_scope = False
+    try:
+        board_of([], "everything")
+    except ValueError:
+        refused_scope = True
+    check("an unknown scope is refused rather than defaulted to the request's", refused_scope)
+
+    # The ladder itself, on items whose shape is the product's: a settled tick, a repeated family, and a family that
+    # only appears after the repetition. `grouped` has to differ from `open` on the third case or it is not a fold.
+    ladder = [
+        {"family": "address", "words": ["street"], "settled_by": "modify_user_address"},
+        {"family": "cancel", "words": ["order"], "settled_by": None},
+        {"family": "address", "words": ["city"], "settled_by": None},
+    ]
+    check("the shipped display is the statement's, item for item", displayed(ladder) == ladder)
+    check("open puts the unresolved asks first and keeps statement order inside each group",
+          [item["family"] for item in displayed(ladder, "open")] == ["cancel", "address", "address"])
+    restated = [
+        {"family": "cancel", "words": ["one"], "settled_by": None},
+        {"family": "cancel", "words": ["two"], "settled_by": None},
+        {"family": "address", "words": ["street"], "settled_by": None},
+    ]
+    check("grouped lifts the second family's first line ahead of the repetition",
+          [item["words"][0] for item in displayed(restated, "grouped")] == ["one", "street", "two"])
+    check("and it removes nothing and settles nothing",
+          sorted(str(item) for item in displayed(restated, "grouped")) == sorted(str(item) for item in restated))
+    check("every rung contains the one before it",
+          [item["words"][0] for item in displayed(restated, "open")] == [item["words"][0] for item in restated])
+    refused_display = False
+    try:
+        displayed(restated, "sorted-by-length")
+    except ValueError:
+        refused_display = True
+    check("an unknown rung is refused rather than defaulted to the statement's", refused_display)
+    # What the ladder buys, measured on the window rather than on the list: the same board, ten items, nine of them one
+    # obligation. At the shipped rung the tenth never reaches the agent; at the folded rung it does — and the block's
+    # own count of what it hid is unchanged, because the fold moves lines out of the window rather than off the board.
+    repeated_lines = {"items": [{"family": "address", "words": [str(index)], "settled_by": None} for index in range(9)]
+                               + [{"family": "modify", "words": ["late"], "settled_by": None}]}
+    check("the shipped render spends its eight lines on one obligation nine times",
+          "modify: late" not in render(repeated_lines))
+    check("the folded render puts the tenth item's family in the window",
+          "modify: late" in render(repeated_lines, display="grouped"))
+    check("and the block still says how many lines it is not showing",
+          "and 2 more" in render(repeated_lines, display="grouped"))
+    manifest = json.loads((Path(__file__).resolve().parents[1] / "manifests" / "serving-defaults.json").read_text())
+    check("the window is the line budget the product ships, read from the manifest",
+          MAX_ITEMS == manifest["defaults"]["blockLines"])
 
     # Message shapes.
     check("a bare list is a message list", len(messages_of(messages)) == 4)

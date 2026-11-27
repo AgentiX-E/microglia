@@ -1992,6 +1992,96 @@ def the_admission_rule_refuses_to_accuse(checks):
 
 
 @case
+def the_clause_arm_is_one_change(checks):
+    """R236. The clause board, read off the switch the dispatch actually sets.
+
+    One change and only one: the block's **reach** — the contract's turn whole, every later turn only through the
+    clauses that name their own family. The placement, the admission rule and the window are what R218b's 456 control
+    episodes already ran, so the contrast against them is the reach and nothing else. Two switches for one arm is how
+    an arm becomes a third treatment nobody registered, so the scope, the rung and the placement are all read from the
+    one variable here — and every value an older arm used must still read exactly as it did.
+    """
+    saved = os.environ.pop(subject.BOARD_ENV, None)
+    try:
+        readings = {}
+        for value in ("", "tail", "front", "policy", "clause", "CLAUSE"):
+            if value:
+                os.environ[subject.BOARD_ENV] = value
+            else:
+                os.environ.pop(subject.BOARD_ENV, None)
+            readings[value] = (subject.board_mode(), subject.board_placement(), subject.board_admission(),
+                               subject.board_scope(), subject.board_display())
+    finally:
+        if saved is None:
+            os.environ.pop(subject.BOARD_ENV, None)
+        else:
+            os.environ[subject.BOARD_ENV] = saved
+    checks.equal(readings["clause"], (True, "tail", "all", "clause", "grouped"),
+                 "the clause arm is the tail placement, the shipped admission and the folded rung")
+    checks.equal(readings["CLAUSE"], readings["clause"], "and it is read case-insensitively, like every switch here")
+    checks.equal(readings["tail"], (True, "tail", "all", "request", "statement"),
+                 "the shipped arm reaches the request only and renders in statement order")
+    checks.equal(readings["policy"], (True, "tail", "state", "request", "statement"),
+                 "the policy arm is unchanged: the same board, one fewer line of it")
+    checks.equal(readings[""], (False, "off", "all", "request", "statement"),
+                 "and an unset variable still serves nothing")
+
+
+@case
+def a_clause_block_reaches_a_later_turn_and_folds_its_window(checks):
+    """R236. What the reach buys and what it costs, at the block a model reads.
+
+    The fixture is the case R231 registered the rule for: the requirement arrives in a later turn, next to an answer
+    that inherits the agent's own question. The shipped block cannot see it — the request is the only turn it reads —
+    and the clause block can, because the turn names a family of its own. The cost is in the same fixture and is
+    asserted rather than described: the second object of a continued list ("and the chair") has no cue of its own, so
+    only inheritance reaches it and the clause rule gives it up.
+
+    The second half is the window. Nine restatements of one family fill eight lines at statement order, and the ask a
+    model needs is behind them; the folded rung spends the same eight lines on distinct obligations and the ask
+    appears. That is R234's 636-of-654 reading, served.
+    """
+    state = LLMAgentState()
+    state.messages.append({"role": "user", "content": "I want to exchange the mechanical keyboard."})
+    state.messages.append({"role": "assistant", "content": "Which keycap set would you like?"})
+    state.messages.append({"role": "user", "content": "not that one, return the lamp, and the chair"})
+    saved = os.environ.get(subject.BOARD_ENV)
+    try:
+        os.environ[subject.BOARD_ENV] = "tail"
+        shipped = subject.MicrogliaAgent().board_for(state, "")
+        os.environ[subject.BOARD_ENV] = "clause"
+        reached = subject.MicrogliaAgent().board_for(state, "")
+    finally:
+        if saved is None:
+            os.environ.pop(subject.BOARD_ENV, None)
+        else:
+            os.environ[subject.BOARD_ENV] = saved
+    checks.substring(shipped, "[ ] exchange: mechanical keyboard", "the shipped block states the contract's ask")
+    checks.equal("return" in shipped, False, "and cannot see the ask a later turn stated")
+    checks.substring(reached, "[ ] return: lamp", "the clause block reaches it")
+    checks.substring(reached, "later turns", "and says where its asks came from")
+    checks.equal("chair" in reached, False, "the object only inheritance reached is given up, as registered")
+
+    restated = LLMAgentState()
+    restated.messages.append({"role": "user", "content": (
+        "change my address to 1 Main St, 2 Oak Ave, 3 Elm Rd, 4 Pine Ln, 5 Bay St, 6 Fox Way, 7 Key Rd, 8 Ash Ct, "
+        "9 Ivy Pl and return the lamp")})
+    try:
+        os.environ[subject.BOARD_ENV] = "tail"
+        nine = subject.MicrogliaAgent().board_for(restated, "")
+        os.environ[subject.BOARD_ENV] = "clause"
+        folded = subject.MicrogliaAgent().board_for(restated, "")
+    finally:
+        if saved is None:
+            os.environ.pop(subject.BOARD_ENV, None)
+        else:
+            os.environ[subject.BOARD_ENV] = saved
+    checks.equal("return" in nine, False, "eight lines of one family hide the ask behind them at statement order")
+    checks.substring(folded, "[ ] return: lamp", "the folded rung puts it in the same window")
+    checks.substring(nine, "… and 2 more", "and the block still counts what it is not showing")
+
+
+@case
 def a_placement_with_nothing_to_say_writes_nothing(checks):
     """R216. The two silent branches of the placement, and the guard that keeps the instrument off the critical path.
 
@@ -2130,6 +2220,10 @@ def the_dose_is_recorded_where_it_is_made(checks):
     checks.equal(after["doseChars"] - before_stats["doseChars"], after["charsTotal"] - before_stats["charsTotal"],
                  "the records' characters are the phase's characters")
     checks.equal(survived != 999, True, "the accessor hands back a copy, not the recording")
+    # R236. The record says which board the episode was served, at the moment the boundary opens rather than by a parse
+    # of the transcript afterwards: B1's first failure mode is an arm that claims the clause board and serves another.
+    checks.equal((first["scope"], first["display"]), ("request", "statement"),
+                 "the shipped arm's record names the request board at the statement rung")
 
 
 @case

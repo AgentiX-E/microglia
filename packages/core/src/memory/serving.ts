@@ -53,6 +53,17 @@ export type ServingDefaults = {
   readonly openAskCeiling: number;
   /** Attempts per task the numbers were measured at. One; the reliability reading is a separate round. */
   readonly trials: number;
+  /**
+   * How many lines a rendered block may spend, which is also the pack's default `limit`.
+   *
+   * One integer, and it had been written down four times before R236: `buildPack`'s `options.limit ?? query.limit ??
+   * 8`, the parser's `MAX_ITEMS`, the instrument's `CAP`, and the R232 registration's arithmetic. Four copies of a
+   * constant is four chances to change one, and a window that is eight lines in the measurement and nine in the
+   * product is a number that stops being about the shipped artefact. R232 measured what the window hides at this
+   * value (14 of 636 reached writes), R233 four, R234 none after the fold — so the value is measured even though it
+   * was never chosen, and it is now stated once.
+   */
+  readonly blockLines: number;
 };
 
 /**
@@ -66,4 +77,5 @@ export const SERVING_DEFAULTS: ServingDefaults = {
   blockCeilingChars: 500,
   openAskCeiling: 3,
   trials: 1,
+  blockLines: 8,
 } as const;

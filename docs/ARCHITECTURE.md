@@ -5636,3 +5636,59 @@ position that somebody else's harness grades, and a mechanism reading on a board
 sizes this lane has measured sit inside that interval, and 1.98 points would need 300 tasks — a third domain, not
 a bigger retail dispatch. A project that only asks "can we afford this?" buys resolution it cannot use; the floor
 is the question that comes first.
+
+### 8.111 A rule measured on a transcript is not yet a rule a model was shown
+
+The three rendering findings of the previous rounds — admit the requirement clause rather than the turn
+(8.105), put open asks before settled ones (8.108), fold to one line per family (8.109) — were all measured on
+**transcripts**: an instrument replayed a conversation, rebuilt the block the arm would have served, and counted
+what it would have shown. That is the right way to price a rule for nothing, and it is not the same claim as
+"the model read this". A rule can be complete on paper and unreachable in a driver; the difference between the two
+is invisible in a reading and decisive in a dispatch.
+
+`8.111` is the level at which that difference is closed. Three things changed, and each one removes a way for the
+measurement and the artefact to disagree.
+
+**One: the board has a scope, and the scope carries its rung.** `goal_board.board_of(messages, scope)` builds at
+`request` (the first user turn, the shipped reading), `conversation` (every turn, R214's reading, kept because a
+subtraction between the two is how a round prices its own fix) or `clause` (the contract's turn whole, every later
+turn only through the clauses that name their own family). A board built at `clause` also carries
+`display: "grouped"`, so the renderer does not need to be told twice — the defect of two switches for one arm is
+that they can disagree, and a disagreement of that kind is a third treatment nobody registered.
+
+```
+scope=request   → items from the first user turn        → display "statement"
+scope=clause    → contract whole + self-naming clauses  → display "grouped"
+```
+
+**Two: the rungs are a ladder, not a pair of flags.** `displayed(items, level)` takes `statement`, `open` or
+`grouped`, and each rung contains the one before it: `open` is a stable partition (unresolved first, statement
+order inside each group), `grouped` is that partition followed by one line per family. The fold is applied **after**
+the order and **before** the cut — before the order it would decide which items the partition sees, after the cut it
+would decide nothing at all, because the eight lines would already have been chosen. The renderer reads the rung off
+the board, so a block cannot be built at one level and shown at another.
+
+**Three: the window is one number.** The block's line budget had been written down **four** times —
+`buildPack`'s `options.limit ?? query.limit ?? 8`, the parser's `MAX_ITEMS`, the instrument's `CAP`, and a
+registration's arithmetic. It is now one field of `eval/manifests/serving-defaults.json`
+(`defaults.blockLines`), read by the product's `SERVING_DEFAULTS`, by the parser's self-test, and by the instrument
+through the parser. R232–R234 measured what the window *hides* at this value (14 of 636 reached writes at statement
+order, then four, then none after the fold), so the value is measured even though it was never chosen.
+
+**And the delegation, which is the part that makes the reading trustworthy.** The instrument does not re-derive the
+rules: `clause_asks` **is** `goal_board.clause_items`, and the fold **is** `goal_board.fold_family`. Two
+implementations of "one line per family" would be two boards, and the difference between them would be a finding
+about the instrument published as a finding about the memory. Re-deriving the four reading scopes over the 456
+episodes already on disk after the delegation returns **byte-identical** JSON — that is the check that the move was
+a move and not a change.
+
+**What this does not claim.** No accuracy number. The rounds that measured these rules measured *display*: 636 of
+654 required writes reachable at the folded rung, none hidden, against 622 and 14 before. Whether a model acts on a
+block that reaches further is a different question with a different sample size — a proportion to be estimated, not
+a difference to be resolved — and it is the next dispatch rather than this section.
+
+**The generalisation worth carrying.** A project accumulates rules whose evidence is a replay, and a replay is
+cheap enough to be mistaken for a serving path. The cheap check is to make the serving path call the same function
+the replay calls, and then to assert in the driver that the arm *ran* with the values the dispatch *asked* for:
+`scope`, `display` and `placement` are three fields of the census and of the per-episode dose record, so an
+environment that lost one of them is a build failure rather than a flat result.

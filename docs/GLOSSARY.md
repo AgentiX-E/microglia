@@ -3013,3 +3013,23 @@ budget whose cached column has been zeroed. Three of the four cost lines this pr
 reason — a rate applied to the wrong quantity — and none of them needed a new measurement to catch, only the
 quantity printed beside the rate. Both external replications together are **¥2.82** off-peak against ¥67.33 without
 a shared prefix.
+
+**Clause board** — a board whose items come from the turn that states the contract **read whole** plus every later
+turn read only through the clauses that **name their own family**. Its purpose is that a requirement and the answer
+to the agent's question share a turn: in one measured corpus 1,893 of 2,453 user turns (77.2%) follow an assistant
+question, so a whole-turn rule cannot keep the requirement without also admitting the value. The board's item set
+contains the request board's by construction, so a rule that reads more turns can never cover fewer writes — and
+what it gives up is stated rather than hidden: the second object of a continued list has no cue of its own, so only
+inheritance reaches it and the clause rule refuses it.
+
+**Display rung** — which of the board's lines a window of `n` shows: `statement` (as stated, the shipped default),
+`open` (unresolved first, settled after, statement order inside each group) or `grouped` (that partition, then one
+line per family). A ladder rather than a pair of switches: each rung contains the one before it, and a board carries
+the rung it renders at, so a block cannot be built at one level and shown at another. The fold is applied after the
+order and before the cut, which is the only position in which it is the rule that was measured.
+
+**Line budget** — how many lines a rendered block may spend, and also the pack's default item count. One integer,
+and this project had it in four places before it was a field of `serving-defaults.json`: the product's
+`limit ?? 8`, the parser's `MAX_ITEMS`, the instrument's `CAP`, and a registration's arithmetic. Four copies of a
+constant is four chances to change one, and a window that is eight lines in the measurement and nine in the product
+is a number that has stopped being about the shipped artefact.

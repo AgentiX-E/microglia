@@ -198,6 +198,13 @@ def write_raw(path, records, tasks) -> int:
                 "written": int(record.get("written") or 0),
                 "changes": int(record.get("changes") or 0),
                 "stable": int(record.get("stable") or 0),
+                # R236. Which board the episode was served, carried through as the agent wrote it. The joined sidecar
+                # keeps its eight columns — a schema change there would move the rows every dose reading was taken
+                # over — and this dump is where "exactly as the agent made it" is the contract, so a record that names
+                # its own scope survives here even though no aggregate reads it. Without it, B1's alternative reading
+                # (the arm claimed the clause board and served the request's) could only be argued from the text.
+                "scope": record.get("scope") or "",
+                "display": record.get("display") or "",
             }
             stream.write(json.dumps(row) + "\n")
     return len(records)
@@ -354,6 +361,17 @@ def self_test() -> int:
         check("and the task where the resolution worked", raw[0]["task"] == "a")
         check("and nothing where it did not", raw[1]["task"] is None)
         check("the index is positional", [row["index"] for row in raw] == [0, 1])
+        # R236. The board a record was made under travels with it. The joined sidecar keeps eight columns, so this
+        # dump is the only artefact that can say which turn-set an episode read — and an arm that claims the clause
+        # board while serving the request's is the failure B1 has to be able to name.
+        write_raw(raw_path, [record(text="a", scope="clause", display="grouped")], ["a"])
+        scoped = [json.loads(line) for line in raw_path.read_text(encoding="utf-8").splitlines()]
+        check("the dump keeps the board's scope and rung",
+              (scoped[0]["scope"], scoped[0]["display"]) == ("clause", "grouped"))
+        check("and an older record with neither is still a row, with two empty strings",
+              (write_raw(raw_path, [record(text="a")], ["a"]) == 1 and
+               (json.loads(raw_path.read_text(encoding="utf-8").splitlines()[0])["scope"],
+                json.loads(raw_path.read_text(encoding="utf-8").splitlines()[0])["display"]) == ("", "")))
         check("a dump of no records is empty", write_raw(raw_path, [], []) == 0 and raw_path.stat().st_size == 0)
         check("a dump shorter than the task list does not invent one",
               write_raw(raw_path, [record(text="a")], []) == 1 and

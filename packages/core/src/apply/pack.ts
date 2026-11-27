@@ -8,6 +8,7 @@
 import { defaultPolicy, mmrSelect, queryCoverage, recallText } from '../kernel/index.js';
 import type { KnowledgeItem, KnowledgePack, RecallQuery } from '../kernel/index.js';
 import type { MemoryPort } from '../memory/index.js';
+import { SERVING_DEFAULTS } from '../memory/serving.js';
 import { emptyPack, makePack, type NoteMode } from './render.js';
 import { foldByShape, type ShapeFold, type ShapeMode } from './shape-fold.js';
 import { decideSpeak, suppressionOf } from './speak.js';
@@ -110,7 +111,9 @@ export async function buildPack(
   options: BuildPackOptions,
 ): Promise<KnowledgePack> {
   const budget = options.budget ?? query.budget ?? 1200;
-  const limit = options.limit ?? query.limit ?? 8;
+  // R236. The default is the manifest's line budget rather than a literal: the block the evaluation measured spends
+  // eight lines, and a product that spends another number is a product the published number does not describe.
+  const limit = options.limit ?? query.limit ?? SERVING_DEFAULTS.blockLines;
   const hits = await options.memory.search({
     ...query,
     limit: options.candidates ?? Math.max(limit * 3, 12),

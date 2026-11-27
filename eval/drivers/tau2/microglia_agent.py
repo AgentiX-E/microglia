@@ -221,7 +221,12 @@ def _open_episode(text: str = "") -> None:
     if board_mode():
         _board_doses.append(
             {"text": (text or "")[:MAX_QUERY_CHARS], "turns": 0, "renders": 0, "chars": 0, "written": 0,
-             "changes": 0, "stable": 0}
+             "changes": 0, "stable": 0,
+             # R236. Which board this episode was served, recorded at the boundary rather than inferred later from a
+             # parse of the transcript: B1's first failure mode is an arm that only *claims* to serve the clause board,
+             # and a column the reader can compare with `--note-source` is the difference between a finding about the
+             # mechanism and a finding about the wiring.
+             "scope": board_scope(), "display": board_display()}
         )
 # Characters of the message this agent actually injects, and of the pack the facade served. R135 measured
 # 559 tokens of system growth per call against a 725-character pack and could not say whether the other
@@ -310,7 +315,33 @@ _UNSET = object()
 
 def board_mode() -> bool:
     """Whether this arm serves the goal board instead of a note."""
-    return os.environ.get(BOARD_ENV, "").strip().lower() in ("1", "true", "yes", "front", "tail", "policy")
+    return os.environ.get(BOARD_ENV, "").strip().lower() in (
+        "1", "true", "yes", "front", "tail", "policy", "clause")
+
+
+def board_scope() -> str:
+    """Which turns the block may take its asks from: `request` as shipped, `clause` under R231's admission.
+
+    R236. The value rides the same environment variable as the placement, for the reason `board_admission` gives: a
+    second switch is a third treatment nobody registered, and the failure it produces — an arm whose block sits where
+    it says and lists what it does not — is invisible in an artefact that records only one of the two.
+
+    `clause` is one change and only one: the contract's turn read whole, every later turn read only through the clauses
+    that name their own family. The placement (`tail`), the admission (`all`) and the window (eight lines) are what the
+    control already ran, so the contrast against R218b's 456 episodes is the board's *reach* and nothing else.
+    """
+    raw = os.environ.get(BOARD_ENV, "").strip().lower()
+    return "clause" if raw == "clause" else "request"
+
+
+def board_display() -> str:
+    """The rung the block is rendered at, as `goal_board` names it: `statement` as shipped, `grouped` for the clause arm.
+
+    Read from the scope rather than from a fourth value, because R233's order and R234's fold were measured *on* the
+    clause board and a clause board shown in statement order is a treatment neither round measured. The pairing is
+    asserted in the self-check rather than left to this comment.
+    """
+    return "grouped" if board_scope() == "clause" else "statement"
 
 
 def _dose_here() -> "dict | None":
@@ -367,7 +398,7 @@ def board_placement() -> str:
     raw = os.environ.get(BOARD_ENV, "").strip().lower()
     if raw in ("1", "true", "yes", "front"):
         return "front"
-    return "tail" if raw in ("tail", "policy") else "off"
+    return "tail" if raw in ("tail", "policy", "clause") else "off"
 
 
 def _memory_url() -> str:
@@ -808,7 +839,7 @@ class MicrogliaAgent(LLMAgent):
         messages = list(state.messages)
         if isinstance(text, str) and text.strip() and role in ("", "user", "human"):
             messages = messages + [{"role": "user", "content": text}]
-        board = goal_board_of(messages)
+        board = goal_board_of(messages, board_scope())
         body = render_goal_board(board, state_only=board_admission() == "state")
         # R218e. The turn is counted before the early return, because a turn the block had nothing to say on is
         # still a model call the episode made: `turns` is the confound the dose reading has to hold, and a
@@ -1009,6 +1040,12 @@ def memory_stats() -> dict:
                     # this field would leave the one variable the round changed unstated, and a `state` value on an arm
                     # whose environment never carried it is the wiring defect this lane has counted six times.
                     "admission": board_admission(),
+                    # R236. The turns the block was allowed to read and the rung it was rendered at. Two fields rather
+                    # than a comment, because the arm a dispatch *asked* for is an argument and the arm that ran is a
+                    # value: an environment that lost `clause` produces a block nobody measured, and the difference
+                    # between that and a flat result is exactly this pair.
+                    "scope": board_scope(),
+                    "display": board_display(),
                     "renders": _board_renders,
                     "items": _board_items,
                     "settled": _board_settled,

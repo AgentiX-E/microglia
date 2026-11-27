@@ -31,10 +31,11 @@ WORKFLOW = ROOT / ".github" / "workflows" / "working-memory.yml"
 #: `board-front` writes into the system message; `board-policy` is the tail placement under R219's admission rule,
 #: which changes what the block says and not where it sits. Anything else is a note source that says nothing about
 #: placement, and a policy arm that was mapped to a placement of its own would be read as a third address.
-PLACEMENT_OF = {"board": "tail", "board-front": "front", "board-policy": "tail"}
+PLACEMENT_OF = {"board": "tail", "board-front": "front", "board-policy": "tail", "board-clause": "tail"}
 
 #: The fields a reader may compare. Kept as data so the report can name a mismatch rather than assert into the void.
-COMPARED = ("placement", "askSource", "settlementGrades", "blockCeilingChars", "openAskCeiling", "trials")
+COMPARED = ("placement", "askSource", "settlementGrades", "blockCeilingChars", "openAskCeiling", "trials",
+            "blockLines")
 
 
 def summary(checks: int, failures: list[str]) -> str:
@@ -192,7 +193,7 @@ def self_test() -> int:
 
     def manifest(carrier: str | None = "board", **defaults) -> Path:
         body = {"placement": "tail", "askSource": "request", "settlementGrades": ["name", "overlap"],
-                "blockCeilingChars": 500, "openAskCeiling": 3, "trials": 1}
+                "blockCeilingChars": 500, "openAskCeiling": 3, "trials": 1, "blockLines": 8}
         body.update(defaults)
         document: dict = {"schema": "microglia.serving-defaults/1", "defaults": body}
         if carrier is not None:
@@ -216,6 +217,7 @@ def self_test() -> int:
     # --- the note source vocabulary --------------------------------------------------------------------------
     expect("board is the tail placement", placement_of("board") == "tail")
     expect("board-front is the front placement", placement_of("board-front") == "front")
+    expect("board-clause is the tail placement under another reach", placement_of("board-clause") == "tail")
     expect("model names no placement", placement_of("model") == "")
     expect("so does anything else", placement_of("anything") == "")
 
@@ -240,7 +242,7 @@ def self_test() -> int:
 
     # --- the workflow ----------------------------------------------------------------------------------------
     expect("run_arm lines are read", arm_note_sources(WORKFLOW) == {
-        "front": "board-front", "board": "board", "policy": "board-policy"})
+        "front": "board-front", "board": "board", "policy": "board-policy", "clause": "board-clause"})
     refuses("a workflow with no run_arm is refused",
             lambda: arm_note_sources(workflow("echo nothing")), "no `run_arm")
     refuses("a missing workflow is refused",

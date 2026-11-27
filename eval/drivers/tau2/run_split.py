@@ -784,8 +784,13 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     # R216: `board` is the tail placement and `board-front` is R215's, kept reachable because a rerun of a reading
     # has to be able to reproduce the arm it came from. The two differ in one thing — where the block sits — and the
     # dispatch that compares them is the one that prices the address.
+    # R236: `board-clause` is the tail placement under R231's admission and R233/R234's rendering — one new thing
+    # against R218b's control, which is the board's **reach**. It is a separate name rather than a modifier on
+    # `board` because the arm a dispatch reads has to be the arm the artefact names.
     parser.add_argument(
-        "--note-source", choices=("model", "verdict", "board", "board-front", "board-policy"), default="model"
+        "--note-source",
+        choices=("model", "verdict", "board", "board-front", "board-policy", "board-clause"),
+        default="model",
     )
     # A full-quality run is six hours and four arms; at double price that is a doubled bill for a
     # number that does not improve. The guard is off by default because a smoke run is cheap enough
@@ -1324,7 +1329,7 @@ def main(argv: list[str]) -> int:
     # round boundary and no writer. The environment is set here rather than left to the dispatch for the same reason
     # the note path is: the agent reads it once, at its first turn, and an arm that says it served a board while the
     # variable was never set is the wiring defect this lane has counted five times.
-    if args.note_source in ("board", "board-front", "board-policy"):
+    if args.note_source in ("board", "board-front", "board-policy", "board-clause"):
         if args.notes:
             raise SystemExit("tau2-board-takes-no-notes")
         # The value *is* the placement: `tail` writes the block behind the conversation, `front` into the system
@@ -1336,6 +1341,9 @@ def main(argv: list[str]) -> int:
             "board": "tail",
             "board-front": "front",
             "board-policy": "policy",
+            # R236. The value carries both the placement and the reach, because one arm with two switches is an arm
+            # whose two switches can disagree — the defect the placement switch was made single-valued to avoid.
+            "board-clause": "clause",
         }[args.note_source]
         if "MICROGLIA_NOTES" in os.environ:
             del os.environ["MICROGLIA_NOTES"]

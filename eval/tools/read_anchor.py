@@ -405,52 +405,16 @@ def clause_asks(messages) -> dict:
     What it gives up is stated because the reading is decided by it: an object list continued across clauses ("return
     the lamp and the chair") loses everything after the first object, because only inheritance reaches the second. That
     is the cost the round exists to price, and `offered - kept` is that cost as a count rather than as a shortfall.
+
+    **R236 moved the implementation, not the rule.** The admission is `goal_board.clause_items`'s, because R236
+    serves this board to a model and B2 asks whether the model acted on what the block *carried*. An instrument that
+    re-derived the boundary its own way would be re-deriving a block the model never saw; one function, read by the
+    renderer and by the reading, is the only version of "the same board" a build can check. The diagnostics below are
+    the ones that function returns, unchanged — R231's numbers are re-derived from it on every push and match.
     """
-    module = _board()
-    turns: list = []
-    seen = 0
-    for message in messages:
-        role = module.role_of(message)
-        if role not in ("user", "human"):
-            continue
-        content = module._field(message, "content")  # noqa: SLF001 - the board's own accessor
-        text = content if isinstance(content, str) else ""
-        position = seen
-        seen += 1
-        if not text.strip():
-            # Nothing to read, and nothing the rule refused. The turn is still counted, because `admitted_asks` counts
-            # it: a turn that stated nothing is an event in the conversation even when neither rule reads it, and two
-            # rules whose turn counts disagree cannot be compared on the denominator they share.
-            continue
-        turns.append({"position": position, "whole": module.items_of(text),
-                      "own": module.items_of(text, inherit=False)})
-    contract = next((turn["position"] for turn in turns if turn["whole"]), None)
-    asks: list = []
-    whole_turns: list = []
-    partial: list = []
-    offered = kept = 0
-    for turn in turns:
-        take = turn["whole"] if turn["position"] == contract else turn["own"]
-        offered += len(turn["whole"])
-        kept += len(take)
-        if turn["position"] == contract:
-            whole_turns.append(turn["position"])
-        elif len(turn["own"]) < len(turn["whole"]):
-            partial.append(turn["position"])
-        asks.extend(take)
-    return {
-        "asks": module._folded(asks),
-        "turns": seen,
-        "contract": contract,
-        "wholeTurns": whole_turns,
-        "partialTurns": partial,
-        # The asks the parser offers across these turns, and the asks the boundary kept. Their difference is exactly
-        # what only inheritance reached — the objects of a list, and the value of an answer.
-        "offered": offered,
-        "kept": kept,
-        "refusedInherited": offered - kept,
-        "containsContract": contract is not None,
-    }
+    return _board().clause_items(messages)
+
+
 
 
 def board(entry: dict, scope: str = "strict") -> dict:
@@ -506,29 +470,25 @@ def board(entry: dict, scope: str = "strict") -> dict:
 
 
 def _fold(items: list) -> list:
-    """R234's rendering rule: one line per family, in the order the families were first stated.
+    """R234's rendering rule, delegated: one line per family, in the order the families were first stated.
 
-    A stable two-bucket partition of the item list and nothing else. The first bucket is the first item of each
-    family, the second is every other item, both in the order they arrived — so the rule's only input is a field every
-    ask board already carries, and its only effect on the board is which of two positions an item occupies. Nothing is
-    removed, nothing is settled, and `itemsAll` is untouched: the block the agent reads has the same lines in it, it
-    spends its first eight on distinct obligations instead of on nine restatements of one.
+    The rule is `goal_board.fold_family`'s and not this file's, and that is R236's point rather than a tidy-up. R236
+    serves the clause board to a model, and B2 compares what the model then writes against what a board *carried* —
+    which is only a comparison if the block the reading re-renders is the block the model read. Two implementations
+    of "one line per family" would be two boards, and the difference between them would be a finding about the
+    instrument published as a finding about the memory.
+
+    A stable two-bucket partition and nothing else. The first bucket is the first item of each family, the second is
+    every other item, both in the order they arrived — so the rule's only input is a field every ask board already
+    carries, and its only effect on the board is which of two positions an item occupies. Nothing is removed, nothing
+    is settled, and `itemsAll` is untouched: the block the agent reads has the same lines in it, it spends its first
+    eight on distinct obligations instead of on nine restatements of one.
 
     The rule is applied **after** the order and **before** the cut, which is the only place it can be applied without
     becoming a different rule. Before the order it would decide which items the partition sees; after the cut it would
     decide nothing at all, because the eight lines would already have been chosen.
     """
-    firsts: list = []
-    repetition: list = []
-    seen: set = set()
-    for item in items:
-        family = item.get("family")
-        if family in seen:
-            repetition.append(item)
-        else:
-            seen.add(family)
-            firsts.append(item)
-    return firsts + repetition
+    return _board().fold_family(items)
 
 
 def ask_board(entry: dict, messages, scope: str = "request", cap=None, later: bool = True,
@@ -639,7 +599,7 @@ def ask_board(entry: dict, messages, scope: str = "request", cap=None, later: bo
     # group comes first. Nothing about the board's *content* moves: the same asks, the same settlements, one different
     # arrangement — which is what makes the round's difference attributable to the order alone.
     if order == "open":
-        items = [item for item in items if not item["settled"]] + [item for item in items if item["settled"]]
+        items = module.order_open(items, is_settled=lambda item: bool(item["settled"]))
     # R234: the fold, between the order and the cut, and last for the reason it is documented in `_fold` — the rule
     # chooses among positions, so it must see the arrangement the product would ship and must not see the window.
     if fold:

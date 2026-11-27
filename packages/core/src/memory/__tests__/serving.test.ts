@@ -31,6 +31,7 @@ type Manifest = {
     readonly blockCeilingChars: number;
     readonly openAskCeiling: number;
     readonly trials: number;
+    readonly blockLines: number;
   };
   readonly provenance: Record<string, { readonly value: unknown; readonly measuredIn: string }>;
   readonly notYet: Record<string, string>;
@@ -54,6 +55,12 @@ describe('the serving defaults are the measured defaults', () => {
 
   it('ships the settlement grades the manifest names, widest last', () => {
     expect([...SERVING_DEFAULTS.settlementGrades]).toEqual(manifest.defaults.settlementGrades);
+  });
+
+  it('ships the line budget the manifest names, which the default pack limit reads', () => {
+    expect(SERVING_DEFAULTS.blockLines).toBe(manifest.defaults.blockLines);
+    expect(Number.isInteger(SERVING_DEFAULTS.blockLines)).toBe(true);
+    expect(SERVING_DEFAULTS.blockLines).toBeGreaterThan(0);
   });
 
   it('ships the block ceiling the manifest names', () => {

@@ -7805,3 +7805,40 @@ hitting — and re-running the benchmark will reproduce the bug at full price ra
 re-derived on every push by a check that refuses a total the rate card does not produce. The number is in a
 manifest, and a document that quotes it is quoting something a build can recompute — which is the only durable
 form a cost estimate takes.
+
+### 32.92 Read the clauses, not the turns — and fold before you cut
+
+If your product's corrections come from conversations rather than from forms, the requirement usually arrives
+**inside a turn that also answers a question your assistant asked**. "Which one did you mean?" — "the purple one,
+and can you also return the lamp?" That turn states one new requirement and one value. A parser that reads the
+turn as a unit cannot keep the requirement without also manufacturing an ask out of the value, and a parser that
+drops later turns entirely loses the requirement (in one measured corpus, 77% of user turns are answers, so the
+loss is most of the traffic).
+
+The rule that works is a reach, not a vocabulary: **read the turn that states the contract whole, and read every
+later turn one clause at a time, admitting only the clauses that name their own action.** You lose the second
+object of a continued list ("return the lamp *and the chair*") because only inheritance reaches it — that is the
+price, and it is worth paying, because the alternative admits a value as a requirement and sends the assistant to
+do what the user answered rather than what they asked.
+
+**Then spend your window on distinct obligations.** A rendered block has a line budget (in this project, eight
+lines — one number, in one manifest, read by every side). Two free rules decide which eight:
+
+1. **Unresolved first.** Partition the items — open ones, then settled ones — keeping the stated order inside each
+   group. A settled ask in front of an open one spends a line telling the agent about work it has already done.
+2. **One line per family.** After the partition, keep the first item of each family ahead of its repetitions. The
+   block holds the same lines; it simply stops spending its window on nine restatements of one obligation.
+
+The order matters: **partition, then fold, then cut.** Folding before the partition decides which items the
+partition sees; folding after the cut decides nothing, because the eight lines have already been chosen.
+
+**What this buys, measured.** In one 456-episode grid the window at statement order reached 622 of 654 required
+writes and hid 14; the partition recovered ten; the fold recovered the last four and hid none. The rules are
+content-free — their only inputs are an item's family and whether a receipt settled it — so they cost nothing to
+run and nothing to review.
+
+**And the trap.** All three of those numbers came from **replaying transcripts**, not from a model reading the
+block. Before you quote them as a result, serve the block and check three things in your own artefact: that the
+census reports the scope and the rung you dispatched, that the block's mean length is inside your ceiling, and that
+some turn found the block unchanged (a block rewritten every turn is not reordered, it is re-billed). A rule that is
+right on paper and unserved in the driver is the most expensive kind of correct.

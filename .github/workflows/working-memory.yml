@@ -28,7 +28,7 @@ on:
   workflow_dispatch:
     inputs:
       arms:
-        description: "three (control, front, tail — R216), placement (front, tail — R216b), pair (control, front — R218b), interleave (control-a, control-b — R218c), admission (tail, policy — R219), both (control, tail), board, control, policy"
+        description: "three (control, front, tail — R216), placement (front, tail — R216b), pair (control, front — R218b), interleave (control-a, control-b — R218c), admission (tail, policy — R219), both (control, tail), board, clause (R236 — the board's reach), control, policy"
         required: false
         default: 'placement'
       tasks:
@@ -489,6 +489,15 @@ jobs:
               run_arm policy --note-source board-policy
               ;;
             board) run_arm board --note-source board ;;
+            clause)
+              # R236. **The board's reach, and only its reach.** `clause` is the tail placement, the admission R218b
+              # ran and the same eight-line window; what changes is which turns may contribute an ask — the contract's
+              # turn whole, every later turn only through the clauses that name their own family (R231), rendered
+              # open-first (R233) and folded to one line per family (R234). The control is not bought: R218b's 456
+              # `front` episodes carry the same measurement of "did the call name a family the block held", so the
+              # contrast is sixty episodes against four hundred and fifty-six already paid for.
+              run_arm clause --note-source board-clause
+              ;;
             policy) run_arm policy --note-source board-policy ;;
             dose)
               # R218e. **One arm, two rounds, and the rounds are the treatment.** The question is inside one task:
@@ -547,10 +556,11 @@ jobs:
 
           board = (summary.get("board") or {}).get("diagnostics", {}).get("memory", {}).get("board") or {}
           front = (summary.get("front") or {}).get("diagnostics", {}).get("memory", {}).get("board") or {}
+          clause = (summary.get("clause") or {}).get("diagnostics", {}).get("memory", {}).get("board") or {}
           # R218b dispatches `pair`, which has no tail arm: the assertions below belong to the arm that was run, so
           # they are gated on its presence rather than on the dispatch's name. A grid that contains both arms runs
           # both blocks exactly as before.
-          assert board or front, "no arm wrote counters: the mechanism did not run"
+          assert board or front or clause, "no arm wrote counters: the mechanism did not run"
           if board:
             renders = board.get("renders") or 0
             assert renders > 0, "the board was served on no turn"
@@ -590,6 +600,33 @@ jobs:
                 f"the rule made the block longer: {policy.get('charsMean')} against {board.get('charsMean')}")
             print(f"policy: {policy.get('renders')} render(s), {policy.get('charsMean')} chars a turn against "
                   f"board's {board.get('charsMean')}, admission {policy.get('admission')!r}")
+
+          if clause:
+            # R236. Asserted on the values the arm *ran* with, not on the argument it was dispatched with. The three
+            # fields together are the claim "this block read more turns and rendered them folded": a run that lost the
+            # environment reports `request`/`statement` here, and the round would then be a null about a treatment
+            # that never ran — the wiring defect this lane has counted seven times.
+            assert clause.get("scope") == "clause", clause.get("scope")
+            assert clause.get("display") == "grouped", clause.get("display")
+            assert clause.get("placement") == "tail", clause.get("placement")
+            assert clause.get("admission") == "all", clause.get("admission")
+            clause_renders = clause.get("renders") or 0
+            assert clause_renders > 0, "the clause board served no turn"
+            clause_chars = clause.get("charsMean") or 0
+            clause_open = (clause.get("open") or 0) / clause_renders
+            # The one bar that transfers unchanged: R236 holds the window at `blockCeilingChars` 500 and the block is
+            # eight lines, so a mean above it is the arm having become a transcript rather than a contract.
+            assert clause_chars <= 500, f"the clause block is {clause_chars:.0f} characters a turn"
+            assert (clause.get("tailAppends") or 0) > 0, "the block was never written into the prompt"
+            assert (clause.get("tailAppends") or 0) <= (clause.get("changes") or 0), (
+                clause.get("tailAppends"), clause.get("changes"))
+            assert (clause.get("tailHeld") or 0) > 0, "no turn found the block already in place"
+            # Reported rather than bounded: the clause board holds more open asks a turn than the request board by
+            # construction (R232 read 8.10 items at a clause-board call against 2.41), and R236's registration puts no
+            # number on it. A ceiling invented here would be a bar the round never registered.
+            print(f"clause: {clause_renders} render(s), {clause.get('changes')} change(s), "
+                  f"{clause_chars:.0f} chars a turn, {clause_open:.1f} open ask(s) a turn, "
+                  f"scope {clause.get('scope')!r}, rung {clause.get('display')!r}")
 
           if front:
               # The parser arm's own counters, which must show the other placement: a run where both arms report
@@ -638,7 +675,7 @@ jobs:
       - name: The attribution, which is the mechanism and not the accuracy
         # R218c's grid is two arms of the same code: it has no board, no parser arm and no contrast to take, and
         # the placebo's own step reads it. Gated on the dispatch rather than on a filename that would not exist.
-        if: env.BOARD_ARMS != 'interleave'
+        if: env.BOARD_ARMS != 'interleave' && env.BOARD_ARMS != 'clause'
         # R216. A board that lists asks and ticks none is a static list, and R215 shipped exactly that: **32.7%** of
         # its writing episodes ended with a tick against a 60% bar. The parser's replay over R215's own document says
         # the three repairs in this round take it to **69.2%** — measured before the dispatch, for free, which is what
@@ -674,7 +711,7 @@ jobs:
         # R218c's grid is two arms of the same code: it has no board, no parser arm and no contrast to take, and
         # the placebo's own step reads it. Gated on the dispatch rather than on a filename that would not exist.
         # R218e's `dose` dispatch has one arm and no contrast either: its reading is the recording, below.
-        if: env.BOARD_ARMS != 'interleave' && env.BOARD_ARMS != 'dose'
+        if: env.BOARD_ARMS != 'interleave' && env.BOARD_ARMS != 'dose' && env.BOARD_ARMS != 'clause'
         # Three contrasts, one change each. `tail − control` is the round's registered endpoint; `front − control` is
         # what the three parser repairs are worth under R215's placement; `tail − front` is what the placement buys.
         # A two-arm grid could only have reported the sum, and the sum is the number that cannot be acted on.
