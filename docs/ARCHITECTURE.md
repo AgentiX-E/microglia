@@ -6118,3 +6118,8 @@ every role from those bytes with no shared code with TypeScript; `--check` re-ad
 own arithmetic. `state-role-manifest.test.ts` derives the same reading with the product's own
 `stateRoleOf`, `serialOf`, `subjectKey` and `resolveStates` and compares every field. A disagreement
 fails exactly one reader and stops the build.
+
+**Bundle budget.** The read-time resolver is a mechanism in the bundle (the product reads it when `stateRole` is
+passed), so `scripts/bundle-size.mjs` raised `core` 54,000 → 56,000 raw and 18,500 → 19,000 gzip, measured at
+55,071 / 18,865 with the raise written down beside the number. `--probe` still fails a halved budget, so the gate
+remains live.

@@ -129,10 +129,18 @@ import { build } from 'esbuild';
  * `serveOptions()` so a knob an arm won cannot be lost in a deployment, and the audit beside it refuses a value
  * the record and the product disagree about. Measured 53,788 raw and 18,389 gzip at this commit, so the raise is
  * 212 raw and 111 gzip of headroom. A mechanism rather than a correction, by this file's own rule.
+ *
+ * Raised on 2026-11-27, 54,000 -> 56,000 raw and 18,500 -> 19,000 gzip, for one mechanism: the read-time
+ * state resolver. `apply/state-role.ts` computes the three roles from the four clocks and the contradiction count
+ * already on every item, and resolves claim revisions by a deterministic serial-max — the assembly step A-TMA and
+ * Freshness locate the harm, reproduced here at ¥0 with no model called. It is in the bundle because the product
+ * reads it: `renderPack` prints `state` when a caller passes `stateRole`, and the switch composes with the existing
+ * knobs without changing their bytes. Measured 55,071 raw and 18,865 gzip at this commit, so the raise is 929 raw
+ * and 135 gzip of headroom. A mechanism rather than a correction, by this file's own rule.
  */
 const BUDGETS = [
   { name: 'browser', entry: 'packages/browser/dist/index.js', raw: 3200, gzip: 1600 },
-  { name: 'core', entry: 'packages/core/dist/index.js', raw: 54000, gzip: 18500 },
+  { name: 'core', entry: 'packages/core/dist/index.js', raw: 56000, gzip: 19000 },
 ];
 
 const probe = process.argv.includes('--probe');
