@@ -37,7 +37,6 @@ import io
 import re
 import sys
 import tempfile
-import tomllib
 
 HERE = pathlib.Path(__file__).resolve().parents[1]
 
@@ -103,6 +102,100 @@ period_end = "2025-01-31"
 #: The types a token can name. A record key carries its type, so a customer-level key can never equal a line-level
 #: one and an intersection cannot be won by two records that merely share a name.
 LINE, CUSTOMER, BILL = "line", "customer", "bill"
+
+
+def toml_of(text: str) -> dict:
+    """The subset of TOML this domain's database is written in, read without `tomllib`.
+
+    `tomllib` arrived in Python 3.11 and the lane's driver step runs on **3.10** on purpose — a suite that passes on
+    the runner's interpreter and fails on the lane's is the drift that step exists to catch, and a script that cannot
+    import is the largest possible version of it. The subset a τ² database uses is four productions: `[table]`,
+    `[[array-of-tables]]`, `key = value` with a scalar or a list of strings, and dotted headers that reach into the
+    last element of an array of tables (`[customers.address]`, `[[customers.payment_methods]]`).
+
+    Where `tomllib` *is* available the self-test compares the two on the real database, so this is not a second
+    dialect that happened to work: it is a reader held against the reference implementation by a test.
+    """
+    root: dict = {}
+    current: dict = root
+    for number, raw in enumerate(text.splitlines(), start=1):
+        line = _strip_comment(raw).strip()
+        if not line:
+            continue
+        if line.startswith("[[") and line.endswith("]]"):
+            current = _table(root, line[2:-2].strip().split("."), array=True)
+            continue
+        if line.startswith("[") and line.endswith("]"):
+            current = _table(root, line[1:-1].strip().split("."), array=False)
+            continue
+        if "=" not in line:
+            raise ValueError(f"line {number}: expected key = value, got {line!r}")
+        key, value = line.split("=", 1)
+        current[key.strip()] = _value(value.strip(), number)
+    return root
+
+
+def _strip_comment(line: str) -> str:
+    """Cut a `#` comment that is not inside a string — a URL in a quoted value would otherwise lose its tail."""
+    quoted = False
+    for index, character in enumerate(line):
+        if character == '"':
+            quoted = not quoted
+        elif character == "#" and not quoted:
+            return line[:index]
+    return line
+
+
+def _table(root: dict, path: list, array: bool) -> dict:
+    node: object = root
+    for part in path[:-1]:
+        if isinstance(node, list):
+            node = node[-1]
+        node = node.setdefault(part, {})  # type: ignore[union-attr]
+    if isinstance(node, list):
+        node = node[-1]
+    last = path[-1]
+    if array:
+        node.setdefault(last, []).append({})  # type: ignore[union-attr]
+        return node[last][-1]  # type: ignore[index]
+    return node.setdefault(last, {})  # type: ignore[union-attr]
+
+
+def _value(text: str, number: int):
+    if text.startswith("[") and text.endswith("]"):
+        inner = text[1:-1].strip()
+        if not inner:
+            return []
+        return [_value(piece.strip(), number) for piece in _split_list(inner)]
+    if text.startswith('"') and text.endswith('"') and len(text) >= 2:
+        return json.loads(text)
+    if text in ("true", "false"):
+        return text == "true"
+    try:
+        return int(text)
+    except ValueError:
+        pass
+    try:
+        return float(text)
+    except ValueError:
+        raise ValueError(f"line {number}: cannot read {text!r} as a value") from None
+
+
+def _split_list(inner: str) -> list:
+    """Split a TOML list on the commas that are not inside a string."""
+    pieces, depth, quoted, start = [], 0, False, 0
+    for index, character in enumerate(inner):
+        if character == '"':
+            quoted = not quoted
+        elif not quoted and character in "[{":
+            depth += 1
+        elif not quoted and character in "]}":
+            depth -= 1
+        elif character == "," and not quoted and depth == 0:
+            pieces.append(inner[start:index])
+            start = index + 1
+    pieces.append(inner[start:])
+    return [piece for piece in pieces if piece.strip()]
 
 
 def digest(path: pathlib.Path) -> dict:
@@ -324,42 +417,7 @@ def self_test() -> int:
             failures += 1
             print(f"FAIL {name}{(' — ' + detail) if detail else ''}")
 
-    db = tomllib.loads(
-        """
-[[plans]]
-plan_id = "P1"
-name = "Basic"
-[[devices]]
-device_id = "D1"
-[[lines]]
-line_id = "L1"
-phone_number = "555-000-0001"
-plan_id = "P1"
-device_id = "D1"
-[[lines]]
-line_id = "L2"
-phone_number = "555-000-0002"
-plan_id = "P1"
-device_id = "D1"
-[[customers]]
-customer_id = "C1"
-full_name = "Ada Lovelace"
-phone_number = "555-000-0001"
-line_ids = ["L1"]
-bill_ids = ["B1"]
-[[customers]]
-customer_id = "C2"
-full_name = "Grace Hopper"
-phone_number = "555-000-0009"
-line_ids = ["L2"]
-bill_ids = []
-[[bills]]
-bill_id = "B1"
-customer_id = "C1"
-period_start = "2025-01-01"
-period_end = "2025-01-31"
-"""
-    )
+    db = toml_of(_DB)
     records = project(db)
     expect("a line is projected with its id and phone", records["lines"]["L1"]["phone"] == "555-000-0001")
     expect("a customer keeps the lines it owns", records["customers"]["C1"]["lines"] == ["L1"])
@@ -434,6 +492,39 @@ period_end = "2025-01-31"
     expect("a user-performed action is not the agent's write",
            graded_writes({"evaluation_criteria": {"actions": [
                {"name": "toggle_roaming", "requestor": "user", "arguments": {}}]}}) == [])
+
+    # The reader: the subset's four productions, the two refusals, and — when the interpreter has one — the
+    # reference implementation on the same bytes. On 3.10 `tomllib` does not exist, and the branch is skipped rather
+    # than faked: the reader is then held by the fixtures above, which is why they assert values and not only counts.
+    parsed = toml_of('[a]\nx = "1.0"\ny = [ "p", "q" ]\n[[list]]\nz = true\n[[list]]\nz = false\n')
+    expect("a dotted header, a string that looks like a number, and a list of strings",
+           parsed["a"]["x"] == "1.0" and parsed["a"]["y"] == ["p", "q"] and [e["z"] for e in parsed["list"]] == [True, False])
+    expect("a hash inside a quoted value is not a comment",
+           toml_of('[a]\nurl = "http://x/#frag"\n')["a"]["url"] == "http://x/#frag")
+    expect("a trailing comment is cut",
+           toml_of('[a]\nx = 1  # the price\n')["a"]["x"] == 1)
+    nested = toml_of('[[list]]\nname = "first"\n[[list.sub]]\nflag = true\n[list.address]\ncity = "x"\n')
+    expect("a dotted header reaches into the last element of an array of tables",
+           nested["list"][0]["sub"] == [{"flag": True}] and nested["list"][0]["address"] == {"city": "x"})
+    deep = toml_of('[[a]]\nname = "row"\n[[a.b.c]]\nv = 1\n[[a.b.c]]\nv = 2\n')
+    expect("a header three parts deep appends under the last element of the array above it",
+           [entry["v"] for entry in deep["a"][0]["b"]["c"]] == [1, 2])
+    expect("an inline list is split on its own commas", toml_of('a = [ [1,2], [3] ]\n')["a"] == [[1, 2], [3]])
+    for name, text in (("a line with no equals is refused", "[a]\nbroken\n"),
+                       ("a value of an unreadable shape is refused", "[a]\nx = nope\n")):
+        refused = None
+        try:
+            toml_of(text)
+        except ValueError as error:
+            refused = str(error)
+        expect(name, refused is not None and "line" in refused)
+    try:
+        import tomllib as reference
+    except ImportError:
+        reference = None
+    if reference is not None:
+        expect("the inline reader agrees with tomllib on this file's own fixture",
+               toml_of(_DB) == reference.loads(_DB))
 
     # The reporter, because a check that cannot fail is not a check: this one is meant to fail, and the counter is
     # wound back so that it does not. R238 shipped a tamper that had stopped tampering, and the lesson was that the
@@ -534,7 +625,7 @@ def main(argv: list) -> int:
             "table that ignores the ambiguity would read every write — including the ones it should refuse."
         ),
         "sources": [{"role": "database", **digest(db_path)}, {"role": "tasks", **digest(task_path)}],
-        "reading": reading(tomllib.loads(db_path.read_text(encoding="utf-8")),
+        "reading": reading(toml_of(db_path.read_text(encoding="utf-8")),
                            json.loads(task_path.read_text(encoding="utf-8"))),
     }
     text = json.dumps(document, indent=1, sort_keys=True)
