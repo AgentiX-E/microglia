@@ -521,6 +521,81 @@ def ask_reading(tasks: list, retail: dict, airline: dict) -> dict:
     }
 
 
+# --- R243: gate 1's affected subset — the ¥0 gate before the ¥1.68 gate -------------------------------------------
+#
+# R240b registered a paid ladder whose first rung (gate 1, 40:1:1, ¥1.68) buys "the sign of the effect on the subset
+# a precision dispatch can move", and wrote that the subset "has not been enumerated, because enumerating it is R241's
+# reachability work — and if telecom's reach stays at 0 of 8, the candidate set holds no correct answer and no dispatch
+# is worth pricing at any rung". R241 cleared that reachability gate by shipping the handle grade, taking telecom from
+# 0 of 8 to 8 of 8. This section enumerates the subset gate 1 would move, at ¥0, from the same sources, and finds it
+# empty — which cancels the whole paid ladder before a single episode is bought.
+#
+# The definition is the one R240b's prose gives: a precision dispatch moves a question only when its answer is IN the
+# candidate set (a wider rule reaches the record) but ranked BELOW the window (the shipped grades do not settle it and
+# its ask is cut by the cap). Three independently measured quantities, never asserted:
+#   * in_candidate_set  — the `blind` rule reaches the write's record (R241's rows, re-derived from the db).
+#   * served_by_shipped — a shipped settlement grade reaches it: `shipped` (name/overlap/record) OR `handle`.
+#   * hidden_by_cap     — the request states an ask for that write's family, and the board holds more asks than
+#                         `goal_board.MAX_ITEMS`, so the ask falls past the window a dispatch could widen.
+# affected = in_candidate_set AND NOT served_by_shipped AND hidden_by_cap. A write the shipped grades already serve
+# cannot be moved; a write with no ask has nothing to rank; a write with no candidate answer cannot be recovered by a
+# dispatch that only re-ranks. All three arms are measured, so the empty subset is a result rather than a refusal.
+
+def precision_reading(db: dict, tasks: list) -> dict:
+    """Enumerate gate 1's affected subset from the domain's own bytes, at ¥0 and with no model call."""
+    rec = reading(db, tasks)          # the R241 four-rule table, re-derived — never read from a saved manifest
+    rows = rec["rows"]
+    writes = rec["writes"]
+    cap = goal_board.MAX_ITEMS
+
+    # How many asks does each request actually state, and how many of those name a family the graded writes need?
+    # telecom requests name symptoms, so `items_of` is zero throughout (R242's finding, measured again here).
+    asks_per_task: list = []
+    hidden_by_cap = 0
+    asks_total = 0
+    affected = 0
+    for task in tasks:
+        text = request_of(task)
+        items = goal_board.items_of(text)
+        asks_per_task.append(len(items))
+        asks_total += len(items)
+        n_over = max(0, len(items) - cap)
+        if n_over:
+            # A generous upper bound: every graded write of this task is treated as hidden if the task's board overflows.
+            # telecom has zero asks, so the bound is exact here, and the arithmetic never credits a hidden write that
+            # does not exist.
+            hidden_by_cap += len(graded_writes(task))
+
+    for row in rows:
+        in_set = bool(row.get("blind"))
+        served = bool(row.get("shipped")) or bool(row.get("handle"))
+        # Whether this specific write's ask overflowed is bounded by the task's over-cap count; recorded per row below.
+        if in_set and not served:
+            # Reached by a wider rule but not served by any shipped grade. This is the ONLY shape a dispatch could
+            # move, and it still needs the ask to have been hidden by the cap — which the per-task bound supplies.
+            task_over = 0
+            for task in tasks:
+                if (task.get("id") or "") == row.get("task"):
+                    task_over = max(0, len(goal_board.items_of(request_of(task))) - cap)
+                    break
+            if task_over:
+                affected += 1
+
+    served_now = sum(1 for row in rows if row.get("shipped") or row.get("handle"))
+    in_candidate = sum(1 for row in rows if row.get("blind"))
+    return {
+        "writes": writes,
+        "inCandidateSet": in_candidate,
+        "servedByShipped": served_now,
+        "asksInRequests": asks_total,
+        "asksPerTaskMax": max(asks_per_task) if asks_per_task else 0,
+        "cap": cap,
+        "hiddenByCap": hidden_by_cap,
+        "affected": affected,
+        "verdict": "CANCEL_GATE_1" if affected == 0 else "DISPATCH",
+    }
+
+
 def reading(db: dict, tasks: list) -> dict:
     """The four numbers, over every graded write in the task set, plus what each rule costs in over-credit.
 
@@ -1078,6 +1153,107 @@ def self_test() -> int:
             main(["--verify-asks", str(bad), "--sources", str(HERE / "eval" / "fixtures" / "telecom")])
         expect("the verify-asks failure branch prints the refusal", "FAIL" in printed.getvalue())
 
+    # --- R243: gate 1's affected subset (TDD — these assertions are written before the function exists) --------
+    # A precision dispatch can move only a write whose answer is in the candidate set but ranked below the window:
+    # `in_candidate_set` (blind reaches) AND NOT `served_by_shipped` (no shipped grade, incl. handle, reaches) AND
+    # `hidden_by_cap` (the ask exists but falls past MAX_ITEMS). The third domain has none of the three in the
+    # dangerous combination: handle ships, so every reachable write is already served; and the requests name no ask,
+    # so no write has an ask to hide behind the cap. If the subset is empty, gate 1 has nothing to dispatch and the
+    # whole paid ladder (¥1.68 / ¥8.41 / ¥93.51) cancels at ¥0.
+    db_path = HERE / "eval" / "fixtures" / "telecom" / "telecom-db.toml"
+    tdf = json.loads((HERE / "eval" / "fixtures" / "telecom" / "telecom-tasks-small.json").read_text(encoding="utf-8"))
+    prec = precision_reading(toml_of(db_path.read_text(encoding="utf-8")), tdf)
+    expect("every graded write is in the candidate set by handle",
+           prec["inCandidateSet"] == prec["writes"] and prec["writes"] == 8)
+    expect("the shipped grades already serve every reachable write",
+           prec["servedByShipped"] == prec["inCandidateSet"] == 8)
+    expect("no write has an ask hidden behind the cap",
+           prec["hiddenByCap"] == 0 and prec["asksInRequests"] == 0)
+    expect("so gate 1's affected subset is empty",
+           prec["affected"] == 0 and prec["verdict"] == "CANCEL_GATE_1")
+    expect("the affected subset is a subset of hidden writes (never larger)",
+           prec["affected"] <= prec["hiddenByCap"])
+
+    with tempfile.TemporaryDirectory() as room:
+        root = pathlib.Path(room)
+        prec_out = root / "gate1.json"
+        with contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(io.StringIO()):
+            code = main(["--precision", "--out", str(prec_out),
+                         "--sources", str(HERE / "eval" / "fixtures" / "telecom")])
+        saved = json.loads(prec_out.read_text(encoding="utf-8"))
+        expect("the precision writer exits zero", code == 0)
+        expect("and the manifest is schema-tagged", saved["schema"] == "microglia/gate1-subset@1")
+        expect("its arithmetic checks", check_precision(saved) == [])
+        expect("and its verify re-derives from the sources",
+               verify_precision(saved, HERE / "eval" / "fixtures" / "telecom") == [])
+        with contextlib.redirect_stdout(io.StringIO()) as printed:
+            main(["--check-precision", str(prec_out)])
+        expect("the check-precision branch reports the cancel",
+               "CANCEL_GATE_1" in printed.getvalue() and "affected" in printed.getvalue())
+        with contextlib.redirect_stdout(io.StringIO()) as printed:
+            main(["--verify-precision", str(prec_out), "--sources", str(HERE / "eval" / "fixtures" / "telecom")])
+        expect("the verify-precision branch reports the re-derivation", "re-derived" in printed.getvalue())
+        with contextlib.redirect_stdout(io.StringIO()) as printed:
+            main(["--precision", "--json", "--sources", str(HERE / "eval" / "fixtures" / "telecom")])
+        expect("the precision json branch prints the manifest",
+               json.loads(printed.getvalue())["schema"] == "microglia/gate1-subset@1")
+        with contextlib.redirect_stdout(io.StringIO()) as printed:
+            main(["--precision", "--sources", str(HERE / "eval" / "fixtures" / "telecom")])
+        expect("the precision human branch names the verdict", "CANCEL_GATE_1" in printed.getvalue())
+        # Tamper: claim a non-empty affected subset without a hidden write to support it.
+        tampered = json.loads(json.dumps(saved))
+        tampered["reading"]["affected"] = 3
+        expect("an affected count above hidden writes is refused",
+               any("affected" in problem for problem in check_precision(tampered)))
+        tampered2 = json.loads(json.dumps(saved))
+        tampered2["reading"]["verdict"] = "DISPATCH"
+        expect("a verdict that contradicts an empty subset is refused",
+               any("verdict" in problem for problem in check_precision(tampered2)))
+        tampered3 = json.loads(json.dumps(saved))
+        tampered3["sources"][0]["sha256"] = "0" * 64
+        expect("a changed source digest is refused by precision verify",
+               any("not the file" in problem for problem in verify_precision(tampered3, HERE / "eval" / "fixtures" / "telecom")))
+        # The remaining check_precision guards, each a distinct way the arithmetic can be made to lie.
+        oset = json.loads(json.dumps(saved))
+        oset["reading"]["inCandidateSet"] = 99
+        expect("an in-candidate count above writes is refused",
+               any("exceeds writes" in problem for problem in check_precision(oset)))
+        srv = json.loads(json.dumps(saved))
+        srv["reading"]["servedByShipped"] = 99
+        expect("a served count above the candidate set is refused",
+               any("exceeds inCandidateSet" in problem for problem in check_precision(srv)))
+        neg = json.loads(json.dumps(saved))
+        neg["reading"]["writes"] = 0
+        expect("a reading with no writes is refused",
+               any("no writes" in problem for problem in check_precision(neg)))
+        askneg = json.loads(json.dumps(saved))
+        askneg["reading"]["asksInRequests"] = 4
+        expect("asks with no per-task maximum is refused",
+               any("asksInRequests" in problem for problem in check_precision(askneg)))
+        capbad = json.loads(json.dumps(saved))
+        capbad["reading"]["cap"] = 99
+        expect("a cap that is not the shipped constant is refused",
+               any("cap:" in problem for problem in check_precision(capbad)))
+        # verify_precision's defensive branches: a missing source and an absent source path.
+        pmiss = json.loads(json.dumps(saved))
+        pmiss["sources"] = [s for s in pmiss["sources"] if s["role"] != "tasks"]
+        expect("a precision manifest missing a source is refused",
+               any("no tasks" in problem for problem in verify_precision(pmiss, HERE / "eval" / "fixtures" / "telecom")))
+        pabsent = json.loads(json.dumps(saved))
+        for source in pabsent["sources"]:
+            if source["role"] == "tasks":
+                source["path"] = "not-here.json"
+        expect("an absent precision source path is refused",
+               any("not in this checkout" in problem for problem in verify_precision(pabsent, HERE / "eval" / "fixtures" / "telecom")))
+        bad = root / "bad-prec.json"
+        bad.write_text(json.dumps(tampered2), encoding="utf-8")
+        with contextlib.redirect_stdout(io.StringIO()) as printed:
+            main(["--check-precision", str(bad)])
+        expect("the check-precision failure branch prints the refusal", "FAIL" in printed.getvalue())
+        with contextlib.redirect_stdout(io.StringIO()) as printed:
+            main(["--verify-precision", str(bad), "--sources", str(HERE / "eval" / "fixtures" / "telecom")])
+        expect("the verify-precision failure branch prints the refusal", "FAIL" in printed.getvalue())
+
     if failures == 0:
         # The count is printed from the counter rather than typed, because a typed count is a claim about the file
         # that stops being true the first time a check is added.
@@ -1096,6 +1272,9 @@ def main(argv: list) -> int:
     parser.add_argument("--asks", action="store_true", help="write the R242 ask-vocabulary reading (six cues + guard)")
     parser.add_argument("--check-asks", default="", help="check the R242 ask manifest's arithmetic")
     parser.add_argument("--verify-asks", default="", help="re-derive the R242 ask manifest from its sources")
+    parser.add_argument("--precision", action="store_true", help="write the R243 gate-1 affected-subset reading")
+    parser.add_argument("--check-precision", default="", help="check the R243 gate-1 manifest's arithmetic")
+    parser.add_argument("--verify-precision", default="", help="re-derive the R243 gate-1 manifest from its sources")
     #: Where the sources named by a manifest are looked for. A parameter rather than a constant because the self-test
     #: writes its own corpus to a temporary directory, and a reader that could only ever look in one place would have
     #: to be trusted about the place it looks.
@@ -1104,6 +1283,63 @@ def main(argv: list) -> int:
     args = parser.parse_args(argv)
     if args.self_test:
         return 1 if self_test() else 0
+    if args.check_precision:
+        saved = json.loads(pathlib.Path(args.check_precision).read_text(encoding="utf-8"))
+        problems = check_precision(saved)
+        for problem in problems:
+            print(f"FAIL {problem}")
+        if not problems:
+            r = saved["reading"]
+            print(f"ok  {pathlib.Path(args.check_precision).name}: affected={r['affected']} of "
+                  f"{r['writes']} writes, {r['verdict']}")
+        return 1 if problems else 0
+    if args.verify_precision:
+        saved = json.loads(pathlib.Path(args.verify_precision).read_text(encoding="utf-8"))
+        problems = check_precision(saved) + verify_precision(saved, pathlib.Path(args.sources))
+        for problem in problems:
+            print(f"FAIL {problem}")
+        if not problems:
+            r = saved["reading"]
+            print(f"ok  {pathlib.Path(args.verify_precision).name}: re-derived from its own bytes — "
+                  f"{r['affected']} affected, {r['verdict']}")
+        return 1 if problems else 0
+    if args.precision:
+        root = pathlib.Path(args.sources)
+        db_path = pathlib.Path(args.db) if args.db else root / "telecom-db.toml"
+        task_path = pathlib.Path(args.tasks) if args.tasks else root / "telecom-tasks-small.json"
+        db_text = db_path.read_text(encoding="utf-8")
+        document = {
+            "schema": "microglia/gate1-subset@1",
+            "note": (
+                "R243. Gate 1 of R240b's paid ladder buys the sign of the effect on the subset a precision dispatch "
+                "can move, priced at ¥1.68, and was registered before that subset had been enumerated. Enumerated here "
+                "at ¥0 from the domain's own bytes: a write is affected only if its answer is in the candidate set "
+                "(blind reaches), no shipped settlement grade — including R241's handle — serves it, AND its ask is "
+                "cut by the cap. On the 20-task telecom sample all eight writes are reachable and all eight are served "
+                "by the shipped grades, and the requests name zero asks (symptoms, not actions), so none is hidden by "
+                "the cap: affected = 0. A dispatch that only re-ranks has nothing to move, so gate 1 and the two paid "
+                "gates above it (¥8.41, ¥93.51) cancel at ¥0. The reading is re-derived from the two named sources by "
+                "--verify; the verdict is forced by the affected count and cannot be edited past --check."
+            ),
+            "sources": [{"role": "database", **digest(db_path)}, {"role": "tasks", **digest(task_path)}],
+            "reading": precision_reading(toml_of(db_text), json.loads(task_path.read_text(encoding="utf-8"))),
+        }
+        text = json.dumps(document, indent=1, sort_keys=True)
+        if args.out:
+            pathlib.Path(args.out).write_text(text + "\n", encoding="utf-8")
+            print(f"wrote {args.out}", file=sys.stderr)
+        if args.json:
+            print(text)
+        else:
+            r = document["reading"]
+            print(f"writes     {r['writes']}")
+            print(f"in set     {r['inCandidateSet']}   (blind rule reaches the record)")
+            print(f"served     {r['servedByShipped']}   (a shipped grade, incl. handle, settles it)")
+            print(f"asks       {r['asksInRequests']}   (requests name symptoms, not asks)")
+            print(f"hidden     {r['hiddenByCap']}   (asks cut by cap={r['cap']})")
+            print(f"affected   {r['affected']}")
+            print(f"verdict    {r['verdict']}")
+        return 0
     if args.check_asks:
         saved = json.loads(pathlib.Path(args.check_asks).read_text(encoding="utf-8"))
         problems = check_asks(saved)
@@ -1308,6 +1544,68 @@ def verify_asks(saved: dict, root: pathlib.Path = FIXTURES) -> list:
                    for cue in stored.get("cues") or []]
     if fresh_cues != stored_cues:
         problems.append("cues: the six rows do not come back from these bytes")
+    return problems
+
+
+def check_precision(saved: dict) -> list:
+    """R243's manifest arithmetic, re-added without opening any source.
+
+    A manifest that could only assert "the subset is empty" would say that about any corpus, so the arithmetic is
+    checked against the three measured columns: an affected write must be a hidden one, a served write must have first
+    been in the candidate set, and the verdict is forced by the affected count. A row edited to show a verdict the
+    columns cannot support fails here.
+    """
+    problems: list = []
+    r = saved.get("reading") or {}
+    writes = r.get("writes") or 0
+    in_set = r.get("inCandidateSet") or 0
+    served = r.get("servedByShipped") or 0
+    hidden = r.get("hiddenByCap") or 0
+    affected = r.get("affected") or 0
+    if in_set > writes:
+        problems.append("inCandidateSet exceeds writes")
+    if served > in_set:
+        problems.append("servedByShipped exceeds inCandidateSet: a grade cannot serve a write with no candidate answer")
+    if affected > hidden:
+        problems.append("affected exceeds hiddenByCap: a dispatch cannot move a write that was never below the window")
+    if affected < 0 or hidden < 0 or writes <= 0:
+        problems.append("a count is negative or the reading has no writes")
+    expected_verdict = "CANCEL_GATE_1" if affected == 0 else "DISPATCH"
+    if r.get("verdict") != expected_verdict:
+        problems.append(f"verdict: {r.get('verdict')} against {expected_verdict} forced by affected={affected}")
+    if (r.get("asksInRequests") or 0) > 0 and (r.get("asksPerTaskMax") or 0) <= 0:
+        problems.append("asksInRequests is positive but no task holds an ask")
+    if r.get("cap") != goal_board.MAX_ITEMS:
+        problems.append(f"cap: {r.get('cap')} against the shipped MAX_ITEMS {goal_board.MAX_ITEMS}")
+    return problems
+
+
+def verify_precision(saved: dict, root: pathlib.Path = FIXTURES) -> list:
+    """Re-derive the whole R243 reading from the manifest's own two named sources, byte for byte."""
+    problems: list = []
+    sources = {source.get("role"): source for source in saved.get("sources") or []}
+    loaded: dict = {}
+    for role in ("database", "tasks"):
+        source = sources.get(role)
+        if not source:
+            problems.append(f"no {role} among the sources")
+            continue
+        path = root / str(source.get("path") or "")
+        if not path.is_file():
+            problems.append(f"{role}: {path} is not in this checkout")
+            continue
+        data = path.read_bytes()
+        if hashlib.sha256(data).hexdigest() != source.get("sha256"):
+            problems.append(f"{role}: {source.get('path')} is not the file this reading was taken from")
+            continue
+        loaded[role] = data.decode("utf-8")
+    if len(loaded) != 2:
+        return problems
+    fresh = precision_reading(toml_of(loaded["database"]), json.loads(loaded["tasks"]))
+    stored = saved.get("reading") or {}
+    for field, value in fresh.items():
+        if stored.get(field) != value:
+            problems.append(f"{field}: {stored.get(field)!r} does not come back from these bytes ({value!r})")
     return problems
 
 

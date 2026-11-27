@@ -261,6 +261,12 @@ jobs:
           # carries — arithmetic alone cannot tell whether it was ever about these tasks.
           python3 scripts/build_telecom_records.py --check-asks eval/manifests/telecom-asks.json
           python3 scripts/build_telecom_records.py --verify-asks eval/manifests/telecom-asks.json
+          # R243. Gate 1's affected subset, enumerated at ¥0 before any episode is bought. A precision dispatch can
+          # move only a write in the candidate set that no shipped grade serves and whose ask the cap hides; telecom
+          # has none of the three in combination, so gate 1 and the two paid gates above it cancel. Both commands
+          # re-derive the reading from the database and task bytes the manifest digests name.
+          python3 scripts/build_telecom_records.py --check-precision eval/manifests/gate1-subset.json
+          python3 scripts/build_telecom_records.py --verify-precision eval/manifests/gate1-subset.json --sources eval/fixtures/telecom
           python3 -m coverage json -o coverage-python.json
           python3 scripts/check-python-coverage.py --self-test
           python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 30

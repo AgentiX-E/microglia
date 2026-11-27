@@ -93,10 +93,22 @@ def checked(plan: dict, budget: dict) -> list:
                                 f"ladder's {match[0]['cny']} for {rung}")
         # What is registered is the first gate that costs anything, and it is checked against that rung:
         # a registration that named a gate and a different price would be two claims wearing one line.
-        paid = next((gate for gate in gates if gate.get("cny", 0.0) > 0.0), None)
-        if paid is not None and abs(item["nowCny"] - paid["cny"]) > 0.02:
-            problems.append(f"{item['id']}: registered at {item['nowCny']} against {paid['id']}'s "
-                            f"{paid['cny']}")
+        # R243 cancels a ladder at ¥0 after its affected subset is enumerated empty. A cancelled ladder still
+        # carries its rungs as the ruler that priced the gates, but its current spend is zero and must stay zero;
+        # the registered-at check applies only while the ladder is still live. Without this branch, cancelling a
+        # gate would force either a lie (keeping ¥1.68 registered) or a checker that refuses the cancellation.
+        cancelled = item.get("status") == "cancelled" and item.get("cancelledBy")
+        if cancelled:
+            if item["nowCny"] != 0.0:
+                problems.append(f"{item['id']}: cancelled by {item['cancelledBy']} but priced at {item['nowCny']}")
+            for gate in gates:
+                if gate.get("rung") is not None and gate.get("status") == "cancelled" and not gate.get("cancelledBy"):
+                    problems.append(f"{item['id']}: {gate['id']} is cancelled but names no round that cancelled it")
+        else:
+            paid = next((gate for gate in gates if gate.get("cny", 0.0) > 0.0), None)
+            if paid is not None and abs(item["nowCny"] - paid["cny"]) > 0.02:
+                problems.append(f"{item['id']}: registered at {item['nowCny']} against {paid['id']}'s "
+                                f"{paid['cny']}")
 
     total = sum(item["nowCny"] for item in plan["items"])
     if abs(plan["totalNowCny"] - total) > 0.02:
@@ -239,11 +251,20 @@ def self_test() -> int:
 
     plan, budget = load(), json.loads(BUDGET.read_text(encoding="utf-8"))
     check("the plan's own numbers agree with the manifests that own them", checked(plan, budget) == [])
-    check("five lines, two of them cancelled or already bought",
-          len(plan["items"]) == 5 and sum(1 for item in plan["items"] if item["nowCny"] == 0) == 2)
+    check("five lines, three of them cancelled or already bought",
+          len(plan["items"]) == 5 and sum(1 for item in plan["items"] if item["nowCny"] == 0) == 3)
     ladder_item = next(item for item in plan["items"] if item["id"] == "R240b")
     check("and one of them is carried as a ladder rather than as a product",
           len(ladder_item["tiers"]) == 10 and ladder_item["tiers"][0]["tasks"] == 278)
+    # R243 cancelled the ladder at ¥0 after enumerating gate 1's affected subset empty. The rungs stay as the ruler
+    # that priced it; the current spend is zero and the cancellation is attributed to the round that measured it.
+    check("R243 cancels the ladder but keeps its ruler",
+          ladder_item["status"] == "cancelled" and ladder_item["cancelledBy"] == "R243"
+          and ladder_item["nowCny"] == 0.0)
+    check("every paid gate names the round that cancelled it",
+          all(gate.get("status") == "cancelled" and gate.get("cancelledBy") == "R243"
+              for gate in ladder_item["gates"] if gate.get("rung") is not None)
+          and next(g for g in ladder_item["gates"] if g["id"] == "gate 0").get("status") == "passed")
     # The ladder's reason for existing, asserted: its rungs must answer different questions at different
     # prices, or the table is decoration around one number.
     prices = sorted(row["cny"] for row in ladder_item["tiers"])
@@ -305,8 +326,23 @@ def self_test() -> int:
     doctored = json.loads(json.dumps(plan))
     ladder = next(item for item in doctored["items"] if item["id"] == "R240b")
     ladder["nowCny"] = 50.0
-    check("a registration that does not match the gate it claims is caught",
+    check("a cancelled ladder that has been given a price is caught",
+          any("cancelled by" in problem for problem in checked(doctored, budget)))
+    # The registered-at branch must still hold for a ladder that is live: cancel nothing, restore the price to the
+    # first gate, and a wrong registration is refused. This is the path R240b took before R243 cancelled it.
+    doctored = json.loads(json.dumps(plan))
+    ladder = next(item for item in doctored["items"] if item["id"] == "R240b")
+    ladder["status"] = "registered"
+    del ladder["cancelledBy"]
+    ladder["nowCny"] = 50.0
+    check("a live registration that does not match its gate is caught",
           any("registered at" in problem for problem in checked(doctored, budget)))
+    doctored = json.loads(json.dumps(plan))
+    ladder = next(item for item in doctored["items"] if item["id"] == "R240b")
+    ladder["gates"][1]["status"] = "cancelled"
+    del ladder["gates"][1]["cancelledBy"]
+    check("a cancelled gate with no attributed round is caught",
+          any("names no round" in problem for problem in checked(doctored, budget)))
     check("the caption's arithmetic holds on the plan as it stands", order_of_magnitude(plan) is True)
     check("and a plan that only halved is not described as an order of magnitude",
           order_of_magnitude({"totalNowCny": 40.0, "totalWasCny": 92.2}) is False)

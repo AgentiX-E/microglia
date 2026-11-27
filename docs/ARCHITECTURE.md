@@ -6050,3 +6050,30 @@ sha256 of three sources and the verdicts `shippedGuard=true`, `shippedCues=[]`. 
 `--verify` re-derives the whole reading from those bytes. The builder imports `goal_board.census` rather than copying
 it, temporary cue tables are restored in a `finally`, and both touched files sit at 99% statement coverage with no
 uncovered lines.
+
+## 8.119 Cancelling a paid gate before spending it (R243)
+
+The accuracy dispatch for the third domain was registered as a ladder whose first paid rung (gate 1, 40 tasks, ¥1.68)
+buys "the sign of the effect on the subset a precision dispatch can move". At registration that subset had *not* been
+enumerated. R243 enumerates it at ¥0, from the domain's own bytes, and finds it empty — so gates 1–3 (¥1.68 / ¥8.41 /
+¥93.51) are cancelled and the whole paid ladder currently costs nothing.
+
+**Criterion.** A precision dispatch re-ranks candidates; it can move a graded write only when three things hold at
+once: the answer is in the candidate set (`blind` reaches the record), no shipped settlement grade — including R241's
+`handle` — already serves it, and its ask is cut below the display cap (`MAX_ITEMS = 8`). Measured on the 20-task
+telecom sample: 8 writes, 8 in the candidate set, 8 already served, **0 asks in the requests** (symptoms, not actions),
+0 hidden by the cap → **affected = 0**, verdict `CANCEL_GATE_1`.
+
+**Why R241 necessarily emptied gate 1.** Gate 1 presupposes "reachable but served too low". Shipping `handle` made
+every reachable write served; R242 made the ask count zero. A dispatcher that only re-ranks has neither an unserved
+answer nor a rankable ask. The two rounds interacted to remove gate 1's premise — a consequence neither round's own
+reading showed.
+
+**Cancellation is a first-class state, not a deleted rung.** `eval/manifests/gate1-subset.json`
+(`microglia/gate1-subset@1`) records the verdict with the sha256 of its two sources; `--check` forces the verdict from
+the affected count and checks `affected ≤ hidden`, `served ≤ in_candidate`; `--verify` re-derives all nine fields from
+the bytes. `plan-costs.json` marks R240b `cancelled` with `cancelledBy: R243`; each paid gate carries its own
+cancellation and gate 0 carries `passedBy: R241`. `budget.py`'s checker now accepts a cancelled ladder at ¥0 while
+still requiring a live ladder to match its first paid gate — otherwise cancelling a gate would make the build fail or
+force the plan to keep advertising ¥1.68. The plan's ceiling falls ¥7.02 → ¥5.34; its floor is unchanged. The ten rungs
+remain as the ruler that priced the gates, and `resolution.py --check-tiers` still re-derives all of them.

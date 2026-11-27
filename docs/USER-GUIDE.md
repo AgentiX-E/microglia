@@ -8123,3 +8123,30 @@ in the census so you can see the trade before you ship it.
 
 **Cost.** ¥0. No model is called. The three-domain reading is stored in `eval/manifests/telecom-asks.json` and can be
 re-derived from its source bytes with `--verify`; both files touched this round are at 99% statement coverage.
+
+## 32.100 Why this release does not buy an accuracy run — and what the release note would have to say to change that
+
+A natural next step after "we can now see and settle the third domain's records" is to pay for an accuracy run. This
+release deliberately does not. It is worth explaining, because the reason is measurable and generalises.
+
+**What an accuracy run would buy.** A "precision dispatch" is a more careful way of surfacing answers that are
+already in the candidate material but ranked low. It can only improve tasks where the answer *is* available and the
+current display *misses* it. So before spending money, we counted the tasks with that shape — at no cost, from the
+data already on disk.
+
+**What we found.** In the third domain there are eight graded writes. All eight are reachable once the record is
+resolved; all eight are already served by the configuration this release ships; and the requests contain **zero**
+asks to rank — callers describe a symptom ("my data is slow"), and the action follows from policy. There is no answer
+sitting just below the display limit, so a more precise display has nothing to move. The count of movable tasks is
+zero, which cancels the ¥1.68 run and the two larger runs above it.
+
+**The general rule for your own system.** Before you pay to improve ranking, confirm that ranking is the thing that
+is failing. Count three quantities: answers that are present at all, answers your current configuration already
+serves, and items pushed below the display window. If the first two are equal, or the third is zero, a ranking
+experiment cannot help — the limitation is elsewhere (here: the request never names the action). A tool that only
+reorders candidates cannot recover an answer that was never a candidate, and cannot improve an answer already served.
+
+**What this does to the published price.** The plan's current spend drops from ¥7.02 to ¥5.34; the ¥1.68 first gate
+is marked cancelled with the round that cancelled it, while the price table itself is kept as the ruler that valued
+the gates. The reading is in `eval/manifests/gate1-subset.json` and can be re-derived from its source bytes with
+`--verify`; the two files touched are at 99% statement coverage.

@@ -1,211 +1,221 @@
 {
- "schema": "microglia/plan-costs@2",
- "note": "What the remaining plan costs, before and after four corrections of reference. Every `nowCny` is derived rather than typed: R236 from sixty episodes at the per-episode cost the R218b grid actually spent, R237 from the rate card through eval/tools/bench_budget.py, R240b from its own ladder through eval/tools/resolution.py, and the two cancellations from zero. A figure in a document that this file does not carry is a figure with no source, which is how a plan kept a twenty-dollar line for four rounds. R240b's ladder exists because its predecessor carried the product 278x2x4 as a single number: the registration is its first gate, and every other rung is a row a reader can refuse on its own merits.",
  "cnyPerUsd": 7.2,
  "episodeUsd": 0.00584,
+ "floorNote": "The lower end is R236's own stopping rule and not a discount: B1 is a proportion with a bar at 0.95, so if it is decided at fifteen episodes the round costs a quarter of its ceiling. The upper end is what the question costs if it is close. Both ends are registered before the first episode.",
  "items": [
   {
+   "floorCny": 0.0,
    "id": "R235",
-   "what": "the clause rule's accuracy dispatch, two arms",
-   "wasCny": 36.2,
    "nowCny": 0.0,
-   "status": "cancelled",
-   "why": "its 3.21-point margin is the domain's own floor, so the gate could not pass at any price",
    "source": "eval/tools/resolution.py --delta 3.21 (prints UNREACHABLE) and AUDIT 34.332",
-   "floorCny": 0.0
+   "status": "cancelled",
+   "wasCny": 36.2,
+   "what": "the clause rule's accuracy dispatch, two arms",
+   "why": "its 3.21-point margin is the domain's own floor, so the gate could not pass at any price"
   },
   {
+   "floorCny": 0.63,
    "id": "R236",
-   "what": "the clause board's mechanism, sixty episodes, one arm",
-   "wasCny": 0.0,
    "nowCny": 2.52,
-   "status": "registered",
-   "why": "a proportion estimated at a proportion's sample size, with the control arm already on disk",
    "source": "60 episodes x the 0.00584 USD an episode R218b measured, at 7.2 CNY/USD",
-   "floorCny": 0.63
+   "status": "registered",
+   "wasCny": 0.0,
+   "what": "the clause board's mechanism, sixty episodes, one arm",
+   "why": "a proportion estimated at a proportion's sample size, with the control arm already on disk"
   },
   {
+   "floorCny": 2.82,
    "id": "R237",
-   "what": "LoCoMo and MemTrapBench, grouped by document",
-   "wasCny": 20.0,
    "nowCny": 2.82,
-   "status": "registered",
-   "why": "99.5% of a long-context set is a shared prefix billed at one fiftieth the miss rate",
    "source": "eval/manifests/bench-budget.json, re-derived from the rate card on every push",
-   "floorCny": 2.82
-  },
-  {
-   "id": "R221",
-   "what": "the 2.0 submission",
-   "wasCny": 36.0,
-   "nowCny": 0.0,
-   "status": "ready",
-   "why": "the 456-episode grids it reports were bought in R218b and carry grades, cost and transcripts",
-   "source": "the two documents on disk; AUDIT 34.333",
-   "floorCny": 0.0
-  },
-  {
-   "id": "R240b",
-   "what": "the third domain's accuracy dispatch, carried as a ladder rather than as a product",
-   "wasCny": 93.51,
-   "nowCny": 1.68,
    "status": "registered",
-   "why": "the quoted product 278x2x4 buys three different things — a denominator, a control and a variance reduction — and only the first gate is a decision, so the plan registers the gate and carries the rest as rungs a reader can refuse one at a time",
-   "source": "eval/tools/resolution.py --tier, re-derived on every push by --check-tiers",
+   "wasCny": 20.0,
+   "what": "LoCoMo and MemTrapBench, grouped by document",
+   "why": "99.5% of a long-context set is a shared prefix billed at one fiftieth the miss rate"
+  },
+  {
+   "floorCny": 0.0,
+   "id": "R221",
+   "nowCny": 0.0,
+   "source": "the two documents on disk; AUDIT 34.333",
+   "status": "ready",
+   "wasCny": 36.0,
+   "what": "the 2.0 submission",
+   "why": "the 456-episode grids it reports were bought in R218b and carry grades, cost and transcripts"
+  },
+  {
+   "cancelReason": "R243 enumerated gate 1's affected subset at ¥0 from the domain bytes and found it empty: all 8 graded writes are reachable by handle and already served by the shipped settlement grades, and the requests name zero asks, so no write is ranked below the cap for a precision dispatch to move. Gate 1 and the two paid gates above it cancel; the ladder stays only as the ruler that priced them. See eval/manifests/gate1-subset.json (verdict CANCEL_GATE_1).",
+   "cancelledBy": "R243",
+   "episodeUsd": 0.00584,
+   "fit": {
+    "a": 0.20248,
+    "b": 0.014962,
+    "state": "FIT"
+   },
    "floorCny": 0.0,
    "gate": "gate 1 — the affected subset, one arm, one attempt",
-   "fit": {
-    "state": "FIT",
-    "a": 0.20248,
-    "b": 0.014962
-   },
-   "episodeUsd": 0.00584,
    "gates": [
     {
-     "id": "gate 0",
-     "rung": null,
      "cny": 0.0,
-     "what": "reachability: R241's settlement handle, before any episode is bought",
-     "stop": "a domain at 0/n reachable has nothing to dispatch, and the round is cancelled at zero"
+     "id": "gate 0",
+     "passedBy": "R241",
+     "rung": null,
+     "status": "passed",
+     "stop": "a domain at 0/n reachable has nothing to dispatch, and the round is cancelled at zero",
+     "what": "reachability: R241's settlement handle, before any episode is bought"
     },
     {
+     "cancelledBy": "R243",
+     "cny": 1.68,
      "id": "gate 1",
      "rung": "40:1:1",
-     "cny": 1.68,
-     "what": "the sign of the effect on the subset a precision dispatch can move",
-     "stop": "a negative sign cancels gates 2 and 3"
+     "status": "cancelled",
+     "stop": "a negative sign cancels gates 2 and 3",
+     "what": "the sign of the effect on the subset a precision dispatch can move"
     },
     {
+     "cancelledBy": "R243",
+     "cny": 8.41,
      "id": "gate 2",
      "rung": "50:2:2",
-     "cny": 8.41,
-     "what": "the size of it, with a control, on the same subset",
-     "stop": "a resolution above the subset's own effect buys nothing further"
+     "status": "cancelled",
+     "stop": "a resolution above the subset's own effect buys nothing further",
+     "what": "the size of it, with a control, on the same subset"
     },
     {
+     "cancelledBy": "R243",
+     "cny": 93.51,
      "id": "gate 3",
      "rung": "278:2:4",
-     "cny": 93.51,
-     "what": "a domain score that can be published, at the resolution the plan has quoted since R235",
-     "stop": "only a published claim needs this rung, and it is priced again at the cache before it is bought"
+     "status": "cancelled",
+     "stop": "only a published claim needs this rung, and it is priced again at the cache before it is bought",
+     "what": "a domain score that can be published, at the resolution the plan has quoted since R235"
     }
    ],
+   "id": "R240b",
+   "nowCny": 0.0,
+   "source": "eval/tools/resolution.py --tier, re-derived on every push by --check-tiers",
+   "status": "cancelled",
    "tiers": [
     {
-     "tasks": 278,
      "arms": 2,
      "attempts": 4,
-     "episodes": 2224,
      "cny": 93.51,
-     "mde": 0.043037,
+     "episodes": 2224,
      "floor": 0.020556,
      "kind": "paired-delta",
+     "mde": 0.043037,
+     "tasks": 278,
      "usdPerPoint": 3.017933
     },
     {
-     "tasks": 278,
      "arms": 1,
      "attempts": 4,
-     "episodes": 1112,
      "cny": 46.76,
-     "mde": 0.042013,
+     "episodes": 1112,
      "floor": null,
      "kind": "absolute-score",
+     "mde": 0.042013,
+     "tasks": 278,
      "usdPerPoint": 1.545724
     },
     {
-     "tasks": 114,
      "arms": 2,
      "attempts": 4,
-     "episodes": 912,
      "cny": 38.35,
-     "mde": 0.067206,
+     "episodes": 912,
      "floor": 0.0321,
      "kind": "paired-delta",
+     "mde": 0.067206,
+     "tasks": 114,
      "usdPerPoint": 0.792501
     },
     {
-     "tasks": 114,
      "arms": 1,
      "attempts": 4,
-     "episodes": 456,
      "cny": 19.17,
-     "mde": 0.065608,
+     "episodes": 456,
      "floor": null,
      "kind": "absolute-score",
+     "mde": 0.065608,
+     "tasks": 114,
      "usdPerPoint": 0.405903
     },
     {
-     "tasks": 114,
      "arms": 1,
      "attempts": 1,
-     "episodes": 114,
      "cny": 4.79,
-     "mde": 0.131216,
+     "episodes": 114,
      "floor": null,
      "kind": "absolute-score",
+     "mde": 0.131216,
+     "tasks": 114,
      "usdPerPoint": 0.050738
     },
     {
-     "tasks": 50,
      "arms": 2,
      "attempts": 2,
-     "episodes": 200,
      "cny": 8.41,
-     "mde": 0.13508,
+     "episodes": 200,
      "floor": 0.048471,
      "kind": "paired-delta",
+     "mde": 0.13508,
+     "tasks": 50,
      "usdPerPoint": 0.086468
     },
     {
-     "tasks": 50,
      "arms": 1,
      "attempts": 2,
-     "episodes": 100,
      "cny": 4.2,
-     "mde": 0.1401,
+     "episodes": 100,
      "floor": null,
      "kind": "absolute-score",
+     "mde": 0.1401,
+     "tasks": 50,
      "usdPerPoint": 0.041685
     },
     {
-     "tasks": 40,
      "arms": 2,
      "attempts": 2,
-     "episodes": 160,
      "cny": 6.73,
-     "mde": 0.151024,
+     "episodes": 160,
      "floor": 0.054192,
      "kind": "paired-delta",
+     "mde": 0.151024,
+     "tasks": 40,
      "usdPerPoint": 0.061871
     },
     {
-     "tasks": 40,
      "arms": 1,
      "attempts": 1,
-     "episodes": 40,
      "cny": 1.68,
-     "mde": 0.221518,
+     "episodes": 40,
      "floor": null,
      "kind": "absolute-score",
+     "mde": 0.221518,
+     "tasks": 40,
      "usdPerPoint": 0.010545
     },
     {
-     "tasks": 24,
      "arms": 1,
      "attempts": 1,
-     "episodes": 24,
      "cny": 1.01,
-     "mde": 0.285978,
+     "episodes": 24,
      "floor": null,
      "kind": "absolute-score",
+     "mde": 0.285978,
+     "tasks": 24,
      "usdPerPoint": 0.004901
     }
-   ]
+   ],
+   "wasCny": 93.51,
+   "what": "the third domain's accuracy dispatch, carried as a ladder rather than as a product",
+   "why": "the quoted product 278x2x4 buys three different things — a denominator, a control and a variance reduction — and only the first gate is a decision, so the plan registers the gate and carries the rest as rungs a reader can refuse one at a time"
   }
  ],
- "totalWasCny": 185.71,
- "totalNowCny": 7.02,
- "floorNote": "The lower end is R236's own stopping rule and not a discount: B1 is a proportion with a bar at 0.95, so if it is decided at fifteen episodes the round costs a quarter of its ceiling. The upper end is what the question costs if it is close. Both ends are registered before the first episode.",
- "totalFloorCny": 3.45
+ "note": "What the remaining plan costs, before and after four corrections of reference. Every `nowCny` is derived rather than typed: R236 from sixty episodes at the per-episode cost the R218b grid actually spent, R237 from the rate card through eval/tools/bench_budget.py, R240b from its own ladder through eval/tools/resolution.py, and the two cancellations from zero. A figure in a document that this file does not carry is a figure with no source, which is how a plan kept a twenty-dollar line for four rounds. R240b's ladder exists because its predecessor carried the product 278x2x4 as a single number: the registration is its first gate, and every other rung is a row a reader can refuse on its own merits.",
+ "schema": "microglia/plan-costs@2",
+ "totalFloorCny": 3.45,
+ "totalNowCny": 5.34,
+ "totalWasCny": 185.71
 }

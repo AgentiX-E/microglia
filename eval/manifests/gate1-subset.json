@@ -1,0 +1,29 @@
+{
+ "note": "R243. Gate 1 of R240b's paid ladder buys the sign of the effect on the subset a precision dispatch can move, priced at \u00a51.68, and was registered before that subset had been enumerated. Enumerated here at \u00a50 from the domain's own bytes: a write is affected only if its answer is in the candidate set (blind reaches), no shipped settlement grade \u2014 including R241's handle \u2014 serves it, AND its ask is cut by the cap. On the 20-task telecom sample all eight writes are reachable and all eight are served by the shipped grades, and the requests name zero asks (symptoms, not actions), so none is hidden by the cap: affected = 0. A dispatch that only re-ranks has nothing to move, so gate 1 and the two paid gates above it (\u00a58.41, \u00a593.51) cancel at \u00a50. The reading is re-derived from the two named sources by --verify; the verdict is forced by the affected count and cannot be edited past --check.",
+ "reading": {
+  "affected": 0,
+  "asksInRequests": 0,
+  "asksPerTaskMax": 0,
+  "cap": 8,
+  "hiddenByCap": 0,
+  "inCandidateSet": 8,
+  "servedByShipped": 8,
+  "verdict": "CANCEL_GATE_1",
+  "writes": 8
+ },
+ "schema": "microglia/gate1-subset@1",
+ "sources": [
+  {
+   "bytes": 9628,
+   "path": "telecom-db.toml",
+   "role": "database",
+   "sha256": "562d647ef9d7df8df91eafd8ee76036e707c8f9e32aaedc4a7fde06975aea2c0"
+  },
+  {
+   "bytes": 83833,
+   "path": "telecom-tasks-small.json",
+   "role": "tasks",
+   "sha256": "c8ea6f75adc18a8ad363974292cbd26b6e8b0e348ec87d265a4188e0088a8f24"
+  }
+ ]
+}

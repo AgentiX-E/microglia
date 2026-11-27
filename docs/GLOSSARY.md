@@ -3160,3 +3160,25 @@ is refused. All six third-domain candidates failed one axis or the other; zero s
 one is wrong in the other. `return` is a refund in retail but a restoration of state in telecom ("speed returns
 excellent"); the same pattern fired forty false asks in telecom. R242 is the first round to *fix* a collision with a
 guard rather than only record it; the vocabulary hypothesis itself was refused in all three domains.
+
+**Affected subset (R243)** — the set of tasks a precision dispatch could actually move: a graded write whose answer is
+in the candidate set (a wider rule reaches its record), which no shipped settlement grade already serves, and whose
+ask is cut below the display window. Formally `affected = in_candidate_set AND NOT served_by_shipped AND hidden_by_cap`.
+R243 enumerated this on the third domain's 20-task sample and found 0 of 8 writes affected — every reachable write was
+already served and the requests named no asks — so the ¥1.68 gate that bought "the sign of the effect on this subset"
+was cancelled before it was spent. The subset is enumerated by `build_telecom_records.py --precision` and re-derived
+from source bytes by `--verify`.
+
+**Cancelled ladder (R243)** — a priced ladder whose gates have been refused but whose rungs are retained as the ruler
+that valued them. Distinguish the *ruler* (the ten tiers in `plan-costs.json`, still re-derived on every push by
+`resolution.py --check-tiers`) from the *current spend* (now ¥0 for that item). A cancelled ladder must carry a
+`cancelledBy` round and each of its cancelled gates must name the round that cancelled it; the budget checker refuses a
+cancelled ladder priced above zero while still requiring a live ladder to match its first paid gate. This is how a
+plan records "we priced it, then decided not to buy it" without either lying about the price or deleting the arithmetic.
+
+**Assembly step (R243)** — the stage between retrieval and decision where retrieved memory is rendered and acted on.
+Field evidence (A-TMA, Freshness, DISCERN, 2026) locates a large part of memory-induced degradation here rather than in
+storage capacity: an explicit state role raises conflict accuracy from 0.425 to 0.725, and deterministic `max(serial)`
+consolidation reaches 78–94.8% where bi-temporal graph systems reach 7%. In microglia the equivalent state (four clocks,
+`conflicted` status, `visibleBefore` watermark) already exists on `KnowledgeItem`; the open instrument gap is an
+external benchmark submission, not a missing storage mechanism.
