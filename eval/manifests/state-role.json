@@ -1,0 +1,105 @@
+{
+ "note": "R244. The store carries four clocks and a contradiction count, but encodeItemLine rendered only six fields \u2014 a world-time-expired yet active rule and a live one reached the model in identical form. This reading enumerates the state role of every item in a bitemporal slice, re-derived from its bytes. worldExpiredStillActive is the count the old renderer silently called current. Roles are the closed three-role vocabulary; perItem.serial and .subject make serial-max auditable; the winner is the max serial of a claim. No model was called: this is the assembly instrument, not an accuracy claim.",
+ "reading": {
+  "at": 1700000000000,
+  "claims": 8,
+  "items": 10,
+  "perItem": [
+   {
+    "id": "k_conflicted",
+    "own": "transition",
+    "resolved": "transition",
+    "serial": "0001699999900000|k_conflicted",
+    "subject": "acme|constraint|retail.f|retail||||",
+    "winner": "k_conflicted"
+   },
+   {
+    "id": "k_contest_new",
+    "own": "current",
+    "resolved": "current",
+    "serial": "0001700000000000|k_contest_new",
+    "subject": "acme|negative|retail.h|retail||||",
+    "winner": "k_contest_new"
+   },
+   {
+    "id": "k_contest_old",
+    "own": "transition",
+    "resolved": "transition",
+    "serial": "0001699999000000|k_contest_old",
+    "subject": "acme|negative|retail.h|retail||||",
+    "winner": "k_contest_new"
+   },
+   {
+    "id": "k_contradicted",
+    "own": "transition",
+    "resolved": "transition",
+    "serial": "0001699999900000|k_contradicted",
+    "subject": "acme|constraint|retail.e|retail||||",
+    "winner": "k_contradicted"
+   },
+   {
+    "id": "k_future",
+    "own": "historical",
+    "resolved": "historical",
+    "serial": "0001699999900000|k_future",
+    "subject": "acme|constraint|retail.d|retail||||",
+    "winner": "k_future"
+   },
+   {
+    "id": "k_live",
+    "own": "current",
+    "resolved": "current",
+    "serial": "0001700000000000|k_live",
+    "subject": "acme|constraint|retail.a|retail||||",
+    "winner": "k_live"
+   },
+   {
+    "id": "k_rev_new",
+    "own": "current",
+    "resolved": "current",
+    "serial": "0001700000000000|k_rev_new",
+    "subject": "acme|constraint|retail.g|retail||||",
+    "winner": "k_rev_new"
+   },
+   {
+    "id": "k_rev_old",
+    "own": "current",
+    "resolved": "historical",
+    "serial": "0001699999000000|k_rev_old",
+    "subject": "acme|constraint|retail.g|retail||||",
+    "winner": "k_rev_new"
+   },
+   {
+    "id": "k_system_superseded",
+    "own": "historical",
+    "resolved": "historical",
+    "serial": "0001699999900000|k_system_superseded",
+    "subject": "acme|constraint|retail.c|retail||||",
+    "winner": "k_system_superseded"
+   },
+   {
+    "id": "k_world_expired",
+    "own": "historical",
+    "resolved": "historical",
+    "serial": "0001699999900000|k_world_expired",
+    "subject": "acme|constraint|retail.b|retail||||",
+    "winner": "k_world_expired"
+   }
+  ],
+  "roles": {
+   "current": 3,
+   "historical": 4,
+   "transition": 3
+  },
+  "worldExpiredStillActive": 1
+ },
+ "schema": "microglia/state-role@1",
+ "sources": [
+  {
+   "bytes": 4041,
+   "path": "eval/fixtures/state-role-store.json",
+   "role": "bitemporal-store-slice",
+   "sha256": "f768c2257d257bfaac00f2702ad395125e3c842a1c937af37b86020423042800"
+  }
+ ]
+}

@@ -6077,3 +6077,44 @@ cancellation and gate 0 carries `passedBy: R241`. `budget.py`'s checker now acce
 still requiring a live ladder to match its first paid gate — otherwise cancelling a gate would make the build fail or
 force the plan to keep advertising ¥1.68. The plan's ceiling falls ¥7.02 → ¥5.34; its floor is unchanged. The ten rungs
 remain as the ruler that priced the gates, and `resolution.py --check-tiers` still re-derives all of them.
+
+## 8.120 Read-time state roles and deterministic serial-max (R244)
+
+**The gap.** `KnowledgeItem` is bitemporal: it carries `validFrom/validUntil` (world time),
+`systemFrom/systemUntil` (system time), a contradiction count, and a `conflicted` status.
+`validityDecay` deliberately keeps a world-time-expired rule `active` so fresh evidence can
+re-assert it instead of leaving a permanent blind spot. But the delivery boundary rendered only
+six fields — `id`, `kind`, `confidence`, `scope`, `when`, `statement`. A rule whose world clock
+had ended and a rule still in force reached the model in byte-identical form, and so did two
+revisions of one claim. The model was asked to infer from prose alone which rule still held. This
+is the assembly step the field locates the harm: A-TMA raises conflict accuracy from 0.425 to
+0.725 with an explicit state role, and Freshness measures deterministic `max(serial)` at 78–94.8%
+against 7% for a graph store that delegates the decision to a model. Neither figure is claimed on
+this corpus.
+
+**The three roles.** `packages/core/src/apply/state-role.ts` is a pure function of the store plus
+one injected clock — no model is asked to decide. `current` means asserted, uncontested, and
+inside both clocks (boundaries inclusive). `historical` means world or system time has ended, or
+the claim is not yet assertable. `transition` means the claim is contested (`contradictions > 0`
+or `status === 'conflicted'`); it wins over every clock, so a disagreement is never silently
+reported as current.
+
+**Serial-max, at read.** Within one claim (`namespace | kind | scopeKey`), the revision with the
+largest serial is current and the rest are superseded to `historical`. The serial is `updatedAt`
+rendered as a fixed-width decimal with the id as tie-break, so a lexical comparison is numeric and
+the winner never depends on iteration order. A losing contested revision keeps its `transition` —
+age does not resolve a disagreement. Superseding happens at read, not at write: it is reversible
+per request, which is what lets one dispatch carry the serial-max arm and its control over one
+identical store.
+
+**Switch discipline.** `stateRole: { now }` is an option on `renderPack` and `buildPack`. Absent —
+the default — every artefact committed before R244 re-renders byte-for-byte identically. `now` is
+injected rather than read from the wall clock, so a replay is deterministic. The option composes
+with `note`, `budgetBasis`, `shape` and `decision` without changing their bytes.
+
+**Three readers, one reading.** `eval/fixtures/state-role-store.json` is a bitemporal slice shaped
+like the store's own records (ten items, eight claims). `eval/tools/state_role.py --verify` re-derives
+every role from those bytes with no shared code with TypeScript; `--check` re-adds the manifest's
+own arithmetic. `state-role-manifest.test.ts` derives the same reading with the product's own
+`stateRoleOf`, `serialOf`, `subjectKey` and `resolveStates` and compares every field. A disagreement
+fails exactly one reader and stops the build.

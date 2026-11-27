@@ -799,7 +799,7 @@ stops being true. `pnpm eval:coupling` recomputes it from the source tree on eve
 
 | layer | production modules | lines | modules that name a scenario |
 |---|---|---|---|
-| `core` | 49 | 10,846 | **0** |
+| `core` | 50 | 11,044 | **0** |
 | `protocol` | 3 | 1,922 | **0** |
 | `sql` (the adapter) | 7 | **1,956** | 5 |
 | `eval` | 198 | 59,836 | 25, each with a written reason |

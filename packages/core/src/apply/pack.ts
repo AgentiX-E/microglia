@@ -104,6 +104,11 @@ export type BuildPackOptions = {
    * written before this option existed is unchanged.
    */
   readonly decision?: boolean;
+  /**
+   * Print each item's read-time state role and apply serial-max over claim revisions (R244). Absent means the exact
+   * pre-R244 pack; the `now` clock is injected so a replay is deterministic. See `RenderOptions.stateRole`.
+   */
+  readonly stateRole?: { readonly now: number };
 };
 
 export async function buildPack(
@@ -186,6 +191,7 @@ export async function buildPack(
       ...(options.tag === undefined ? {} : { tag: options.tag }),
       ...(options.note === undefined ? {} : { note: options.note }),
       ...(options.budgetBasis === undefined ? {} : { budgetBasis: options.budgetBasis }),
+      ...(options.stateRole === undefined ? {} : { stateRole: options.stateRole }),
     },
     fold,
   );

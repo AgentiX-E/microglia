@@ -3182,3 +3182,24 @@ storage capacity: an explicit state role raises conflict accuracy from 0.425 to 
 consolidation reaches 78–94.8% where bi-temporal graph systems reach 7%. In microglia the equivalent state (four clocks,
 `conflicted` status, `visibleBefore` watermark) already exists on `KnowledgeItem`; the open instrument gap is an
 external benchmark submission, not a missing storage mechanism.
+
+**State role (R244)** — the read-time classification of a recalled item as `current`, `historical`
+or `transition`. Computed by a pure function of the item's four clocks, its contradiction count and
+one injected `now`, rather than stored as a mutable flag. `transition` outranks the clocks: a
+contested claim is never silently current. Exposed on a rendered line when the caller opts into
+`stateRole: { now }`; absent by default so pre-R244 artefacts are unchanged.
+
+**Serial (R244)** — a stable, lexically-comparable identity for one revision of a claim: `updatedAt`
+as a fixed-width decimal, with the item id breaking an exact tie. The maximum serial in a claim
+group is the newest revision. Because the width is fixed, a string comparison is a numeric one, and
+because the id is the tie-break, the winner never depends on input order — the property that makes
+deterministic `max(serial)` reproducible without a model.
+
+**Claim (R244)** — the unit over which serial-max runs: `namespace | kind | scopeKey(scope)`. Two
+revisions of one statement share a claim; a claim and a negative over the same scope do not. The
+winner is current, the rest are superseded to `historical` — except a contested one, which keeps
+its `transition` because age does not resolve a disagreement.
+
+**Assembly step (R243, implemented R244)** — see above: originally the term for the gap; R244 is
+the module that closes the storage-to-prompt half of it. The remaining open half is still an
+external benchmark submission, not a storage mechanism.

@@ -25,6 +25,16 @@ export {
 export { buildPack, type BuildPackOptions } from './pack.js';
 
 export {
+  STATE_ROLES,
+  resolveStates,
+  serialOf,
+  stateRoleOf,
+  subjectKey,
+  type StateRole,
+  type StateSubject,
+} from './state-role.js';
+
+export {
   decideSpeak,
   suppressionOf,
   type SpeakInput,

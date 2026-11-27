@@ -13,7 +13,8 @@
  *     number dropped is reported rather than silently discarded.
  */
 import { MicrogliaError, hashText, hashJson } from '../kernel/index.js';
-import type { Json, KnowledgeItem, KnowledgePack, RecallQuery } from '../kernel/index.js';
+import type { Json, KnowledgeItem, KnowledgePack, KnowledgeStatus, RecallQuery } from '../kernel/index.js';
+import { resolveStates, type StateRole } from './state-role.js';
 import type { ShapeFold } from './shape-fold.js';
 
 export const OPEN_TAG = '<microglia-knowledge';
@@ -77,6 +78,16 @@ export type RenderOptions = {
    * is the note-free block, so it still satisfies the original guarantee exactly.
    */
   readonly budgetBasis?: 'note-included' | 'note-excluded';
+  /**
+   * Print each item's read-time state role (`current`/`historical`/`transition`) and apply a deterministic
+   * serial-max over revisions of one claim (R244). Absent — the default — renders the exact pre-R244 bytes.
+   *
+   * `now` is injected rather than read from the wall clock, so two replays of one store at one time print the same
+   * roles. The store keeps a world-time-expired rule `active` so fresh evidence can re-assert it; this switch is how
+   * a caller tells the model that the rule is historical without deleting it. Freshness and A-TMA locate the gain
+   * in this assembly step, not in storage — neither +pp is claimed on this corpus.
+   */
+  readonly stateRole?: { readonly now: number };
 };
 
 export type NoteMode = NonNullable<RecallQuery['note']>;
@@ -106,6 +117,19 @@ export type RenderableItem = Pick<
 > & {
   readonly when?: string;
   readonly payload?: Json;
+  /**
+   * The fields a state decision reads, optional so a caller that only has the original six fields (the R57 planted
+   * arm) still renders. When the `stateRole` switch is on and these are absent, the item is treated as current —
+   * the honest reading of a record that carries no clocks.
+   */
+  readonly namespace?: string;
+  readonly validFrom?: number;
+  readonly validUntil?: number;
+  readonly systemFrom?: number;
+  readonly systemUntil?: number;
+  readonly contradictions?: number;
+  readonly status?: KnowledgeStatus;
+  readonly updatedAt?: number;
 };
 
 /**
@@ -117,7 +141,7 @@ export type RenderableItem = Pick<
  * drifted. Everything the renderer guarantees — the condition first, `<` escaped, no trailing
  * whitespace — is this function's, so the appended line is the renderer's line.
  */
-export function encodeItemLine(item: RenderableItem, conditions: boolean): string {
+export function encodeItemLine(item: RenderableItem, conditions: boolean, state?: StateRole): string {
   const record = {
     id: item.id,
     kind: item.kind,
@@ -129,6 +153,9 @@ export function encodeItemLine(item: RenderableItem, conditions: boolean): strin
     ...(conditions && item.when !== undefined ? { when: item.when } : {}),
     statement: item.statement,
     ...(item.payload === undefined ? {} : { payload: item.payload }),
+    // `state` is printed only when the caller opted in and a role was resolved; the default line is byte-identical
+    // to every artefact committed before R244.
+    ...(state === undefined ? {} : { state }),
   };
   // `<` is escaped so a statement cannot terminate the wrapper element.
   return JSON.stringify(record).replace(/</g, '\\u003c');
@@ -268,13 +295,36 @@ export function renderPack(items: readonly RenderableItem[], options: RenderOpti
     return { rendered: '', ids: [], tokens: 0, truncated: items.length };
   }
 
+  // The state resolution is computed once over the whole set, so serial-max sees every revision of a claim even
+  // when the character budget will later drop some of them. A line's role is a property of the set, not of the
+  // window — the same reason the fold runs before the budget in `buildPack`.
+  const states =
+    options.stateRole === undefined
+      ? undefined
+      : resolveStates(
+          items.map((item) => ({
+            id: item.id,
+            namespace: item.namespace ?? '',
+            kind: item.kind,
+            scope: item.scope,
+            validFrom: item.validFrom ?? Number.NEGATIVE_INFINITY,
+            validUntil: item.validUntil ?? Number.POSITIVE_INFINITY,
+            systemFrom: item.systemFrom ?? Number.NEGATIVE_INFINITY,
+            systemUntil: item.systemUntil ?? Number.POSITIVE_INFINITY,
+            contradictions: item.contradictions ?? 0,
+            status: item.status ?? 'active',
+            updatedAt: item.updatedAt ?? 0,
+          })),
+          options.stateRole.now,
+        );
+
   const lines: string[] = [];
   const ids: string[] = [];
   let used = overhead;
   let truncated = 0;
 
   for (const item of items) {
-    const line = encodeItemLine(item, conditions);
+    const line = encodeItemLine(item, conditions, states?.get(item.id));
     if (used + line.length + 1 > options.budget) {
       truncated += 1;
       continue;

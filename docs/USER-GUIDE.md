@@ -8150,3 +8150,41 @@ reorders candidates cannot recover an answer that was never a candidate, and can
 is marked cancelled with the round that cancelled it, while the price table itself is kept as the ruler that valued
 the gates. The reading is in `eval/manifests/gate1-subset.json` and can be re-derived from its source bytes with
 `--verify`; the two files touched are at 99% statement coverage.
+
+## 32.101 Knowing which remembered rule still applies (R244)
+
+A memory store that supports corrections will hold rules that were once true and are now not.
+This release lets the store say so at the moment it serves them, instead of leaving the model to
+guess from the wording.
+
+**What you get.** Pass `stateRole: { now: Date.now() }` to `renderPack` or `buildPack`, and each
+line in the knowledge block carries a `state`:
+
+| state | meaning |
+|---|---|
+| `current` | asserted, uncontested, inside both its validity and system clocks |
+| `historical` | its world or system clock has ended, or it is not yet in force |
+| `transition` | the claim is contested — treat it as unresolved, not as current |
+
+When two lines are revisions of one claim, only the newest one (by `updatedAt`, id breaking an
+exact tie) is `current`; older revisions are `historical`. A contested older revision stays
+`transition` — being superseded does not settle a disagreement.
+
+**Why you would turn it on.** If your corrections change conventions over time — a policy that
+moved, a value that was revised — a historically-true rule presented as current will anchor the
+model to the old convention. Marking it `historical` lets the model set it aside without the store
+having to delete it (deletion would mean fresh evidence could never re-assert it). The field
+literature measures this assembly step, not the storage: an explicit state role and a deterministic
+newest-revision rule both beat asking the model to decide. This project reports the mechanism and
+its own reading; it does not import another benchmark's accuracy number.
+
+**What does not change.** The option is off by default. Every pack produced before this release —
+and every committed artefact — renders byte-for-byte as it did. `now` is a value you pass in, not
+the wall clock read inside the library, so two replays at the same time produce the same block.
+All the other knobs (`note`, `budgetBasis`, `shape`, `speakMargin`, `decision`) work exactly as
+before, with or without state roles.
+
+**An honest limit.** A state role tells the model how to treat a rule; it does not make the rule
+true, and it is not itself a claim about task accuracy. Whether it raises task success on your
+workload is a measurement you run with the option on and off over the same store — the same
+one-variable contrast the library is built to support.

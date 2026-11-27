@@ -267,9 +267,18 @@ jobs:
           # re-derive the reading from the database and task bytes the manifest digests name.
           python3 scripts/build_telecom_records.py --check-precision eval/manifests/gate1-subset.json
           python3 scripts/build_telecom_records.py --verify-precision eval/manifests/gate1-subset.json --sources eval/fixtures/telecom
+          # R244. The assembly step the store never exposed: a read-time state role (current/historical/transition)
+          # and a deterministic serial-max over claim revisions, priced at ¥0 with no model called. The store keeps a
+          # world-time-expired rule `active`; the old renderer showed it in the same six fields as a live one. This
+          # reader re-derives every role from the bitemporal slice's bytes; --verify refuses a manifest that drifted
+          # from them, and the product's own functions are bound to the same reading by state-role-manifest.test.ts.
+          python3 -m coverage run --append --branch --include="*/state_role.py" \
+            eval/tools/state_role.py --self-test
+          python3 eval/tools/state_role.py --check --manifest eval/manifests/state-role.json
+          python3 eval/tools/state_role.py --verify --manifest eval/manifests/state-role.json --fixture eval/fixtures/state-role-store.json
           python3 -m coverage json -o coverage-python.json
           python3 scripts/check-python-coverage.py --self-test
-          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 30
+          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 31
 
       - name: The rounds this project owes, and the date each one was registered for
         # The failure this prevents is not a wrong number, it is a round that quietly stops being planned: R216b's
