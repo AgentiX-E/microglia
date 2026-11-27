@@ -4608,7 +4608,8 @@ The registered rule was worth two settlements. Three other defects were worth th
 re-registering would have found them, because the counter that would have said so — how many settlements came from
 which rule — did not exist. It does now (`loose`), and the replay is the first thing an arm should be measured with.
 
-**The four repairs.** `grade_of` gives a settlement one of two grades: **containment** (one word set inside the
+**The four repairs.** `grade_of` gives a settlement one of two *name* grades — the module has four, the other two
+being the identifier grades R238 and R241 added (8.113, 8.117): **containment** (one word set inside the
 other, the strict grade and the only one R214/R215 ever used) and **overlap** (at least one shared content word and
 at least half of the shorter side). The second grade exists because 28 of the round's refusals were one word short:
 `watch received` against **Smart Watch**, `gaming related purchased` against **Gaming Mouse**. It is deliberately
@@ -5939,3 +5940,73 @@ publishable score at ¥93.51.
 Every rung is re-derived from its own factors in CI (`resolution.py --check-tiers`), and the manifest check refuses a
 rung whose cost is not its three factors times the price, a gate whose price is not its own rung's, or a
 registration that does not match the first paid gate it claims.
+
+### 8.117 A settlement handle can be a phone number — and the rule that reads one must refuse siblings
+
+R240 measured the third domain's record grade at **0 of 8** graded writes and named the cause: a telecom request
+identifies its line by a phone number, `records_in` reads identifiers out of the clause, the receipt carries
+`line_id` / `customer_id`, and a string intersection between the two is empty. What it could not fix was the reason
+the obvious repair is wrong. In this database a customer's `phone_number` **is** one of their lines' numbers, so a
+token table that resolved `555-123-2002` to every record claiming it would read 8 of 8 **and** credit a repair on
+any of that account's three lines. R240 reported both numbers — `blind` 8, `strict` 0 — and shipped neither.
+
+R241 ships a third rule, and the two ideas it rests on are separable.
+
+**The handle is the record the episode read, not a copy of the database.** A memory instrument that held its own
+token table would be a second source of truth about a corpus it does not own, and it would answer for a resolution
+the episode never performed. The reads are already in the transcript: the agent resolves the caller's number to an
+account (`get_customer_by_phone`), then reads the line. `read_records` keeps the three relations those reads prove:
+
+```
+phones    555-123-2002 -> L1002    a LINE record whose own `phone_number` is that number
+accounts  555-123-1002 -> C1001    a CUSTOMER record whose own `phone_number` is that number
+owners    L1002 -> C1001           a customer's `line_ids`, and a bill's `customer_id`
+```
+
+A token that a line claims resolves to **that line and its account** — never to the account's other lines. That is
+the whole of the sibling repair, and it is a property of the relation rather than of the corpus.
+
+**The comparison is a lattice, not an intersection.** Because a line carries its account, both sides of a settlement
+usually name a line *and* an account, and a plain intersection then settles a write on line 3 from an ask about line
+2 — the account matches. `same_record` therefore compares at the **finest type both sides commit to**:
+
+| ask names | receipt names | settled when |
+|---|---|---|
+| a line | a line | the lines intersect — a sibling is refused even though the account matches |
+| a bill | a bill | the bills intersect |
+| anything else | anything else | the records intersect, ignoring type |
+
+The third rule is where retail keeps working: an ask that spells `#W7449508` and a receipt that carries `order_id`
+are both **untyped**, because no read ever typed them, and untyped keys compare on their spelling — R238's rule
+unchanged. A grade that needed a read is reported as `handle`; a grade that did not is still `record`, so a reader
+can see how much of a board rests on a resolution.
+
+**The measurement has two axes, and one of them is what the rule refuses.** A reach count cannot separate the handle
+rule from the ambiguity-blind table — both reach every write. So every rule is scored twice: on the task set's eight
+graded writes, and on a counterfactual that synthesises `resume_line` against **every line in the database**. The
+correct answer there is one line, the one whose own number the request spells.
+
+| rule | reaches (of 8) | credits (of 9 lines) |
+|---|---|---|
+| shipped, identifier only (R240) | 0 | — |
+| blind token table | 8 | `L1001`, `L1002`, `L1003` |
+| strict token table | 0 | — |
+| **handle (R241)** | **8** | **`L1002`** |
+
+That table is the round: the reach was always available, and the credit is what the reach costs. Both readings are
+taken through the shipped resolver — `build_telecom_records.py` imports `goal_board` rather than re-implementing it —
+so a defect in the product's rule is a defect in the table, not a difference between two implementations. The corpus
+and the reading are both in the repository, and `--verify` re-derives every figure from the bytes the manifest names.
+
+**The limit, stated rather than hidden.** The handle grade rests on a read, so a request whose number no account
+claims — a household's second line, whose owner's contact number is a different number — resolves to nothing and
+credits nothing. A static table would reach it; the shipped rule does not. That is the price of anchoring on the
+transcript, and it is a bound rather than a loss here: all twenty tasks in the set carry the account's contact
+number.
+
+**The vocabulary caught up with the board.** `SETTLEMENT_GRADES` declared two grades while the board had emitted
+three since R238 — a divergence no test could see, because nothing compared the declaration with what the rule
+returns. `goal_board`'s self-test now asserts its four return values against the manifest, the product's TypeScript
+reads the same manifest, and the third domain's nine write tools are in `FAMILIES` so a receipt from it is visible
+at all. What is *not* shipped is a cue list for those families: recognising "my data is slow" as an ask is a separate
+axis, R217a's, and it is named in the manifest's `notYet` rather than left as a silent gap.

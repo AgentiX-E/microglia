@@ -8041,3 +8041,56 @@ episode has cost you is a measured average over dispatches that may not have sha
 
 **Cost.** ¥0 to produce the ladder: it is arithmetic over a fit on a grid you already have. What changes is not the
 total — it is that a reader can now disagree with one rung instead of with the whole line.
+
+### 32.98 When your domain's identity is a handle, settle on the record the episode read
+
+Some domains have no order number. A telecom request names its line by a **phone number**; the database keys lines as
+`L1002` and customers as `C1001`; and a settlement rule that intersects the numbers it can read in a sentence against
+the identifiers a tool call carries will find nothing. That is not a parser bug and no amount of vocabulary fixes it:
+the two sides are written in different alphabets, and the bridge between them is a **read**.
+
+**The bridge is the read, not a table.** You already have the resolution in the transcript — the agent had to resolve
+the caller's number before it could act. Build the three relations those reads prove and resolve each token through
+them:
+
+```python
+from goal_board import read_records, handles_in, receipt_keys, same_record
+
+records = read_records(transcript)        # phones -> line, accounts -> customer, line/bill -> owner
+ask     = handles_in("my number is 555-123-2002", records)      # {(line, l1002), (customer, c1001)}
+carried = receipt_keys({"args": {"line_id": "L1002", "customer_id": "C1001"}})
+same_record(ask, carried)                 # True
+```
+
+**A token that a line claims resolves to that line and its account — never to the account's other lines.** This is
+the rule that matters. A household's number belongs to one line and to the account that holds it; the account's
+second and third lines are **siblings**, and a write to a sibling is not the repair the caller asked for.
+
+**Compare at the finest type both sides name.** Because a line carries its account, both sides usually name a line
+*and* an account, and a plain intersection settles a write on line 3 from an ask about line 2 — the account matches.
+`same_record` refuses that: if both sides name a line, the lines must intersect; if both name a bill, the bills must;
+otherwise compare the records on their spelling, which is what keeps an untyped order id working.
+
+**Measure what your rule refuses, not only what it reaches.** Reach alone cannot tell a good rule from a careless
+one — both reach everything. Take a counterfactual: synthesise a write against **every record in the database** and
+count how many the rule credits. The right answer is one. On the third domain the shipped rule reached 0 of 8 writes,
+the blind table reached 8 and credited 3 lines, and the handle grade reached 8 and credited 1.
+
+```bash
+$ python3 scripts/build_telecom_records.py --db db.toml --tasks tasks.json
+records   {'lines': 9, 'customers': 4, 'bills': 6}
+writes    8
+shipped   0   (the clause must spell the id the write carries)
+blind     8   (a token table with the ambiguity ignored)
+strict    0   (a token table with the ambiguity refused)
+handle    8   (the record the episode read, compared at the finest type both name)
+credits   555-123-2002: blind ['L1001','L1002','L1003']  handle ['L1002']  shipped []  strict []
+```
+
+**Know the limit you have accepted.** The grade rests on a read, so a request whose number no account claims
+resolves to nothing and credits nothing. A static table would reach it and would also reach every sibling. If your
+corpus is full of such numbers, the repair is a resolver in the domain's own tools, not a wider rule in the
+instrument.
+
+**Cost.** ¥0. Every number above is arithmetic over a corpus and a rule; no model is called, and `--verify` re-derives
+the whole block from the two source files whose digests sit in the manifest.

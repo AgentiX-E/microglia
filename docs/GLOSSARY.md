@@ -3124,3 +3124,21 @@ zero cost: if a domain's settlement grade reaches none of its graded writes, no 
 gates that follow buy the sign, then the size with a control, then a publishable score — in that order, because each
 one can cancel the next. A registration names the first *paid* gate, and the manifest check refuses a registration
 whose figure is not that rung's own price.
+
+**Handle** — a token a request uses to name a record when the domain keys that record by something else: a phone
+number naming a line, an account number naming a customer. A handle is not an identifier, and no string comparison
+can bridge the two — the bridge is a **read**, so a settlement that uses one is anchored on what the episode resolved
+rather than on what the clause spells. That is why the grade it produces (`handle`) is reported separately from
+`record`: it is a weaker claim, and a reader has to be able to see how much of a board rests on it.
+
+**Settlement lattice** — the rule that compares an ask's typed records against a receipt's at the **finest type both
+sides commit to**. A line carries its account, so both sides of a settlement usually name a line *and* an account;
+a plain intersection would then settle a write to one line from an ask about another. The lattice refuses that: if
+both sides name a line, the lines must intersect; if both name a bill, the bills must; otherwise the records compare
+on their spelling, which is what keeps an untyped identifier working.
+
+**Sibling (of a record)** — a record under the same owner that the request did not name: the account's other lines,
+its other bills. A settlement rule that credits a sibling passes every reach count and fails the only question worth
+asking, which is why every rule in this lane is scored on **two** axes — the writes it reaches and the records it
+wrongly credits. R241 measures the third domain at 8 of 8 reached and one line of nine credited, against the
+ambiguity-blind table's three.

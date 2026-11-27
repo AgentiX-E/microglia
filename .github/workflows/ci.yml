@@ -242,14 +242,18 @@ jobs:
           python3 -m coverage run --append --branch --include="*/eval/tools/memory_traps.py" \
             eval/tools/memory_traps.py --self-test
           python3 eval/tools/memory_traps.py --check eval/manifests/r237-traps.json
-          # R240. The third domain's records, and the question that decides whether the record grade can reach them:
-          # a telecom request names its line by a phone number, and in this database a customer's phone number is
-          # also one of their lines'. Under the floor for the reason R227's census is - the file reports a zero
-          # (0 of 8 writes reachable under the shipped rule) and a zero is only a reading if the rule that produced
-          # it can be re-run.
+          # R240/R241. The third domain's records, and the question that decides whether the record grade can reach
+          # them: a telecom request names its line by a phone number, and in this database a customer's phone number
+          # is also one of their lines'. Under the floor for the reason R227's census is - the file reports readings
+          # that nothing else in the suite would notice going wrong (0 of 8 writes reachable by identifier against 8
+          # by the record the episode read, crediting one line of nine against the ambiguity-blind rule's three) and
+          # a reading is only a reading if the rule that produced it can be re-run. `--verify` re-derives the whole
+          # block from the two source files, whose digests are in the manifest and whose bytes are in this repository:
+          # without it the manifest can only check its own arithmetic, which is what R240 shipped.
           python3 -m coverage run --append --branch --include="*/scripts/build_telecom_records.py" \
             scripts/build_telecom_records.py --self-test
           python3 scripts/build_telecom_records.py --check eval/manifests/telecom-records.json
+          python3 scripts/build_telecom_records.py --verify eval/manifests/telecom-records.json
           python3 -m coverage json -o coverage-python.json
           python3 scripts/check-python-coverage.py --self-test
           python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 30

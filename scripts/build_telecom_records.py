@@ -17,10 +17,30 @@ the answer needs them:
   3. **price the repair** — a token table that resolves a phone number to the record it names — and report what that
      table would buy, and what it would cost in over-credit.
 
-The third reading is the round. In this domain a customer's `phone_number` equals one of *their own* lines', so the
-only token the requests carry names **two records**. A table that ignores that reads 6 of 6 and would credit a write
-to one line from an ask about another; a rule that refuses the ambiguity reads 0 of 6. Both numbers are reported,
-because the finding is the pair.
+The third reading was R240's round. In this domain a customer's `phone_number` equals one of *their own* lines', so
+the only token the requests carry names **two records**. A table that ignores that reads 6 of 6 and would credit a
+write to one line from an ask about another; a rule that refuses the ambiguity reads 0 of 6. Both numbers are
+reported, because the finding is the pair.
+
+**R241 adds the fourth reading and the column that decides between them.** The repair is not a token table — a table
+would be a second copy of the database inside a memory instrument — but the resolution the *episode* performed: the
+customer read by phone, then the lines that account holds. `goal_board.handles_in` types each token through those
+relations and `goal_board.same_record` compares at the finest type both sides name, so an ask about one line can no
+longer be settled by a write to a sibling of that line on the same account.
+
+A reach count alone cannot separate that rule from the ambiguity-blind one; both read every write. So every rule is
+scored **twice**: on the task set's real writes, and on a counterfactual that synthesises a write against every line
+in the database. The correct answer there is one line — the one whose own number the request spells — and the
+distance between the rules is the round:
+
+    rule      reaches (of n)   credits (of every line)
+    shipped   0                0
+    blind     n                every line on the account
+    strict    0                0
+    handle    n                1
+
+Both readings are taken through the **shipped** resolver (`goal_board`, imported rather than re-implemented), so a
+defect in the product's rule is a defect in this table rather than a difference between two implementations.
 
 Usage:
   build_telecom_records.py --db db.toml --tasks tasks_small.json --out eval/manifests/telecom-records.json
@@ -39,6 +59,13 @@ import sys
 import tempfile
 
 HERE = pathlib.Path(__file__).resolve().parents[1]
+
+#: R241. The resolver the **product** ships, imported rather than re-implemented. A reading taken through a copy of the
+#: rule is a reading about the copy: the copy can be right while the shipped rule is wrong, and the two drift with
+#: nothing failing. Importing it is also what lets this script answer the question it was written for — whether the
+#: rule *as it ships* can read the third domain — rather than whether a rule it invented for the occasion can.
+sys.path.insert(0, str(HERE / "eval" / "tools"))
+import goal_board  # noqa: E402  (after the path insert, which is the only way this file can import the lane)
 
 #: The tools that change telecom state, and the family each belongs to. Derived from the domain's own tool list and
 #: asserted against `goal_board.FAMILIES` in the self-test rather than imported, because this script has to run on a
@@ -80,11 +107,21 @@ line_id = "L2"
 phone_number = "555-000-0002"
 plan_id = "P1"
 device_id = "D1"
+[[lines]]
+line_id = "L3"
+phone_number = "555-000-0003"
+plan_id = "P1"
+device_id = "D1"
+[[lines]]
+line_id = "L4"
+phone_number = "555-000-0004"
+plan_id = "P1"
+device_id = "D1"
 [[customers]]
 customer_id = "C1"
 full_name = "Ada Lovelace"
 phone_number = "555-000-0001"
-line_ids = ["L1"]
+line_ids = ["L1", "L3"]
 bill_ids = ["B1"]
 [[customers]]
 customer_id = "C2"
@@ -359,33 +396,42 @@ def request_of(task: dict) -> str:
 
 
 def reading(db: dict, tasks: list) -> dict:
-    """The three numbers, over every graded write in the task set."""
+    """The four numbers, over every graded write in the task set, plus what each rule costs in over-credit.
+
+    R241 adds the fourth rule and, with it, the column that decides between them: a rule is not better because it
+    reaches more writes, it is better when it reaches the right ones **and refuses the others**. So every rule is
+    scored twice — on the eight real writes, and on the nine writes the request does *not* name.
+    """
     records = project(db)
     table = claims(records)
     ambiguous_tokens = ambiguous(table)
     rows: list = []
+    # One rule set and one counterfactual per **distinct request**, keyed by the number it carries, because a task set
+    # may name more than one caller and a counterfactual read off the first task would silently be an answer about one
+    # of them. A request that carries no number is keyed by `""` and is a finding in its own right.
+    rules_of_text: dict = {}
+    credits: dict = {}
     for task in tasks:
         text = request_of(task)
+        if text not in rules_of_text:
+            rules_of_text[text] = rules_for(text, table, ambiguous_tokens, reads_for(db, text))
+            phone = (PHONE.findall(text) or [""])[0]
+            credits.setdefault(phone, sibling_credits(db, rules_of_text[text]))
+        rules = rules_of_text[text]
         for write in graded_writes(task):
             wanted = receipt_keys(write["arguments"], table)
             if not wanted:
                 continue
-            shipped = bool(resolve(text, table, refuse_ambiguous=False) & wanted) and not any(
-                token in ambiguous_tokens for token in PHONE.findall(text)
-            )
-            blind = bool(resolve(text, table, refuse_ambiguous=False) & wanted)
-            strict = bool(resolve(text, table, refuse_ambiguous=True) & wanted)
-            rows.append(
-                {
-                    "task": task.get("id"),
-                    "wanted": sorted(wanted),
-                    "shipped": shipped,
-                    "blind": blind,
-                    "strict": strict,
-                    "tokens": sorted({token.lower() for token in PHONE.findall(text)}),
-                }
-            )
+            row = {
+                "task": task.get("id"),
+                "wanted": sorted(wanted),
+                "tokens": sorted({token.lower() for token in PHONE.findall(text)}),
+            }
+            for name, rule in rules.items():
+                row[name] = bool(rule(write["arguments"]))
+            rows.append(row)
     total = len(rows)
+    counted = {name: sum(1 for row in rows if row.get(name)) for name in ("shipped", "blind", "strict", "handle")}
     return {
         "records": {
             "lines": len(records["lines"]),
@@ -393,17 +439,111 @@ def reading(db: dict, tasks: list) -> dict:
             "bills": len(records["bills"]),
         },
         "writes": total,
-        # The rule as it ships: an ask names a record only when the clause spells the identifier the write carries.
-        # A phone number is not one of those, and it is the only handle the request gives, so this reads zero.
-        "shipped": sum(1 for row in rows if row["shipped"]),
+        # The rule as it ships before R241: an ask names a record only when the clause spells the identifier the write
+        # carries. A phone number is not one of those, and it is the only handle the request gives, so this reads zero.
+        "shipped": counted["shipped"],
         # The repair with its ambiguity ignored: every request reaches its record, and an ask about the household
         # reaches a write to any of its lines. Reportable, not shippable.
-        "blind": sum(1 for row in rows if row["blind"]),
+        "blind": counted["blind"],
         # The repair with the ambiguity refused: a token that names two records names neither.
-        "strict": sum(1 for row in rows if row["strict"]),
+        "strict": counted["strict"],
+        # R241. The record the episode **read**: the phone resolves to the line that claims it and to that line's
+        # account, never to a sibling, and the write is compared at the finest type both sides name.
+        "handle": counted["handle"],
+        # The counterfactual, per rule: which of the database's lines an ask about the caller's number would credit.
+        # A rule that reaches eight of eight and credits nine of nine has learned nothing; the pair is the finding.
+        "credits": credits,
         "ambiguous": ambiguous_tokens,
         "rows": rows,
     }
+
+
+def reads_for(db: dict, text: str) -> list:
+    """The transcript an episode must have produced before it can write, from the database alone.
+
+    The episodes are not on disk, so the read has to be reconstructed — and it is reconstructed as the **minimum** the
+    domain's own tools require, not as a favourable sample: every τ² telecom task begins with the caller's number and
+    every route to a write passes through the account that number belongs to. So the prelude is the customer read, then
+    one read of each line that account holds. An episode that did less could not have named a line at all; an episode
+    that did more has read *more* records, which can only widen what the resolver knows.
+
+    A request that carries no number gets no prelude, and that is the point of the second argument being text rather
+    than a task: a domain whose requests name no handle at all is a finding, not an error.
+    """
+    records = project(db)
+    numbers = PHONE.findall(text)
+    messages: list = [{"role": "user", "content": text}]
+    if not numbers:
+        return messages
+    phone = numbers[0]
+    customer = next(
+        (entry for entry in records["customers"].values() if (entry.get("phone") or "").lower() == phone.lower()),
+        None,
+    )
+    if customer is None:
+        return messages
+    messages.append({"role": "assistant",
+                     "tool_calls": [{"name": "get_customer_by_phone", "arguments": {"phone_number": phone}}]})
+    messages.append({"role": "tool", "content": json.dumps(
+        {"customer_id": customer["id"], "phone_number": phone, "line_ids": customer["lines"]})})
+    for line_id in customer["lines"]:
+        line = records["lines"].get(line_id) or {}
+        messages.append({"role": "assistant",
+                         "tool_calls": [{"name": "get_details_by_id", "arguments": {"line_id": line_id}}]})
+        messages.append({"role": "tool", "content": json.dumps(
+            {"line_id": line_id, "phone_number": line.get("phone")})})
+    return messages
+
+
+def rules_for(text: str, table: dict, ambiguous_tokens: dict, messages: list) -> dict:
+    """The four rules, as four predicates over one write's arguments.
+
+    They are built from the same text and the same read, so the difference between any two of them is the rule and not
+    the input — which is what makes the table an ablation rather than four measurements of four different questions.
+    """
+    read = goal_board.read_records(messages)
+    ask = goal_board.handles_in(text, read)
+
+    def shipped(arguments: dict) -> bool:
+        wanted = receipt_keys(arguments, table)
+        return bool(resolve(text, table, False) & wanted) and not any(
+            token in ambiguous_tokens for token in PHONE.findall(text))
+
+    def blind(arguments: dict) -> bool:
+        return bool(resolve(text, table, False) & receipt_keys(arguments, table))
+
+    def strict(arguments: dict) -> bool:
+        return bool(resolve(text, table, True) & receipt_keys(arguments, table))
+
+    def handle(arguments: dict) -> bool:
+        return goal_board.same_record(ask, goal_board.receipt_keys({"args": arguments}))
+
+    return {"shipped": shipped, "blind": blind, "strict": strict, "handle": handle}
+
+
+def sibling_credits(db: dict, rules: dict) -> dict:
+    """Which of the database's lines each rule would credit for an ask about **one** line.
+
+    The counterfactual is the whole discipline of this round: reaching the eight real writes is necessary and nowhere
+    near sufficient. A write is synthesised for every line in the database — `resume_line` on that line, carrying its
+    account — and each rule is asked whether it would credit it. The correct answer is a **set of one**, the line whose
+    own number the request spells; every other element of every other set is a credit for work nobody asked for.
+    """
+    records = project(db)
+    owner_of = {
+        line_id: customer["id"]
+        for customer in records["customers"].values()
+        for line_id in customer["lines"]
+    }
+    credited: dict = {name: [] for name in rules}
+    for line_id in sorted(records["lines"]):
+        arguments = {"line_id": line_id}
+        if owner_of.get(line_id):
+            arguments["customer_id"] = owner_of[line_id]
+        for name, rule in rules.items():
+            if rule(arguments):
+                credited[name].append(line_id)
+    return credited
 
 
 def self_test() -> int:
@@ -420,7 +560,7 @@ def self_test() -> int:
     db = toml_of(_DB)
     records = project(db)
     expect("a line is projected with its id and phone", records["lines"]["L1"]["phone"] == "555-000-0001")
-    expect("a customer keeps the lines it owns", records["customers"]["C1"]["lines"] == ["L1"])
+    expect("a customer keeps the lines it owns", records["customers"]["C1"]["lines"] == ["L1", "L3"])
     expect("a bill keeps its period", records["bills"]["B1"]["period"] == "2025-01-01..2025-01-31")
     table = claims(records)
     expect("both a line's id and its phone are identity tokens",
@@ -472,6 +612,27 @@ def self_test() -> int:
     expect("the ambiguous request ships nothing under the shipped rule", two["shipped"] == 0)
     expect("reads its record when the ambiguity is ignored", two["blind"] == 1)
     expect("and nothing when it is refused", two["strict"] == 0)
+    # R241. The record the episode read. Ada's number is her line's, so the resolver types it as that line **and her
+    # account** — and the lattice compares at the finest type both sides name, which is what keeps the sibling out.
+    expect("the record the episode read settles the write it names", two["handle"] == 1)
+    expect("and credits exactly the line whose number the caller gave",
+           two["credits"]["555-000-0001"]["handle"] == ["L1"])
+    expect("while the ambiguity-blind table credits the sibling as well",
+           two["credits"]["555-000-0001"]["blind"] == ["L1", "L3"])
+    expect("and neither the shipped rule nor the strict one credits anything",
+           two["credits"]["555-000-0001"]["shipped"] == [] and two["credits"]["555-000-0001"]["strict"] == [])
+    # The limit, stated rather than hidden: the handle grade rests on a **read**, so a number that no account claims —
+    # a second line's, in this fixture — gets no prelude and credits nothing. The static table reaches it (it scans
+    # every record) and the shipped rule does not, which is the price of anchoring on the transcript: a resolution the
+    # episode never made is a resolution the board cannot use. In the real task set all twenty requests carry the
+    # account's contact number, so this case is a bound and not a reading.
+    expect("a number no account claims credits nothing under the handle grade", one["handle"] == 0)
+    expect("a request that carries no number gets no prelude, and the resolver is told about no record",
+           [message["role"] for message in reads_for(db, "my data is slow")] == ["user"])
+    # The counterfactual is taken once per distinct request: a task set that repeats a request must not pay for a
+    # second scan, and — more to the point — must not report a second, disagreeing one.
+    repeated = reading(db, [task, ada_task, {**task, "id": "t-again"}])
+    expect("a repeated request is measured once", len(repeated["credits"]) == 2 and repeated["writes"] == 5)
 
     # The walkers' refusals. Each of these is a shape the corpus produces: a task with no initial state at all, an
     # action list holding something that is not a dict, an action that reads rather than writes, and a write whose
@@ -573,6 +734,64 @@ def self_test() -> int:
         (root / "miscounted.json").write_text(json.dumps(miscounted), encoding="utf-8")
         with contextlib.redirect_stdout(io.StringIO()):
             expect("a miscounted total is refused", main(["--check", str(root / "miscounted.json")]) == 1)
+        # R241's two new ways to be wrong: a handle count that is not its rows, and a counterfactual that credits a
+        # sibling. Both are tampered deliberately — a check nobody has seen reject anything is a check whose
+        # emptiness is a guess, which is the lesson R238 recorded when its tamper stopped tampering.
+        handle_tamper = json.loads(out.read_text(encoding="utf-8"))
+        handle_tamper["reading"]["handle"] = 0
+        handle_tamper["reading"]["rows"][0]["handle"] = True
+        (root / "handle.json").write_text(json.dumps(handle_tamper), encoding="utf-8")
+        with contextlib.redirect_stdout(io.StringIO()):
+            expect("a handle count that is not its rows is refused",
+                   main(["--check", str(root / "handle.json")]) == 1)
+        sibling_tamper = json.loads(out.read_text(encoding="utf-8"))
+        for per_rule in sibling_tamper["reading"]["credits"].values():
+            per_rule["handle"] = ["L1", "L2"]
+        (root / "sibling.json").write_text(json.dumps(sibling_tamper), encoding="utf-8")
+        with contextlib.redirect_stdout(io.StringIO()):
+            expect("a counterfactual that credits two lines is refused",
+                   main(["--check", str(root / "sibling.json")]) == 1)
+        no_credit = json.loads(out.read_text(encoding="utf-8"))
+        no_credit["reading"].pop("credits")
+        (root / "nocr.json").write_text(json.dumps(no_credit), encoding="utf-8")
+        with contextlib.redirect_stdout(io.StringIO()):
+            expect("a reading with no counterfactual is refused", main(["--check", str(root / "nocr.json")]) == 1)
+        short_rule = json.loads(out.read_text(encoding="utf-8"))
+        for per_rule in short_rule["reading"]["credits"].values():
+            per_rule.pop("handle", None)
+        (root / "short.json").write_text(json.dumps(short_rule), encoding="utf-8")
+        with contextlib.redirect_stdout(io.StringIO()):
+            expect("a counterfactual missing a rule is refused", main(["--check", str(root / "short.json")]) == 1)
+        # Re-derivation: the reading against the bytes it names, which is the one check the arithmetic cannot make.
+        expect("a manifest re-derives from its own bytes",
+               verified(json.loads(out.read_text(encoding="utf-8")), root) == [])
+        drifted = json.loads(out.read_text(encoding="utf-8"))
+        drifted["reading"]["handle"] = 99
+        expect("a figure that does not come back is named",
+               any("handle" in problem for problem in verified(drifted, root)))
+        absent = json.loads(out.read_text(encoding="utf-8"))
+        absent["sources"] = absent["sources"][1:]
+        expect("a source the manifest does not name is refused", len(verified(absent, root)) >= 1)
+        stranger = json.loads(out.read_text(encoding="utf-8"))
+        stranger["sources"][0]["sha256"] = "0" * 64
+        expect("a file that is not the one the reading was taken from is refused",
+               any("not the file" in problem for problem in verified(stranger, root)))
+        expect("a manifest whose source is not in the checkout is refused",
+               len(verified(json.loads(out.read_text(encoding="utf-8")), root / "nowhere")) == 2)
+        with contextlib.redirect_stdout(io.StringIO()):
+            expect("the verify branch exits zero on a good manifest",
+                   main(["--verify", str(out), "--sources", str(root)]) == 0)
+        # A manifest that has drifted from its own bytes: the projection and the row labels are both wrong, and both
+        # are things the arithmetic of `--check` would happily accept.
+        drifted = json.loads(out.read_text(encoding="utf-8"))
+        drifted["reading"]["records"]["lines"] = 99
+        drifted["reading"]["rows"][0]["task"] = "another"
+        (root / "drift.json").write_text(json.dumps(drifted), encoding="utf-8")
+        with contextlib.redirect_stdout(io.StringIO()) as said:
+            expect("a drifted manifest is refused by the verify branch",
+                   main(["--verify", str(root / "drift.json"), "--sources", str(root)]) == 1)
+        expect("and the refusal names what did not come back",
+               "records" in said.getvalue() and "rows" in said.getvalue())
         # The value of `--db` without `--tasks`, and the machine-readable branch: the two paths a reader of this file
         # reaches from a terminal rather than from CI.
         for name, argv in (("a missing task set is a usage error", ["--db", str(root / "db.toml")]),
@@ -603,6 +822,11 @@ def main(argv: list) -> int:
     parser.add_argument("--out", default="")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--check", default="", help="check that a saved reading adds up")
+    parser.add_argument("--verify", default="", help="re-derive a saved reading from the sources it names")
+    #: Where the sources named by a manifest are looked for. A parameter rather than a constant because the self-test
+    #: writes its own corpus to a temporary directory, and a reader that could only ever look in one place would have
+    #: to be trusted about the place it looks.
+    parser.add_argument("--sources", default=str(FIXTURES))
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args(argv)
     if args.self_test:
@@ -616,16 +840,30 @@ def main(argv: list) -> int:
             print(f"ok  {pathlib.Path(args.check).name}: {saved['reading']['shipped']} of "
                   f"{saved['reading']['writes']} write(s) reach a record under the shipped rule")
         return 1 if problems else 0
+    if args.verify:
+        saved = json.loads(pathlib.Path(args.verify).read_text(encoding="utf-8"))
+        problems = checked(saved) + verified(saved, pathlib.Path(args.sources))
+        for problem in problems:
+            print(f"FAIL {problem}")
+        if not problems:
+            result = saved["reading"]
+            print(f"ok  {pathlib.Path(args.verify).name}: re-derived from its own bytes — "
+                  f"{result['handle']} of {result['writes']} write(s) reach a record by handle against "
+                  f"{result['shipped']} by identifier")
+        return 1 if problems else 0
     if not (args.db and args.tasks):
-        parser.error("--db and --tasks are required unless --self-test or --check")
+        parser.error("--db and --tasks are required unless --self-test, --check or --verify")
     db_path, task_path = pathlib.Path(args.db), pathlib.Path(args.tasks)
     document = {
         "schema": "microglia/telecom-records@1",
         "note": (
             "The third domain's records, and the one question that decides whether the record grade can reach them: "
             "its requests name a line by a phone number, and in this database a customer's phone number is also one "
-            "of their lines'. A string intersection cannot tell the two apart, so the shipped rule reads zero and a "
-            "table that ignores the ambiguity would read every write — including the ones it should refuse."
+            "of their lines'. A string intersection cannot tell the two apart, so the shipped rule reads zero; a table "
+            "that ignores the ambiguity reads every write including the ones it should refuse; and the rule that reads "
+            "them is the record the episode itself resolved, compared at the finest type both sides name. `credits` is "
+            "the counterfactual that separates the last two: a write synthesised against every line in the database, "
+            "where the right answer is one line and the blind table reaches three."
         ),
         "sources": [{"role": "database", **digest(db_path)}, {"role": "tasks", **digest(task_path)}],
         "reading": reading(toml_of(db_path.read_text(encoding="utf-8")),
@@ -644,8 +882,61 @@ def main(argv: list) -> int:
         print(f"shipped   {result['shipped']}   (the rule as it ships: the clause must spell the id the write carries)")
         print(f"blind     {result['blind']}   (a token table with the ambiguity ignored)")
         print(f"strict    {result['strict']}   (a token table with the ambiguity refused)")
+        print(f"handle    {result['handle']}   (the record the episode read, compared at the finest type both name)")
+        for phone, per_rule in sorted(result["credits"].items()):
+            print(f"credits   {phone or '(no number)'}: "
+                  + "  ".join(f"{name} {sorted(ids)}" for name, ids in sorted(per_rule.items())))
         print(f"ambiguous {sorted(result['ambiguous'])}")
     return 0
+
+
+FIXTURES = HERE / "eval" / "fixtures" / "telecom"
+
+
+def verified(saved: dict, root: pathlib.Path = FIXTURES) -> list:
+    """Re-run the reading from the bytes the manifest names, and report every figure that does not come back.
+
+    `checked` re-adds a manifest's own arithmetic; it cannot tell whether the arithmetic was ever about this corpus,
+    because a reading whose rows add up perfectly can have been taken from a database that has since changed, or from
+    none at all. This function is the other half: the two source files are in the repository, their digests are in the
+    manifest, and the whole reading is recomputed from them and compared field by field. A claim of the form "0 of 8
+    before, 8 of 8 after" is worth nothing if it cannot be re-derived by the next person who reads it — and R240
+    shipped the zero on a manifest that could not.
+    """
+    problems: list = []
+    sources = {source.get("role"): source for source in saved.get("sources") or []}
+    located: dict = {}
+    for role in ("database", "tasks"):
+        source = sources.get(role)
+        if not source:
+            problems.append(f"no {role} among the sources")
+            continue
+        path = root / str(source.get("path") or "")
+        if not path.is_file():
+            problems.append(f"{role}: {path} is not in this checkout, so the reading cannot be re-derived")
+            continue
+        data = path.read_bytes()
+        if hashlib.sha256(data).hexdigest() != source.get("sha256"):
+            problems.append(f"{role}: {source.get('path')} is not the file this reading was taken from")
+            continue
+        located[role] = data
+    if len(located) != 2:
+        return problems
+    fresh = reading(toml_of(located["database"].decode("utf-8")), json.loads(located["tasks"].decode("utf-8")))
+    stored = saved.get("reading") or {}
+    for field in ("writes", "shipped", "blind", "strict", "handle"):
+        if fresh.get(field) != stored.get(field):
+            problems.append(f"{field}: {stored.get(field)} recorded against {fresh.get(field)} re-derived")
+    for field in ("credits", "records", "ambiguous"):
+        if fresh.get(field) != stored.get(field):
+            problems.append(f"{field}: the {field} block does not come back from these bytes")
+    fresh_rows = [(row.get("task"), row.get("shipped"), row.get("blind"), row.get("strict"), row.get("handle"))
+                  for row in fresh.get("rows") or []]
+    stored_rows = [(row.get("task"), row.get("shipped"), row.get("blind"), row.get("strict"), row.get("handle"))
+                   for row in stored.get("rows") or []]
+    if fresh_rows != stored_rows:
+        problems.append(f"rows: {len(stored_rows)} recorded against {len(fresh_rows)} re-derived")
+    return problems
 
 
 def checked(saved: dict) -> list:
@@ -660,12 +951,31 @@ def checked(saved: dict) -> list:
     rows = result.get("rows") or []
     if result.get("writes") != len(rows):
         problems.append(f"writes: {result.get('writes')} against {len(rows)} row(s)")
-    for column in ("shipped", "blind", "strict"):
+    for column in ("shipped", "blind", "strict", "handle"):
         wanted = sum(1 for row in rows if row.get(column))
         if result.get(column) != wanted:
             problems.append(f"{column}: {result.get(column)} against {wanted} row(s)")
     if (result.get("strict") or 0) > (result.get("blind") or 0):
         problems.append("strict exceeds blind: refusing an ambiguous token cannot reach more than accepting it")
+    # R241's counterfactual, held to the only claim that makes the handle grade worth shipping: it credits **exactly
+    # one** line for a request that names one, and that line is among the ones the blind table credits. Anything else
+    # is either a rule that is still crediting siblings or a recording error, and a reader cannot tell which.
+    credits = result.get("credits") or {}
+    if not credits:
+        problems.append("no counterfactual: a reach count with no over-credit column is half a reading")
+    for phone, per_rule in credits.items():
+        missing = {"shipped", "blind", "strict", "handle"} - set(per_rule)
+        if missing:
+            problems.append(f"counterfactual for {phone!r} is missing {sorted(missing)}")
+            continue
+        credited = per_rule["handle"]
+        # "At most one", not "exactly one": a request whose number no account claims resolves to nothing, and a
+        # checker that demanded one would fail the very case the rule is supposed to refuse. The claim that it credits
+        # *the* line is a statement about this database, and it is made in the report rather than in the arithmetic.
+        if len(credited) > 1:
+            problems.append(f"counterfactual for {phone!r}: the handle rule credits {len(credited)} line(s)")
+        if not set(credited) <= set(per_rule["blind"]):
+            problems.append(f"counterfactual for {phone!r}: the handle rule credits a line the blind one does not")
     if len(saved.get("sources") or []) != 2:
         problems.append("expected a database and a task set beside the reading")
     for row in rows:

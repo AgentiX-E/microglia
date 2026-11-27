@@ -799,7 +799,7 @@ stops being true. `pnpm eval:coupling` recomputes it from the source tree on eve
 
 | layer | production modules | lines | modules that name a scenario |
 |---|---|---|---|
-| `core` | 49 | 10,834 | **0** |
+| `core` | 49 | 10,846 | **0** |
 | `protocol` | 3 | 1,922 | **0** |
 | `sql` (the adapter) | 7 | **1,956** | 5 |
 | `eval` | 198 | 59,836 | 25, each with a written reason |
@@ -1280,7 +1280,7 @@ four causes it classifies, said that the round's registered diagnosis (a set phr
 was worth **two settlements in a hundred and seven**. The bulk was three other defects: an ask one word short of the
 product it names (28 episodes), a contract sealed on a greeting that carried no ask (14), and the account families —
 address, payment, transfer — whose receipts carry no item id at all. With those repaired the same replay reports
-**69.2%**, and `loose` says how many of the ticks came from the weaker of the two settlement grades.
+**69.2%**, and `loose` says how many of the ticks came from the weaker of the two name grades.
 
 The grid is one attempt over 114 tasks with both arms in one seed world, which is the cheapest powered
 behavioural design in this lane: a floor near 9 points, against 20 for the 24-task grid every earlier reading

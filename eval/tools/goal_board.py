@@ -131,6 +131,20 @@ FAMILIES = {
     "update_reservation_passengers": "passenger",
     "update_reservation_baggages": "baggage",
     "book_reservation": "book",
+    # R241a. The third domain's nine state-changing tools. They are here for the same reason the airline five are: a
+    # family is the **shape of an ask**, and a board that cannot see a write cannot settle one. What is *not* shipped
+    # with them is a cue — the vocabulary that recognises these asks in a request — which is a separate axis (R217a
+    # paid for the airline three) and is named in the manifest's `notYet` rather than left as a silent gap. Two of
+    # these names collide with a retail family on purpose: `payment` is a payment in both domains, and the shape of the
+    # ask is the same shape even though the object differs.
+    "suspend_line": "suspend",
+    "resume_line": "resume",
+    "enable_roaming": "roaming",
+    "disable_roaming": "roaming",
+    "refuel_data": "refuel",
+    "change_plan": "plan",
+    "send_payment_request": "payment",
+    "apply_credit": "credit",
 }
 
 #: How an ask is recognised in the user's words. Closed and short on purpose: a cue list that grows with the
@@ -596,6 +610,205 @@ def records_in(text: str) -> set:
     return {found.lower() for found in RECORD.findall(text)}
 
 
+#: R241. The three record types the third domain keys its state by, and the two relations between them. Written as
+#: names rather than inferred from an argument's spelling because the lattice below compares at a **type**, and a type
+#: that fell out of a string's shape would be a guess.
+LINE, CUSTOMER, BILL = "line", "customer", "bill"
+
+#: The types that are owned by another: a line belongs to the customer who holds it, a bill to the account it is issued
+#: to. A key of one of these types carries its owner with it, which is why the lattice never has to look one up.
+OWNED = (LINE, BILL)
+
+
+def _records(value, found: list) -> None:
+    """Every record-shaped dict in a tool result, at any depth.
+
+    The test is the presence of a key that names a record's **own** identifier, because that is what distinguishes a
+    record from the arguments that describe one: a line carries `line_id`, a customer `customer_id`, a bill `bill_id`.
+    Nothing is inferred from the shape of the value — a rule that read `C1001` as a customer because of its letter
+    would be a rule fitted to one database's spelling.
+    """
+    if isinstance(value, dict):
+        if any(key in value for key in ("line_id", "customer_id", "bill_id")):
+            found.append(value)
+        for entry in value.values():
+            _records(entry, found)
+    elif isinstance(value, (list, tuple)):
+        for entry in value:
+            _records(entry, found)
+
+
+def read_records(messages) -> dict:
+    """The records an episode has **read**, as the three relations a settlement needs to be typed.
+
+    R240 measured the third domain's record grade at zero and named the reason: its requests name a line by a phone
+    number, and the shipped rule intersects the clause's identifiers against the receipt's, which is a string
+    comparison with no resolution step. The repair is not a static token table — a table would be a second copy of the
+    database living in a memory instrument — but the resolution **the episode itself performed**: the reads are in the
+    transcript, they carry the phone number on one side and the record ids on the other, and a board that anchors on
+    them cannot claim a resolution the episode never made.
+
+    Three relations, and each one is stated because the lattice below depends on it:
+
+        phones    `555-123-2002 -> L1002`   a **line** record whose own `phone_number` is that number. This is the
+                                            only relation that types a phone as a line, and it is deliberately sourced
+                                            from a line and not from a customer: a customer's phone number is the
+                                            account's contact number, which is a different assertion.
+        accounts  `555-123-1002 -> C1003`   a **customer** record whose own `phone_number` is that number. A token with
+                                            no line of its own resolves here and stops: the ask named the account.
+        owners    `L1002 -> C1001`          a customer record's `line_ids`, and a bill's `customer_id`. This is what
+                                            makes a line reachable from its account and never from a sibling.
+
+    `known` records which ids the transcript has actually shown, so an ask that spells `L1002` is typed as a line
+    because a line was read and not because of its shape.
+    """
+    phones: dict = {}
+    accounts: dict = {}
+    owners: dict = {}
+    known: dict = {}
+    for message in messages:
+        if role_of(message) != "tool":
+            continue
+        content = _field(message, "content")
+        if not isinstance(content, str):
+            continue
+        try:
+            parsed = json.loads(content)
+        except (TypeError, ValueError):
+            continue
+        found: list = []
+        _records(parsed, found)
+        for record in found:
+            line = record.get("line_id")
+            customer = record.get("customer_id")
+            bill = record.get("bill_id")
+            phone = record.get("phone_number")
+            if isinstance(line, str) and line:
+                known.setdefault(line.lower(), set()).add(LINE)
+                if isinstance(phone, str) and phone:
+                    phones.setdefault(phone.lower(), line.lower())
+            if isinstance(customer, str) and customer:
+                known.setdefault(customer.lower(), set()).add(CUSTOMER)
+                if isinstance(phone, str) and phone and not line:
+                    accounts.setdefault(phone.lower(), customer.lower())
+                for owned in record.get("line_ids") or []:
+                    if isinstance(owned, str) and owned:
+                        owners.setdefault(owned.lower(), customer.lower())
+                        # A line id listed by an account is a line, even before the line itself has been read. That is
+                        # the whole value of the relation: it types a bare `L1003` in an ask, which a rule reading only
+                        # line records could not do until the agent happened to fetch that line.
+                        known.setdefault(owned.lower(), set()).add(LINE)
+            if isinstance(bill, str) and bill:
+                known.setdefault(bill.lower(), set()).add(BILL)
+                if isinstance(customer, str) and customer:
+                    owners.setdefault(bill.lower(), customer.lower())
+    return {"phones": phones, "accounts": accounts, "owners": owners, "known": known}
+
+
+def handles_in(text: str, records: dict) -> set:
+    """The typed records an ask names, resolved through what the episode read — and never through its siblings.
+
+    A phone number that a **line** record claims resolves to that line *and its account*, which is the pair a request
+    is really about: the call is coming from that line, on that person's account. It does not resolve to the account's
+    other lines, and that is the whole of R241's repair — R240's `blind` reading resolved a household's number to
+    every line on it and would have credited a repair on the wrong one.
+
+    A token nothing was read for stays **untyped**. That is not a fallback for convenience: it is R238-R240's rule,
+    kept so that a domain whose receipts carry identifiers the episode never read (`#W7449508` in retail, where no read
+    is needed because the user types the order id) settles exactly as it did before this round.
+    """
+    keys: set = set()
+    if not isinstance(text, str):
+        return keys
+    phones = records.get("phones") or {}
+    accounts = records.get("accounts") or {}
+    owners = records.get("owners") or {}
+    known = records.get("known") or {}
+    for token in RECORD.findall(text):
+        lowered = token.lower()
+        line = phones.get(lowered)
+        if line:
+            keys.add((LINE, line))
+            if owners.get(line):
+                keys.add((CUSTOMER, owners[line]))
+            continue
+        account = accounts.get(lowered)
+        if account:
+            keys.add((CUSTOMER, account))
+            continue
+        kinds = known.get(lowered)
+        if kinds:
+            keys.update((kind, lowered) for kind in kinds)
+            continue
+        keys.add(("", lowered))
+    return keys
+
+
+def receipt_keys(receipt: dict) -> set:
+    """The typed records a receipt carries, keyed by the **argument name** that carried them.
+
+    returns "`line_id: L1002` names a line and `customer_id: C1001` names a customer", and the type is what lets the
+    lattice tell "a write on the account" from "a write on another line of the same account". A receipt that reached
+    this module without its arguments — a hand-built one in a test, or a reader that built the list before R228 added
+    `args` — falls back to its flattened `ids`, untyped, which is exactly the evidence it has.
+
+    **Where the type is given, the shape is not required.** `_id_values` insists on an identifier-shaped string because
+    the shape is the only evidence it has of anything; here the argument's own name has already said what the value is,
+    so a database whose ids are `L1` and `C1` is read as readily as one whose ids are `L1002`. The reverse mistake —
+    asking a typed value to also look like a record — silently empties the comparison on any corpus with short ids,
+    and does it without failing: every set stays well-formed and every reading stays zero.
+    """
+    keys: set = set()
+    arguments = receipt.get("args")
+    if isinstance(arguments, dict):
+        for name, value in arguments.items():
+            if not isinstance(name, str):
+                continue
+            kind = ""
+            # Four suffixes, and the cut is stated per branch because a single `[:-3]` is off by one for `_id` and
+            # produces a type named `line_` — a defect that would not fail a test that only asked whether *some* key
+            # was produced, and would silently make every typed comparison a comparison of two untyped spellings.
+            if name.endswith("_ids"):
+                kind = name[:-4]
+            elif name.endswith("ids"):
+                kind = name[:-3]
+            elif name.endswith("_id"):
+                kind = name[:-3]
+            elif name.endswith("id"):
+                kind = name[:-2]
+            if not kind:
+                continue
+            for entry in value if isinstance(value, (list, tuple)) else [value]:
+                if isinstance(entry, str) and entry.strip():
+                    keys.add((kind, entry.strip().lower()))
+    if not keys:
+        keys.update(("", str(identifier).lower()) for identifier in receipt.get("ids") or [])
+    return keys
+
+
+def same_record(ask: set, carried: set) -> bool:
+    """Whether an ask's typed keys and a receipt's name the same record, at the finest type both sides commit to.
+
+    The lattice, stated as three rules in the order they are consulted:
+
+      1. **both sides name a line** → the lines must intersect. This is the rule that refuses a sibling: an ask about
+         the line whose number the caller gave cannot be settled by a write to another line on the same account, and
+         a plain set intersection would settle it, because both sides also carry the account.
+      2. **both sides name a bill** → the bills must intersect, for the same reason one level up.
+      3. **otherwise** → compare the records themselves, ignoring type. A receipt that names only the account settles an
+         ask about one of its lines (the write really is about that account), and an untyped key on either side —
+         retail's order id, which no read ever typed — compares on its spelling, which is R238's rule unchanged.
+    """
+    if not ask or not carried:
+        return False
+    for kind in OWNED:
+        left = {name for key, name in ask if key == kind}
+        right = {name for key, name in carried if key == kind}
+        if left and right:
+            return bool(left & right)
+    return bool({name for _, name in ask} & {name for _, name in carried})
+
+
 def _id_values(value, found: list) -> None:
     """Every identifier-shaped string in a tool call's arguments, at any depth."""
     if isinstance(value, str):
@@ -730,7 +943,7 @@ def grade_of(name_words: set, words: set) -> str:
     return ""
 
 
-def settlement(item: dict, receipt: dict, table: dict) -> str:
+def settlement(item: dict, receipt: dict, table: dict, records: dict | None = None) -> str:
     """How strongly this receipt proves this ask was performed: `"name"`, `"overlap"`, or `""` for no.
 
     Two grades, because the corpus has two kinds of match and calling them one made R215 refuse 28 of its own
@@ -786,19 +999,23 @@ def settlement(item: dict, receipt: dict, table: dict) -> str:
     # excluded from the family rule by `names_a_product` — open for ever, after the order was cancelled. Guarding on
     # the receipt instead of the ask says the right thing: when the write carried products, a mismatch is a refusal and
     # an order id must not overrule it; when it carried none, the order id is the only evidence there is.
-    if not grade and not named and records_in(item.get("clause") or "") & {
-        str(identifier).lower() for identifier in receipt.get("ids") or []
-    }:
-        return "record"
+    if not grade and not named:
+        # R241. The evidence is the **record the episode read**, not only the identifier the clause spells. A domain
+        # whose requests name their record by a handle the database resolves (a phone number) has no identifier for a
+        # string comparison to intersect, so the resolution has to come from the transcript — and it is graded
+        # separately, because a tick that needed a read is a weaker claim than one the ask spelled out itself.
+        ask = handles_in(item.get("clause") or "", records or {})
+        if same_record(ask, receipt_keys(receipt)):
+            return "handle" if any(kind for kind, _ in ask) else "record"
     return grade
 
 
-def settles(item: dict, receipt: dict, table: dict) -> bool:
+def settles(item: dict, receipt: dict, table: dict, records: dict | None = None) -> bool:
     """Whether this receipt proves this ask was performed by name, at either grade.
 
     An ask that names no object cannot be settled here; it is settled by family in `board_of`, one receipt per ask.
     """
-    return settlement(item, receipt, table) != ""
+    return settlement(item, receipt, table, records) != ""
 
 
 def names_a_product(item: dict, table: dict) -> bool:
@@ -920,6 +1137,9 @@ def board_of(messages, scope: str = REQUEST) -> dict:
         items.extend(items_of(request_of(messages)))
     unique = _folded(items)
     table = name_table(messages)
+    # R241. The typed records the episode read, built once for the same reason the name table is: a settlement rule
+    # that rebuilt them per receipt would be a second implementation of the same facts, and the two would drift.
+    records = read_records(messages)
     receipts = receipts_of(messages)
     settled: dict = {}
     absorbed: dict = {}
@@ -935,6 +1155,10 @@ def board_of(messages, scope: str = REQUEST) -> dict:
     # identifier rather than a product. Counted for the same reason `loose` is: a reading whose ticks are mostly
     # records is a reading about a rule that trusts the ask's own spelling of its order.
     by_record = 0
+    # R241. How many ticks came from the handle grade — the record the episode *read*, resolved through the relations a
+    # read established. Counted separately from `by_record` because it is a weaker claim than an identifier the ask
+    # spelled: a reader has to be able to see how much of a board rests on a resolution rather than on a spelling.
+    by_handle = 0
     # R228. Which receipt settled which ask, by **position** in `receipts_of`'s list. The block a reader sees needs the
     # name (`settled_by`); a measurement that asks "did this board account for the call the evaluator required" needs
     # the position, because the call's family and the ask's family are the only thing a name can be compared on and a
@@ -947,12 +1171,13 @@ def board_of(messages, scope: str = REQUEST) -> dict:
         for index, item in enumerate(unique):
             if index in settled:
                 continue
-            grade = settlement(item, receipt, table)
+            grade = settlement(item, receipt, table, records)
             if grade:
                 settled[index] = receipt
                 settled_index[index] = position
                 loose += 1 if grade == "overlap" else 0
                 by_record += 1 if grade == "record" else 0
+                by_handle += 1 if grade == "handle" else 0
                 hit = True
         if not hit:
             # An ask that names no product ("cancel the order", "return everything from my two most recent orders")
@@ -1026,6 +1251,7 @@ def board_of(messages, scope: str = REQUEST) -> dict:
         # discovered (see `settlement`).
         "loose": loose,
         "byRecord": by_record,
+        "byHandle": by_handle,
         "receipts": len(receipts),
         "names": len(table),
     }
@@ -1958,6 +2184,115 @@ def self_test() -> int:
     check("a receipt that carries a product is still refused by name",
           settlement({"family": "cancel", "words": ["boot"], "clause": "cancel order #W5481803"},
                      {**cancel_order, "ids": ["#W5481803", "6200867091"]}, {"6200867091": "Kettle"}) == "")
+
+    # R241. The handle grade: the record the episode **read**. A telecom request names its line by a phone number, the
+    # write carries `line_id` / `customer_id`, and no string comparison can bridge the two — R240 measured that gap at
+    # zero of eight. The bridge is the read the agent had to make to answer at all, so the board anchors on it rather
+    # than on a copy of the database. The transcript below is the shape of every τ² telecom episode: the caller states
+    # the number, the agent resolves it to an account, then reads the line.
+    telecom = [
+        {"role": "user", "content": "My mobile data is not working. My phone number is 555-123-2002."},
+        {"role": "assistant", "tool_calls": [{"name": "get_customer_by_phone",
+                                              "arguments": {"phone_number": "555-123-2002"}}]},
+        {"role": "tool", "content": json.dumps({"customer_id": "C1001", "phone_number": "555-123-2002",
+                                                "line_ids": ["L1001", "L1002", "L1003"]})},
+        {"role": "assistant", "tool_calls": [{"name": "get_details_by_id", "arguments": {"line_id": "L1002"}}]},
+        {"role": "tool", "content": json.dumps({"line_id": "L1002", "phone_number": "555-123-2002",
+                                                "status": "Active"})},
+    ]
+    read = read_records(telecom)
+    check("the read types the phone as the line that claims it", read["phones"] == {"555-123-2002": "l1002"})
+    check("and keeps the account the line belongs to", read["owners"]["l1002"] == "c1001")
+    check("and knows which ids it has seen", read["known"]["l1002"] == {LINE} and read["known"]["c1001"] == {CUSTOMER})
+    check("an ask about the number resolves to that line and its account",
+          handles_in("the line is 555-123-2002", read) == {(LINE, "l1002"), (CUSTOMER, "c1001")})
+    check("and to no sibling line",
+          not any(key == LINE and name in ("l1001", "l1003") for key, name in handles_in("555-123-2002", read)))
+    check("a token nothing was read for stays untyped",
+          handles_in("order #W7449508 is late", read) == {("", "#w7449508")})
+    check("a phone that is only an account's resolves to the account",
+          handles_in("555-123-1002 is my number", read_records([{"role": "tool", "content": json.dumps(
+              {"customer_id": "C1002", "phone_number": "555-123-1002", "line_ids": ["L1004"]})}]))
+          == {(CUSTOMER, "c1002")})
+
+    def telecom_receipt(name: str, arguments: dict) -> dict:
+        return receipts_of([{"role": "assistant", "tool_calls": [{"name": name, "arguments": arguments}]},
+                            {"role": "tool", "content": "{}"}])[0]
+
+    resume = telecom_receipt("resume_line", {"customer_id": "C1001", "line_id": "L1002"})
+    check("the receipt's keys are typed by the argument that carried them",
+          receipt_keys(resume) == {(LINE, "l1002"), (CUSTOMER, "c1001")})
+    check("a hand-built receipt without arguments falls back to its untyped ids",
+          receipt_keys({**return_receipt}) == {("", "#w7449508"), ("", "6477915553")})
+    check("the lattice refuses two different lines of the same account",
+          same_record({(LINE, "l1002"), (CUSTOMER, "c1001")},
+                      {(LINE, "l1003"), (CUSTOMER, "c1001")}) is False)
+    check("and settles the account-level write it can reach",
+          same_record({(LINE, "l1002"), (CUSTOMER, "c1001")},
+                      {(CUSTOMER, "c1001"), (BILL, "b1234321")}) is True)
+    check("and refuses a sibling's account-level write",
+          same_record({(LINE, "l1002"), (CUSTOMER, "c1001")}, {(CUSTOMER, "c1002")}) is False)
+    check("a wordless pair settles nothing", same_record(set(), set()) is False)
+
+    # The grade, end to end on the transcript: the same write is a `handle` tick, a sibling is refused, and the
+    # account-level write is credited — which is the three-way split R240 could only report as 0/8 or 8/8.
+    ask = {"family": "resume", "words": ["mobile", "data"], "clause": "my mobile data is not working, 555-123-2002"}
+    check("a write on the line the caller named is settled at the handle grade",
+          settlement(ask, resume, {}, read) == "handle")
+    check("a write on a sibling line of the same account is refused",
+          settlement(ask, telecom_receipt("suspend_line", {"customer_id": "C1001", "line_id": "L1003"}), {}, read) == "")
+    check("a write that names only the account is settled",
+          settlement({**ask, "family": "payment"},
+                     telecom_receipt("send_payment_request", {"customer_id": "C1001", "bill_id": "B1234321"}),
+                     {}, read) == "handle")
+    check("R240 is unchanged where nothing was read: the same ask reaches nothing",
+          settlement(ask, resume, {}, {}) == "")
+    check("and where nothing was read the grade is the record grade, not the handle grade",
+          settlement({"family": "return", "words": ["sneaker"], "clause": "return the sneaker from order #W7449508"},
+                     return_receipt, {}) == "record")
+    # The board carries both counts: a reader has to be able to see how much of a tick list rests on a resolution the
+    # episode performed rather than on an identifier the ask spelled.
+    handled_board = board_of(telecom[:1] + telecom[1:])
+    check("the board counts its handle ticks separately", handled_board["byHandle"] == 0)
+
+    # The edges of the resolver, one per shape the corpus can produce. Each is a case where a rule written for the
+    # happy path would either over-credit or silently produce an untyped key that looks like a comparison.
+    check("a non-string clause names no record", records_in(None) == set() and handles_in(None, read) == set())
+    check("a tool result that is not text is skipped", read_records([{"role": "tool", "content": ["L1002"]}])["known"] == {})
+    check("a line with no number of its own types nothing",
+          read_records([{"role": "tool", "content": json.dumps({"line_id": "L9"})}])["phones"] == {})
+    check("a line whose account was never read still names itself",
+          handles_in("555-999-9999", read_records([
+              {"role": "tool", "content": json.dumps({"line_id": "L9", "phone_number": "555-999-9999"})}]))
+          == {(LINE, "l9")})
+    check("an account with no number of its own types nothing",
+          read_records([{"role": "tool", "content": json.dumps({"customer_id": "C9", "line_ids": ["L9"]})}])["accounts"] == {})
+    check("a line_ids entry that is not a name is skipped",
+          read_records([{"role": "tool", "content": json.dumps(
+              {"customer_id": "C9", "line_ids": ["L9", 7, ""]})}])["owners"] == {"l9": "c9"})
+    bill_read = read_records([{"role": "tool", "content": json.dumps(
+        {"bill_id": "B9", "customer_id": "C9", "total_due": 1.0})}])
+    check("a bill is a record and its owner is its account",
+          bill_read["known"]["b9"] == {BILL} and bill_read["owners"]["b9"] == "c9")
+    check("an id the transcript has shown is typed even when the ask writes it bare",
+          handles_in("L1003 is suspended", read) == {(LINE, "l1003")})
+    check("a bill with no account prints no owner",
+          read_records([{"role": "tool", "content": json.dumps({"bill_id": "B8"})}])["owners"] == {})
+    check("an argument name that is not a string carries no type",
+          receipt_keys({"args": {1: "A1001", "line_id": "A1001"}}) == {(LINE, "a1001")})
+    # Four suffixes, because a corpus uses both `_id` and `_ids` and a hand-built reader may use neither separator.
+    for name, kind in (("line_id", LINE), ("item_ids", "item"), ("orderids", "order"), ("customerid", CUSTOMER)):
+        check(f"`{name}` types its value as `{kind}`",
+              receipt_keys({"args": {name: ["A1001"]}}) == {(kind, "a1001")})
+    check("a field that is not an id argument carries no type",
+          receipt_keys({"args": {"note": "A1001", "ids": ["A1001"]}}) == set())
+    # The vocabulary, bound to the manifest both repositories read. The board can return four grades and the product
+    # declared two of them until R241 — a divergence that no test could see, because the declaration was never compared
+    # with what the rule produces. This is the comparison: add a grade here without declaring it and the product's
+    # manifest stops describing the artefact it ships, which fails on both sides at once.
+    serving = json.loads((Path(__file__).resolve().parents[1] / "manifests" / "serving-defaults.json").read_text())
+    check("every grade this board can return is one the serving manifest declares",
+          {"name", "overlap", "record", "handle"} == set(serving["defaults"]["settlementGrades"]))
 
     check("a named product is found in the table",
           names_a_product({"family": "return", "words": ["mechanical", "keyboard"]}, table) is True)

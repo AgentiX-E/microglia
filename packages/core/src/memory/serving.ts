@@ -33,10 +33,22 @@ export const ASK_SOURCES = ['request', 'receipt'] as const;
 export type AskSource = (typeof ASK_SOURCES)[number];
 
 /**
- * A settlement grade. `name` is containment of the product the ask names; `overlap` is at least one shared content
- * word and half the shorter side, which is what a set-shaped ask needs to settle at all.
+ * A settlement grade, widest last.
+ *
+ * `name` is containment of the product the ask names; `overlap` is at least one shared content word and half the
+ * shorter side, which is what a set-shaped ask needs to settle at all. `record` and `handle` are the two grades whose
+ * evidence is an **identifier** rather than a product, and they had been produced by the evaluation's board since R238
+ * while this vocabulary still named two — a divergence no test could see, because nothing compared the declaration with
+ * what the rule emits. R241 made that comparison (`goal_board`'s self-test asserts this exact set against its own
+ * four return values) and closed it:
+ *
+ *   `record`  the ask spells the identifier the receipt carries (`return the sneaker from order #W7449508`), and the
+ *             receipt names no product at all. R238 measured this at 28 refusals recovered.
+ *   `handle`  the ask spells a handle the database has no identifier for — a phone number — and the episode's own read
+ *             resolved it to a record. R241 measured the third domain at 0 of 8 writes reached before this grade and 8
+ *             of 8 after, with no sibling line credited.
  */
-export const SETTLEMENT_GRADES = ['name', 'overlap'] as const;
+export const SETTLEMENT_GRADES = ['name', 'overlap', 'record', 'handle'] as const;
 
 export type SettlementGrade = (typeof SETTLEMENT_GRADES)[number];
 
@@ -73,7 +85,7 @@ export type ServingDefaults = {
 export const SERVING_DEFAULTS: ServingDefaults = {
   placement: 'tail',
   askSource: 'request',
-  settlementGrades: ['name', 'overlap'],
+  settlementGrades: ['name', 'overlap', 'record', 'handle'],
   blockCeilingChars: 500,
   openAskCeiling: 3,
   trials: 1,

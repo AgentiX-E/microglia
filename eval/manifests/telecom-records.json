@@ -1,5 +1,5 @@
 {
- "note": "The third domain's records, and the one question that decides whether the record grade can reach them: its requests name a line by a phone number, and in this database a customer's phone number is also one of their lines'. A string intersection cannot tell the two apart, so the shipped rule reads zero and a table that ignores the ambiguity would read every write \u2014 including the ones it should refuse.",
+ "note": "The third domain's records, and the one question that decides whether the record grade can reach them: its requests name a line by a phone number, and in this database a customer's phone number is also one of their lines'. A string intersection cannot tell the two apart, so the shipped rule reads zero; a table that ignores the ambiguity reads every write including the ones it should refuse; and the rule that reads them is the record the episode itself resolved, compared at the finest type both sides name. `credits` is the counterfactual that separates the last two: a write synthesised against every line in the database, where the right answer is one line and the blind table reaches three.",
  "reading": {
   "ambiguous": {
    "555-123-2002": [
@@ -8,6 +8,21 @@
    ]
   },
   "blind": 8,
+  "credits": {
+   "555-123-2002": {
+    "blind": [
+     "L1001",
+     "L1002",
+     "L1003"
+    ],
+    "handle": [
+     "L1002"
+    ],
+    "shipped": [],
+    "strict": []
+   }
+  },
+  "handle": 8,
   "records": {
    "bills": 6,
    "customers": 4,
@@ -16,6 +31,7 @@
   "rows": [
    {
     "blind": true,
+    "handle": true,
     "shipped": false,
     "strict": false,
     "task": "[mobile_data_issue]user_abroad_roaming_enabled_off[PERSONA:None]",
@@ -29,6 +45,7 @@
    },
    {
     "blind": true,
+    "handle": true,
     "shipped": false,
     "strict": false,
     "task": "[mobile_data_issue]user_abroad_roaming_disabled_on[PERSONA:Easy]",
@@ -42,6 +59,7 @@
    },
    {
     "blind": true,
+    "handle": true,
     "shipped": false,
     "strict": false,
     "task": "[mobile_data_issue]user_abroad_roaming_disabled_on[PERSONA:Easy]",
@@ -55,6 +73,7 @@
    },
    {
     "blind": true,
+    "handle": true,
     "shipped": false,
     "strict": false,
     "task": "[mobile_data_issue]user_abroad_roaming_disabled_off[PERSONA:Hard]",
@@ -68,6 +87,7 @@
    },
    {
     "blind": true,
+    "handle": true,
     "shipped": false,
     "strict": false,
     "task": "[mobile_data_issue]user_abroad_roaming_disabled_off[PERSONA:Hard]",
@@ -81,6 +101,7 @@
    },
    {
     "blind": true,
+    "handle": true,
     "shipped": false,
     "strict": false,
     "task": "[mobile_data_issue]data_usage_exceeded[PERSONA:Easy]",
@@ -94,6 +115,7 @@
    },
    {
     "blind": true,
+    "handle": true,
     "shipped": false,
     "strict": false,
     "task": "[service_issue]overdue_bill_suspension[PERSONA:Easy]",
@@ -107,6 +129,7 @@
    },
    {
     "blind": true,
+    "handle": true,
     "shipped": false,
     "strict": false,
     "task": "[service_issue]overdue_bill_suspension[PERSONA:Easy]",
