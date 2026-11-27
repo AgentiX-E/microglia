@@ -2443,9 +2443,9 @@
      "acted": true,
      "extra": 0,
      "graded": 4,
-     "gradedOpen": 2,
+     "gradedOpen": 1,
      "required": 4,
-     "served": 2,
+     "served": 1,
      "task": "103",
      "wired": false,
      "writes": 4
@@ -3730,9 +3730,9 @@
      "acted": true,
      "extra": 0,
      "graded": 4,
-     "gradedOpen": 2,
+     "gradedOpen": 1,
      "required": 4,
-     "served": 2,
+     "served": 1,
      "task": "103",
      "wired": false,
      "writes": 4
@@ -5050,7 +5050,7 @@
    "scope": "request",
    "served": {
     "allWrites": 723,
-    "writes": 479
+    "writes": 477
    },
    "skipped": 0,
    "wiring": {

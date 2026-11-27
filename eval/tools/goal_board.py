@@ -164,12 +164,26 @@ STOP = frozenset(
 
 #: Identifier shapes. An id is evidence of *which* record, never of *which product*, so it is stripped before a
 #: value is turned into words: `#W2378156` in an address argument would otherwise make every address ask unsettleable.
-ID = re.compile(r"#?[A-Za-z]?\d{6,}")
+#:
+#: R240. A record is not always an order number. Three shapes, and the rule for each is stated rather than implied
+#: because the third domain's whole record grade turns on it:
+#:
+#:   `#W2378156`      the hash form retail writes, unchanged since R215;
+#:   `L1002`, `C1001` a short letter prefix and four digits — a domain that keys its lines and customers by id, and
+#:                    that a receipt carries under `line_id` / `customer_id`;
+#:   `555-123-2002`   a phone number, which is the only handle a telecom request ever gives on a line.
+#:
+#: The bare numeric form keeps its six-digit floor on purpose: τ²'s zip codes are five digits, and a zip is a place
+#: rather than a record, so a rule that read it as one would tick a cancel against every request that states where
+#: the caller lives.
+ID = re.compile(r"#[A-Za-z]{1,3}\d{3,}|[A-Za-z]{1,3}\d{4,}|\d{6,}|\d{3}-\d{3}-\d{4}")
 
-#: A record identifier as a **user** writes it: `#W7449508`. Narrower than `ID` on purpose — an ask naming an order
-#: is naming a record, and a bare number in a sentence ("the 2 items") is not, so the record grade requires the
-#: `#` and a short letter prefix that the corpus's order ids all carry.
-RECORD = re.compile(r"#[A-Za-z]{1,3}\d{3,}")
+#: A record identifier as a **user** writes it. The hash form is unchanged; R240 adds the two shapes a user types
+#: without one, because a request that says "my order W4284542" (53 of the 2,744 user strings in the control grid) or
+#: "the line is 555-123-2002" was naming a record the board could not read. A bare number in a sentence ("the 2
+#: items", "2025 dollars") is still not a record: the bare form requires letters, and the phone form requires its
+#: own separators.
+RECORD = re.compile(r"#[A-Za-z]{1,3}\d{3,}|\b[A-Za-z]{1,3}\d{4,}\b|\b\d{3}-\d{3}-\d{4}\b")
 
 #: A clause boundary. `and`, `but`, `then`, `also` and a bare comma each start a new ask in this corpus —
 #: "return the cleaner, headphone, and smart watch" is three asks and one call, which is the case the board exists
@@ -1904,6 +1918,34 @@ def self_test() -> int:
           settlement({"family": "return", "words": ["espresso", "machine"],
                       "clause": "return the espresso machine from order #W7449508"},
                      return_receipt, {"6477915553": "Sneakers", "6200867091": "Espresso Machine"}) == "")
+    # R240. The grammar of a record identifier is not one domain's habit. Two shapes a user actually types were
+    # unreadable: the order id **without** its `#` ("my order W4284542", 53 of the 2,744 user strings in the control
+    # grid), and a phone number ("the line is 555-123-2002"), which is the only handle a telecom request ever gives.
+    # A rule that cannot read them reads **zero** on that domain, and a zero is indistinguishable from a corpus whose
+    # requests name nothing — the failure mode R238 found one level down.
+    check("R240: an order id without its hash names the record",
+          records_in("my order W4284542 is late") == {"w4284542"})
+    check("R240: a phone number names a record",
+          records_in("the line is 555-123-2002 and has no data") == {"555-123-2002"})
+    check("R240: the hash form is unchanged",
+          records_in("order #W7449508") == {"#w7449508"})
+    check("R240: a bare number that names nothing is still not a record",
+          records_in("I have 2025 dollars and 2 items") == set())
+    # Both sides have to read the same shapes, or the grade stays unreachable: the receipt is where `L1002` and the
+    # phone number arrive, and `_id_values` collects neither under a rule written for ten-digit item ids.
+    telecom_ok = receipts_of([{"role": "assistant", "tool_calls": [{"name": "cancel_pending_order",
+                              "arguments": {"customer_id": "C1001", "line_id": "L1002", "gb": 2.0}}]},
+                              {"role": "tool", "content": "{}"}])
+    check("R240: the receipt side reads a short prefixed id",
+          sorted(telecom_ok[0]["ids"]) == ["C1001", "L1002"])
+    phone_ok = receipts_of([{"role": "assistant", "tool_calls": [{"name": "cancel_pending_order",
+                             "arguments": {"phone_number": "555-123-2002"}}]},
+                            {"role": "tool", "content": "{}"}])
+    check("R240: and a phone number", phone_ok[0]["ids"] == ["555-123-2002"])
+    zip_ok = receipts_of([{"role": "assistant", "tool_calls": [{"name": "cancel_pending_order",
+                          "arguments": {"zip": "19122", "item_ids": ["6477915553"]}}]},
+                          {"role": "tool", "content": "{}"}])
+    check("R240: a five-digit zip is still not an identifier", zip_ok[0]["ids"] == ["6477915553"])
     # An order-level write: `cancel_pending_order` carries the order and nothing else, so a product-naming ask about
     # that order has nothing to be compared against and would otherwise stay open after the order was cancelled.
     cancel_order = {"family": "cancel", "ok": True, "ids": ["#W5481803"], "free": []}

@@ -7963,3 +7963,35 @@ coarser unit than your block, check the finer unit before declaring the two rule
 
 **Cost.** ¥0 — no model was called. The change is one function sharing, four regenerated JSON manifests, and three
 self-tests. The product you ship and the number you publish now come from the same settlement rule.
+
+### 32.96 When your records are not order numbers
+
+The record grade — the settlement that fires on an **identifier** rather than a product name — is the grade most
+likely to read zero on a new domain, and the zero is the hardest kind of number to notice: it looks like a corpus
+whose requests name nothing.
+
+**Check both sides before you trust either.** A settlement is a set intersection: `records_in(ask) & receipt[ids]`.
+On retail that works because a user types `#W2378156` and `cancel_pending_order` carries the same string. On a domain
+whose records are keyed `L1002`, the ask says `555-123-2002` and the write carries `L1002` — two alphabets, and the
+intersection is empty by construction. The receipt side fails silently too: an identifier rule that demands six
+consecutive digits drops `L1002` long before any comparison.
+
+**Measure the reach before building the parser.** `scripts/build_telecom_records.py` is the smallest version of this:
+project the domain's database into records, take every graded write, and count how many the shipped rule reaches. On
+telecom's 20-task sample it reads **0 of 8** — and the same script will read a different number on yours, which is the
+point of running it rather than reasoning about it.
+
+**A token table is not automatically the repair.** The obvious fix — resolve a phone number to the record it names —
+read 8 of 8 here, and it is wrong: a customer's phone number **is** one of their own lines' in this database, so the
+token names `customer:C1001` and `line:L1002` together. Ignoring the ambiguity credits a write to any of the
+household's lines; refusing it reaches nothing. Both numbers are in the manifest (`shipped`, `blind`, `strict`) so
+you can see which kind of repair you are about to buy.
+
+**What to read instead.** If your request cannot spell the record the write carries, no string rule will settle it.
+The handles that do work are the ones the episode itself establishes: the record it **read** before writing (the
+read-anchored rule this project used before R238), or the identity the caller authenticated with. That is a different
+design, not a wider pattern — and it is the next round's work here rather than this one's.
+
+**Cost.** ¥0: the database and the tasks are static, no model is called, and the reading is eight rows. The rule
+change itself ships with a gate that re-derives every published manifest, because a settlement rule that moves a
+published number is a regression until it is regenerated and recorded.

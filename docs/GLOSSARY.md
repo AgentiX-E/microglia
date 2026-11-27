@@ -3086,3 +3086,24 @@ order the episode never read is **open** on the read-anchored board and **ticked
 serving-settled board. Mechanism readers (`board_mechanism`, `memory_traps`) use the serving-settled board; the
 family-level bars built on it are unchanged by the switch because a family with several asks keeps another open —
 the ask-level columns are the ones that move (463→461 reached; rejected familyStale 507→483).
+
+**Record grade** — the third of the three settlement grades: an ask settles a receipt when the ask's clause spells a
+**record identifier** the receipt carries. It is the weakest grade and the only one whose evidence is an identifier
+rather than a product name, and it exists because `cancel_pending_order` carries an order id and nothing else, so an
+ask about an order's products can never be settled by a name. Since R240 it reads three identifier shapes — `#W2378156`,
+a bare `L1002`, and `555-123-2002` — because the first one is retail's spelling and a rule written in one domain's
+alphabet reads **zero** on another.
+
+**Alphabet (of a domain)** — the shapes a domain's identifiers take, on both sides of a settlement: what a request
+types (`555-123-2002`, "order W4284542") and what a write carries (`line_id: L1002`). A settlement rule is a string
+intersection, so two alphabets with no string in common intersect at zero — which is a property of the rule, not of
+the corpus, and cannot be seen from the corpus's side.
+
+**Ambiguous token** — a token that names more than one record in a domain's database. In telecom `555-123-2002` is
+both customer `C1001`'s phone and line `L1002`'s, so it identifies neither on its own. A token table that ignores
+this credits a write to any of the household's lines; one that refuses it reaches nothing. The pair of numbers is the
+finding: **no token-table repair exists** for a domain whose only handle is ambiguous.
+
+**Reach (of a settlement grade)** — the share of graded writes a grade can actually settle on a domain, measured
+before any dispatch. Telecom's record grade reaches **0 of 8** writes under the rule as it shipped, which is why the
+third domain's settlement handle is a design question rather than a parser tuning.

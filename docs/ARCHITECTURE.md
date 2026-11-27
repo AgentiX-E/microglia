@@ -5835,3 +5835,55 @@ code. Changing a settlement function means explicitly regenerating every manifes
 r232/r233/r234 and r237-traps), against the original control grid (sha256 `b41ff472…`), and recording the before and
 after numbers in the audit. CI green (manifests self-consistent) and product↔evaluation agreement (manifests produced
 by the current code) are two different properties; only this discipline guarantees the second.
+
+### 8.115 A settlement grade written in one domain's alphabet
+
+The record grade's evidence is an identifier: the ask's clause spells one, the receipt carries one, and the two sets
+intersect (`settlement`, the branch R238 added). That sentence contains a hidden assumption — that both sides spell
+the identifier **the same way** — and retail hides it, because a retail user types the order id (`#W2378156`) that the
+write also carries.
+
+**The grammar was retail's.** `RECORD` required a `#` and a one-to-three-letter prefix. Two shapes a user actually
+types were unreadable: the same order id **without** its `#` ("my order W4284542"), which appears in **53 of the 2,744
+user strings** in the 456-episode control grid, and a **phone number** ("the line is 555-123-2002"), which is the only
+handle a telecom request ever gives on a line. The receipt side was narrower still: `ID` demanded six consecutive
+digits, so a domain keyed `L1002` / `C1001` had its writes' arguments dropped before any comparison happened. Two
+sides, two blanks.
+
+R240 reads three shapes on both sides — the hash form unchanged, a bare prefixed id (`L1002`), and a phone number —
+and keeps the floor that made the original rule honest: a bare number is still not a record (a zip code is a place,
+not a record, and τ²'s are five digits).
+
+**What the third domain reads.** `scripts/build_telecom_records.py` projects the telecom database into records and
+measures the grade on every graded write of the domain's 20-task sample:
+
+| reading | reach | what it is |
+|---|---|---|
+| the rule as it shipped | **0 of 8** | the clause must spell the id the write carries; a telecom request never does |
+| a token table, ambiguity ignored | 8 of 8 | every request reaches its record — including writes it should not reach |
+| a token table, ambiguity refused | **0 of 8** | a token that names two records names neither |
+
+The middle row is not a repair. In this domain a customer's `phone_number` **equals one of their own lines'**, so the
+single token the requests carry (`555-123-2002`) is claimed by `customer:C1001` and `line:L1002` at once. A table that
+ignores that credits a write to *any* of the household's lines; a table that refuses it reaches nothing. **No
+token-table repair exists**, and the next round needs a different handle — the record the episode read, or an
+authenticated customer — rather than a wider pattern.
+
+**The grammar is inert on retail, and that is measured rather than asserted.** The record grade only fires when
+both name grades refuse *and* the receipt carried no product; on retail those asks were already settled by name, so
+the wider grammar raises clause-level recall (542 of 18,596 clauses name a record under R239's grammar, **611** under
+R240's) and changes no settlement. The control that makes the claim falsifiable is a grammar that matches nothing: it
+moves every column (trap reader: `shown` 3,479 → 3,507, `hidden` 137 → 109, `served.stale` 10 → 0, `familyStale`
+483 → 518), so a reading that does not move under R240's grammar is a reading the change does not touch rather than a
+reading that cannot see it. The five manifests a settlement change can reach were re-derived: **four are
+byte-identical** (r232/r233/r234/r237) and the fifth is the drift below, which is the round's second finding. The four
+anchor readings (r228–r231) are read-anchored — they settle on the record an episode *opened*, never call the record
+grade — so the grammar cannot reach them at all.
+
+**And a drift the previous round's method could not have caught.** `r236-replay` did not re-derive byte-identically:
+its comparison arm's `served` column read **479** on disk and **477** under both R239's and R240's grammar. The two
+writes were lost by R239 (its `moment` → `board_of` switch settles two more asks, so two fewer are open work the
+window carried), and R239's audit asserted byte-identity by `diff`-ing the manifest against *a backup of itself* —
+which is a tautology, not a check. R240 regenerates it and records the correction here; the invariant that would have
+caught it is the one this round added: a manifest is verified against a **re-derivation**, never against its own
+history.
