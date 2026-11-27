@@ -8188,3 +8188,40 @@ before, with or without state roles.
 true, and it is not itself a claim about task accuracy. Whether it raises task success on your
 workload is a measurement you run with the option on and off over the same store — the same
 one-variable contrast the library is built to support.
+
+## 32.102 Reading a provider error before you retry it (R245)
+
+A `429` is not one answer. It can mean "slow down", "raise the key quota", "the account has no
+credit", or "this window's budget is spent" — and only the first is fixed by retrying. This
+release gives the drivers a deterministic reading of the reply so a cost decision is made from
+the provider's own error code instead of from the status line.
+
+**Why this matters to cost.** The embedding probe used to retry every non-2xx four times with a
+linear backoff. An out-of-credit or exhausted-quota reply therefore spent ten seconds and four
+calls doing nothing, then reported a generic failure. Worse, a rate limit was read as an empty
+balance, which led to paid experiments being cancelled and an offline fallback being selected
+while the account was funded. The classifier names the family first.
+
+**The three dispositions.** A reply is classified into a family and one of three actions:
+
+| disposition | meaning | what the driver does |
+|---|---|---|
+| `retry` | a rate limit or a server fault — "not now" | backs off and re-sends; a `Retry-After` header wins over the backoff |
+| `wait-until` | a spend window, a subscription cap, or an account cap | stops the run and reports when the window resets |
+| `stop` | no balance, key quota, or a bad request | stops immediately with the family named; retry cannot help |
+
+**The decisive fact.** Out of credit is **HTTP 403 `INSUFFICIENT_BALANCE`**, not a 429. A 429
+family that says `API_KEY_QUOTA_EXHAUSTED` or `USAGE_LIMIT_EXCEEDED` is on the provider's documented
+no-retry list. The GLM Coding Plan numeric codes are read too: `1302`/`1305` retry,
+`1308`/`1310`/`1316–1321` wait for `next_flush_time`, `1113`/`1311`/`1309` need a top-up, and
+`1313`/`1314`/`1315` need a different key or product.
+
+**What does not change.** A plain 429 with no family code still retries, and a `Retry-After`
+still sets the wait — existing benchmark behaviour is preserved where the family is genuinely a
+rate limit. The classifier is pure: no clock, no network, no model. It reads the status, the
+error code, the message and the `Retry-After` value the driver already has.
+
+**What it is not.** It does not claim an accuracy gain and it does not check whether the account
+is funded — it reports what the provider said. If the provider mislabels its own reply, the
+reading follows the provider. The value is reproducibility: the product, an independent Python
+reader and a committed manifest must agree on every field, or the build stops.

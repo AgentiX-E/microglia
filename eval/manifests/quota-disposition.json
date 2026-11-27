@@ -1,0 +1,108 @@
+{
+ "schema": "microglia/quota-disposition@1",
+ "note": "R245. A 429 is a family, not a verdict. BigModel's rate-limit page separates retryable limits (concurrency / RPM with Retry-After) from spend windows, subscription caps, key quotas and — at HTTP 403 — insufficient balance. This reading re-derives the family, disposition and hint of each real-shaped reply from fixture bytes, independent of the TypeScript product. No model was called; no accuracy is claimed.",
+ "sourceSha256": "9f27a55de02ae8fef10c760151cae4f66eee66e18a31f79e75a7154d358175b0",
+ "reading": {
+  "cases": 12,
+  "byDisposition": {
+   "retry": 5,
+   "wait-until": 3,
+   "stop": 4
+  },
+  "perCase": [
+   {
+    "id": "balance-403",
+    "status": 403,
+    "family": "balance.insufficient",
+    "disposition": "stop",
+    "hint": "top-up",
+    "code": "INSUFFICIENT_BALANCE"
+   },
+   {
+    "id": "spend-cap-402",
+    "status": 402,
+    "family": "window.cap",
+    "disposition": "wait-until",
+    "hint": "wait-for-spend-cap-reset",
+    "code": "spend_cap_reached"
+   },
+   {
+    "id": "rate-concurrency",
+    "status": 429,
+    "family": "rate.concurrency",
+    "disposition": "retry",
+    "hint": "reduce-parallelism-and-backoff",
+    "code": "rate_limit_error"
+   },
+   {
+    "id": "rate-rpm",
+    "status": 429,
+    "family": "rate.rpm",
+    "disposition": "retry",
+    "hint": "honor-retry-after",
+    "code": "rate_limit_exceeded"
+   },
+   {
+    "id": "key-quota",
+    "status": 429,
+    "family": "key.quota",
+    "disposition": "stop",
+    "hint": "raise-key-quota",
+    "code": "API_KEY_QUOTA_EXHAUSTED"
+   },
+   {
+    "id": "window-5h",
+    "status": 429,
+    "family": "window.spend",
+    "disposition": "wait-until",
+    "hint": "wait-for-window-reset",
+    "code": "rate_limit_exceeded"
+   },
+   {
+    "id": "coding-1302",
+    "status": 429,
+    "family": "coding.backoff",
+    "disposition": "retry",
+    "hint": "backoff-retry",
+    "code": "1302"
+   },
+   {
+    "id": "coding-1308",
+    "status": 429,
+    "family": "coding.reset",
+    "disposition": "wait-until",
+    "hint": "wait-for-next-flush",
+    "code": "1308"
+   },
+   {
+    "id": "coding-1113",
+    "status": 429,
+    "family": "balance.insufficient",
+    "disposition": "stop",
+    "hint": "top-up",
+    "code": "1113"
+   },
+   {
+    "id": "server-503",
+    "status": 503,
+    "family": "server",
+    "disposition": "retry",
+    "hint": "backoff-retry"
+   },
+   {
+    "id": "refusal-400",
+    "status": 400,
+    "family": "refusal",
+    "disposition": "stop",
+    "hint": "fix-request-or-key"
+   },
+   {
+    "id": "rate-unclassified",
+    "status": 429,
+    "family": "rate.unclassified",
+    "disposition": "retry",
+    "hint": "backoff-retry"
+   }
+  ]
+ }
+}

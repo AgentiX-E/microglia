@@ -20,6 +20,9 @@ import {
   creditedWith,
   embeddingText,
   pairsOf,
+  quotaReplyFrom,
+  quotaRetryAdvice,
+  retryAfterMs,
   separationOf,
   type CaseRecord,
 } from '@agentix-e/microglia-eval';
@@ -55,8 +58,22 @@ async function embed(texts: readonly string[]): Promise<Map<string, readonly num
           signal: AbortSignal.timeout(60_000),
         });
         if (!response.ok) {
-          last = `${response.status}: ${(await response.text()).slice(0, 200)}`;
-          await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
+          // A non-2xx is a family, not a directive to sleep. Read the body, name the
+          // family, and stop at once on a balance failure, a key quota or an exhausted
+          // window — the old probe retried all of these four times and burned ten seconds
+          // reporting nothing. Only a rate limit or a server fault earns a retry.
+          const text = (await response.text()).slice(0, 400);
+          const reply = quotaReplyFrom(
+            response.status,
+            retryAfterMs(response.headers.get('retry-after')),
+            text,
+          );
+          const advice = quotaRetryAdvice(reply, attempt, (a) => 1000 * (a + 1));
+          last = `${response.status} ${advice.family}: ${text}`;
+          if (!advice.retry) {
+            throw new Error(`embedding ${advice.reason} (status ${response.status}, ${advice.family}: ${text})`);
+          }
+          await new Promise((resolve) => setTimeout(resolve, advice.waitMs));
           continue;
         }
         const body = (await response.json()) as { data?: { index?: number; embedding?: number[] }[] };

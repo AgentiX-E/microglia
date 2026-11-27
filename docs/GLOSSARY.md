@@ -3203,3 +3203,25 @@ its `transition` because age does not resolve a disagreement.
 **Assembly step (R243, implemented R244)** — see above: originally the term for the gap; R244 is
 the module that closes the storage-to-prompt half of it. The remaining open half is still an
 external benchmark submission, not a storage mechanism.
+
+**Quota family (R245)** — the machine-readable kind of a provider error reply, derived from its
+HTTP status, error code and message: a rate limit, a spend window, a key quota, a subscription
+cap, an insufficient balance, a server fault, or a client refusal. A `429` is a family of these,
+not a single verdict; out of credit is an HTTP `403 INSUFFICIENT_BALANCE`. Fifteen families are
+defined in `packages/eval/src/quota-disposition.ts`.
+
+**Disposition (R245)** — one of three actions a driver takes from a quota family: `retry` (a rate
+limit or server fault — back off and re-send), `wait-until` (a window or cap — stop and report the
+reset time), or `stop` (balance, key quota or refusal — retry cannot help). Exactly one applies;
+it is derived from the family, never stored beside it.
+
+**NO_RETRY (R245)** — the provider's documented set of replies that will fail identically until
+something outside the run changes. For BigModel these are `API_KEY_QUOTA_EXHAUSTED`,
+`USAGE_LIMIT_EXCEEDED` and `INSUFFICIENT_BALANCE`. The drivers stop at once on these rather than
+spending the run's deadline repeating a request that cannot succeed.
+
+**Retry advice (R245)** — the driver's single decision: retry with this wait (a provider
+`Retry-After` takes precedence over the driver's own backoff), or stop with this reason. Produced
+by the pure `quotaRetryAdvice`, so the loop that burns the deadline and the reading that names the
+failure share one rule.
+

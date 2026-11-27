@@ -637,3 +637,56 @@ describe('LlmClient authorising more calls', () => {
     expect(texts.map((text) => text.text)).toEqual(['a', 'b', 'c']);
   });
 });
+
+describe('a 429 is a family, not a directive to retry', () => {
+  it('stops at a 429 key-quota code instead of spending four attempts', async () => {
+    // BigModel's NO_RETRY set: the request will fail identically until the key quota is raised.
+    const { instance, seen } = client([
+      { status: 429, body: { error: { code: 'API_KEY_QUOTA_EXHAUSTED', message: 'quota exhausted' } } },
+    ]);
+    await expect(instance.chat('hi')).rejects.toMatchObject({ code: 'MG_E_CONFIG' });
+    expect(seen).toHaveLength(1);
+    expect(instance.stats).toMatchObject({ calls: 1, prompts: 1, failures: 1 });
+  });
+
+  it('stops at a 429 balance-family code, naming the family in the error', async () => {
+    const { instance } = client([
+      { status: 429, body: { error: { code: 'INSUFFICIENT_BALANCE', message: 'please recharge' } } },
+    ]);
+    await expect(instance.chat('hi')).rejects.toThrow(/balance\.insufficient|top.up/i);
+  });
+
+  it('still retries a plain 429 with no family code', async () => {
+    const { instance } = client([{ status: 429 }, ok('done')]);
+    await expect(instance.chat('hi')).resolves.toMatchObject({ text: 'done', attempts: 2 });
+  });
+
+  it('still honours Retry-After on a generic rate-limit 429', async () => {
+    const waits: number[] = [];
+    let index = 0;
+    const instance = new LlmClient({
+      apiKey: 'k',
+      model: 'm',
+      maxCalls: 100,
+      random: () => 0,
+      sleep: async (ms: number) => { waits.push(ms); },
+      fetchImpl: (async () => {
+        index += 1;
+        return index === 1
+          ? new Response(JSON.stringify({ error: { code: 'rate_limit_exceeded', message: 'rpm' } }), {
+              status: 429, headers: { 'content-type': 'application/json', 'retry-after': '3' },
+            })
+          : new Response(JSON.stringify(ok('x').body), { status: 200 });
+      }) as unknown as typeof fetch,
+    });
+    await instance.chat('p');
+    expect(waits).toEqual([3000]);
+  });
+});
+
+  it('stops at a 429 spend window, naming the wait in the error', async () => {
+    const { instance } = client([
+      { status: 429, body: { error: { code: 'rate_limit_exceeded', message: 'This API key has reached its 5-hour spend limit.' } } },
+    ]);
+    await expect(instance.chat('hi')).rejects.toThrow(/spend window|wait/i);
+  });

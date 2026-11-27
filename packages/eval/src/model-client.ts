@@ -22,6 +22,7 @@
 import { MicrogliaError } from '@agentix-e/microglia-core';
 import { splitProvider } from './model-id.js';
 import { CircuitBreaker, backoffMs } from './concurrency.js';
+import { classifyQuotaFailure, quotaReplyFrom } from './quota-disposition.js';
 import { EMPTY_BANDED, addToBand, totalUsage, type BandedUsage } from './cost.js';
 
 export type ChatReply = {
@@ -171,6 +172,29 @@ function verdictOf(status: number): StatusVerdict {
     return 'transient';
   }
   return status === 402 ? 'unpaid' : 'refusal';
+}
+
+/**
+ * A 429 is a family, not a directive to retry. BigModel's rate-limit page puts key quotas,
+ * subscription limits and balance failures in a NO_RETRY set: repeating the same prompt
+ * inside one run only spends the deadline and becomes a number that describes an outage.
+ * Only the rate-limit families earn the transient path; a terminal family is refused as a
+ * configuration error, with the family and hint named for the readback.
+ *
+ * The body is read once here because the status alone cannot tell a rate limit from a cap.
+ */
+function terminal429Of(body: string): { family: string; hint: string; reason: string } | undefined {
+  const reply = quotaReplyFrom(429, undefined, body);
+  const verdict = classifyQuotaFailure(reply);
+  if (verdict.disposition === 'retry') return undefined;
+  return {
+    family: verdict.family,
+    hint: verdict.hint,
+    reason:
+      verdict.disposition === 'wait-until'
+        ? `the provider answered a spend window (${verdict.family}, ${verdict.hint}); waiting belongs outside the retry loop`
+        : `the provider refused the key or account (${verdict.family}, ${verdict.hint}); retrying cannot help`,
+  };
 }
 
 /** Whether an aborted call was abandoned by its own timeout, which is a different fact from a reset. */
@@ -353,6 +377,21 @@ export class LlmClient {
       }
       const verdict = verdictOf(response.status);
       if (verdict === 'transient') {
+        // Only a 429 can carry a terminal family inside an otherwise transient status.
+        if (response.status === 429) {
+          const body = (await response.text()).slice(0, 400);
+          const terminal = terminal429Of(body);
+          if (terminal !== undefined) {
+            this.failures += 1;
+            throw new MicrogliaError('MG_E_CONFIG', terminal.reason, {
+              body,
+              model: this.model,
+              family: terminal.family,
+              hint: terminal.hint,
+              hint_text: 'Top up, raise the key quota, or wait for the window reset outside this run.',
+            });
+          }
+        }
         last = `status ${response.status}`;
         waitMs = retryAfterMs(response.headers.get('retry-after'));
         continue;

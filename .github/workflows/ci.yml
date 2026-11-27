@@ -281,9 +281,20 @@ jobs:
             eval/tools/state_role.py --check --manifest eval/manifests/state-role.json
           python3 -m coverage run --append --branch --include="*/state_role.py" \
             eval/tools/state_role.py --verify --manifest eval/manifests/state-role.json --fixture eval/fixtures/state-role-store.json
+          # R245. A 429 is a family, not a verdict: BigModel's 403 INSUFFICIENT_BALANCE is the real out-of-credit
+          # case, while rate limits retry, spend windows wait and NO_RETRY key/subscription codes stop. The old
+          # embed probe retried every non-2xx four times. This reader re-derives each family from the fixture bytes;
+          # --verify refuses a manifest that drifted, and quota-disposition-manifest.test.ts binds the TS product
+          # to the same reading. All three commands run under coverage so main()'s argparse branches are counted.
+          python3 -m coverage run --append --branch --include="*/quota_disposition.py" \
+            eval/tools/quota_disposition.py --self-test
+          python3 -m coverage run --append --branch --include="*/quota_disposition.py" \
+            eval/tools/quota_disposition.py --check --manifest eval/manifests/quota-disposition.json
+          python3 -m coverage run --append --branch --include="*/quota_disposition.py" \
+            eval/tools/quota_disposition.py --verify --manifest eval/manifests/quota-disposition.json --fixture eval/fixtures/quota-replies.json
           python3 -m coverage json -o coverage-python.json
           python3 scripts/check-python-coverage.py --self-test
-          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 31
+          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 32
 
       - name: The rounds this project owes, and the date each one was registered for
         # The failure this prevents is not a wrong number, it is a round that quietly stops being planned: R216b's

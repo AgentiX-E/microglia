@@ -6123,3 +6123,52 @@ fails exactly one reader and stops the build.
 passed), so `scripts/bundle-size.mjs` raised `core` 54,000 → 56,000 raw and 18,500 → 19,000 gzip, measured at
 55,071 / 18,865 with the raise written down beside the number. `--probe` still fails a halved budget, so the gate
 remains live.
+
+## 8.121 A 429 is a family, not a verdict (R245)
+
+**The defect.** `eval/tools/embed-probe.ts` retried every non-2xx four times with a linear
+backoff. A 429 that meant "raise the key quota" and a 429 that meant "slow down" were
+indistinguishable to it; so was an HTTP 403. The consequence was not just ten wasted seconds —
+it was a wrong diagnosis. A rate limit was read as an exhausted balance, which cancelled paid
+experiments and switched the embedding backend to an offline fallback. The account was in fact
+funded.
+
+**The authoritative taxonomy.** BigModel's own rate-limit page (retrieved 27 Nov 2026) separates
+the cases the status code alone conflates:
+
+| reply | family | disposition |
+|---|---|---|
+| 403 `INSUFFICIENT_BALANCE` | balance | stop — top up |
+| 402 `spend_cap_reached` | cap | wait for the reset the header names |
+| 429 `rate_limit_error` (concurrency) | rate | retry, reduce parallelism |
+| 429 `rate_limit_exceeded` + `Retry-After` | rate | retry, honour the header |
+| 429 `API_KEY_QUOTA_EXHAUSTED` | key quota | stop — raise the key quota |
+| 429 `USAGE_LIMIT_EXCEEDED` | subscription | wait for the period reset |
+| 429 ...5h/1d/7d spend limit | window | wait for `reset_at` |
+| GLM coding 1302 / 1305 | rate | retry with backoff |
+| GLM coding 1308 / 1310 / 1316–1321 | window | wait for `next_flush_time` |
+| GLM coding 1113 / 1311 / 1309 | balance | stop — top up |
+| GLM coding 1313 / 1314 / 1315 | key/product | stop — change key or product |
+
+The decisive fact is the first row: **out of credit is an HTTP 403**, not a 429. The old probe
+had no way to say so.
+
+**The implementation.** `packages/eval/src/quota-disposition.ts` is a pure classifier from a
+parsed reply (status, error code, message, `Retry-After`) to one of fifteen families and one of
+three dispositions — `retry`, `wait-until`, `stop`. `quotaRetryAdvice` adds the driver's own
+backoff and returns a single decision: retry with this wait, or stop with this reason. Terminal
+replies never reach the backoff. Both drivers use it: the embed probe reads a non-2xx body and
+stops at once on a terminal family, and `LlmClient` refuses a terminal 429 as `MG_E_CONFIG`
+before spending four attempts. A plain 429 still retries, and a `Retry-After` still wins over
+the backoff — the existing contract is unchanged where the family is a rate limit.
+
+**Three readers, one reading.** `eval/fixtures/quota-replies.json` holds real-shaped replies from
+the provider's documentation. `eval/tools/quota_disposition.py --verify` re-derives every family,
+disposition and hint from those bytes with no shared code; `--check` re-adds the manifest's
+tally. `quota-disposition-manifest.test.ts` derives the same reading with the TypeScript product
+and compares every field. A drift fails one reader and stops the build.
+
+**What this is not.** No accuracy is claimed and no model was called. The module classifies the
+provider's own error code; it does not guess whether the account was funded. Its value is that a
+future 429 is named correctly, so a cost decision is made from the reply rather than from a
+reading of the status code.

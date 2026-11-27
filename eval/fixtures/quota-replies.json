@@ -1,0 +1,78 @@
+{
+ "schema": "microglia/quota-replies@1",
+ "note": "Real-shaped provider error replies, transcribed from BigModel's rate-limits page and GLM Coding Plan error-code table (retrieved 27 Nov 2026). Each case carries only the status, body and Retry-After a driver would actually receive; family/disposition/hint are deliberately absent here and are re-derived independently by eval/tools/quota_disposition.py and by the TS product in quota-disposition.ts. balance is HTTP 403 INSUFFICIENT_BALANCE, not a 429 — the fact the old embed probe got wrong.",
+ "cases": [
+  {
+   "id": "balance-403",
+   "status": 403,
+   "body": { "error": { "code": "INSUFFICIENT_BALANCE", "message": "Insufficient balance or no resource package. Please recharge." } },
+   "retryAfterMs": null
+  },
+  {
+   "id": "spend-cap-402",
+   "status": 402,
+   "body": { "error": { "code": "spend_cap_reached", "message": "weekly spend cap reached" } },
+   "retryAfterMs": 3600000
+  },
+  {
+   "id": "rate-concurrency",
+   "status": 429,
+   "body": { "error": { "code": "rate_limit_error", "message": "Concurrency limit exceeded for user, please retry later" } },
+   "retryAfterMs": null
+  },
+  {
+   "id": "rate-rpm",
+   "status": 429,
+   "body": { "error": { "code": "rate_limit_exceeded", "message": "rate limit exceeded" } },
+   "retryAfterMs": 2000
+  },
+  {
+   "id": "key-quota",
+   "status": 429,
+   "body": { "error": { "code": "API_KEY_QUOTA_EXHAUSTED", "message": "api key quota exhausted" } },
+   "retryAfterMs": null
+  },
+  {
+   "id": "window-5h",
+   "status": 429,
+   "body": { "error": { "code": "rate_limit_exceeded", "message": "This API key has reached its 5-hour spend limit." } },
+   "retryAfterMs": null
+  },
+  {
+   "id": "coding-1302",
+   "status": 429,
+   "body": { "code": 1302, "msg": "Rate limit reached for requests" },
+   "retryAfterMs": null
+  },
+  {
+   "id": "coding-1308",
+   "status": 429,
+   "body": { "code": 1308, "msg": "Usage limit reached for package. Your limit will reset at next_flush_time." },
+   "retryAfterMs": null
+  },
+  {
+   "id": "coding-1113",
+   "status": 429,
+   "body": { "code": 1113, "msg": "余额不足或无可用资源包,请充值" },
+   "retryAfterMs": null
+  },
+  {
+   "id": "server-503",
+   "status": 503,
+   "body": null,
+   "retryAfterMs": null
+  },
+  {
+   "id": "refusal-400",
+   "status": 400,
+   "body": { "error": { "message": "model not found" } },
+   "retryAfterMs": null
+  },
+  {
+   "id": "rate-unclassified",
+   "status": 429,
+   "body": null,
+   "retryAfterMs": null
+  }
+ ]
+}

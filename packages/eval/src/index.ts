@@ -1185,6 +1185,17 @@ export {
   type ProviderProbeVerdict,
 } from './provider-probe.js';
 export {
+  classifyQuotaFailure,
+  quotaReplyFrom,
+  quotaRetryAdvice,
+  type QuotaDisposition,
+  type QuotaFamily,
+  type QuotaHint,
+  type QuotaReply,
+  type QuotaVerdict,
+  type RetryAdvice,
+} from './quota-disposition.js';
+export {
   resilientInterpreter,
   stampDomain,
   type InterpreterFaults,
