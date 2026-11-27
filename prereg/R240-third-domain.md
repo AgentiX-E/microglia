@@ -2,14 +2,14 @@
 id: R240-third-domain
 step: R240
 opened: 2026-11-27
-arms: 0
+arms: none
 sample: 8
-gates: B1 B2 B3
+gates: V0
 ---
 
 # R240 — the third domain's records, and the alphabet the record grade is written in
 
-Registered 27 November 2026, before any dispatch. It spends nothing: `arms: 0`, and B3 says so in money.
+Registered 27 November 2026, before any dispatch. It spends nothing: `arms: none`, and B3 says so in money.
 
 Three rounds have ended by correcting a number rather than by buying one: R238 found that the 6.8% it had published as
 a settlement defect was the distance between two settlement rules; R239 found that a family-level bar could not see a
