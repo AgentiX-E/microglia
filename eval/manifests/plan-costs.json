@@ -11,7 +11,8 @@
    "nowCny": 0.0,
    "status": "cancelled",
    "why": "its 3.21-point margin is the domain's own floor, so the gate could not pass at any price",
-   "source": "eval/tools/resolution.py --delta 3.21 (prints UNREACHABLE) and AUDIT 34.332"
+   "source": "eval/tools/resolution.py --delta 3.21 (prints UNREACHABLE) and AUDIT 34.332",
+   "floorCny": 0.0
   },
   {
    "id": "R236",
@@ -20,7 +21,8 @@
    "nowCny": 2.52,
    "status": "registered",
    "why": "a proportion estimated at a proportion's sample size, with the control arm already on disk",
-   "source": "60 episodes x the 0.00584 USD an episode R218b measured, at 7.2 CNY/USD"
+   "source": "60 episodes x the 0.00584 USD an episode R218b measured, at 7.2 CNY/USD",
+   "floorCny": 0.63
   },
   {
    "id": "R237",
@@ -29,7 +31,8 @@
    "nowCny": 2.82,
    "status": "registered",
    "why": "99.5% of a long-context set is a shared prefix billed at one fiftieth the miss rate",
-   "source": "eval/manifests/bench-budget.json, re-derived from the rate card on every push"
+   "source": "eval/manifests/bench-budget.json, re-derived from the rate card on every push",
+   "floorCny": 2.82
   },
   {
    "id": "R221",
@@ -38,9 +41,12 @@
    "nowCny": 0.0,
    "status": "ready",
    "why": "the 456-episode grids it reports were bought in R218b and carry grades, cost and transcripts",
-   "source": "the two documents on disk; AUDIT 34.333"
+   "source": "the two documents on disk; AUDIT 34.333",
+   "floorCny": 0.0
   }
  ],
  "totalWasCny": 92.2,
- "totalNowCny": 5.34
+ "totalNowCny": 5.34,
+ "floorNote": "The lower end is R236's own stopping rule and not a discount: B1 is a proportion with a bar at 0.95, so if it is decided at fifteen episodes the round costs a quarter of its ceiling. The upper end is what the question costs if it is close. Both ends are registered before the first episode.",
+ "totalFloorCny": 3.45
 }

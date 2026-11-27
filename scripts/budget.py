@@ -49,6 +49,11 @@ def checked(plan: dict, budget: dict) -> list:
         problems.append(f"R236: {by['R236']['nowCny']} against {60 * episodes:.2f} from sixty episodes")
     if abs(by["R237"]["nowCny"] - budget["totalCny"]) > 0.02:
         problems.append(f"R237: {by['R237']['nowCny']} against the budget manifest's {budget['totalCny']}")
+    if abs(by["R236"].get("floorCny", by["R236"]["nowCny"]) - 15 * episodes) > 0.02:
+        # The floor is not a percentage: it is the stopping rule's first checkpoint, fifteen episodes at the measured
+        # price. A floor derived any other way is a number that looks like a bracket and is a guess.
+        problems.append(f"R236's floor is not fifteen episodes at the measured price "
+                        f"({15 * episodes:.2f})")
     for identifier in ("R235", "R221"):
         if by[identifier]["nowCny"] != 0.0:
             problems.append(f"{identifier}: cancelled or already bought, and priced at {by[identifier]['nowCny']}")
@@ -62,6 +67,19 @@ def checked(plan: dict, budget: dict) -> list:
 
     # The claim the figure exists to support, asserted rather than drawn: the corrections are what did the work, and
     # a plan that fell for some other reason would be a plan whose figure says the opposite of its paragraph.
+    # The floor, which is the only honest way to quote a bill for a round that can stop early. It is checked against
+    # its own lines for the same reason the ceiling is: an interval whose ends come from different arithmetic is two
+    # numbers wearing one bracket.
+    if "totalFloorCny" in plan:
+        floor = sum(item.get("floorCny", item["nowCny"]) for item in plan["items"])
+        if abs(plan["totalFloorCny"] - floor) > 0.02:
+            problems.append(f"totalFloorCny is {plan['totalFloorCny']} against {floor:.2f}")
+        if plan["totalFloorCny"] > plan["totalNowCny"] + 0.02:
+            problems.append("the floor is above the ceiling, which is a bracket drawn upside down")
+        for item in plan["items"]:
+            if item.get("floorCny", item["nowCny"]) > item["nowCny"] + 1e-9:
+                problems.append(f"{item['id']}: the floor exceeds the ceiling")
+
     if not order_of_magnitude(plan):
         problems.append("the corrections did not remove an order of magnitude, so the figure's caption is false")
     return problems
@@ -110,8 +128,14 @@ def waterfall(plan: dict, out: pathlib.Path) -> None:
     # line sits under the last bar and at ¥92 the opening line sits under the first column's header, and a label
     # placed "beside" either of them lands on a bar.
     axes.axhline(plan["totalNowCny"], color=GREEN, linestyle="--", linewidth=1.1, zorder=2)
-    axes.text(-0.66, plan["totalNowCny"] + 1.6,
-              f"after the corrections: ¥{plan['totalNowCny']:.2f}", ha="left", fontsize=9.5, color=GREEN)
+    label = f"ceiling ¥{plan['totalNowCny']:.2f}"
+    if plan.get("totalFloorCny"):
+        # A round that can stop early has a bracket rather than a price, and drawing only the ceiling is drawing the
+        # number that makes the plan look most expensive. The floor is R236's own registered stopping rule.
+        axes.axhline(plan["totalFloorCny"], color=GREEN, linestyle=":", linewidth=1.1, zorder=2)
+        label = (f"ceiling ¥{plan['totalNowCny']:.2f} / floor ¥{plan['totalFloorCny']:.2f} "
+                 f"(R236's stopping rule)")
+    axes.text(-0.66, plan["totalNowCny"] + 1.6, label, ha="left", fontsize=9.5, color=GREEN)
     axes.axhline(plan["totalWasCny"], color=GREY, linestyle=":", linewidth=1.0, zorder=2)
 
     axes.set_xticks([])
@@ -129,6 +153,7 @@ def waterfall(plan: dict, out: pathlib.Path) -> None:
         "R221 is ¥0 because its 456-episode grids were bought in R218b — \"submit\" was priced as \"produce\".",
         "R237 is ¥2.82 because 99.5% of a long-context set is one shared prefix, billed at 1/50 the miss rate.",
         "What survives buys an external ladder position and a mechanism probe — not a retail accuracy gain.",
+        "The floor is registered, not hoped for: R236 stops at fifteen episodes if B1 is already decided either way.",
     ]
     figure.text(0.012, -0.03, "\n".join(notes), fontsize=8.6, color="#3c4043", va="top", family="DejaVu Sans")
 
@@ -187,6 +212,15 @@ def self_test() -> int:
     doctored = json.loads(json.dumps(plan))
     doctored["totalNowCny"] = 92.2
     check("a total that is not the sum of its lines is caught", checked(doctored, budget) != [])
+    doctored = json.loads(json.dumps(plan))
+    doctored["totalFloorCny"] = 20.0
+    check("a floor that is not the sum of its own lines is caught",
+          any("totalFloorCny" in problem for problem in checked(doctored, budget)))
+    doctored = json.loads(json.dumps(plan))
+    doctored["totalFloorCny"] = 99.0
+    doctored["items"][1]["floorCny"] = 50.0
+    check("a floor above its ceiling is caught as a bracket drawn upside down",
+          any("floor" in problem for problem in checked(doctored, budget)))
     doctored = json.loads(json.dumps(plan))
     doctored["totalWasCny"] = 100.0
     check("an opening total that is not the sum of what the plan used to cost is caught",
@@ -276,7 +310,8 @@ def main() -> int:
     for item in plan["items"]:
         print(f"{item['id']:5s} was ¥{item['wasCny']:6.2f}  now ¥{item['nowCny']:5.2f}  {item['status']:9s} "
               f"{item['why']}")
-    print(f"total  was ¥{plan['totalWasCny']:6.2f}  now ¥{plan['totalNowCny']:5.2f}")
+    print(f"total  was ¥{plan['totalWasCny']:6.2f}  now ¥{plan['totalNowCny']:5.2f}"
+          f"  floor ¥{plan.get('totalFloorCny', plan['totalNowCny']):5.2f}")
     return 0
 
 
