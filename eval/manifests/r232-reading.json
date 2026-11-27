@@ -14,7 +14,7 @@
     ],
     "rates": {
      "clause": 0.9510703363914373,
-     "request": 0.7079510703363915
+     "request": 0.7048929663608563
     },
     "required": 654
    },
@@ -30,10 +30,10 @@
    "B3_displayTax": {
     "against": 416,
     "bar": 4,
-    "displayed": 463,
+    "displayed": 461,
     "holds": false,
-    "moment": 463,
-    "tax": 47
+    "moment": 461,
+    "tax": 45
    },
    "holds": false
   },
@@ -156,8 +156,8 @@
     "covered": 416,
     "credited": 419,
     "items": 970,
-    "open": 527,
-    "openPerEpisode": 1.3076923076923077,
+    "open": 520,
+    "openPerEpisode": 1.2903225806451613,
     "openUnneeded": 278,
     "openUnneededPerEpisode": 0.6898263027295285,
     "overCredit": 3,
@@ -207,14 +207,14 @@
     "shownShare": 0.9510703363914373
    },
    "request": {
-    "displayed": 463,
+    "displayed": 461,
     "hidden": 0,
     "hiddenShare": 0.0,
     "itemsPerCall": 2.4069478908188584,
-    "other": 463,
-    "reached": 463,
+    "other": 461,
+    "reached": 461,
     "required": 654,
-    "shownShare": 0.7079510703363915
+    "shownShare": 0.7048929663608563
    }
   },
   "dropped": 0,
@@ -241,7 +241,7 @@
      ],
      "rates": {
       "clause": 0.9362363919129082,
-      "request": 0.6889580093312597
+      "request": 0.6811819595645412
      },
      "required": 643
     },
@@ -255,12 +255,12 @@
      "scope": "clause"
     },
     "B3_displayTax": {
-     "against": 393,
+     "against": 392,
      "bar": 4,
-     "displayed": 443,
+     "displayed": 438,
      "holds": false,
-     "moment": 444,
-     "tax": 50
+     "moment": 439,
+     "tax": 46
     },
     "holds": false
    },
@@ -377,21 +377,21 @@
      "unbound": 36
     },
     "request": {
-     "complete": 209,
-     "completeShare": 0.5251256281407035,
-     "coverage": 0.6111975116640747,
-     "covered": 393,
-     "credited": 398,
+     "complete": 208,
+     "completeShare": 0.5226130653266332,
+     "coverage": 0.609642301710731,
+     "covered": 392,
+     "credited": 397,
      "items": 937,
-     "open": 510,
-     "openPerEpisode": 1.2814070351758795,
+     "open": 506,
+     "openPerEpisode": 1.271356783919598,
      "openUnneeded": 282,
      "openUnneededPerEpisode": 0.7085427135678392,
      "overCredit": 5,
      "overCreditPerEpisode": 0.01256281407035176,
-     "precision": 0.9874371859296482,
+     "precision": 0.9874055415617129,
      "recoveredFromLate": 0,
-     "unaccounted": 240,
+     "unaccounted": 241,
      "unaccountedBy": null,
      "unbound": 0
     },
@@ -428,20 +428,20 @@
      "hidden": 19,
      "hiddenShare": 0.030595813204508857,
      "itemsPerCall": 7.722152428810718,
-     "other": 614,
+     "other": 615,
      "reached": 621,
      "required": 643,
      "shownShare": 0.9362363919129082
     },
     "request": {
-     "displayed": 443,
+     "displayed": 438,
      "hidden": 1,
-     "hiddenShare": 0.0022522522522522522,
+     "hiddenShare": 0.002277904328018223,
      "itemsPerCall": 2.3542713567839195,
-     "other": 443,
-     "reached": 444,
+     "other": 438,
+     "reached": 439,
      "required": 643,
-     "shownShare": 0.6889580093312597
+     "shownShare": 0.6811819595645412
     }
    },
    "dropped": 0,
@@ -449,12 +449,12 @@
    "graded": 398,
    "lateWrites": 156,
    "paired": {
-    "completeDelta": 157,
-    "coverageDelta": 0.3390357698289269,
-    "episodesCompleteGained": 157,
+    "completeDelta": 158,
+    "coverageDelta": 0.3405909797822706,
+    "episodesCompleteGained": 158,
     "episodesCompleteLost": 0,
     "overCreditDelta": 2,
-    "unaccountedDelta": -220
+    "unaccountedDelta": -221
    },
    "recovered": 20,
    "required": 720,

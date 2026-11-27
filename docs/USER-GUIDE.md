@@ -7920,11 +7920,46 @@ python3 eval/tools/memory_traps.py --document your-run.json --scope clause --sam
     served:    10 of 3479 shown line(s) name work a write of their family already carried (0.29%)
     rejected:  family-level staleness 507 of 4447 (11.4%), of which 304 in a family where no ask ever settled
 
-The first line is the block your product renders, counted over **asks**; the second is a different board — the
-read-anchored one — counted over **families**, and it is kept only as a refuted quantity. On this grid the same
-phenomenon reads 0.29% and 11.4%, which is why the two must never be quoted as one number.
+The first line is the block your product renders, counted over **asks**; the second aggregates the same board over
+**families**, which are what the board settles by, and it is kept as a refuted quantity — a family is what gets
+ticked, not what the model reads. On this grid the same phenomenon reads 0.29% and 10.9%, which is why the two must
+never be quoted as one number. (The number was 11.4% before R239 unified settlement; see §32.95.)
 
 **What is left after both fixes, and why it is correct.** The ten remaining lines are all `return` asks that are
 narrower or wider than the write: "return all five items" against a write that returned three, or "return item
 6704763132 from order #W8528674" against a write that touched a different item of that order. An order id cannot tell
 those apart, and closing them would mean showing the wrong thing — the ask is genuinely still outstanding.
+
+### 32.95 Make the instrument read the board you actually rendered
+
+If your evaluation reads the memory block with a *different* settlement rule than the one your product uses to render
+it, then every number about "what the model saw" is about a block that was never served. This is not a philosophical
+objection: on our grid two rules — the instrument's "a receipt settles an ask only if the episode opened the record
+it touched", and the product's "an ask settles by product name, free-text value, or the record it names" — disagreed on
+**133 of 4,968** ask-moments. Every disagreement was inside a family, so a family-level summary could not see it.
+
+**The practical rule.** Both the renderer and the reader must call the same settlement function with the same arguments.
+In this project that is `goal_board.board_of(messages[:upto], scope)`; the instrument reaches it through
+`read_anchor.moment`, which now passes `settle="serving"`. The historical read-anchored rule is still available as
+`ask_board`'s default, because older published readings measure it — but it is no longer what the mechanism reader uses.
+
+**A test that proves the two are joined.** Do not assert that "the numbers are similar"; assert a case where the rules
+*must* disagree, and require the reader to follow the product:
+
+```python
+# An ask names an order id; the episode never read the order; the write carries only the id.
+# The product settles it at the record grade. A reader using the read anchor would leave it open.
+board = board_of(messages[:3], "request")           # settled_by = "cancel_pending_order"
+read  = moment(entry, messages, 3, "request")       # must report settled=True on the same ask
+```
+
+**Regenerate every published number that reads through the changed function.** A saved reading with `--check` proves
+only that its rows sum to its summary — not that it was produced by today's code. After changing settlement we
+regenerated all four affected manifests and recorded the before/after values: the three display readings' request
+column moved 463→461 (control) and 444→439 (replicate), the trap reader's rejected family-level column moved
+507→483, while the shipped mechanism gate (431/456 wired, 394/403 acted) and the product-side served column were
+byte-identical. The gate did not move because it judges *families*; the gap was in *asks*. If your own gate is at a
+coarser unit than your block, check the finer unit before declaring the two rules equivalent.
+
+**Cost.** ¥0 — no model was called. The change is one function sharing, four regenerated JSON manifests, and three
+self-tests. The product you ship and the number you publish now come from the same settlement rule.

@@ -12,17 +12,17 @@
     "passers": [],
     "rates": {
      "clause": 0.9663608562691132,
-     "request": 0.7079510703363915
+     "request": 0.7048929663608563
     },
     "required": 654
    },
    "B2_contract": {
     "against": 416,
-    "displayed": 463,
-    "floor": 463,
+    "displayed": 461,
+    "floor": 461,
     "holds": true,
-    "moment": 463,
-    "tax": 47
+    "moment": 461,
+    "tax": 45
    },
    "B3_hidden": {
     "bar": 0.01,
@@ -154,8 +154,8 @@
     "covered": 416,
     "credited": 419,
     "items": 970,
-    "open": 527,
-    "openPerEpisode": 1.3076923076923077,
+    "open": 520,
+    "openPerEpisode": 1.2903225806451613,
     "openUnneeded": 278,
     "openUnneededPerEpisode": 0.6898263027295285,
     "overCredit": 3,
@@ -205,14 +205,14 @@
     "shownShare": 0.9663608562691132
    },
    "request": {
-    "displayed": 463,
+    "displayed": 461,
     "hidden": 0,
     "hiddenShare": 0.0,
     "itemsPerCall": 2.4069478908188584,
-    "other": 463,
-    "reached": 463,
+    "other": 461,
+    "reached": 461,
     "required": 654,
-    "shownShare": 0.7079510703363915
+    "shownShare": 0.7048929663608563
    }
   },
   "dropped": 0,
@@ -236,24 +236,24 @@
      "holds": false,
      "passers": [],
      "rates": {
-      "clause": 0.9548989113530326,
-      "request": 0.6889580093312597
+      "clause": 0.9564541213063764,
+      "request": 0.6811819595645412
      },
      "required": 643
     },
     "B2_contract": {
-     "against": 393,
-     "displayed": 443,
-     "floor": 443,
+     "against": 392,
+     "displayed": 438,
+     "floor": 438,
      "holds": true,
-     "moment": 444,
-     "tax": 50
+     "moment": 439,
+     "tax": 46
     },
     "B3_hidden": {
      "bar": 0.01,
-     "hidden": 7,
-     "hiddenShare": 0.011272141706924315,
-     "holds": false,
+     "hidden": 6,
+     "hiddenShare": 0.00966183574879227,
+     "holds": true,
      "passed": false,
      "reached": 621,
      "scope": "clause"
@@ -373,21 +373,21 @@
      "unbound": 36
     },
     "request": {
-     "complete": 209,
-     "completeShare": 0.5251256281407035,
-     "coverage": 0.6111975116640747,
-     "covered": 393,
-     "credited": 398,
+     "complete": 208,
+     "completeShare": 0.5226130653266332,
+     "coverage": 0.609642301710731,
+     "covered": 392,
+     "credited": 397,
      "items": 937,
-     "open": 510,
-     "openPerEpisode": 1.2814070351758795,
+     "open": 506,
+     "openPerEpisode": 1.271356783919598,
      "openUnneeded": 282,
      "openUnneededPerEpisode": 0.7085427135678392,
      "overCredit": 5,
      "overCreditPerEpisode": 0.01256281407035176,
-     "precision": 0.9874371859296482,
+     "precision": 0.9874055415617129,
      "recoveredFromLate": 0,
-     "unaccounted": 240,
+     "unaccounted": 241,
      "unaccountedBy": null,
      "unbound": 0
     },
@@ -420,24 +420,24 @@
    "discharged": 643,
    "display": {
     "clause": {
-     "displayed": 614,
-     "hidden": 7,
-     "hiddenShare": 0.011272141706924315,
+     "displayed": 615,
+     "hidden": 6,
+     "hiddenShare": 0.00966183574879227,
      "itemsPerCall": 7.722152428810718,
      "other": 602,
      "reached": 621,
      "required": 643,
-     "shownShare": 0.9548989113530326
+     "shownShare": 0.9564541213063764
     },
     "request": {
-     "displayed": 443,
+     "displayed": 438,
      "hidden": 1,
-     "hiddenShare": 0.0022522522522522522,
+     "hiddenShare": 0.002277904328018223,
      "itemsPerCall": 2.3542713567839195,
-     "other": 443,
-     "reached": 444,
+     "other": 438,
+     "reached": 439,
      "required": 643,
-     "shownShare": 0.6889580093312597
+     "shownShare": 0.6811819595645412
     }
    },
    "dropped": 0,
@@ -445,12 +445,12 @@
    "graded": 398,
    "lateWrites": 156,
    "paired": {
-    "completeDelta": 157,
-    "coverageDelta": 0.3390357698289269,
-    "episodesCompleteGained": 157,
+    "completeDelta": 158,
+    "coverageDelta": 0.3405909797822706,
+    "episodesCompleteGained": 158,
     "episodesCompleteLost": 0,
     "overCreditDelta": 2,
-    "unaccountedDelta": -220
+    "unaccountedDelta": -221
    },
    "recovered": 20,
    "required": 720,

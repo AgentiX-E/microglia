@@ -5788,8 +5788,50 @@ id. They disagree on 133 of 4,968 item-moments in this grid, every one of them i
 cannot see an attribution difference, so the whole distance was published as defect. AUDIT 34.339 records the
 refutation; the served column in `eval/tools/memory_traps.py` exists so the two can never be quoted as one again.
 
-**What is still split, stated rather than papered over.** The two rules are still two implementations: the reader's
-`moment` and the product's `board_of`. R236 unified scope, rung, window and fold; settlement is the part it did not
-unify, and the 133 item-moments are what is left of that gap. Closing it means making `moment` call `board_of` and
-deleting the read-anchored settlement from the reading path — a change that moves three published manifests at once,
-and it is registered as R239 rather than smuggled into this round's numbers.
+**What was still split, and is now closed.** The two rules were two implementations: the reader's `moment` and the
+product's `board_of`. R236 unified scope, rung, window and fold; settlement was the part it did not unify, and the 133
+item-moments were what was left of that gap. **R239 closed it** (§8.114): `moment` now takes its settlements from
+`board_of`, and four published manifests were regenerated rather than left stale.
+
+### 8.114 One settlement function, two consumers: the instrument reads the board the product rendered
+
+R238 completed the product's settlement rule to three grades — **name**, **overlap**, **record** — but the instrument
+(`read_anchor.moment`) still walked a second path: through `ask_board`, it settled a receipt against an ask of its
+family only when the episode had *opened* the record the receipt touched (`record in seen`). The two implementations
+disagreed on **133 of 4,968 item-moments** on the 456-transcript grid, all inside a family. While they were two
+functions, a reading about "what the model saw on the block" could be a reading about a block the product never
+rendered — the exact failure mode R236's scope/rung/window/fold unification was built to prevent, one level down.
+
+**The interface.** `ask_board` takes a `settle` parameter with two values:
+
+    "read"       the default. The read-anchored rule; the r228–r231 published readings measure it, so it stays.
+    "serving"    items' `settled` comes from goal_board.board_of(messages[:upto], scope) — the same function, with
+                 the same arguments, that the serving path renders.
+
+`moment` passes `"serving"`. It still uses `entry["at"]` and `bisect` to find the message boundary, so two writes in one
+assistant message read one block (R232's no-leak constraint), but settlement no longer comes from the ledger's events.
+`_serving_ask_board` returns the same shape as `ask_board` — items with a boolean `settled`, `itemsAll`, `credited` —
+so the three consumers of `moment` (`read_anchor.visibility`, `board_mechanism.windows`, `memory_traps.episode_reading`)
+are unchanged.
+
+**A decidable difference, not an average.** An ask "cancel order #W5056519" that the episode never read, settled by a
+write carrying only the order id:
+
+    before R239: moment → ("cancel", False)   the read anchor cannot settle an unopened record
+    after R239:  moment → ("cancel", True)    board_of settles at the record grade, byRecord = 1
+
+This case is a self-test. It proves the change is observable behaviour, not just a rewiring of calls.
+
+**Why the published gate numbers did not move.** R236's B1 (wired 431/456) and B2 (acted 394/403) ask whether a
+*family* was open in the window. When a family has several asks, settling one of them leaves another open, so the
+verdict is unchanged. The gap lived in the **ask** unit, which family-level bars cannot see — the second independent
+sign that a family was never the right unit. What did move: the three display manifests' request column 463→461
+(control) and 444→439 (replicate); `r237-traps`' rejected column familyStale 507→483 and staleUnsettled 304→290.
+`r236-replay.json` and the product-side `served` column are byte-identical and were not regenerated.
+
+**The manifest discipline.** `--check` verifies that a saved reading's rows sum to its summary; it does not re-derive
+the reading from the source document. A stale manifest is therefore still self-consistent — consistent with the old
+code. Changing a settlement function means explicitly regenerating every manifest that reads through it (here:
+r232/r233/r234 and r237-traps), against the original control grid (sha256 `b41ff472…`), and recording the before and
+after numbers in the audit. CI green (manifests self-consistent) and product↔evaluation agreement (manifests produced
+by the current code) are two different properties; only this discipline guarantees the second.

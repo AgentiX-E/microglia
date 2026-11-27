@@ -491,8 +491,61 @@ def _fold(items: list) -> list:
     return _board().fold_family(items)
 
 
+def _serving_ask_board(entry: dict, messages, scope: str, cap, later: bool, order: str, fold: bool) -> dict:
+    """`ask_board`'s shape, with settlement taken from the serving path's `board_of`.
+
+    R239 closes the gap R238 measured: the instrument's block and the product's block are produced by one settlement
+    rule, so a line the product has ticked cannot still be shown open to a reader. The asks and the ticks come from
+    `goal_board.board_of(messages[:upto], scope)` — the exact call the renderer makes — and the fields this module's
+    consumers read (`items` with a boolean `settled`, `itemsAll`, `credited`) are derived from it. The other fields
+    (`unaccounted*`, `unbound`, `admission`) keep their names so the shape stays one contract; on this path they are
+    empty, because the serving rule reports its misses as `unattributed`/`unrequested` on the board itself, not as
+    read-anchor diagnoses.
+    """
+    module = _board()
+    # `admitted` has no serving counterpart: it was R230's parser experiment, not a rendered scope, and no consumer of
+    # `moment` uses it. Refuse it rather than quietly rendering the request board under an admitted label.
+    if scope not in ("request", "conversation", "clause"):
+        raise ValueError(f"unknown serving scope {scope!r}")
+    board = module.board_of(messages, scope)
+    items = [
+        {
+            "family": item["family"],
+            "words": list(item.get("words") or []),
+            "record": (item.get("settled_by") or None),
+            "settled": bool(item.get("settled_by")),
+        }
+        for item in board["items"]
+    ]
+    if order == "open":
+        items = module.order_open(items, is_settled=lambda item: item["settled"])
+    if fold:
+        items = _fold(items)
+    offered = len(items)
+    if cap is not None:
+        items = items[:cap]
+    # `credited` is the positions of the receipts the serving board ticked. `board_of` records these as `settledIndex`
+    # on the items; a set ask absorbs several calls, which it also records. Read the same list the renderer does rather
+    # than re-deriving it: one source for the ticks the board claims.
+    credited = sorted(
+        [item["settledIndex"] for item in board["items"] if item.get("settledIndex") is not None]
+    )
+    return {
+        "scope": f"ask-{scope}",
+        "items": items,
+        "itemsAll": offered,
+        "credited": credited,
+        "unaccounted": [],
+        "unbound": [],
+        "open": [{"family": item["family"], "words": item["words"]} for item in items if not item["settled"]],
+        "unaccountedBy": {},
+        "unaccountedByPosition": {},
+        "admission": None,
+    }
+
+
 def ask_board(entry: dict, messages, scope: str = "request", cap=None, later: bool = True,
-              order: str = "statement", fold: bool = False) -> dict:
+              order: str = "statement", fold: bool = False, settle: str = "read") -> dict:
     """R229's rule: an item is an **ask**, and the read supplies only the binding.
 
     R228 measured the two anchors' failures as a trade rather than as a deficit: the request board attributes 63.6% of
@@ -522,6 +575,14 @@ def ask_board(entry: dict, messages, scope: str = "request", cap=None, later: bo
     if order not in ORDERS:
         # Same reason as the scope: an order nobody implements must not be the statement order by accident.
         raise ValueError(f"unknown order {order!r}")
+    if settle not in ("read", "serving"):
+        raise ValueError(f"unknown settlement rule {settle!r}")
+    if settle == "serving":
+        # R239. The instrument reads the board the product served: one settlement rule, `goal_board.board_of`, for the
+        # renderer and for the reading. The read-anchored branch below stays the default because r228–r231's published
+        # readings measure it and must not move; only `moment` asks for the serving rule. Both branches return the same
+        # shape, so the three consumers of `moment` (`visibility`, `board_mechanism`, `memory_traps`) read one contract.
+        return _serving_ask_board(entry, messages, scope, cap, later, order, fold)
     if scope == "admitted":
         admission = admitted_asks(messages)
     elif scope == "clause":
@@ -685,10 +746,16 @@ def moment(entry: dict, messages, upto: int, scope: str, order: str = "statement
 
     `later=False` for the first reason in its sharpest form: the `disclosedLater` taxonomy parses turns the agent had
     not read yet, and a moment board that consults them is not a measurement of the moment.
+
+    **R239 settles by the serving rule.** The block is built by `goal_board.board_of`, the same function the driver
+    renders, so a line the product has ticked cannot still be open on the reading. The read-anchored settlement that
+    `ask_board` still provides by default is the 133-item-moment gap R238 measured; `moment` is the instrument's eye
+    on the served block, so it reads the served rule. `entry` is still sliced to the message boundary — two calls in
+    one assistant message saw one block — but the settlement no longer comes from its events.
     """
     stop = bisect.bisect_left(entry["at"], upto)
     return ask_board({**entry, "events": entry["events"][:stop]}, messages[:upto], scope, later=False, order=order,
-                     fold=fold)
+                     fold=fold, settle="serving")
 
 
 def visibility(entry: dict, messages, done: dict, scope: str, cap: int = CAP, order: str = "statement",
@@ -2356,6 +2423,66 @@ def self_test() -> int:
     twin_done = discharge(twin_entry["writes"], required_writes(twin_task))
     check("so both graded writes are shown, each against the block it was served",
           visibility(twin_entry, paired_calls, twin_done, "request")["displayed"] == 2)
+
+    # R239. The moment board now settles by `goal_board.board_of`, the same rule the product renders, rather than by
+    # the read-anchor's `record in seen` test. The decidable case is a cancel that names an order id but which the
+    # episode never read: `board_of` settles it at the `record` grade (R238), while the read anchor cannot, because
+    # the order was never opened. A moment that reports the ask still open is the 133-item-moment gap R238 measured.
+    cancel_by_id = [
+        {"role": "user", "content": "Please cancel order #W5056519."},
+        _call("cancel_pending_order", order_id="#W5056519", reason="customer asked"),
+        _result("{}"),
+        {"role": "assistant", "content": "Done."},
+    ]
+    cancel_entry = ledger(cancel_by_id)
+    serving = _board().board_of(cancel_by_id[:3], "request")
+    moment_settled = moment(cancel_entry, cancel_by_id, 3, "request")["items"]
+    check("the serving board settles a cancel-by-id at the record grade",
+          serving["byRecord"] == 1 and serving["items"][0]["settled_by"] is not None)
+    check("R239: the moment reports the same settlement as the serving path",
+          [(item["family"], item["settled"]) for item in moment_settled] == [("cancel", True)])
+    # The gap closes for the display reader too: a returned ask names its product, settles at the name grade, and the
+    # moment must not leave it open where the product has ticked it.
+    moment_closed = moment(moment_entry, volunteered, 5, "request")["items"]
+    check("R239: a moment built before any write still carries the contract's asks",
+          [item["family"] for item in moment_closed] == ["cancel"])
+    # The serving branch is the same shape under every rendering switch: open-first reorders, fold collapses families,
+    # and the cap cuts only the window. All three are exercised on the restated fixture, where statement order puts a
+    # repeated family ahead of the family the graded write needs.
+    served_statement = _serving_ask_board(moment_entry, volunteered, "clause", None, False, "statement", False)
+    served_open = _serving_ask_board(moment_entry, volunteered, "clause", None, False, "open", False)
+    served_fold = _serving_ask_board(moment_entry, volunteered, "clause", None, False, "statement", True)
+    served_cut = _serving_ask_board(moment_entry, volunteered, "clause", 1, False, "statement", False)
+    check("R239: the serving branch reorders open-first without moving settlements",
+          {item["family"]: item["settled"] for item in served_open["items"]}
+          == {item["family"]: item["settled"] for item in served_statement["items"]})
+    check("R239: the serving branch folds one line per family and keeps the count",
+          len({item["family"] for item in served_fold["items"]}) == len(served_fold["items"])
+          and served_fold["itemsAll"] == served_statement["itemsAll"])
+    check("R239: the serving branch's cap cuts the window but not the count",
+          len(served_cut["items"]) == 1 and served_cut["itemsAll"] == served_statement["itemsAll"])
+    # The two refusal paths: an unknown scope has no serving counterpart, and an unknown settlement rule is not the
+    # read anchor by accident. Both are named errors rather than silent defaults.
+    refused_scope = refused_rule = None
+    try:
+        _serving_ask_board(moment_entry, volunteered, "admitted", None, False, "statement", False)
+    except ValueError as error:
+        refused_scope = str(error)
+    try:
+        ask_board(moment_entry, volunteered, "clause", settle="neither")
+    except ValueError as error:
+        refused_rule = str(error)
+    check("R239: an admitted scope has no serving counterpart", "unknown serving scope" in (refused_scope or ""))
+    check("R239: an unknown settlement rule is refused", "unknown settlement rule" in (refused_rule or ""))
+    # The read-anchor path keeps its order and fold switches: the published r232–r234 readings were taken with them,
+    # and a reader of those manifest rows must be able to re-derive them. `moment` no longer calls this branch, so the
+    # self-test is its only caller — cover both switches here rather than leave them as dead lines.
+    read_ordered = ask_board(moment_entry, volunteered, "clause", order="open")
+    read_folded = ask_board(moment_entry, volunteered, "clause", fold=True)
+    check("the read-anchor path still reorders open-first",
+          [item["settled"] for item in read_ordered["items"]]
+          == sorted(item["settled"] for item in ask_board(moment_entry, volunteered, "clause")["items"]))
+    check("and still folds one line per family", read_folded["itemsAll"] >= len(read_folded["items"]))
 
     # R232's bars at their exact thresholds. The summary is built the way `compare` builds it, from four counts per
     # scope, so that the bar is tested as arithmetic rather than through a corpus.

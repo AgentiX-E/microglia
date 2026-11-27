@@ -5,24 +5,24 @@
  "windows": 575,
  "writes": 723,
  "settlement": {
-  "hidden": 117,
-  "shown": 4447,
-  "perWindow": 0.20347826086956522
+  "hidden": 137,
+  "shown": 4427,
+  "perWindow": 0.2382608695652174
  },
  "crowding": {
-  "unused": 2131,
-  "shown": 4447,
-  "share": 0.47919946031032157,
+  "unused": 2114,
+  "shown": 4427,
+  "share": 0.47752428281002934,
   "windowed": 27,
-  "linesPerWindow": 7.733913043478261
+  "linesPerWindow": 7.699130434782608
  },
  "rejected": {
-  "familyStale": 507,
-  "staleUnsettled": 304,
-  "staleMulti": 203,
-  "shown": 4447,
-  "share": 0.1140094445693726,
-  "unsettledShare": 0.068360692601754,
+  "familyStale": 483,
+  "staleUnsettled": 290,
+  "staleMulti": 193,
+  "shown": 4427,
+  "share": 0.10910323017845042,
+  "unsettledShare": 0.06550711542805511,
   "unit": "family",
   "why": "a family is what the board settles by and an ask is what the model reads; see --sample"
  },
@@ -91,10 +91,7 @@
    "open": [
     [
      "exchange",
-     [
-      "water",
-      "bottle"
-     ]
+     []
     ],
     [
      "return",
@@ -106,8 +103,8 @@
     [
      "exchange",
      [
-      "desk",
-      "lamp"
+      "water",
+      "bottle"
      ]
     ],
     [
@@ -154,10 +151,7 @@
    "open": [
     [
      "exchange",
-     [
-      "water",
-      "bottle"
-     ]
+     []
     ],
     [
      "return",
@@ -169,8 +163,8 @@
     [
      "exchange",
      [
-      "desk",
-      "lamp"
+      "water",
+      "bottle"
      ]
     ],
     [
@@ -218,7 +212,8 @@
     [
      "return",
      [
-      "go"
+      "cancellation",
+      "process"
      ]
     ],
     [
@@ -231,8 +226,7 @@
     [
      "return",
      [
-      "mechanical",
-      "keyboard"
+      "go"
      ]
     ],
     [
@@ -273,15 +267,12 @@
    "write": "modify_user_address",
    "open": [
     [
-     "modify",
+     "address",
      []
     ],
     [
-     "address",
-     [
-      "w9911714",
-      "highway"
-     ]
+     "modify",
+     []
     ],
     [
      "modify",
@@ -442,10 +433,7 @@
      "open": [
       [
        "exchange",
-       [
-        "water",
-        "bottle"
-       ]
+       []
       ],
       [
        "return",
@@ -457,8 +445,8 @@
       [
        "exchange",
        [
-        "desk",
-        "lamp"
+        "water",
+        "bottle"
        ]
       ],
       [
@@ -505,10 +493,7 @@
      "open": [
       [
        "exchange",
-       [
-        "water",
-        "bottle"
-       ]
+       []
       ],
       [
        "return",
@@ -520,8 +505,8 @@
       [
        "exchange",
        [
-        "desk",
-        "lamp"
+        "water",
+        "bottle"
        ]
       ],
       [
@@ -801,7 +786,8 @@
       [
        "return",
        [
-        "go"
+        "cancellation",
+        "process"
        ]
       ],
       [
@@ -814,8 +800,7 @@
       [
        "return",
        [
-        "mechanical",
-        "keyboard"
+        "go"
        ]
       ],
       [
@@ -983,15 +968,12 @@
      "write": "modify_user_address",
      "open": [
       [
-       "modify",
+       "address",
        []
       ],
       [
-       "address",
-       [
-        "w9911714",
-        "highway"
-       ]
+       "modify",
+       []
       ],
       [
        "modify",
@@ -1149,10 +1131,7 @@
       ],
       [
        "exchange",
-       [
-        "current",
-        "boots"
-       ]
+       []
       ],
       [
        "return",
@@ -1182,17 +1161,6 @@
       [
        "return",
        []
-      ],
-      [
-       "exchange",
-       []
-      ],
-      [
-       "exchange",
-       [
-        "boots",
-        "first"
-       ]
       ]
      ]
     },
@@ -1208,10 +1176,7 @@
       ],
       [
        "exchange",
-       [
-        "current",
-        "boots"
-       ]
+       []
       ],
       [
        "return",
@@ -1241,27 +1206,16 @@
       [
        "return",
        []
-      ],
-      [
-       "exchange",
-       []
-      ],
-      [
-       "exchange",
-       [
-        "boots",
-        "first"
-       ]
       ]
      ]
     }
    ],
-   "shown": 24,
-   "hidden": 0,
-   "familyStale": 6,
-   "staleUnsettled": 6,
-   "staleMulti": 0,
-   "unused": 16,
+   "shown": 20,
+   "hidden": 4,
+   "familyStale": 2,
+   "staleUnsettled": 0,
+   "staleMulti": 2,
+   "unused": 12,
    "used": 8,
    "crowded": 1,
    "servedShown": 20,
@@ -1356,7 +1310,7 @@
       [
        "return",
        [
-        "backpack"
+        "keyboard"
        ]
       ],
       [
@@ -1365,12 +1319,6 @@
         "garden",
         "hose",
         "pending"
-       ]
-      ],
-      [
-       "return",
-       [
-        "keyboard"
        ]
       ],
       [
@@ -1396,6 +1344,13 @@
        [
         "list",
         "correct"
+       ]
+      ],
+      [
+       "return",
+       [
+        "paypal",
+        "fine"
        ]
       ]
      ]
@@ -1460,9 +1415,7 @@
       ],
       [
        "return",
-       [
-        "tablet"
-       ]
+       []
       ],
       [
        "cancel",
@@ -1509,14 +1462,13 @@
       ],
       [
        "return",
-       [
-        "tablet"
-       ]
+       []
       ],
       [
        "cancel",
        [
-        "w9373487"
+        "charger",
+        "bought"
        ]
       ],
       [
@@ -1582,6 +1534,13 @@
       [
        "cancel",
        [
+        "charger",
+        "bought"
+       ]
+      ],
+      [
+       "cancel",
+       [
         "boot"
        ]
       ],
@@ -1612,29 +1571,22 @@
      "write": "transfer_to_human_agents",
      "open": [
       [
+       "return",
+       [
+        "reorder"
+       ]
+      ],
+      [
+       "cancel",
+       [
+        "charger",
+        "bought"
+       ]
+      ],
+      [
        "cancel",
        [
         "boot"
-       ]
-      ],
-      [
-       "return",
-       [
-        "sneaker"
-       ]
-      ],
-      [
-       "return",
-       [
-        "sneaker",
-        "w7449508"
-       ]
-      ],
-      [
-       "return",
-       [
-        "gift",
-        "card"
        ]
       ],
       [
@@ -1658,8 +1610,8 @@
    "shown": 13,
    "hidden": 3,
    "familyStale": 7,
-   "staleUnsettled": 0,
-   "staleMulti": 7,
+   "staleUnsettled": 4,
+   "staleMulti": 3,
    "unused": 8,
    "used": 5,
    "crowded": 1,
@@ -1689,7 +1641,10 @@
       ],
       [
        "cancel",
-       []
+       [
+        "charger",
+        "bought"
+       ]
       ],
       [
        "cancel",
@@ -1714,6 +1669,13 @@
        [
         "reorder",
         "tablet"
+       ]
+      ],
+      [
+       "cancel",
+       [
+        "charger",
+        "bought"
        ]
       ],
       [
@@ -1751,12 +1713,12 @@
      ]
     }
    ],
-   "shown": 13,
-   "hidden": 3,
-   "familyStale": 5,
+   "shown": 14,
+   "hidden": 2,
+   "familyStale": 6,
    "staleUnsettled": 0,
-   "staleMulti": 5,
-   "unused": 4,
+   "staleMulti": 6,
+   "unused": 5,
    "used": 9,
    "crowded": 0,
    "servedShown": 14,
@@ -2279,23 +2241,6 @@
       [
        "return",
        [
-        "camera"
-       ]
-      ],
-      [
-       "return",
-       [
-        "w4689314",
-        "24mp",
-        "digital",
-        "camera",
-        "id",
-        "refund"
-       ]
-      ],
-      [
-       "return",
-       [
         "label"
        ]
       ],
@@ -2308,6 +2253,18 @@
        [
         "window",
         "deadline"
+       ]
+      ],
+      [
+       "return",
+       [
+        "window"
+       ]
+      ],
+      [
+       "return",
+       [
+        "proceed"
        ]
       ]
      ]
@@ -2379,13 +2336,9 @@
       [
        "cancel",
        [
-        "reasons",
-        "w4836353",
-        "longer",
-        "needed",
-        "w7342738",
-        "go",
-        "ahead"
+        "two",
+        "pending",
+        "right"
        ]
       ],
       [
@@ -2441,13 +2394,9 @@
       [
        "cancel",
        [
-        "reasons",
-        "w4836353",
-        "longer",
-        "needed",
-        "w7342738",
-        "go",
-        "ahead"
+        "two",
+        "pending",
+        "right"
        ]
       ],
       [
@@ -2633,7 +2582,11 @@
       [
        "address",
        [
-        "springfield"
+        "updated",
+        "new",
+        "place",
+        "elm",
+        "st"
        ]
       ],
       [
@@ -2643,35 +2596,34 @@
       [
        "address",
        [
-        "il"
-       ]
-      ],
-      [
-       "address",
-       [
         "update"
        ]
       ],
       [
-       "address",
+       "modify",
        [
-        "change"
+        "saved"
        ]
       ],
       [
-       "address",
+       "cancel",
        [
-        "update",
-        "w2702727",
-        "confirm",
-        "new",
-        "shipping",
-        "address",
-        "exactly",
-        "listed",
-        "elm",
-        "st",
-        "springfield"
+        "older",
+        "pending",
+        "don",
+        "exact",
+        "date",
+        "front"
+       ]
+      ],
+      [
+       "cancel",
+       [
+        "under",
+        "reason",
+        "longer",
+        "needed",
+        "finalize"
        ]
       ]
      ]
@@ -2679,11 +2631,11 @@
    ],
    "shown": 16,
    "hidden": 0,
-   "familyStale": 5,
-   "staleUnsettled": 5,
+   "familyStale": 2,
+   "staleUnsettled": 2,
    "staleMulti": 0,
-   "unused": 10,
-   "used": 6,
+   "unused": 8,
+   "used": 8,
    "crowded": 0,
    "servedShown": 16,
    "servedStale": 0,
@@ -2873,11 +2825,10 @@
       [
        "return",
        [
-        "original",
-        "payment",
-        "method",
-        "visa",
-        "ending"
+        "everything",
+        "except",
+        "coffee",
+        "machine"
        ]
       ],
       [
@@ -3556,13 +3507,6 @@
        ]
       ],
       [
-       "address",
-       [
-        "maple",
-        "drive"
-       ]
-      ],
-      [
        "modify",
        [
         "red"
@@ -3575,12 +3519,12 @@
      ]
     }
    ],
-   "shown": 14,
-   "hidden": 1,
-   "familyStale": 2,
+   "shown": 13,
+   "hidden": 2,
+   "familyStale": 1,
    "staleUnsettled": 0,
-   "staleMulti": 2,
-   "unused": 8,
+   "staleMulti": 1,
+   "unused": 7,
    "used": 6,
    "crowded": 0,
    "servedShown": 13,
@@ -4236,17 +4180,15 @@
        ]
       ],
       [
-       "return",
-       []
-      ],
-      [
        "exchange",
        [
-        "air",
-        "purifier",
-        "came",
-        "sneakers"
+        "silicone",
+        "watch"
        ]
+      ],
+      [
+       "return",
+       []
       ],
       [
        "address",
@@ -4283,17 +4225,15 @@
        ]
       ],
       [
-       "return",
-       []
-      ],
-      [
        "exchange",
        [
-        "air",
-        "purifier",
-        "came",
-        "sneakers"
+        "silicone",
+        "watch"
        ]
+      ],
+      [
+       "return",
+       []
       ],
       [
        "exchange",
@@ -4409,9 +4349,7 @@
       ],
       [
        "return",
-       [
-        "two"
-       ]
+       []
       ],
       [
        "address",
@@ -4435,10 +4373,7 @@
       [
        "return",
        [
-        "backpack",
-        "came",
-        "vacuum",
-        "cleaner"
+        "two"
        ]
       ],
       [
@@ -4471,9 +4406,7 @@
       ],
       [
        "return",
-       [
-        "two"
-       ]
+       []
       ],
       [
        "address",
@@ -4497,10 +4430,7 @@
       [
        "return",
        [
-        "backpack",
-        "came",
-        "vacuum",
-        "cleaner"
+        "two"
        ]
       ],
       [
@@ -4636,12 +4566,7 @@
       ],
       [
        "return",
-       [
-        "backpack",
-        "came",
-        "vacuum",
-        "cleaner"
-       ]
+       []
       ],
       [
        "modify",
@@ -4906,13 +4831,16 @@
       [
        "modify",
        [
-        "laptop"
+        "options"
        ]
       ],
       [
-       "modify",
+       "address",
        [
-        "options"
+        "profile",
+        "found",
+        "without",
+        "saying"
        ]
       ]
      ]
@@ -4923,8 +4851,8 @@
    "familyStale": 7,
    "staleUnsettled": 7,
    "staleMulti": 0,
-   "unused": 15,
-   "used": 9,
+   "unused": 16,
+   "used": 8,
    "crowded": 0,
    "servedShown": 24,
    "servedStale": 0,
@@ -4965,9 +4893,32 @@
      "write": "modify_pending_order_items",
      "open": [
       [
+       "modify",
+       []
+      ],
+      [
        "exchange",
        [
         "number"
+       ]
+      ],
+      [
+       "address",
+       [
+        "updated",
+        "nyc",
+        "address",
+        "already",
+        "saved",
+        "profile"
+       ]
+      ],
+      [
+       "return",
+       [
+        "original",
+        "payment",
+        "method"
        ]
       ],
       [
@@ -4982,26 +4933,6 @@
        [
         "possible",
         "ships"
-       ]
-      ],
-      [
-       "return",
-       [
-        "original",
-        "payment",
-        "method"
-       ]
-      ],
-      [
-       "address",
-       [
-        "listed"
-       ]
-      ],
-      [
-       "modify",
-       [
-        "laptop"
        ]
       ],
       [
@@ -5469,7 +5400,9 @@
      "open": [
       [
        "address",
-       []
+       [
+        "account"
+       ]
       ],
       [
        "modify",
@@ -5480,14 +5413,22 @@
       [
        "address",
        [
-        "highway"
+        "line",
+        "highway",
+        "city",
+        "new",
+        "york",
+        "state",
+        "ny",
+        "country",
+        "usa",
+        "zip",
+        "code"
        ]
       ],
       [
        "address",
-       [
-        "w9911714"
-       ]
+       []
       ],
       [
        "address",
@@ -5505,7 +5446,9 @@
      "open": [
       [
        "address",
-       []
+       [
+        "account"
+       ]
       ],
       [
        "modify",
@@ -5516,14 +5459,22 @@
       [
        "address",
        [
-        "highway"
+        "line",
+        "highway",
+        "city",
+        "new",
+        "york",
+        "state",
+        "ny",
+        "country",
+        "usa",
+        "zip",
+        "code"
        ]
       ],
       [
        "address",
-       [
-        "w9911714"
-       ]
+       []
       ],
       [
        "address",
@@ -5690,14 +5641,6 @@
        []
       ],
       [
-       "exchange",
-       [
-        "two",
-        "piece",
-        "set"
-       ]
-      ],
-      [
        "modify",
        []
       ],
@@ -5710,12 +5653,12 @@
      ]
     }
    ],
-   "shown": 19,
-   "hidden": 2,
-   "familyStale": 7,
+   "shown": 18,
+   "hidden": 3,
+   "familyStale": 6,
    "staleUnsettled": 0,
-   "staleMulti": 7,
-   "unused": 8,
+   "staleMulti": 6,
+   "unused": 7,
    "used": 11,
    "crowded": 0,
    "servedShown": 18,
@@ -5941,10 +5884,7 @@
       ],
       [
        "return",
-       [
-        "tablet",
-        "w2692684"
-       ]
+       []
       ],
       [
        "cancel",
@@ -5988,15 +5928,13 @@
       ],
       [
        "return",
-       [
-        "tablet",
-        "w2692684"
-       ]
+       []
       ],
       [
        "cancel",
        [
-        "charger"
+        "charger",
+        "bought"
        ]
       ],
       [
@@ -6006,6 +5944,12 @@
         "gift",
         "card",
         "ending"
+       ]
+      ],
+      [
+       "cancel",
+       [
+        "charger"
        ]
       ],
       [
@@ -6025,12 +5969,12 @@
      ]
     }
    ],
-   "shown": 18,
-   "hidden": 2,
-   "familyStale": 7,
-   "staleUnsettled": 1,
-   "staleMulti": 6,
-   "unused": 9,
+   "shown": 19,
+   "hidden": 1,
+   "familyStale": 8,
+   "staleUnsettled": 6,
+   "staleMulti": 2,
+   "unused": 10,
    "used": 9,
    "crowded": 0,
    "servedShown": 19,
@@ -6059,7 +6003,8 @@
       [
        "cancel",
        [
-        "charger"
+        "charger",
+        "bought"
        ]
       ],
       [
@@ -6067,6 +6012,12 @@
        [
         "missing",
         "tablet"
+       ]
+      ],
+      [
+       "cancel",
+       [
+        "charger"
        ]
       ],
       [
@@ -6096,6 +6047,13 @@
        ]
       ],
       [
+       "cancel",
+       [
+        "charger",
+        "bought"
+       ]
+      ],
+      [
        "transfer",
        [
         "missing",
@@ -6105,27 +6063,25 @@
       [
        "cancel",
        [
-        "boot"
+        "charger"
        ]
       ],
       [
        "cancel",
        [
-        "entire",
-        "w5481803",
-        "boots"
+        "boot"
        ]
       ]
      ]
     }
    ],
-   "shown": 12,
-   "hidden": 3,
-   "familyStale": 5,
-   "staleUnsettled": 0,
-   "staleMulti": 5,
-   "unused": 6,
-   "used": 6,
+   "shown": 14,
+   "hidden": 1,
+   "familyStale": 7,
+   "staleUnsettled": 4,
+   "staleMulti": 3,
+   "unused": 7,
+   "used": 7,
    "crowded": 0,
    "servedShown": 14,
    "servedStale": 0,
@@ -6174,6 +6130,13 @@
       [
        "cancel",
        [
+        "charger",
+        "bought"
+       ]
+      ],
+      [
+       "cancel",
+       [
         "charger"
        ]
       ],
@@ -6182,10 +6145,6 @@
        [
         "boot"
        ]
-      ],
-      [
-       "cancel",
-       []
       ],
       [
        "return",
@@ -6207,15 +6166,16 @@
      "write": "transfer_to_human_agents",
      "open": [
       [
-       "cancel",
+       "return",
        [
-        "charger"
+        "reorder"
        ]
       ],
       [
-       "return",
+       "cancel",
        [
-        "sneaker"
+        "charger",
+        "bought"
        ]
       ],
       [
@@ -6225,18 +6185,13 @@
       [
        "cancel",
        [
-        "boot"
+        "charger"
        ]
       ],
       [
        "cancel",
-       []
-      ],
-      [
-       "return",
        [
-        "sneakers",
-        "w7449508"
+        "boot"
        ]
       ],
       [
@@ -6248,12 +6203,12 @@
      ]
     }
    ],
-   "shown": 16,
-   "hidden": 2,
-   "familyStale": 9,
-   "staleUnsettled": 3,
-   "staleMulti": 6,
-   "unused": 10,
+   "shown": 15,
+   "hidden": 3,
+   "familyStale": 8,
+   "staleUnsettled": 0,
+   "staleMulti": 8,
+   "unused": 9,
    "used": 6,
    "crowded": 0,
    "servedShown": 15,
@@ -6508,8 +6463,7 @@
       [
        "address",
        [
-        "let",
-        "know"
+        "account"
        ]
       ],
       [
@@ -6527,23 +6481,14 @@
       [
        "address",
        [
-        "maple"
+        "fix"
        ]
       ],
       [
        "address",
        [
-        "w9583042",
-        "w4082615",
-        "maple",
-        "drive"
-       ]
-      ],
-      [
-       "address",
-       [
-        "w9583042",
-        "w4082615"
+        "let",
+        "know"
        ]
       ],
       [
@@ -6555,12 +6500,12 @@
      ]
     }
    ],
-   "shown": 31,
-   "hidden": 1,
-   "familyStale": 4,
+   "shown": 30,
+   "hidden": 2,
+   "familyStale": 3,
    "staleUnsettled": 0,
-   "staleMulti": 4,
-   "unused": 13,
+   "staleMulti": 3,
+   "unused": 12,
    "used": 18,
    "crowded": 1,
    "servedShown": 14,
@@ -7896,16 +7841,14 @@
      "write": "modify_pending_order_items",
      "open": [
       [
+       "address",
+       []
+      ],
+      [
        "exchange",
        [
         "bluetooth",
         "speaker"
-       ]
-      ],
-      [
-       "address",
-       [
-        "right"
        ]
       ],
       [
@@ -7923,6 +7866,12 @@
         "paypal",
         "unless",
         "paid"
+       ]
+      ],
+      [
+       "address",
+       [
+        "right"
        ]
       ],
       [
@@ -7948,18 +7897,14 @@
         "file",
         "recent"
        ]
-      ],
-      [
-       "exchange",
-       []
       ]
      ]
     }
    ],
    "shown": 16,
    "hidden": 0,
-   "familyStale": 4,
-   "staleUnsettled": 4,
+   "familyStale": 5,
+   "staleUnsettled": 5,
    "staleMulti": 0,
    "unused": 10,
    "used": 6,
@@ -7994,15 +7939,19 @@
       ],
       [
        "address",
-       [
-        "out",
-        "loud"
-       ]
+       []
       ],
       [
        "return",
        [
         "difference"
+       ]
+      ],
+      [
+       "address",
+       [
+        "out",
+        "loud"
        ]
       ],
       [
@@ -8026,12 +7975,6 @@
        [
         "spoken",
         "displayed"
-       ]
-      ],
-      [
-       "address",
-       [
-        "w6750959"
        ]
       ]
      ]
@@ -8175,16 +8118,17 @@
      "write": "transfer_to_human_agents",
      "open": [
       [
+       "return",
+       [
+        "few",
+        "last"
+       ]
+      ],
+      [
        "exchange",
        [
         "luggage",
         "set"
-       ]
-      ],
-      [
-       "return",
-       [
-        "skateboard"
        ]
       ],
       [
@@ -8201,6 +8145,12 @@
       [
        "return",
        [
+        "skateboard"
+       ]
+      ],
+      [
+       "return",
+       [
         "new",
         "skateboard"
        ]
@@ -8211,18 +8161,14 @@
         "custom",
         "design"
        ]
-      ],
-      [
-       "exchange",
-       []
       ]
      ]
     }
    ],
    "shown": 23,
    "hidden": 1,
-   "familyStale": 3,
-   "staleUnsettled": 3,
+   "familyStale": 4,
+   "staleUnsettled": 4,
    "staleMulti": 0,
    "unused": 17,
    "used": 6,
@@ -8447,18 +8393,7 @@
      "write": "transfer_to_human_agents",
      "open": [
       [
-       "exchange",
-       [
-        "glass",
-        "kettle"
-       ]
-      ],
-      [
        "modify",
-       []
-      ],
-      [
-       "transfer",
        []
       ],
       [
@@ -8466,6 +8401,10 @@
        [
         "good"
        ]
+      ],
+      [
+       "transfer",
+       []
       ],
       [
        "exchange",
@@ -8497,6 +8436,10 @@
         "backorder",
         "restock"
        ]
+      ],
+      [
+       "exchange",
+       []
       ]
      ]
     }
@@ -8554,18 +8497,6 @@
       [
        "return",
        [
-        "jigsaw"
-       ]
-      ],
-      [
-       "return",
-       [
-        "bookshelf"
-       ]
-      ],
-      [
-       "return",
-       [
         "mastercard",
         "ending"
        ]
@@ -8596,7 +8527,8 @@
       [
        "return",
        [
-        "bookshelf"
+        "mastercard",
+        "ending"
        ]
       ],
       [
@@ -8605,22 +8537,6 @@
         "default",
         "chicago",
         "address"
-       ]
-      ],
-      [
-       "return",
-       [
-        "mastercard",
-        "ending"
-       ]
-      ],
-      [
-       "return",
-       [
-        "backpack",
-        "came",
-        "vacuum",
-        "cleaner"
        ]
       ],
       [
@@ -8644,7 +8560,8 @@
       [
        "return",
        [
-        "bookshelf"
+        "mastercard",
+        "ending"
        ]
       ],
       [
@@ -8660,22 +8577,6 @@
       ],
       [
        "return",
-       [
-        "mastercard",
-        "ending"
-       ]
-      ],
-      [
-       "return",
-       [
-        "backpack",
-        "came",
-        "vacuum",
-        "cleaner"
-       ]
-      ],
-      [
-       "return",
        []
       ],
       [
@@ -8685,13 +8586,13 @@
      ]
     }
    ],
-   "shown": 26,
-   "hidden": 2,
-   "familyStale": 14,
-   "staleUnsettled": 5,
-   "staleMulti": 9,
-   "unused": 13,
-   "used": 13,
+   "shown": 20,
+   "hidden": 8,
+   "familyStale": 8,
+   "staleUnsettled": 1,
+   "staleMulti": 7,
+   "unused": 9,
+   "used": 11,
    "crowded": 0,
    "servedShown": 20,
    "servedStale": 0,
@@ -9263,10 +9164,10 @@
       [
        "exchange",
        [
-        "ideally",
-        "battery",
-        "powered",
-        "first"
+        "two",
+        "recent",
+        "water",
+        "bottle"
        ]
       ],
       [
@@ -9607,7 +9508,9 @@
      "open": [
       [
        "address",
-       []
+       [
+        "account"
+       ]
       ],
       [
        "modify",
@@ -9617,9 +9520,7 @@
       ],
       [
        "address",
-       [
-        "w9911714"
-       ]
+       []
       ],
       [
        "address",
@@ -9632,13 +9533,6 @@
       [
        "address",
        [
-        "change",
-        "w9911714"
-       ]
-      ],
-      [
-       "address",
-       [
         "highland",
         "drive"
        ]
@@ -9646,13 +9540,13 @@
      ]
     }
    ],
-   "shown": 14,
-   "hidden": 2,
-   "familyStale": 5,
+   "shown": 13,
+   "hidden": 3,
+   "familyStale": 4,
    "staleUnsettled": 0,
-   "staleMulti": 5,
+   "staleMulti": 4,
    "unused": 1,
-   "used": 13,
+   "used": 12,
    "crowded": 0,
    "servedShown": 9,
    "servedStale": 0,
@@ -9777,16 +9671,16 @@
      "write": "transfer_to_human_agents",
      "open": [
       [
-       "return",
-       [
-        "backpack"
-       ]
-      ],
-      [
        "exchange",
        [
         "hiking",
         "boots"
+       ]
+      ],
+      [
+       "return",
+       [
+        "refund"
        ]
       ],
       [
@@ -9795,12 +9689,6 @@
         "waterproof",
         "version",
         "quickly"
-       ]
-      ],
-      [
-       "return",
-       [
-        "refund"
        ]
       ],
       [
@@ -9824,6 +9712,12 @@
       [
        "exchange",
        []
+      ],
+      [
+       "return",
+       [
+        "take"
+       ]
       ]
      ]
     }
@@ -9875,15 +9769,15 @@
      "write": "return_delivered_order_items",
      "open": [
       [
-       "cancel",
+       "return",
        [
-        "recent"
+        "few"
        ]
       ],
       [
-       "return",
+       "cancel",
        [
-        "skateboard"
+        "recent"
        ]
       ],
       [
@@ -9903,12 +9797,6 @@
       [
        "return",
        []
-      ],
-      [
-       "return",
-       [
-        "paypal"
-       ]
       ]
      ]
     },
@@ -9939,23 +9827,17 @@
       [
        "cancel",
        []
-      ],
-      [
-       "return",
-       [
-        "paypal"
-       ]
       ]
      ]
     }
    ],
-   "shown": 18,
-   "hidden": 3,
-   "familyStale": 5,
+   "shown": 16,
+   "hidden": 5,
+   "familyStale": 3,
    "staleUnsettled": 0,
-   "staleMulti": 5,
+   "staleMulti": 3,
    "unused": 9,
-   "used": 9,
+   "used": 7,
    "crowded": 0,
    "servedShown": 16,
    "servedStale": 0,
@@ -9982,13 +9864,14 @@
       ],
       [
        "cancel",
-       []
+       [
+        "charger",
+        "bought"
+       ]
       ],
       [
        "cancel",
-       [
-        "w9373487"
-       ]
+       []
       ],
       [
        "cancel",
@@ -10081,7 +9964,11 @@
       ],
       [
        "cancel",
-       []
+       [
+        "charger",
+        "bought",
+        "goes"
+       ]
       ],
       [
        "return",
@@ -10194,7 +10081,8 @@
       [
        "cancel",
        [
-        "w9373487"
+        "charger",
+        "bought"
        ]
       ],
       [
@@ -10237,6 +10125,13 @@
       ],
       [
        "cancel",
+       [
+        "charger",
+        "bought"
+       ]
+      ],
+      [
+       "cancel",
        []
       ],
       [
@@ -10247,13 +10142,6 @@
        "cancel",
        [
         "boot"
-       ]
-      ],
-      [
-       "cancel",
-       [
-        "whole",
-        "w5481803"
        ]
       ],
       [
@@ -10557,8 +10445,7 @@
       [
        "address",
        [
-        "tracking",
-        "number"
+        "sent"
        ]
       ],
       [
@@ -10594,6 +10481,13 @@
       [
        "address",
        [
+        "tracking",
+        "number"
+       ]
+      ],
+      [
+       "address",
+       [
         "see"
        ]
       ],
@@ -10602,13 +10496,6 @@
        [
         "daughter",
         "chicago"
-       ]
-      ],
-      [
-       "address",
-       [
-        "maple",
-        "drive"
        ]
       ]
      ]
@@ -10642,31 +10529,9 @@
       [
        "return",
        [
-        "vacuum",
-        "cleaner",
-        "recent"
-       ]
-      ],
-      [
-       "return",
-       [
         "processed",
         "quickly",
         "possible"
-       ]
-      ],
-      [
-       "return",
-       [
-        "canister",
-        "vacuum",
-        "cleaner"
-       ]
-      ],
-      [
-       "return",
-       [
-        "paypal"
        ]
       ],
       [
@@ -10698,12 +10563,12 @@
      ]
     }
    ],
-   "shown": 16,
-   "hidden": 0,
-   "familyStale": 8,
-   "staleUnsettled": 8,
-   "staleMulti": 0,
-   "unused": 8,
+   "shown": 13,
+   "hidden": 3,
+   "familyStale": 5,
+   "staleUnsettled": 0,
+   "staleMulti": 5,
+   "unused": 5,
    "used": 8,
    "crowded": 1,
    "servedShown": 13,
@@ -11011,8 +10876,11 @@
       [
        "cancel",
        [
-        "pending",
-        "w4836353"
+        "anything",
+        "hasn",
+        "shipped",
+        "yet",
+        "first"
        ]
       ],
       [
@@ -11038,20 +10906,28 @@
        []
       ],
       [
-       "cancel",
-       [
-        "reason",
-        "longer",
-        "needed",
-        "w4836353"
-       ]
-      ],
-      [
        "return",
        [
         "post",
         "immediately",
         "relief"
+       ]
+      ],
+      [
+       "return",
+       [
+        "five",
+        "delivered",
+        "air",
+        "purifier",
+        "smart",
+        "watch",
+        "coffee",
+        "maker",
+        "water",
+        "bottle",
+        "hiking",
+        "boots"
        ]
       ]
      ]
@@ -11075,8 +10951,11 @@
       [
        "cancel",
        [
-        "pending",
-        "w4836353"
+        "anything",
+        "hasn",
+        "shipped",
+        "yet",
+        "first"
        ]
       ],
       [
@@ -11102,20 +10981,28 @@
        []
       ],
       [
-       "cancel",
-       [
-        "reason",
-        "longer",
-        "needed",
-        "w4836353"
-       ]
-      ],
-      [
        "return",
        [
         "post",
         "immediately",
         "relief"
+       ]
+      ],
+      [
+       "return",
+       [
+        "five",
+        "delivered",
+        "air",
+        "purifier",
+        "smart",
+        "watch",
+        "coffee",
+        "maker",
+        "water",
+        "bottle",
+        "hiking",
+        "boots"
        ]
       ]
      ]
@@ -11123,11 +11010,11 @@
    ],
    "shown": 32,
    "hidden": 0,
-   "familyStale": 6,
-   "staleUnsettled": 6,
+   "familyStale": 4,
+   "staleUnsettled": 4,
    "staleMulti": 0,
-   "unused": 14,
-   "used": 18,
+   "unused": 12,
+   "used": 20,
    "crowded": 0,
    "servedShown": 16,
    "servedStale": 0,
@@ -11380,7 +11267,7 @@
       [
        "address",
        [
-        "change"
+        "file"
        ]
       ],
       [
@@ -11398,6 +11285,12 @@
        [
         "difference",
         "paypal"
+       ]
+      ],
+      [
+       "address",
+       [
+        "change"
        ]
       ],
       [
@@ -11423,23 +11316,17 @@
         "use",
         "paypal"
        ]
-      ],
-      [
-       "modify",
-       [
-        "mind"
-       ]
       ]
      ]
     }
    ],
    "shown": 16,
    "hidden": 0,
-   "familyStale": 3,
-   "staleUnsettled": 3,
+   "familyStale": 4,
+   "staleUnsettled": 4,
    "staleMulti": 0,
-   "unused": 9,
-   "used": 7,
+   "unused": 10,
+   "used": 6,
    "crowded": 0,
    "servedShown": 16,
    "servedStale": 0,
@@ -12136,14 +12023,14 @@
        ]
       ],
       [
-       "modify",
-       []
-      ],
-      [
        "address",
        [
-        "use"
+        "la"
        ]
+      ],
+      [
+       "modify",
+       []
       ],
       [
        "return",
@@ -12169,9 +12056,7 @@
       [
        "address",
        [
-        "w6750959",
-        "maple",
-        "drive"
+        "use"
        ]
       ],
       [
@@ -12598,6 +12483,50 @@
       [
        "return",
        [
+        "three"
+       ]
+      ],
+      [
+       "cancel",
+       [
+        "jigsaw",
+        "puzzles",
+        "received",
+        "re",
+        "different"
+       ]
+      ],
+      [
+       "return",
+       [
+        "original",
+        "payment",
+        "method",
+        "perfect"
+       ]
+      ],
+      [
+       "return",
+       [
+        "two",
+        "w6239298"
+       ]
+      ]
+     ]
+    },
+    {
+     "message": 30,
+     "write": "return_delivered_order_items",
+     "open": [
+      [
+       "cancel",
+       [
+        "bookshelves"
+       ]
+      ],
+      [
+       "return",
+       [
         "original",
         "payment",
         "method",
@@ -12619,51 +12548,6 @@
        [
         "two",
         "w6239298"
-       ]
-      ],
-      [
-       "return",
-       [
-        "bookshelf",
-        "w8660475",
-        "refund"
-       ]
-      ]
-     ]
-    },
-    {
-     "message": 30,
-     "write": "return_delivered_order_items",
-     "open": [
-      [
-       "cancel",
-       [
-        "bookshelves"
-       ]
-      ],
-      [
-       "return",
-       [
-        "two",
-        "w6239298"
-       ]
-      ],
-      [
-       "cancel",
-       [
-        "jigsaw",
-        "puzzles",
-        "received",
-        "re",
-        "different"
-       ]
-      ],
-      [
-       "return",
-       [
-        "bookshelf",
-        "w8660475",
-        "refund"
        ]
       ],
       [
@@ -12703,9 +12587,10 @@
       [
        "return",
        [
-        "bookshelf",
-        "w8660475",
-        "refund"
+        "original",
+        "payment",
+        "method",
+        "perfect"
        ]
       ],
       [
@@ -12738,16 +12623,8 @@
       [
        "return",
        [
-        "backpack",
-        "came",
-        "vacuum",
-        "cleaner"
-       ]
-      ],
-      [
-       "return",
-       [
-        "backpack"
+        "two",
+        "w6239298"
        ]
       ],
       [
@@ -12756,17 +12633,23 @@
         "card",
         "ending"
        ]
+      ],
+      [
+       "modify",
+       [
+        "color"
+       ]
       ]
      ]
     }
    ],
    "shown": 25,
    "hidden": 2,
-   "familyStale": 12,
-   "staleUnsettled": 4,
+   "familyStale": 11,
+   "staleUnsettled": 3,
    "staleMulti": 8,
-   "unused": 13,
-   "used": 12,
+   "unused": 12,
+   "used": 13,
    "crowded": 0,
    "servedShown": 25,
    "servedStale": 3,
@@ -12808,11 +12691,7 @@
       ],
       [
        "return",
-       [
-        "jigsaw",
-        "puzzle",
-        "came"
-       ]
+       []
       ],
       [
        "payment",
@@ -12822,10 +12701,6 @@
         "mastercard",
         "ending"
        ]
-      ],
-      [
-       "return",
-       []
       ],
       [
        "return",
@@ -12879,16 +12754,6 @@
       [
        "return",
        [
-        "backpack",
-        "came",
-        "vacuum",
-        "cleaner",
-        "different"
-       ]
-      ],
-      [
-       "return",
-       [
         "original",
         "mastercard",
         "ending"
@@ -12932,16 +12797,6 @@
       [
        "return",
        [
-        "backpack",
-        "came",
-        "vacuum",
-        "cleaner",
-        "different"
-       ]
-      ],
-      [
-       "return",
-       [
         "original",
         "mastercard",
         "ending"
@@ -12950,13 +12805,13 @@
      ]
     }
    ],
-   "shown": 25,
-   "hidden": 3,
-   "familyStale": 11,
+   "shown": 22,
+   "hidden": 6,
+   "familyStale": 8,
    "staleUnsettled": 1,
-   "staleMulti": 10,
-   "unused": 15,
-   "used": 10,
+   "staleMulti": 7,
+   "unused": 13,
+   "used": 9,
    "crowded": 0,
    "servedShown": 22,
    "servedStale": 0,
@@ -13006,8 +12861,9 @@
       [
        "address",
        [
-        "able",
-        "see"
+        "updated",
+        "new",
+        "home"
        ]
       ],
       [
@@ -13034,6 +12890,13 @@
       [
        "address",
        [
+        "able",
+        "see"
+       ]
+      ],
+      [
+       "address",
+       [
         "account"
        ]
       ],
@@ -13042,10 +12905,6 @@
        [
         "fixes"
        ]
-      ],
-      [
-       "address",
-       []
       ]
      ]
     }
@@ -13077,11 +12936,7 @@
      "open": [
       [
        "address",
-       [
-        "updated",
-        "new",
-        "home"
-       ]
+       []
       ],
       [
        "modify",
@@ -13110,6 +12965,14 @@
       [
        "address",
        [
+        "updated",
+        "new",
+        "home"
+       ]
+      ],
+      [
+       "address",
+       [
         "out",
         "loud",
         "details"
@@ -13123,15 +12986,6 @@
         "tablet",
         "update",
         "default"
-       ]
-      ],
-      [
-       "address",
-       [
-        "out",
-        "loud",
-        "right",
-        "details"
        ]
       ]
      ]
@@ -13265,10 +13119,7 @@
       ],
       [
        "address",
-       [
-        "already",
-        "profile"
-       ]
+       []
       ],
       [
        "exchange",
@@ -13292,6 +13143,13 @@
        ]
       ],
       [
+       "address",
+       [
+        "already",
+        "profile"
+       ]
+      ],
+      [
        "modify",
        [
         "doable",
@@ -13299,21 +13157,14 @@
         "anything",
         "ships"
        ]
-      ],
-      [
-       "exchange",
-       [
-        "happen",
-        "yet"
-       ]
       ]
      ]
     }
    ],
    "shown": 16,
    "hidden": 0,
-   "familyStale": 1,
-   "staleUnsettled": 1,
+   "familyStale": 2,
+   "staleUnsettled": 2,
    "staleMulti": 0,
    "unused": 11,
    "used": 5,
@@ -13756,6 +13607,10 @@
      "write": "modify_user_address",
      "open": [
       [
+       "address",
+       []
+      ],
+      [
        "modify",
        [
         "mind"
@@ -13767,12 +13622,6 @@
         "original",
         "highland",
         "drive"
-       ]
-      ],
-      [
-       "address",
-       [
-        "w9911714"
        ]
       ],
       [
@@ -14076,7 +13925,12 @@
       ],
       [
        "cancel",
-       []
+       [
+        "charger",
+        "bought",
+        "goes",
+        "tablet"
+       ]
       ],
       [
        "transfer",
@@ -14238,7 +14092,8 @@
       [
        "cancel",
        [
-        "w9373487"
+        "charger",
+        "bought"
        ]
       ],
       [
@@ -14326,19 +14181,28 @@
       [
        "cancel",
        [
+        "charger",
+        "bought",
+        "goes",
+        "tablet"
+       ]
+      ],
+      [
+       "cancel",
+       [
         "boot"
        ]
       ]
      ]
     }
    ],
-   "shown": 4,
-   "hidden": 1,
-   "familyStale": 1,
-   "staleUnsettled": 0,
-   "staleMulti": 1,
+   "shown": 5,
+   "hidden": 0,
+   "familyStale": 2,
+   "staleUnsettled": 2,
+   "staleMulti": 0,
    "unused": 2,
-   "used": 2,
+   "used": 3,
    "crowded": 0,
    "servedShown": 5,
    "servedStale": 0,
@@ -14606,6 +14470,12 @@
       [
        "address",
        [
+        "wrong"
+       ]
+      ],
+      [
+       "address",
+       [
         "though"
        ]
       ],
@@ -14617,13 +14487,6 @@
        "address",
        [
         "changed"
-       ]
-      ],
-      [
-       "address",
-       [
-        "maple",
-        "drive"
        ]
       ]
      ]
@@ -14635,6 +14498,12 @@
       [
        "address",
        [
+        "wrong"
+       ]
+      ],
+      [
+       "address",
+       [
         "though"
        ]
       ],
@@ -14647,13 +14516,6 @@
        [
         "changed"
        ]
-      ],
-      [
-       "address",
-       [
-        "maple",
-        "drive"
-       ]
       ]
      ]
     },
@@ -14663,9 +14525,7 @@
      "open": [
       [
        "address",
-       [
-        "changed"
-       ]
+       []
       ],
       [
        "modify",
@@ -14686,8 +14546,7 @@
       [
        "address",
        [
-        "maple",
-        "drive"
+        "changed"
        ]
       ],
       [
@@ -14731,9 +14590,7 @@
       [
        "address",
        [
-        "give",
-        "tracking",
-        "number"
+        "sent"
        ]
       ],
       [
@@ -14747,6 +14604,14 @@
       [
        "address",
        [
+        "give",
+        "tracking",
+        "number"
+       ]
+      ],
+      [
+       "address",
+       [
         "let",
         "know"
        ]
@@ -14756,13 +14621,6 @@
        [
         "daughter",
         "chicago"
-       ]
-      ],
-      [
-       "address",
-       [
-        "maple",
-        "drive"
        ]
       ],
       [
@@ -14908,18 +14766,10 @@
      "open": [
       [
        "return",
-       [
-        "vacuum",
-        "cleaner",
-        "recent"
-       ]
-      ],
-      [
-       "transfer",
        []
       ],
       [
-       "return",
+       "transfer",
        []
       ],
       [
@@ -14954,7 +14804,16 @@
       [
        "return",
        [
-        "paypal"
+        "within",
+        "days"
+       ]
+      ],
+      [
+       "return",
+       [
+        "label",
+        "quickly",
+        "possible"
        ]
       ]
      ]
@@ -14987,19 +14846,10 @@
      "open": [
       [
        "exchange",
-       [
-        "lowest",
-        "priced",
-        "earbud",
-        "rest"
-       ]
-      ],
-      [
-       "return",
        []
       ],
       [
-       "exchange",
+       "return",
        []
       ],
       [
@@ -15038,12 +14888,12 @@
      ]
     }
    ],
-   "shown": 15,
-   "hidden": 0,
-   "familyStale": 4,
-   "staleUnsettled": 4,
-   "staleMulti": 0,
-   "unused": 11,
+   "shown": 14,
+   "hidden": 1,
+   "familyStale": 3,
+   "staleUnsettled": 0,
+   "staleMulti": 3,
+   "unused": 10,
    "used": 4,
    "crowded": 1,
    "servedShown": 14,
@@ -15112,21 +14962,6 @@
       [
        "return",
        [
-        "camera"
-       ]
-      ],
-      [
-       "return",
-       [
-        "digital",
-        "camera",
-        "id",
-        "w4689314"
-       ]
-      ],
-      [
-       "return",
-       [
         "original",
         "credit",
         "card",
@@ -15136,6 +14971,19 @@
       [
        "return",
        []
+      ],
+      [
+       "return",
+       [
+        "instructions"
+       ]
+      ],
+      [
+       "return",
+       [
+        "instructions",
+        "way"
+       ]
       ]
      ]
     }
@@ -15168,6 +15016,12 @@
       [
        "return",
        [
+        "credited"
+       ]
+      ],
+      [
+       "return",
+       [
         "original",
         "credit",
         "card",
@@ -15175,13 +15029,6 @@
         "possible",
         "bike",
         "expensive"
-       ]
-      ],
-      [
-       "return",
-       [
-        "bicycle",
-        "w3916020"
        ]
       ],
       [
@@ -16064,14 +15911,6 @@
       [
        "return",
        [
-        "mechanical",
-        "keyboard",
-        "w4680753"
-       ]
-      ],
-      [
-       "return",
-       [
         "paypal",
         "fine"
        ]
@@ -16085,12 +15924,12 @@
      ]
     }
    ],
-   "shown": 10,
-   "hidden": 1,
-   "familyStale": 4,
+   "shown": 9,
+   "hidden": 2,
+   "familyStale": 3,
    "staleUnsettled": 0,
-   "staleMulti": 4,
-   "unused": 4,
+   "staleMulti": 3,
+   "unused": 3,
    "used": 6,
    "crowded": 0,
    "servedShown": 9,
@@ -16133,6 +15972,10 @@
      "open": [
       [
        "return",
+       []
+      ],
+      [
+       "return",
        [
         "go"
        ]
@@ -16146,29 +15989,7 @@
       [
        "return",
        [
-        "skateboards",
-        "unhappy"
-       ]
-      ],
-      [
-       "return",
-       [
-        "smart",
-        "watch"
-       ]
-      ],
-      [
-       "return",
-       [
         "separate"
-       ]
-      ],
-      [
-       "return",
-       [
-        "w7553978",
-        "two",
-        "skateboards"
        ]
       ],
       [
@@ -16183,6 +16004,19 @@
        [
         "mastercard",
         "ending"
+       ]
+      ],
+      [
+       "return",
+       [
+        "shipping",
+        "options"
+       ]
+      ],
+      [
+       "return",
+       [
+        "labels"
        ]
       ]
      ]
@@ -16382,23 +16216,7 @@
       ],
       [
        "exchange",
-       [
-        "two",
-        "laptops"
-       ]
-      ],
-      [
-       "exchange",
        []
-      ],
-      [
-       "exchange",
-       [
-        "single",
-        "laptop",
-        "two",
-        "w2905754"
-       ]
       ],
       [
        "exchange",
@@ -16406,17 +16224,29 @@
         "cross",
         "ship"
        ]
+      ],
+      [
+       "return",
+       [
+        "others",
+        "once",
+        "arrive"
+       ]
+      ],
+      [
+       "return",
+       []
       ]
      ]
     }
    ],
    "shown": 16,
    "hidden": 0,
-   "familyStale": 6,
-   "staleUnsettled": 6,
+   "familyStale": 4,
+   "staleUnsettled": 4,
    "staleMulti": 0,
-   "unused": 4,
-   "used": 12,
+   "unused": 6,
+   "used": 10,
    "crowded": 0,
    "servedShown": 16,
    "servedStale": 0,
@@ -16436,17 +16266,17 @@
      "write": "modify_pending_order_items",
      "open": [
       [
+       "address",
+       [
+        "la"
+       ]
+      ],
+      [
        "exchange",
        [
         "bluetooth",
         "speaker",
         "ordered"
-       ]
-      ],
-      [
-       "address",
-       [
-        "change"
        ]
       ],
       [
@@ -16457,23 +16287,17 @@
        ]
       ],
       [
+       "address",
+       [
+        "change"
+       ]
+      ],
+      [
        "exchange",
        [
         "cheapest",
         "green",
         "version"
-       ]
-      ],
-      [
-       "address",
-       [
-        "change",
-        "update",
-        "w6750959",
-        "nyc",
-        "address",
-        "file",
-        "w3407479"
        ]
       ],
       [
@@ -16502,17 +16326,17 @@
      "write": "transfer_to_human_agents",
      "open": [
       [
+       "address",
+       [
+        "la"
+       ]
+      ],
+      [
        "exchange",
        [
         "bluetooth",
         "speaker",
         "ordered"
-       ]
-      ],
-      [
-       "address",
-       [
-        "change"
        ]
       ],
       [
@@ -16536,23 +16360,17 @@
        ]
       ],
       [
+       "address",
+       [
+        "change"
+       ]
+      ],
+      [
        "exchange",
        [
         "cheapest",
         "green",
         "version"
-       ]
-      ],
-      [
-       "address",
-       [
-        "change",
-        "update",
-        "w6750959",
-        "nyc",
-        "address",
-        "file",
-        "w3407479"
        ]
       ],
       [
@@ -16916,10 +16734,7 @@
       ],
       [
        "return",
-       [
-        "mastercard",
-        "ending"
-       ]
+       []
       ],
       [
        "address",
@@ -16939,10 +16754,8 @@
       [
        "return",
        [
-        "backpack",
-        "came",
-        "vacuum",
-        "cleaner"
+        "mastercard",
+        "ending"
        ]
       ],
       [
@@ -16963,10 +16776,7 @@
       ],
       [
        "return",
-       [
-        "mastercard",
-        "ending"
-       ]
+       []
       ],
       [
        "address",
@@ -16988,10 +16798,8 @@
       [
        "return",
        [
-        "backpack",
-        "came",
-        "vacuum",
-        "cleaner"
+        "mastercard",
+        "ending"
        ]
       ],
       [
@@ -17115,9 +16923,7 @@
       ],
       [
        "return",
-       [
-        "bookshelves"
-       ]
+       []
       ],
       [
        "modify",
@@ -17144,17 +16950,14 @@
       [
        "return",
        [
-        "mastercard",
-        "ending"
+        "bookshelves"
        ]
       ],
       [
        "return",
        [
-        "backpack",
-        "came",
-        "vacuum",
-        "cleaner"
+        "mastercard",
+        "ending"
        ]
       ],
       [
@@ -17183,9 +16986,7 @@
       ],
       [
        "return",
-       [
-        "bookshelves"
-       ]
+       []
       ],
       [
        "modify",
@@ -17212,17 +17013,14 @@
       [
        "return",
        [
-        "mastercard",
-        "ending"
+        "bookshelves"
        ]
       ],
       [
        "return",
        [
-        "backpack",
-        "came",
-        "vacuum",
-        "cleaner"
+        "mastercard",
+        "ending"
        ]
       ],
       [
@@ -17399,15 +17197,17 @@
        ]
       ],
       [
-       "exchange",
+       "address",
        [
-        "watch"
+        "nyc",
+        "already",
+        "profile"
        ]
       ],
       [
-       "address",
+       "exchange",
        [
-        "details"
+        "watch"
        ]
       ],
       [
@@ -17425,6 +17225,12 @@
       [
        "address",
        [
+        "details"
+       ]
+      ],
+      [
+       "address",
+       [
         "linked"
        ]
       ],
@@ -17432,12 +17238,6 @@
        "modify",
        [
         "laptop"
-       ]
-      ],
-      [
-       "address",
-       [
-        "yes"
        ]
       ]
      ]
@@ -17454,15 +17254,17 @@
        ]
       ],
       [
-       "exchange",
+       "address",
        [
-        "watch"
+        "nyc",
+        "already",
+        "profile"
        ]
       ],
       [
-       "address",
+       "exchange",
        [
-        "details"
+        "watch"
        ]
       ],
       [
@@ -17480,6 +17282,12 @@
       [
        "address",
        [
+        "details"
+       ]
+      ],
+      [
+       "address",
+       [
         "linked"
        ]
       ],
@@ -17487,12 +17295,6 @@
        "modify",
        [
         "laptop"
-       ]
-      ],
-      [
-       "address",
-       [
-        "yes"
        ]
       ]
      ]

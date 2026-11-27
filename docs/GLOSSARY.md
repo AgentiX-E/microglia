@@ -3072,3 +3072,17 @@ already carried, keyed by the record the ask itself names. The quantity is the m
 effect and it is decidable at zero model calls. Its companion `rejected` quantity is the same question asked of the
 **family** on the read-anchored board, and the two differ by an order of magnitude on the same transcripts — which is
 the reason the unit is part of the definition rather than a footnote to it.
+
+**Settlement consistency** — the property that the function which renders the block the agent reads and the function
+which reads that block for measurement are the **same function, called with the same scope and message prefix**. When
+they differ, a reading about "what the window carried" may describe a board the product never served; R238 measured
+that gap at 133 of 4,968 item-moments (AUDIT 34.341). R239 closed it by making `read_anchor.moment` take settlements
+from `goal_board.board_of` via `ask_board(settle="serving")`. The older read-anchored rule remains the default of
+`ask_board` so the r228–r231 published readings stay reproducible; it is no longer the reader's rule.
+
+**Serving-settled board** — the board whose `settled` flags come from the serving path's three grades (name, overlap,
+record) rather than from the read anchor's `record in seen` test. The distinction is decidable: a cancel-by-id whose
+order the episode never read is **open** on the read-anchored board and **ticked at the record grade** on the
+serving-settled board. Mechanism readers (`board_mechanism`, `memory_traps`) use the serving-settled board; the
+family-level bars built on it are unchanged by the switch because a family with several asks keeps another open —
+the ask-level columns are the ones that move (463→461 reached; rejected familyStale 507→483).
