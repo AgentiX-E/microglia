@@ -672,6 +672,20 @@ jobs:
                   "+20%, and a large negative is a run that did not happen")
           PY
 
+      - name: The mechanism reading, on the arm's own transcript
+        # R236. The round's two bars, taken by the tool that was built for them and not by hand. B1 is the wiring
+        # certificate — the recomputed block reaches further than the request board on ≥80% of episodes, 94.5% on the
+        # control grid and 0% for an environment that lost the switch — and B2 is the harm bar: the dispatched share
+        # of graded writes naming a family the window carried must not fall more than the registered resolution
+        # below the replay ceiling. `--bar` makes a wiring failure a red build rather than a paragraph.
+        if: env.BOARD_ARMS == 'clause'
+        run: |
+          set -euo pipefail
+          python3 eval/tools/board_mechanism.py \
+            --document "${BOARD_DIR}/clause.json" --scope clause \
+            --save "${RUNNER_TEMP}/r236-mechanism.json" --bar
+          python3 eval/tools/board_mechanism.py --check "${RUNNER_TEMP}/r236-mechanism.json"
+
       - name: The attribution, which is the mechanism and not the accuracy
         # R218c's grid is two arms of the same code: it has no board, no parser arm and no contrast to take, and
         # the placebo's own step reads it. Gated on the dispatch rather than on a filename that would not exist.

@@ -130,3 +130,75 @@ The ratio is the point and not a detail: a long-context benchmark asks 1,986 que
 documents, so 99.5% of its input is a shared prefix billed at the cached rate, which on this card is
 one fiftieth of the uncached rate. A harness that queries one question at a time in a fresh context —
 which is how most published replications of these sets are run — pays the right-hand column.
+
+---
+
+# Amendment 1 — B1's bar is the wiring's, and B2's is the ceiling's
+
+Registered 27 November 2026, **before the first paid episode**. No money has been spent and no clause-arm episode
+exists; both documents below are the control arms of earlier rounds, already on disk.
+
+## What was read, for nothing
+
+The reader this round needs did not exist, so it was built first and pointed at the 456 control transcripts at both
+scopes. It recomputes the block as it stood before every write — `read_anchor.moment` at the arm's scope and rung,
+which is the renderer the driver runs — and then asks two questions per episode:
+
+| reading | scope | wiring: episodes holding an ask the request board does not | acted: graded episodes whose write named a family the window carried |
+|---|---|---|---|
+| `control.json` (456) | `request` | 0 of 456 (**0.0%**) | 318 of 403 (**78.9%**) |
+| `control.json` (456) | `clause` | 431 of 456 (**94.5%**, 3,025 extra asks) | 394 of 403 (**97.8%**) |
+| `front.json` (456) | `clause` | 430 of 456 (**94.3%**, 2,876 extra asks) | 385 of 398 (**96.7%**) |
+
+`eval/manifests/r236-replay.json`, both documents pinned by sha256, re-checked by `board_mechanism.py --check`.
+
+## The defect in the registered B1
+
+B1 was written as "on ≥95% of the 60 episodes, some block the model read carries an open ask whose family the
+episode later writes", with the bar taken from R234's **97.2%** display coverage. Those are two different rates over
+two different denominators: 636 of 654 is a share of **required writes**, and B1 is a share of **episodes**. Measured
+on the same 456 episodes the episode-level quantity is **89.5%** at the clause scope and **71.1%** at the request
+scope — so the bar, as registered, is one the correct arm fails and the incorrect arm also fails, which is a bar that
+cannot distinguish anything. It is R235's defect one level down (AUDIT 34.332: a margin taken from the wrong
+quantity) and it was found the same way, by printing the quantity beside the rate.
+
+## The amendment
+
+**B1 becomes a wiring certificate, and the bar is 80%.**
+
+> The recomputed block holds at least one ask the request board does not, on ≥80% of episodes.
+
+It reads **94.5%** on the control grid and **0.0%** when the same reader is pointed at the request scope — that is,
+zero for an environment that lost the switch, which is the failure B1 exists to catch. The bar sits fourteen points
+under the measured level and a hundred points over the failure, so sixty episodes cannot fail it for noise and a lost
+environment cannot pass it. The episode-level "any write named a carried family" quantity — 89.5% against 71.1% —
+is **reported beside it as a diagnostic and is not a bar**: it moves with the grid's task mix, and this round has no
+use for a second number that cannot fail.
+
+**B2's comparison becomes the replay ceiling, and the bar is 88.8%.**
+
+> Of the episodes that made a graded write, the share whose write named a family that was open on the window at that
+> moment is ≥ **ceil − 9 points**, where the ceiling is the same board replayed over the 456 control transcripts.
+
+The registered form compared against the *contract board* (78.9%). That comparison prices the window's **width**,
+which is a superset by construction — the clause board holds strictly more asks on 94.5% of episodes, so its share
+must rise whether or not the model does anything differently. A number that is a consequence of the arithmetic
+cannot be evidence about the model. The falsifiable risk that remains is the opposite one, and it is real: a window
+of nine lines instead of two may **distract**, and a model reading more may act on less. B2 is therefore a **harm
+bar** — the dispatched share must not fall more than the registered resolution (±9 points at 60 against 456) below
+the ceiling of 97.8%, i.e. **88.8%** — and the point estimate is reported against both references.
+
+The ceiling replicates: **97.8%** on `control.json` and **96.7%** on `front.json`, two independent 456-episode grids,
+1.1 points apart with overlapping intervals. It is a property of the board and not of the grid it was taken on.
+
+**B3 is unchanged**: total spend ≤ ¥3, read from the run's own `agent_cost` and `user_cost`.
+
+## What this does not do
+
+It does not make the round cheaper or easier to pass: every bar is computed by a tool that re-derives it on every
+push, and both documents' digests are in the manifest. It does not change the question, either. The round still
+cannot say the wider window **helped** — B2's point estimate will be near the ceiling by construction, and the only
+claim available is the negative one (a wider window did not make the model worse) plus the descriptive share at the
+window the model actually read. What would have happened without the amendment is the thing worth writing down:
+sixty episodes bought, B1 read at 89.5% against a 95% bar, and a round that reported "the board was not served" about
+an arm that served it perfectly.

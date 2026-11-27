@@ -220,9 +220,19 @@ jobs:
           # this repository has already audited what a second source costs (AUDIT 34.329).
           python3 -m coverage run --append --branch --include="*/scripts/budget.py" \
             scripts/budget.py --self-test
+          # R236. The reader the round's bars are taken with, which did not exist when the round was registered: B1 and
+          # B2 are per-episode proportions over a dispatched transcript, and `--replay` reads ticks over the request
+          # board while `--compare` pairs rewards. Under the floor for the reason this whole step exists - the tool
+          # that decides whether a ¥2.5 dispatch passed is arithmetic, and arithmetic in a paragraph is arithmetic
+          # nobody re-ran.
+          python3 -m coverage run --append --branch --include="*/eval/tools/board_mechanism.py" \
+            eval/tools/board_mechanism.py --self-test
+          # …and the reading it took for nothing, on the 456 control transcripts, re-checked so the numbers the
+          # amendment quotes cannot drift from the tool that produced them.
+          python3 eval/tools/board_mechanism.py --check eval/manifests/r236-replay.json
           python3 -m coverage json -o coverage-python.json
           python3 scripts/check-python-coverage.py --self-test
-          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 27
+          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 28
 
       - name: The rounds this project owes, and the date each one was registered for
         # The failure this prevents is not a wrong number, it is a round that quietly stops being planned: R216b's
