@@ -1,0 +1,160 @@
+{
+  "schema": "microglia/memory-confidence@1",
+  "fixtureSchema": "microglia/memory-confidence-inputs@1",
+  "cases": [
+    {
+      "id": "fresh-knowledge",
+      "expected": {
+        "id": "ep-fresh",
+        "verdict": "admit",
+        "reason": "reliable",
+        "decidingId": "m-knowledge",
+        "decidingScoreMilli": 828,
+        "itemCount": 1,
+        "admitCount": 1,
+        "reweightCount": 0,
+        "abstainCount": 0
+      }
+    },
+    {
+      "id": "fresh-semantic-support",
+      "expected": {
+        "id": "ep-support",
+        "verdict": "admit",
+        "reason": "reliable",
+        "decidingId": "m-semantic",
+        "decidingScoreMilli": 850,
+        "itemCount": 1,
+        "admitCount": 1,
+        "reweightCount": 0,
+        "abstainCount": 0
+      }
+    },
+    {
+      "id": "marginal-resource",
+      "expected": {
+        "id": "ep-marginal",
+        "verdict": "reweight",
+        "reason": "marginal",
+        "decidingId": "m-resource",
+        "decidingScoreMilli": 670,
+        "itemCount": 1,
+        "admitCount": 0,
+        "reweightCount": 1,
+        "abstainCount": 0
+      }
+    },
+    {
+      "id": "stale-episodic",
+      "expected": {
+        "id": "ep-stale",
+        "verdict": "abstain",
+        "reason": "below-threshold",
+        "decidingId": "m-episodic-old",
+        "decidingScoreMilli": 225,
+        "itemCount": 1,
+        "admitCount": 0,
+        "reweightCount": 0,
+        "abstainCount": 1
+      }
+    },
+    {
+      "id": "conflict-overwhelms",
+      "expected": {
+        "id": "ep-conflict",
+        "verdict": "abstain",
+        "reason": "conflict-overwhelms",
+        "decidingId": "m-conflicted",
+        "decidingScoreMilli": 75,
+        "itemCount": 1,
+        "admitCount": 0,
+        "reweightCount": 0,
+        "abstainCount": 1
+      }
+    },
+    {
+      "id": "decayed-semantic",
+      "expected": {
+        "id": "ep-decayed",
+        "verdict": "abstain",
+        "reason": "below-threshold",
+        "decidingId": "m-semantic-old",
+        "decidingScoreMilli": 456,
+        "itemCount": 1,
+        "admitCount": 0,
+        "reweightCount": 0,
+        "abstainCount": 1
+      }
+    },
+    {
+      "id": "procedural-neutral",
+      "expected": {
+        "id": "ep-neutral",
+        "verdict": "reweight",
+        "reason": "marginal",
+        "decidingId": "m-procedural",
+        "decidingScoreMilli": 553,
+        "itemCount": 1,
+        "admitCount": 0,
+        "reweightCount": 1,
+        "abstainCount": 0
+      }
+    },
+    {
+      "id": "weighted-consensus",
+      "expected": {
+        "id": "ep-weighted",
+        "verdict": "admit",
+        "reason": "reliable",
+        "decidingId": "m-weighted",
+        "decidingScoreMilli": 790,
+        "itemCount": 1,
+        "admitCount": 1,
+        "reweightCount": 0,
+        "abstainCount": 0
+      }
+    },
+    {
+      "id": "reject-dominates-mixed",
+      "expected": {
+        "id": "ep-mixed-reject",
+        "verdict": "abstain",
+        "reason": "conflict-overwhelms",
+        "decidingId": "bad",
+        "decidingScoreMilli": 75,
+        "itemCount": 3,
+        "admitCount": 1,
+        "reweightCount": 1,
+        "abstainCount": 1
+      }
+    },
+    {
+      "id": "reweight-dominates-no-abstain",
+      "expected": {
+        "id": "ep-mixed-reweight",
+        "verdict": "reweight",
+        "reason": "marginal",
+        "decidingId": "mid",
+        "decidingScoreMilli": 670,
+        "itemCount": 2,
+        "admitCount": 1,
+        "reweightCount": 1,
+        "abstainCount": 0
+      }
+    },
+    {
+      "id": "severity-tie-first-wins",
+      "expected": {
+        "id": "ep-tie",
+        "verdict": "admit",
+        "reason": "reliable",
+        "decidingId": "first",
+        "decidingScoreMilli": 828,
+        "itemCount": 2,
+        "admitCount": 2,
+        "reweightCount": 0,
+        "abstainCount": 0
+      }
+    }
+  ]
+}

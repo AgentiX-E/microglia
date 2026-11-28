@@ -3419,3 +3419,37 @@ acting on it. WikiTrace (arXiv 2611.14320) stores each insight with a success/fa
 descends through the link when the insight lacks needed detail, conflicts with another, or comes from a failed task.
 In the gate a link is `linked` when it points at a trajectory and `reachable` when a terminal tool can walk to it; a
 reachable link must also be linked, and an unreachable link converts a would-be escalation into a rejection.
+
+### Confidence gate (R252)
+
+The decision, applied to each retrieved memory before it is used, of how much that memory may be trusted. Three
+signals — source credibility, half-life temporal decay and conflict-aware signed consensus — combine into a score
+in `[0, 1]`, and the score maps to `admit`, `reweight` or `abstain`. `memoryConfidence` audits a described retrieval
+set and returns the strictest verdict in it. It reproduces MMA's per-item reliability layer (arXiv 2602.16493),
+which cuts FEVER variance 35.2% and reaches 41.18% on MMA-Bench conflict cases where the baseline scores 0.0%.
+
+### Source credibility (R252)
+
+A prior on how trustworthy a memory is, based on where it came from. The closed mapping follows MMA's
+`confidence_v2.yaml`: `knowledge` 0.95, `semantic` 0.70, `procedural` and `resource` 0.60, `episodic` 0.50. A
+knowledge-base fact therefore outranks a conversational remark before any other signal is considered.
+
+### Temporal decay / half-life (R252)
+
+The discount applied to a memory as it ages: `T = 0.5 ** (ageDays / halfLifeDays)`. Each half-life doubles the age
+and halves the strength — with the default `halfLifeDays` of 30, a 30-day-old memory is worth 0.5 and a 60-day-old
+one 0.25. This is the closed form of MMA's `exp(-ln2 * delta / halfLife)`.
+
+### Signed consensus (R252)
+
+The weighted mean of `neighbor.confidence * neighbor.support` over a memory's retrieved neighbors, with `support`
+in `[-1, 1]`. Positive support reinforces the memory, negative support contradicts it and can drive the combined
+score down; no neighbors yields 0. A memory whose neighborhood contradicts it strongly, and whose other signals are
+weak, is withheld as `conflict-overwhelms` rather than shown to the model.
+
+### Abstention (R252)
+
+The decision to withhold a memory entirely because support is insufficient. MMA's central claim is that an agent
+should know when not to answer: a low-confidence, stale or contradicted item is safer omitted than used. In the gate,
+a score below `abstainBelow` (default 0.50) abstains — `conflict-overwhelms` when a negative consensus dominates,
+`below-threshold` otherwise. On a set, one abstain determines the verdict.

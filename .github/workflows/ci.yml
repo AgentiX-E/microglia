@@ -360,9 +360,20 @@ jobs:
             eval/tools/memory_admission.py --check --manifest eval/manifests/memory-admission.json
           python3 -m coverage run --append --branch --include="*/memory_admission.py" \
             eval/tools/memory_admission.py --verify --manifest eval/manifests/memory-admission.json --fixture eval/fixtures/memory-admission.json
+          # R252. Confidence-weighted reliability and calibrated abstention: score each retrieved item on source
+          # credibility, half-life decay and conflict-aware signed consensus (MMA, arXiv 2602.16493), then admit,
+          # reweight or abstain. This reader re-derives every verdict, reason, deciding id, count and integer score
+          # from an episode's bytes, --verify refuses a drifted manifest, and memory-confidence-manifest.test.ts
+          # binds the TS product to the same reading. All three run under coverage so argparse branches are counted.
+          python3 -m coverage run --append --branch --include="*/memory_confidence.py" \
+            eval/tools/memory_confidence.py --self-test
+          python3 -m coverage run --append --branch --include="*/memory_confidence.py" \
+            eval/tools/memory_confidence.py --check --manifest eval/manifests/memory-confidence.json
+          python3 -m coverage run --append --branch --include="*/memory_confidence.py" \
+            eval/tools/memory_confidence.py --verify --manifest eval/manifests/memory-confidence.json --fixture eval/fixtures/memory-confidence.json
           python3 -m coverage json -o coverage-python.json
           python3 scripts/check-python-coverage.py --self-test
-          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 38
+          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 39
 
       - name: The rounds this project owes, and the date each one was registered for
         # The failure this prevents is not a wrong number, it is a round that quietly stops being planned: R216b's

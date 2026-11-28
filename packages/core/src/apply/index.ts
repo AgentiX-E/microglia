@@ -125,6 +125,22 @@ export {
 } from './memory-admission.js';
 
 export {
+  CONFIDENCE_DISPOSITIONS,
+  CONFIDENCE_REASONS,
+  CONFIDENCE_SOURCES,
+  memoryConfidence,
+  SOURCE_CREDIBILITY,
+  type ConfidenceDisposition,
+  type ConfidenceItem,
+  type ConfidenceReason,
+  type ConfidenceSource,
+  type ConfidenceWeights,
+  type ConsensusNeighbor,
+  type MemoryConfidence,
+  type MemoryConfidenceInput,
+} from './memory-confidence.js';
+
+export {
   decideSpeak,
   suppressionOf,
   type SpeakInput,

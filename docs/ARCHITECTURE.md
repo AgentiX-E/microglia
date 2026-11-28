@@ -6492,3 +6492,56 @@ not linked. New module 100% on all four TypeScript dimensions (169/169 statement
 (the only open arc is the module import guard). README core layer updated (55 → 56 modules, 12,140 → 12,442 lines);
 coupling snapshot regenerated (272 → 273 modules, 11 checks); bundle unchanged (library helper, not on the render
 path); `--expect-files` 37 → 38; 13 workflows parse.
+
+## 8.128 A retrieved memory is not equally trustworthy: score it, then abstain (R252)
+
+The write-side gates (R246-R251) decide what we store and whether a correction sticks, but they hand the model every
+surviving item at the same weight. MMA (arXiv 2602.16493, github.com/AIGeeksGroup/MMA) names that "Blind Faith": a
+stale, low-credibility or contradictory memory is shown with the same force as a fresh, sourced one, and an
+overconfident answer follows. On FEVER its per-item reliability layer holds accuracy while cutting variance 35.2%;
+on MMA-Bench it reaches 41.18% Type-B accuracy in vision mode against a 0.0% baseline. This gate reproduces that
+reliability layer and pins its "abstain when support is insufficient" rule as a falsifiable verdict.
+
+`packages/core/src/apply/memory-confidence.ts` exports `memoryConfidence(input)`, a pure audit of one retrieval
+episode. Three signals are computed per item, each faithful to MMA's `confidence_module.py::compute_v2` (tri mode):
+source credibility `S` from a closed mapping (knowledge 0.95, semantic 0.70, procedural/resource 0.60, episodic 0.50),
+half-life temporal decay `T = 0.5 ** (ageDays / halfLifeDays)`, and conflict-aware signed consensus `C`, the weighted
+mean of `neighbor.confidence * neighbor.support` with support in `[-1, 1]` (positive reinforces, negative
+contradicts; no neighbors gives 0). Confidence is the self-normalising weighted sum, floored at zero:
+
+`C = max(0, (w_s*S + w_t*T + w_c*C_signed) / (w_s + w_t + w_c))`
+
+The upper clamp in MMA is provably unreachable when weights are non-negative and signals are bounded, so it is
+removed rather than left as dead code; the consensus mean is already within `[-1, 1]`, so no clamp is applied there.
+`decidingScoreMilli` reports the deciding item's confidence in integer thousandths so the product and the reader
+compare integers, not floats.
+
+| condition (checked in order) | disposition | reason |
+|---|---|---|
+| `score < abstainBelow` and signed consensus `< 0` | `abstain` | `conflict-overwhelms` |
+| `score < abstainBelow` | `abstain` | `below-threshold` |
+| `score < reweightBelow` | `reweight` | `marginal` |
+| otherwise | `admit` | `reliable` |
+
+A strongly contradicting neighborhood the score cannot outvote is withheld first; insufficient support abstains next;
+a marginal item is admitted only at a discount. The set verdict is the strictest disposition present — `abstain`
+dominates `reweight` dominates `admit` — and `reason` / `decidingId` name the most severe item, first wins a tie. The
+three disposition counts partition the item total.
+
+**Three readers, one reading.** `eval/fixtures/memory-confidence.json` holds eleven episodes: a fresh knowledge item,
+a corroborated semantic item, a marginal resource item, stale and decayed items, a conflict-overwhelms item, a
+weighted-consensus item, a neutral neighbor, and three aggregation cases. `eval/tools/memory_confidence.py --verify`
+re-derives every verdict, reason, deciding id, count and integer score from those bytes with no shared code;
+`--check` re-adds the arithmetic (count partition, reason/verdict family, threshold ordering); `--self-test` drives
+boundary, half-up rounding, determinism and tamper assertions. `memory-confidence-manifest.test.ts` derives the same
+reading with the product's own function and compares every field.
+
+**Discipline and gates.** Pure and deterministic; it audits a *description* the caller supplies, editing and fetching
+nothing, at ¥0 with no model call. Guards refuse a blank episode id, a non-object or negative-weight set, zero total
+weight, a non-finite or non-positive half-life, thresholds outside `[0,1]` or reweight below abstain, a non-array or
+empty item set, a non-object item, a blank or duplicate item id, an unknown source, a negative or non-finite age, a
+non-array neighbor set, a non-object neighbor, and a non-positive weight or out-of-range confidence/support on any
+neighbor. New module 100% on all four TypeScript dimensions; 43 behaviour tests plus 16 binding tests; Python reader
+100% statements and branches over self-test + check + verify. README core layer updated (56 → 57 modules,
+12,442 → 12,778 lines); coupling snapshot regenerated (273 → 274 modules, 11 checks); bundle unchanged (library
+helper, not on the render path); `--expect-files` 38 → 39; 13 workflows parse.

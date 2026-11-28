@@ -1,0 +1,191 @@
+{
+  "schema": "microglia/memory-confidence-inputs@1",
+  "cases": [
+    {
+      "id": "fresh-knowledge",
+      "input": {
+        "id": "ep-fresh",
+        "weights": { "source": 0.45, "time": 0.40, "consensus": 0.15 },
+        "halfLifeDays": 30,
+        "abstainBelow": 0.5,
+        "reweightBelow": 0.75,
+        "items": [
+          { "id": "m-knowledge", "source": "knowledge", "ageDays": 0, "neighbors": [] }
+        ]
+      },
+      "note": "Fresh, highest-credibility source with no neighborhood: 0.45*0.95+0.40*1=0.8275 -> admit (MMA v2 baseline)."
+    },
+    {
+      "id": "fresh-semantic-support",
+      "input": {
+        "id": "ep-support",
+        "weights": { "source": 0.45, "time": 0.40, "consensus": 0.15 },
+        "halfLifeDays": 30,
+        "abstainBelow": 0.5,
+        "reweightBelow": 0.75,
+        "items": [
+          {
+            "id": "m-semantic",
+            "source": "semantic",
+            "ageDays": 0,
+            "neighbors": [{ "weight": 1, "confidence": 0.9, "support": 1 }]
+          }
+        ]
+      },
+      "note": "Positive signed consensus lifts a mid-credibility item: 0.45*0.70+0.40+0.15*0.9=0.85 -> admit."
+    },
+    {
+      "id": "marginal-resource",
+      "input": {
+        "id": "ep-marginal",
+        "weights": { "source": 0.45, "time": 0.40, "consensus": 0.15 },
+        "halfLifeDays": 30,
+        "abstainBelow": 0.5,
+        "reweightBelow": 0.75,
+        "items": [
+          { "id": "m-resource", "source": "resource", "ageDays": 0, "neighbors": [] }
+        ]
+      },
+      "note": "Fresh but mid-credibility and uncorroborated: 0.45*0.60+0.40=0.67 -> reweight (marginal)."
+    },
+    {
+      "id": "stale-episodic",
+      "input": {
+        "id": "ep-stale",
+        "weights": { "source": 0.45, "time": 0.40, "consensus": 0.15 },
+        "halfLifeDays": 30,
+        "abstainBelow": 0.5,
+        "reweightBelow": 0.75,
+        "items": [
+          { "id": "m-episodic-old", "source": "episodic", "ageDays": 600, "neighbors": [] }
+        ]
+      },
+      "note": "Low-credibility source decayed past twenty half-lives: time ~0 -> 0.45*0.50=0.225 -> abstain below threshold."
+    },
+    {
+      "id": "conflict-overwhelms",
+      "input": {
+        "id": "ep-conflict",
+        "weights": { "source": 0.45, "time": 0.40, "consensus": 0.15 },
+        "halfLifeDays": 30,
+        "abstainBelow": 0.5,
+        "reweightBelow": 0.75,
+        "items": [
+          {
+            "id": "m-conflicted",
+            "source": "episodic",
+            "ageDays": 300,
+            "neighbors": [{ "weight": 2, "confidence": 1, "support": -1 }]
+          }
+        ]
+      },
+      "note": "A strongly contradicting neighborhood with weak source/time: signed consensus -1, score ~0.075 -> abstain conflict-overwhelms."
+    },
+    {
+      "id": "decayed-semantic",
+      "input": {
+        "id": "ep-decayed",
+        "weights": { "source": 0.45, "time": 0.40, "consensus": 0.15 },
+        "halfLifeDays": 30,
+        "abstainBelow": 0.5,
+        "reweightBelow": 0.75,
+        "items": [
+          { "id": "m-semantic-old", "source": "semantic", "ageDays": 45, "neighbors": [] }
+        ]
+      },
+      "note": "One and a half half-lives: time = 0.5^1.5 ~ 0.3536 -> 0.45*0.70+0.40*0.3536 ~ 0.456 -> abstain below threshold."
+    },
+    {
+      "id": "procedural-neutral",
+      "input": {
+        "id": "ep-neutral",
+        "weights": { "source": 0.45, "time": 0.40, "consensus": 0.15 },
+        "halfLifeDays": 30,
+        "abstainBelow": 0.5,
+        "reweightBelow": 0.75,
+        "items": [
+          {
+            "id": "m-procedural",
+            "source": "procedural",
+            "ageDays": 15,
+            "neighbors": [{ "weight": 1, "confidence": 0.5, "support": 0 }]
+          }
+        ]
+      },
+      "note": "A neutral (zero-support) neighbor contributes nothing: time = 0.5^0.5 ~ 0.707 -> ~0.553 -> reweight."
+    },
+    {
+      "id": "weighted-consensus",
+      "input": {
+        "id": "ep-weighted",
+        "weights": { "source": 0.45, "time": 0.40, "consensus": 0.15 },
+        "halfLifeDays": 30,
+        "abstainBelow": 0.5,
+        "reweightBelow": 0.75,
+        "items": [
+          {
+            "id": "m-weighted",
+            "source": "semantic",
+            "ageDays": 0,
+            "neighbors": [
+              { "weight": 3, "confidence": 1, "support": 1 },
+              { "weight": 1, "confidence": 1, "support": -1 }
+            ]
+          }
+        ]
+      },
+      "note": "Weighted consensus (3 support : 1 conflict) = 0.5; lift stays moderate."
+    },
+    {
+      "id": "reject-dominates-mixed",
+      "input": {
+        "id": "ep-mixed-reject",
+        "weights": { "source": 0.45, "time": 0.40, "consensus": 0.15 },
+        "halfLifeDays": 30,
+        "abstainBelow": 0.5,
+        "reweightBelow": 0.75,
+        "items": [
+          { "id": "good", "source": "knowledge", "ageDays": 0, "neighbors": [] },
+          {
+            "id": "bad",
+            "source": "episodic",
+            "ageDays": 300,
+            "neighbors": [{ "weight": 2, "confidence": 1, "support": -1 }]
+          },
+          { "id": "mid", "source": "resource", "ageDays": 0, "neighbors": [] }
+        ]
+      },
+      "note": "One conflict-overwhelms item spoils the set; counts partition 1 admit / 1 reweight / 1 abstain."
+    },
+    {
+      "id": "reweight-dominates-no-abstain",
+      "input": {
+        "id": "ep-mixed-reweight",
+        "weights": { "source": 0.45, "time": 0.40, "consensus": 0.15 },
+        "halfLifeDays": 30,
+        "abstainBelow": 0.5,
+        "reweightBelow": 0.75,
+        "items": [
+          { "id": "good", "source": "knowledge", "ageDays": 0, "neighbors": [] },
+          { "id": "mid", "source": "resource", "ageDays": 0, "neighbors": [] }
+        ]
+      },
+      "note": "A marginal item with no abstain: reweight dominates admit."
+    },
+    {
+      "id": "severity-tie-first-wins",
+      "input": {
+        "id": "ep-tie",
+        "weights": { "source": 0.45, "time": 0.40, "consensus": 0.15 },
+        "halfLifeDays": 30,
+        "abstainBelow": 0.5,
+        "reweightBelow": 0.75,
+        "items": [
+          { "id": "first", "source": "knowledge", "ageDays": 0, "neighbors": [] },
+          { "id": "second", "source": "knowledge", "ageDays": 0, "neighbors": [] }
+        ]
+      },
+      "note": "Two equally reliable items: the first wins the decidingId tie."
+    }
+  ]
+}

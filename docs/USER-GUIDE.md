@@ -8574,3 +8574,64 @@ it is not: an insight you cannot check is an insight you must not follow.
 call a model. It is a cheap, deterministic check you can run before a retrieval set is handed to a model: the
 product's TypeScript function, an independent Python reader and a committed manifest must agree field by field, or
 the build stops. That keeps the documented admission policy honest rather than trusting a paragraph no test recomputes.
+
+## 32.109 Weighing a retrieved memory instead of trusting it all equally (R252)
+
+### Why this matters
+
+Imagine an assistant that remembers three things about a customer: a policy confirmed last week by the official
+knowledge base, a note taken months ago in conversation, and a rumour from an unreliable source. A naive memory
+system hands all three to the model at equal strength. The stale note and the rumour can then outweigh the fresh
+policy, and the assistant answers with Confidence it has not earned. Researchers call this "Blind Faith" — treating
+every retrieved memory as equally trustworthy.
+
+The confidence gate fixes this in two steps: it gives each retrieved memory a reliability score, then it decides
+whether the memory should be admitted, used at a discount, or abstained from entirely. The scoring follows MMA
+(Multimodal Memory Agent, arXiv 2602.16493), which on the FEVER benchmark kept accuracy while cutting variance by
+35.2%, and on its own MMA-Bench reached 41.18% on conflict cases where the baseline scored 0.0%.
+
+### The three signals
+
+For each retrieved memory the gate reads three things you already have:
+
+1. **Source credibility** — where the memory came from. A fact from the knowledge base scores 0.95; an inferred
+   semantic memory 0.70; a workflow or document 0.60; a conversational remark 0.50.
+2. **Temporal decay** — how old it is. A memory loses half its strength every `halfLifeDays` (30 days by default).
+   A fact from 60 days ago is worth a quarter of a fresh one.
+3. **Conflict-aware consensus** — whether other retrieved memories support or contradict it. Each neighbor carries
+   a weight, its own confidence and a `support` value from `-1` (contradicts) to `+1` (supports). They combine into a
+   weighted mean.
+
+These combine into one score in `[0, 1]`:
+
+`score = max(0, (0.45 × source + 0.40 × time + 0.15 × consensus) / 1.0)`
+
+You can change the three weights and both thresholds for your own use case; the defaults above are MMA's published
+values.
+
+### The four verdicts
+
+| condition (checked in order) | what happens | reason |
+|---|---|---|
+| score below `abstainBelow` (0.50) and neighbors contradict it | **abstain** — do not use it | `conflict-overwhelms` |
+| score below `abstainBelow` (0.50) | **abstain** — not enough support | `below-threshold` |
+| score below `reweightBelow` (0.75) | **reweight** — usable but discounted | `marginal` |
+| otherwise | **admit** — use it at full weight | `reliable` |
+
+For a batch of memories the gate takes the strictest verdict: one abstain outweighs any number of admits, so a set
+is only as trustworthy as its weakest member. The reported `decidingId` tells you which memory made that call.
+
+### A worked example
+
+A policy confirmed by the knowledge base, retrieved fresh with no neighbors, scores
+`0.45 × 0.95 + 0.40 × 1.0 = 0.8275` — admitted. The same policy retrieved 60 days later with a contradicting note
+drops to `0.45 × 0.95 + 0.40 × 0.25 − 0.15 × 1 = 0.5025` — still usable but reweighted. A conversational rumour,
+six months old and contradicted, scores about `0.075` and is abstained from as `conflict-overwhelms`.
+
+### What you get, and what it costs
+
+`memoryConfidence(input)` is a pure function: it reads a description you supply, changes no store, calls no model and
+costs nothing (¥0). It composes with the earlier gates: use it after R249/R250/R251 have decided which memories are
+eligible, to decide how much each eligible memory should be trusted. Its score is reported in integer thousandths
+(`decidingScoreMilli`) so the product and the independent evaluation reader always agree exactly — no floating-point
+drift between what you see and what the benchmarks measure.
