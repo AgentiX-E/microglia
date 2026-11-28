@@ -6223,3 +6223,53 @@ Python reader 96.7% over self-test + check + verify, self-test 72/72; `readme-la
 core module (50 → 51 modules, 11,044 → 11,243 lines, adapter share 2.6% → 2.5%); coupling snapshot regenerated
 (267 → 268 modules, all 11 checks); bundle unchanged (core 55,071 / 18,865 B, the module is opt-in and not on the
 render path); `--expect-files` 32 → 33; 13 workflows parse. Both repos CI green on push.
+
+## 8.123 Accumulate experience, not abstractions (R247)
+
+> **Status, 28 Nov: read, ¥0, no model called.** R246 closed the write-side question of whether a *single*
+> correction is durable across re-analysis. This round closes the adjacent question the same evidence keeps
+> raising: once a rule survives that gate, should it be **stored at all**? Anti-Persistence (arXiv 2610.27406,
+> Indiana University + Tencent) puts a number on it. The paper names *error reproduction* — a wrong abstraction
+> shapes a task's execution, the resulting trajectory feeds the next synthesis round, and the same error is
+> re-derived even after the original rule is removed. Its design retains observed trajectories and outcomes,
+> reconstructs task-specific guidance on demand, and discards that guidance after execution. Across three
+> benchmarks and three backbones it reports higher held-out success at the lowest average LLM-call cost among
+> the evaluated memory designs. No +pp is imported here — that benchmark has no microglia submission.
+
+**The seam in this codebase.** `isEventKind` already distinguishes `exemplar` (a record of one episode — two
+records cannot contradict) from the claim kinds (`constraint`, `negative`, `lexicon`, `procedure`, `abstention`,
+which assert something about a class of situations). That is exactly Anti-Persistence' line between accumulated
+experience and inferred abstraction; what was missing was a *lifecycle decision* on top of it. The store held a
+claim and a record under the same persistence rules.
+
+**The module.** `packages/core/src/apply/abstraction-lifecycle.ts` exports
+`abstractionLifecycle(item, options)`. It reduces one item to a disposition and a reason:
+
+| kind / observed outcome | disposition | reason |
+|---|---|---|
+| `exemplar` (any utility) | `retain` | `event-record` |
+| claim, net flip < 0 | `discard` | `harmful-abstraction` |
+| claim, net flip > 0 and `injected ≥ minInjections` | `retain` | `stable-help` |
+| claim, net flip > 0 but `injected < minInjections` | `ephemeral` | `insufficient-outcomes` |
+| claim, net flip = 0 or no utility | `ephemeral` | `no-signal` |
+
+Two decisions carry the argument. **Harm is checked before the floor**: a rule that hurt even once can regenerate,
+so outcome volume does not excuse it — this is the error-reproduction path closed at the source. And an exemplar
+is retained even with a harmful reading: a record of what happened is experience, not a claim to be applied, so
+there is no rule there to reproduce. `delta`, `injected` and the applied floor are reported for a readback but the
+decision uses only the net-flip sign and the floor. Guards refuse a blank id, an unknown kind, an impossible
+utility or a bad floor rather than defaulting — any of those would silently misclassify a record as a claim or
+fabricate stable help.
+
+**Three readers, one reading.** `eval/fixtures/abstraction-lifecycle.json` holds twelve real-shaped cases spanning
+all three dispositions and all five reasons. `eval/tools/abstraction_lifecycle.py --verify` re-derives every
+disposition, reason and figure from those bytes with no shared code; `--check` re-adds the manifest's own ladder
+and refuses a row whose decision disagrees with its kind/delta/floor; `--self-test` drives 66 boundary, tamper
+and CLI assertions. `abstraction-lifecycle-manifest.test.ts` derives the same reading with the product's own
+function and compares every field. A disagreement fails one reader and stops the build.
+
+**Discipline and gates.** Pure and deterministic; opt-in like `stateRole` and `viewConsensus`, so every artefact
+committed before R247 stays byte-identical. New module 100% on all four TypeScript dimensions; 36 tests across
+behaviour and binding; Python reader 97.8% over self-test + check + verify, self-test 66/66; README core layer
+updated (51 → 52 modules, 11,243 → 11,425 lines); coupling snapshot regenerated (268 → 269 modules, 11 checks);
+bundle unchanged (module is opt-in, not on the render path); `--expect-files` 33 → 34; 13 workflows parse.

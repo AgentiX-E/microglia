@@ -8290,3 +8290,68 @@ in front of persistence, not a change to the store.
 SPLICE's *mechanism* — keep only knowledge whose utility is consistent across views — on this project's own
 utility readings, and pins it the way every reading here is pinned: the product's TypeScript function, an
 independent Python reader and a committed manifest must agree field by field, or the build stops.
+
+## 32.104 Deciding whether a remembered rule should be kept at all (R247)
+
+**The problem you have felt.** You teach the assistant a rule, it works once, and from then on the rule is stored
+and shown in later prompts. Sometimes things then get worse in a way that has nothing to do with retrieval — the
+rule was right once but wrong in a different situation, and because it was stored it kept being applied. Worse, the
+assistant's own record of that mistake can be distilled into a *new* rule that repeats the original error. This is
+the loop the Anti-Persistence paper (arXiv 2610.27406) calls *error reproduction*: abstraction → execution →
+re-abstraction.
+
+**The distinction that breaks the loop.** Not everything in memory is the same kind of thing:
+
+- an **event record** (`exemplar`) says what happened in one episode. Two records cannot contradict each other.
+- a **claim** (`constraint`, `procedure`, `negative`, `lexicon`, `abstention`) says something that is meant to hold
+  across many situations. A wrong claim is the thing that reproduces.
+
+Keep every record. Treat claims as temporary guidance: rebuild them when a task needs them, and throw them away
+afterwards — unless a claim's own track record has earned the right to be kept.
+
+**The decision.** `abstractionLifecycle(item, { minInjections })` returns a `disposition` and a `reason`:
+
+| item | disposition | meaning |
+|---|---|---|
+| an `exemplar`, whatever its outcome | `retain` | a record — accumulate it |
+| a claim whose net flip is negative | `discard` | it hurt — do not even rebuild it |
+| a claim with a positive net flip at or above `minInjections` | `retain` | proven useful — store it |
+| a claim with a positive net flip below the floor | `ephemeral` | a hint — rebuild on demand, do not store |
+| a claim with no net flip, or no outcomes at all | `ephemeral` | no evidence — rebuild on demand |
+
+`minInjections` defaults to 3: that many observed outcomes must have seen the rule before a positive result is
+enough to persist it. Harm is checked *first* — a rule that hurt once is discarded even if only one outcome was
+seen, because that single episode is where reproduction starts.
+
+**A worked example.**
+
+```ts
+import { abstractionLifecycle } from '@agentix-e/microglia-apply';
+
+// A record of one episode: kept, even though the outcome was bad.
+abstractionLifecycle({ id: 'ex-1', kind: 'exemplar', utility: { injected: 10, flippedUp: 1, flippedDown: 8 } });
+// → { disposition: 'retain', reason: 'event-record' }
+
+// A rule that hurt: discarded before it can be rebuilt.
+abstractionLifecycle({ id: 'c-1', kind: 'constraint', utility: { injected: 10, flippedUp: 2, flippedDown: 7 } });
+// → { disposition: 'discard', reason: 'harmful-abstraction' }
+
+// A rule that helped, but only twice: rebuilt on demand, not stored.
+abstractionLifecycle({ id: 'c-2', kind: 'procedure', utility: { injected: 2, flippedUp: 2, flippedDown: 0 } });
+// → { disposition: 'ephemeral', reason: 'insufficient-outcomes' }
+```
+
+**What you supply, and what the library does not do.** As with `viewConsensus`, the product does not run a model
+here. You supply each item's `kind` and, once it has been used, its `utility` counts (`injected` = how many
+outcomes saw it, `flippedUp`/`flippedDown` = how many improved or worsened). The function is pure: no clock, no
+network, no model, and it never changes the item. It reports `delta`, `injected` and the floor it applied so your
+logs can explain the decision, but only the sign of the net flip and the floor decide it.
+
+**What does not change.** This is opt-in. Unless you call `abstractionLifecycle`, the store behaves as before,
+and every artefact already committed is untouched. It is a policy you can apply at write time, not a change to the
+store's format.
+
+**What it is not.** It claims no accuracy gain and re-runs no experiment. It reproduces Anti-Persistence'
+*mechanism* — accumulate experience, make abstractions temporary unless proven — on this project's own data, and
+pins it the way every reading here is pinned: the product's TypeScript function, an independent Python reader and
+a committed manifest must agree field by field, or the build stops.

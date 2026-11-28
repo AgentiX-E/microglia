@@ -1,0 +1,150 @@
+{
+  "schema": "microglia/abstraction-lifecycle@1",
+  "fixtureSchema": "microglia/abstraction-lifecycle-readings@1",
+  "cases": [
+    {
+      "id": "episode-no-utility",
+      "expected": {
+        "disposition": "retain",
+        "reason": "event-record",
+        "id": "ex-1",
+        "kind": "exemplar",
+        "delta": 0,
+        "injected": 0,
+        "minInjections": 3
+      }
+    },
+    {
+      "id": "episode-harmful-still-retained",
+      "expected": {
+        "disposition": "retain",
+        "reason": "event-record",
+        "id": "ex-2",
+        "kind": "exemplar",
+        "delta": -7,
+        "injected": 10,
+        "minInjections": 3
+      }
+    },
+    {
+      "id": "claim-no-utility",
+      "expected": {
+        "disposition": "ephemeral",
+        "reason": "no-signal",
+        "id": "c-1",
+        "kind": "constraint",
+        "delta": 0,
+        "injected": 0,
+        "minInjections": 3
+      }
+    },
+    {
+      "id": "claim-zero-net",
+      "expected": {
+        "disposition": "ephemeral",
+        "reason": "no-signal",
+        "id": "c-2",
+        "kind": "procedure",
+        "delta": 0,
+        "injected": 12,
+        "minInjections": 3
+      }
+    },
+    {
+      "id": "claim-zero-injected",
+      "expected": {
+        "disposition": "ephemeral",
+        "reason": "no-signal",
+        "id": "c-3",
+        "kind": "negative",
+        "delta": 0,
+        "injected": 0,
+        "minInjections": 3
+      }
+    },
+    {
+      "id": "claim-harmful",
+      "expected": {
+        "disposition": "discard",
+        "reason": "harmful-abstraction",
+        "id": "c-4",
+        "kind": "lexicon",
+        "delta": -5,
+        "injected": 10,
+        "minInjections": 3
+      }
+    },
+    {
+      "id": "claim-harmful-below-floor",
+      "expected": {
+        "disposition": "discard",
+        "reason": "harmful-abstraction",
+        "id": "c-5",
+        "kind": "constraint",
+        "delta": -1,
+        "injected": 1,
+        "minInjections": 3
+      }
+    },
+    {
+      "id": "claim-stable-help-at-floor",
+      "expected": {
+        "disposition": "retain",
+        "reason": "stable-help",
+        "id": "c-6",
+        "kind": "procedure",
+        "delta": 3,
+        "injected": 3,
+        "minInjections": 3
+      }
+    },
+    {
+      "id": "claim-stable-help-above-floor",
+      "expected": {
+        "disposition": "retain",
+        "reason": "stable-help",
+        "id": "c-7",
+        "kind": "constraint",
+        "delta": 11,
+        "injected": 20,
+        "minInjections": 3
+      }
+    },
+    {
+      "id": "claim-positive-below-floor",
+      "expected": {
+        "disposition": "ephemeral",
+        "reason": "insufficient-outcomes",
+        "id": "c-8",
+        "kind": "abstention",
+        "delta": 2,
+        "injected": 2,
+        "minInjections": 3
+      }
+    },
+    {
+      "id": "claim-custom-floor-help",
+      "expected": {
+        "disposition": "retain",
+        "reason": "stable-help",
+        "id": "c-9",
+        "kind": "procedure",
+        "delta": 6,
+        "injected": 6,
+        "minInjections": 5
+      }
+    },
+    {
+      "id": "claim-custom-floor-insufficient",
+      "expected": {
+        "disposition": "ephemeral",
+        "reason": "insufficient-outcomes",
+        "id": "c-10",
+        "kind": "constraint",
+        "delta": 4,
+        "injected": 4,
+        "minInjections": 8
+      }
+    }
+  ]
+}

@@ -25,6 +25,17 @@ export {
 export { buildPack, type BuildPackOptions } from './pack.js';
 
 export {
+  abstractionLifecycle,
+  LIFECYCLE_DISPOSITIONS,
+  LIFECYCLE_REASONS,
+  type AbstractionLifecycleDecision,
+  type AbstractionLifecycleInput,
+  type AbstractionLifecycleOptions,
+  type LifecycleDisposition,
+  type LifecycleReason,
+} from './abstraction-lifecycle.js';
+
+export {
   VIEW_VERDICTS,
   viewConsensus,
   type ViewConsensus,

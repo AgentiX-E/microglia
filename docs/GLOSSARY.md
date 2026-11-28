@@ -3268,3 +3268,47 @@ Raising it requires more analyses to agree before a candidate is admitted.
 The difference between the largest and smallest per-view net gain, reported by `viewConsensus.spread`. It is a
 diagnostic for a readback, not a gate: the admission decision depends only on the *sign* of each view's net
 gain, never on the magnitude of the disagreement. It is zero when fewer than two views are supplied.
+
+### Event record (R247)
+
+A knowledge item that records one episode that happened — `kind: 'exemplar'`. Two event records cannot contradict
+each other: two orders cancelled on two afternoons are not two answers to one question. Event records are
+*experience* in Anti-Persistence' sense (arXiv 2610.27406) and are always `retain`ed by `abstractionLifecycle`,
+regardless of their utility reading. The product's `isEventKind` is the canonical test.
+
+### Claim / abstraction (R247)
+
+A knowledge item that asserts something meant to hold across a class of situations — `constraint`, `procedure`,
+`negative`, `lexicon`, `abstention`. Unlike an event record, a wrong claim can reproduce: it shapes a task's
+execution, and the resulting trajectory can be distilled into a new claim with the same error. Under
+`abstractionLifecycle`, a claim is temporary guidance by default (`ephemeral`) unless its own observed outcomes
+show stable help (`retain`) or harm (`discard`).
+
+### Error reproduction (R247)
+
+The feedback loop named by Anti-Persistence (arXiv 2610.27406): an abstraction → execution → re-abstraction cycle
+in which a stored wrong rule is re-derived from trajectories produced under its own influence, even after the
+original rule is removed. It is distinct from simple retrieval of a stored error. `abstractionLifecycle` closes
+the write-side entry: a claim with a negative net flip is `discard`ed *before* the injection floor, because one
+harmful episode is enough to seed the loop.
+
+### Disposition (R247)
+
+The lifecycle decision `abstractionLifecycle` returns for one item, from the closed set `retain` / `ephemeral` /
+`discard`. `retain` means the item may be a stored object (an event record, or a claim with proven stable help);
+`ephemeral` means rebuild it on demand and do not persist it; `discard` means the item's own outcomes showed harm,
+so it should not even be rebuilt.
+
+### Reason (R247)
+
+The closed, ordered explanation a disposition carries: `event-record` (an exemplar is always kept), `stable-help`
+(positive net flip at or above the floor), `harmful-abstraction` (negative net flip, checked before the floor),
+`insufficient-outcomes` (positive net flip below the floor), and `no-signal` (zero net flip or no utility). A
+reason is reported for a readback; it never overrides the disposition it explains.
+
+### Injection floor (R247)
+
+`minInjections`, the number of observed outcomes that must have seen a claim before a positive net flip licenses
+persisting it. Default three, an integer of at least one. Harm is not gated by this floor — a claim that hurt on a
+single observed outcome is still discarded. Raising the floor demands more evidence before a rule becomes a stored
+object.

@@ -1,0 +1,95 @@
+{
+  "schema": "microglia/abstraction-lifecycle-readings@1",
+  "cases": [
+    {
+      "id": "episode-no-utility",
+      "item": { "id": "ex-1", "kind": "exemplar" }
+    },
+    {
+      "id": "episode-harmful-still-retained",
+      "item": {
+        "id": "ex-2",
+        "kind": "exemplar",
+        "utility": { "injected": 10, "flippedUp": 1, "flippedDown": 8 }
+      }
+    },
+    {
+      "id": "claim-no-utility",
+      "item": { "id": "c-1", "kind": "constraint" }
+    },
+    {
+      "id": "claim-zero-net",
+      "item": {
+        "id": "c-2",
+        "kind": "procedure",
+        "utility": { "injected": 12, "flippedUp": 4, "flippedDown": 4 }
+      }
+    },
+    {
+      "id": "claim-zero-injected",
+      "item": {
+        "id": "c-3",
+        "kind": "negative",
+        "utility": { "injected": 0, "flippedUp": 0, "flippedDown": 0 }
+      }
+    },
+    {
+      "id": "claim-harmful",
+      "item": {
+        "id": "c-4",
+        "kind": "lexicon",
+        "utility": { "injected": 10, "flippedUp": 2, "flippedDown": 7 }
+      }
+    },
+    {
+      "id": "claim-harmful-below-floor",
+      "item": {
+        "id": "c-5",
+        "kind": "constraint",
+        "utility": { "injected": 1, "flippedUp": 0, "flippedDown": 1 }
+      }
+    },
+    {
+      "id": "claim-stable-help-at-floor",
+      "item": {
+        "id": "c-6",
+        "kind": "procedure",
+        "utility": { "injected": 3, "flippedUp": 3, "flippedDown": 0 }
+      }
+    },
+    {
+      "id": "claim-stable-help-above-floor",
+      "item": {
+        "id": "c-7",
+        "kind": "constraint",
+        "utility": { "injected": 20, "flippedUp": 14, "flippedDown": 3 }
+      }
+    },
+    {
+      "id": "claim-positive-below-floor",
+      "item": {
+        "id": "c-8",
+        "kind": "abstention",
+        "utility": { "injected": 2, "flippedUp": 2, "flippedDown": 0 }
+      }
+    },
+    {
+      "id": "claim-custom-floor-help",
+      "item": {
+        "id": "c-9",
+        "kind": "procedure",
+        "utility": { "injected": 6, "flippedUp": 6, "flippedDown": 0 }
+      },
+      "options": { "minInjections": 5 }
+    },
+    {
+      "id": "claim-custom-floor-insufficient",
+      "item": {
+        "id": "c-10",
+        "kind": "constraint",
+        "utility": { "injected": 4, "flippedUp": 4, "flippedDown": 0 }
+      },
+      "options": { "minInjections": 8 }
+    }
+  ]
+}

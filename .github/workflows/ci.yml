@@ -303,9 +303,20 @@ jobs:
             eval/tools/view_consistency.py --check --manifest eval/manifests/view-consistency.json
           python3 -m coverage run --append --branch --include="*/view_consistency.py" \
             eval/tools/view_consistency.py --verify --manifest eval/manifests/view-consistency.json --fixture eval/fixtures/view-consistency.json
+          # R247. Anti-Persistence' experience/abstraction separation: an exemplar is accumulated, a claim is
+          # temporary guidance unless its own observed outcomes license persisting it. This reader re-derives each
+          # disposition from the item's bytes, --verify refuses a drifted manifest, and
+          # abstraction-lifecycle-manifest.test.ts binds the TS product to the same reading. All three run under
+          # coverage so main()'s argparse branches are counted.
+          python3 -m coverage run --append --branch --include="*/abstraction_lifecycle.py" \
+            eval/tools/abstraction_lifecycle.py --self-test
+          python3 -m coverage run --append --branch --include="*/abstraction_lifecycle.py" \
+            eval/tools/abstraction_lifecycle.py --check --manifest eval/manifests/abstraction-lifecycle.json
+          python3 -m coverage run --append --branch --include="*/abstraction_lifecycle.py" \
+            eval/tools/abstraction_lifecycle.py --verify --manifest eval/manifests/abstraction-lifecycle.json --fixture eval/fixtures/abstraction-lifecycle.json
           python3 -m coverage json -o coverage-python.json
           python3 scripts/check-python-coverage.py --self-test
-          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 33
+          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 34
 
       - name: The rounds this project owes, and the date each one was registered for
         # The failure this prevents is not a wrong number, it is a round that quietly stops being planned: R216b's
