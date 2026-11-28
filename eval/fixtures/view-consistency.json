@@ -1,0 +1,64 @@
+{
+  "schema": "microglia/view-consistency-readings@1",
+  "note": "Synthetic but real-shaped multi-view utility readings for one correction each. Counts mirror the product's Utility type. Three independent readers derive the same verdict from these bytes.",
+  "cases": [
+    {
+      "id": "durable-help",
+      "candidate": "when a refund is requested after the item arrived damaged, issue a replacement before asking for a return",
+      "views": [
+        { "view": "t0.2", "injected": 12, "flippedUp": 9, "flippedDown": 1 },
+        { "view": "t0.7", "injected": 12, "flippedUp": 8, "flippedDown": 2 },
+        { "view": "t1.0", "injected": 12, "flippedUp": 10, "flippedDown": 0 }
+      ]
+    },
+    {
+      "id": "sign-flip-fragile",
+      "candidate": "always confirm the order total with the customer before writing the invoice",
+      "views": [
+        { "view": "t0.2", "injected": 10, "flippedUp": 8, "flippedDown": 1 },
+        { "view": "t0.7", "injected": 10, "flippedUp": 1, "flippedDown": 8 }
+      ]
+    },
+    {
+      "id": "uniform-harm",
+      "candidate": "skip the availability check when the cart has a single item",
+      "views": [
+        { "view": "prompt-a", "injected": 20, "flippedUp": 2, "flippedDown": 11 },
+        { "view": "prompt-b", "injected": 20, "flippedUp": 3, "flippedDown": 12 }
+      ]
+    },
+    {
+      "id": "abstention-plus-help",
+      "candidate": "when the user names a fiscal quarter, map it to the calendar quarter of the same number",
+      "views": [
+        { "view": "t0.2", "injected": 10, "flippedUp": 7, "flippedDown": 1 },
+        { "view": "t0.7", "injected": 10, "flippedUp": 4, "flippedDown": 4 },
+        { "view": "t1.0", "injected": 0, "flippedUp": 0, "flippedDown": 0 }
+      ]
+    },
+    {
+      "id": "all-neutral",
+      "candidate": "state the currency in every answer",
+      "views": [
+        { "view": "a", "injected": 9, "flippedUp": 2, "flippedDown": 2 },
+        { "view": "b", "injected": 9, "flippedUp": 0, "flippedDown": 0 }
+      ]
+    },
+    {
+      "id": "single-view-insufficient",
+      "candidate": "round weights to two decimals",
+      "views": [
+        { "view": "only", "injected": 12, "flippedUp": 10, "flippedDown": 1 }
+      ]
+    },
+    {
+      "id": "three-view-majority-still-fragile",
+      "candidate": "prefer the earliest matching row when several rows match",
+      "views": [
+        { "view": "a", "injected": 8, "flippedUp": 6, "flippedDown": 1 },
+        { "view": "b", "injected": 8, "flippedUp": 5, "flippedDown": 2 },
+        { "view": "c", "injected": 8, "flippedUp": 1, "flippedDown": 6 }
+      ]
+    }
+  ]
+}

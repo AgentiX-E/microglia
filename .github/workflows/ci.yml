@@ -292,9 +292,20 @@ jobs:
             eval/tools/quota_disposition.py --check --manifest eval/manifests/quota-disposition.json
           python3 -m coverage run --append --branch --include="*/quota_disposition.py" \
             eval/tools/quota_disposition.py --verify --manifest eval/manifests/quota-disposition.json --fixture eval/fixtures/quota-replies.json
+          # R246. SPLICE's write-side rule: keep only a correction whose utility gain is consistent across
+          # independent views of the same experience. A sign-flipping candidate is a fragile abstraction that
+          # would regenerate as a contradiction (Anti-Persistence); this reader re-derives every verdict from the
+          # readings' bytes, --verify refuses a drifted manifest, and view-consistency-manifest.test.ts binds the
+          # TS product to the same reading. All three run under coverage so main()'s argparse branches are counted.
+          python3 -m coverage run --append --branch --include="*/view_consistency.py" \
+            eval/tools/view_consistency.py --self-test
+          python3 -m coverage run --append --branch --include="*/view_consistency.py" \
+            eval/tools/view_consistency.py --check --manifest eval/manifests/view-consistency.json
+          python3 -m coverage run --append --branch --include="*/view_consistency.py" \
+            eval/tools/view_consistency.py --verify --manifest eval/manifests/view-consistency.json --fixture eval/fixtures/view-consistency.json
           python3 -m coverage json -o coverage-python.json
           python3 scripts/check-python-coverage.py --self-test
-          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 32
+          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 33
 
       - name: The rounds this project owes, and the date each one was registered for
         # The failure this prevents is not a wrong number, it is a round that quietly stops being planned: R216b's

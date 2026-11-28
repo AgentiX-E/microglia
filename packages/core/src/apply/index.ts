@@ -25,6 +25,15 @@ export {
 export { buildPack, type BuildPackOptions } from './pack.js';
 
 export {
+  VIEW_VERDICTS,
+  viewConsensus,
+  type ViewConsensus,
+  type ViewConsensusOptions,
+  type ViewUtility,
+  type ViewVerdict,
+} from './view-consistency.js';
+
+export {
   STATE_ROLES,
   resolveStates,
   serialOf,

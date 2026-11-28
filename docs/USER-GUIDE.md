@@ -8225,3 +8225,68 @@ error code, the message and the `Retry-After` value the driver already has.
 is funded — it reports what the provider said. If the provider mislabels its own reply, the
 reading follows the provider. The value is reproducibility: the product, an independent Python
 reader and a committed manifest must agree on every field, or the build stops.
+
+## 32.103 Checking whether a remembered rule survives being analysed again (R246)
+
+**The problem.** You corrected the assistant once, it learned a rule, and the rule reached later prompts. But
+sometimes a memory that helped in one situation made things worse in another — not because it was retrieved
+wrongly, but because the rule itself was an artifact of how it was written down. Ask the same experience to be
+distilled under a different temperature, prompt or interpreter and the two rules can disagree. Storing both puts
+a contradiction into the prompt: one view's rule helps, the other's hurts, and the model has no way to know which
+to follow.
+
+**The idea.** Before you persist a correction, ask for more than one reading of how useful it is. A view is one
+independent analysis with three numbers:
+
+| field | meaning |
+|---|---|
+| `injected` | how many outcomes saw the rule |
+| `flippedUp` | how many of those got better |
+| `flippedDown` | how many got worse |
+
+Net gain is `(flippedUp - flippedDown) / injected`. Only its *sign* decides: a view with no net flip is an
+abstention, not a vote against.
+
+**What the gate returns.** `viewConsensus(views, { minViews })` gives one verdict:
+
+| verdict | when | admitted? |
+|---|---|---|
+| `consistent-help` | enough views, every informative one gains | **yes** |
+| `fragile` | some views gain, others lose | no — this is the artifact to avoid |
+| `consistent-harm` | every informative view loses | no |
+| `no-signal` | enough views, none gains either way | no |
+| `insufficient` | fewer than `minViews` views | no |
+
+Only `consistent-help` sets `admit: true`. The default floor is two views; raise `minViews` to require more
+agreement, or set it to one when you deliberately want a single analysis to decide.
+
+**A worked example.** One correction yields two views:
+
+```ts
+import { viewConsensus } from '@agentix-e/microglia-apply';
+
+const ruling = viewConsensus([
+  { view: 't0.2', injected: 10, flippedUp: 8, flippedDown: 1 },  // +7
+  { view: 't0.7', injected: 10, flippedUp: 1, flippedDown: 8 },  // −7
+]);
+// ruling.verdict === 'fragile', ruling.admit === false
+```
+
+The two views disagree in sign, so the candidate is refused: it helped under one analysis and hurt under
+another. Persisting it would store a rule that regenerates as a contradiction. If both views had gained
+(`+7`, `+6`), the verdict would be `consistent-help` and the candidate could be admitted.
+
+**What you must supply, and what the library does not do.** The library does not run a model here, so *you*
+collect the views — from repeated distillation at different temperatures, prompts or interpreters — and pass
+their utility readings in. The function is pure: no clock, no network, no model, and it works on any object with
+the four fields above. It reports `gains` per view (in input order) and their `spread` for your logs, but those
+numbers never decide the verdict — only the signs do.
+
+**What does not change.** This is opt-in. Unless you call `viewConsensus`, the write path behaves exactly as
+before, and every artefact already committed renders byte-for-byte identically. The gate is a filter you place
+in front of persistence, not a change to the store.
+
+**What it is not.** It does not claim an accuracy gain and it does not re-run an experiment. It reproduces
+SPLICE's *mechanism* — keep only knowledge whose utility is consistent across views — on this project's own
+utility readings, and pins it the way every reading here is pinned: the product's TypeScript function, an
+independent Python reader and a committed manifest must agree field by field, or the build stops.

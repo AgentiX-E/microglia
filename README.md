@@ -799,14 +799,14 @@ stops being true. `pnpm eval:coupling` recomputes it from the source tree on eve
 
 | layer | production modules | lines | modules that name a scenario |
 |---|---|---|---|
-| `core` | 50 | 11,044 | **0** |
+| `core` | 51 | 11,243 | **0** |
 | `protocol` | 3 | 1,922 | **0** |
 | `sql` (the adapter) | 7 | **1,956** | 5 |
 | `eval` | 199 | 60,133 | 25, each with a written reason |
 | `browser` | 2 | 280 | 0 |
 | `node` | 6 | 1,308 | 0 |
 
-**The scenario is 2.6% of the production tree and none of it is in the library.** `core` names no
+**The scenario is 2.5% of the production tree and none of it is in the library.** `core` names no
 database in code — every occurrence of `sql` in it is inside a test, where a scope string is free text —
 and the text-to-SQL surface is **1,956 lines in 7 modules** that execute, guard, differ, link and
 render SQL. The 25 modules that keep a scenario word outside the adapter each carry a reason in the

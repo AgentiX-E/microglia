@@ -6172,3 +6172,54 @@ and compares every field. A drift fails one reader and stops the build.
 provider's own error code; it does not guess whether the account was funded. Its value is that a
 future 429 is named correctly, so a cost decision is made from the reply rather than from a
 reading of the status code.
+
+## 8.122 A correction is admitted only if it survives being analysed again (R246)
+
+> **Status, 28 Nov: read, ¥0, no model called.** R245 closed the cost-side diagnosis; this round closes the
+> write-side question the user kept returning to — *the negative effect is not how much memory we keep but what
+> we chose to keep*. Three 2026 results converge on one mechanism: SPLICE (arXiv 2610.30790) measures that the
+> same experience analysed different ways yields knowledge of substantially different utility, and keeps only
+> candidates whose gain is consistent across views; Anti-Persistence (arXiv 2610.27406) shows a stored wrong
+> abstraction regenerates through abstraction → execution → re-abstraction even after the original is removed;
+> Faulty Memory (UIUC) reports GPT-5.4 falling from 100% to 54% on ARC-AGI after consolidating a lesson the
+> original episode did not need. This round implements the first result's admission rule as a pure function on
+> microglia's own utility readings. No +pp is imported — neither benchmark has a microglia submission.
+
+**The defect this stands in front of.** `admitWrite` decides whether an incoming claim is a *duplicate* of what
+is stored, scoring it against its nearest neighbours by similarity and merging or adding. It cannot ask a
+different question: is the rule itself durable, or is it an artifact of the one way this project happened to
+distil it? Two analyses of one correction can both clear admission, both reach the pack, and then contradict
+each other in the prompt — a rule that helped under one lens and hurt under another. That is the shape a
+sign-flip catches before persistence.
+
+**The module.** `packages/core/src/apply/view-consistency.ts` exports `viewConsensus(views, options)`. Each view
+is one independent analysis — a temperature, a prompt, an interpreter — with a utility reading in the product's
+own `Utility` shape: `injected`, `flippedUp`, `flippedDown`. Net gain per view is
+`(flippedUp - flippedDown) / injected`, and its *sign* is the durable signal; a view with no net flip is an
+abstention, not a contradiction. The verdict is a pure function of the sign counts and a view floor:
+
+| verdict | condition | `admit` |
+|---|---|---|
+| `consistent-help` | ≥ `minViews` views, all informative views positive | **true** |
+| `fragile` | at least one positive and one negative view | false |
+| `consistent-harm` | informative views exist and all are negative | false |
+| `no-signal` | enough views, none with a net gain either way | false |
+| `insufficient` | fewer than `minViews` views | false |
+
+Only `consistent-help` admits. This is deliberately stricter than "not shown to hurt": SPLICE's finding is
+about *keeping* consistent candidates, and a rule no analysis showed to help is not one there is evidence to
+keep. Nothing is wired into the default write path: a caller opts in by calling the gate, so every artefact
+committed before R246 renders byte-identically — the same switch discipline as `stateRole`, `shape` and `note`.
+
+**Three readers, one reading.** `eval/fixtures/view-consistency.json` holds seven real-shaped cases spanning all
+five verdicts. `eval/tools/view_consistency.py --verify` re-derives every verdict, count, gain and spread from
+those bytes with no shared code; `--check` re-adds the manifest's own arithmetic and refuses a manifest whose
+verdict disagrees with its count ladder; `--self-test` drives 72 boundary, determinism and tamper assertions.
+`view-consistency-manifest.test.ts` derives the same reading with the product's own `viewConsensus` and compares
+every field. A disagreement fails one reader and stops the build — the product ships the gate the measurement read.
+
+**Gates.** new module 100% on all four TypeScript dimensions; 31 tests across the behaviour and binding files;
+Python reader 96.7% over self-test + check + verify, self-test 72/72; `readme-layers.test.ts` updated for the new
+core module (50 → 51 modules, 11,044 → 11,243 lines, adapter share 2.6% → 2.5%); coupling snapshot regenerated
+(267 → 268 modules, all 11 checks); bundle unchanged (core 55,071 / 18,865 B, the module is opt-in and not on the
+render path); `--expect-files` 32 → 33; 13 workflows parse. Both repos CI green on push.

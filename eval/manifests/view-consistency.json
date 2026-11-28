@@ -1,0 +1,134 @@
+{
+  "schema": "microglia/view-consistency@1",
+  "fixtureSchema": "microglia/view-consistency-readings@1",
+  "cases": [
+    {
+      "id": "durable-help",
+      "expected": {
+        "verdict": "consistent-help",
+        "admit": true,
+        "views": 3,
+        "positive": 3,
+        "negative": 0,
+        "zero": 0,
+        "net": 24,
+        "gains": [
+          0.6666666666666666,
+          0.5,
+          0.8333333333333334
+        ],
+        "spread": 0.33333333333333337,
+        "minViews": 2
+      }
+    },
+    {
+      "id": "sign-flip-fragile",
+      "expected": {
+        "verdict": "fragile",
+        "admit": false,
+        "views": 2,
+        "positive": 1,
+        "negative": 1,
+        "zero": 0,
+        "net": 0,
+        "gains": [
+          0.7,
+          -0.7
+        ],
+        "spread": 1.4,
+        "minViews": 2
+      }
+    },
+    {
+      "id": "uniform-harm",
+      "expected": {
+        "verdict": "consistent-harm",
+        "admit": false,
+        "views": 2,
+        "positive": 0,
+        "negative": 2,
+        "zero": 0,
+        "net": -18,
+        "gains": [
+          -0.45,
+          -0.45
+        ],
+        "spread": 0.0,
+        "minViews": 2
+      }
+    },
+    {
+      "id": "abstention-plus-help",
+      "expected": {
+        "verdict": "consistent-help",
+        "admit": true,
+        "views": 3,
+        "positive": 1,
+        "negative": 0,
+        "zero": 2,
+        "net": 6,
+        "gains": [
+          0.6,
+          0.0,
+          0.0
+        ],
+        "spread": 0.6,
+        "minViews": 2
+      }
+    },
+    {
+      "id": "all-neutral",
+      "expected": {
+        "verdict": "no-signal",
+        "admit": false,
+        "views": 2,
+        "positive": 0,
+        "negative": 0,
+        "zero": 2,
+        "net": 0,
+        "gains": [
+          0.0,
+          0.0
+        ],
+        "spread": 0.0,
+        "minViews": 2
+      }
+    },
+    {
+      "id": "single-view-insufficient",
+      "expected": {
+        "verdict": "insufficient",
+        "admit": false,
+        "views": 1,
+        "positive": 1,
+        "negative": 0,
+        "zero": 0,
+        "net": 9,
+        "gains": [
+          0.75
+        ],
+        "spread": 0.0,
+        "minViews": 2
+      }
+    },
+    {
+      "id": "three-view-majority-still-fragile",
+      "expected": {
+        "verdict": "fragile",
+        "admit": false,
+        "views": 3,
+        "positive": 2,
+        "negative": 1,
+        "zero": 0,
+        "net": 3,
+        "gains": [
+          0.625,
+          0.375,
+          -0.625
+        ],
+        "spread": 1.25,
+        "minViews": 2
+      }
+    }
+  ]
+}

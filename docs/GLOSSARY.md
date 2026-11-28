@@ -3225,3 +3225,46 @@ spending the run's deadline repeating a request that cannot succeed.
 by the pure `quotaRetryAdvice`, so the loop that burns the deadline and the reading that names the
 failure share one rule.
 
+
+### Cross-view consistency (R246)
+
+A property of a *candidate correction*: its usefulness has the same sign under more than one independent analysis
+of the same experience. `viewConsensus` reads one or more **views** — each a `Utility` reading of `injected`,
+`flippedUp` and `flippedDown` — and reduces them to one verdict. The net gain of a view is
+`(flippedUp - flippedDown) / injected`; a view with no net flip is an abstention, not a vote against. The rule is
+SPLICE's (arXiv 2610.30790): keep only the candidates whose utility gain is consistent across views, because the
+same experience analysed a different way yields knowledge of substantially different utility.
+
+### View (R246)
+
+One independent analysis of one experience — a temperature, a prompt, or an interpreter. A view contributes a
+single utility reading to `viewConsensus`. Its label must be non-blank and unique within a call; duplicate labels
+are refused so one analysis cannot count twice. More than one view is needed before consistency can be claimed
+(the default `minViews` is two).
+
+### Fragile (R246)
+
+The verdict for a candidate whose views disagree in sign: at least one view gained on net and at least one lost.
+A fragile candidate is refused admission. It is the write-side shape of Anti-Persistence's *error reproduction*
+(arXiv 2610.27406): a rule that helped under one analysis and hurt under another is an abstraction that will
+regenerate as a contradiction once it is stored and applied.
+
+### Consistent-help / consistent-harm / no-signal / insufficient (R246)
+
+The four verdicts other than `fragile`. `consistent-help`: enough views, and every informative view has a
+positive net gain — the only verdict that sets `admit: true`. `consistent-harm`: informative views exist and
+all are negative. `no-signal`: enough views, none with a net gain in either direction. `insufficient`: fewer
+views than `minViews`, so no consistency claim is possible. Only `consistent-help` is admitted; the others are
+refused rather than treated as "not shown to hurt".
+
+### View floor (R246)
+
+`minViews`, the minimum number of views required before `viewConsensus` will claim consistency. Default two;
+an integer of at least one. Below the floor the verdict is `insufficient` regardless of the readings' signs.
+Raising it requires more analyses to agree before a candidate is admitted.
+
+### Gain spread (R246)
+
+The difference between the largest and smallest per-view net gain, reported by `viewConsensus.spread`. It is a
+diagnostic for a readback, not a gate: the admission decision depends only on the *sign* of each view's net
+gain, never on the magnitude of the disagreement. It is zero when fewer than two views are supplied.
