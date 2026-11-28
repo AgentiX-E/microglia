@@ -186,6 +186,25 @@ export {
 } from './experience-gate.js';
 
 export {
+  FRAGMENTATION_FLOOR_MILLI,
+  WITNESS_FLOOR_MILLI,
+  CHAINED_CEILING_MILLI,
+  PROPOSER_VERDICTS,
+  PROPOSER_REASONS,
+  PROPOSER_SIGNALS,
+  ABLATABLE_SIGNALS,
+  proposerValue,
+  type ProposerValueInput,
+  type ProposerValue,
+  type ProposerVerdict,
+  type ProposerReason,
+  type ProposerSignal,
+  type AblatableSignal,
+  type ProposerAblation,
+  type ProposerAblationReading,
+} from './proposer-value.js';
+
+export {
   decideSpeak,
   suppressionOf,
   type SpeakInput,

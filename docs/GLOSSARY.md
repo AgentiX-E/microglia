@@ -3534,3 +3534,24 @@ capacity). It makes a fact held to a stricter standard as memory fills, without 
 Two rejection reasons. `contradicted` means every support sample was zero — the source context directly refutes the
 candidate. `insufficient-support` means some support existed but the rounded mean was below the threshold. The
 distinction lets a host treat a refuted fact differently from a merely unproven one.
+
+
+### Proposer value (R256)
+
+A zero-cost, deterministic verdict on whether a paid experience-proposer arm is worth calling. It is `admit` only
+when the deterministic fold has not already reached the repairs (fragmentation at or above its floor), the witness
+is strong, the defect is prose rather than a chain, and the call fits the budget; otherwise `reject` (stop or use the
+free fold), `abstain` (evidence too weak), or `reweight` (a cheaper split arm should go first).
+
+### Firing rung (R256)
+
+One of the six registered conditions a proposer-value gate can trigger, in strict priority: `no-candidates`,
+`over-budget`, `prose-not-the-problem`, `weak-witness`, `grouping-first`, `worth-proposing`. Several may fire at
+once; the strictest one, chosen by a severity table rather than by check order, determines the verdict and the
+deciding signal.
+
+### Injected cost (R256)
+
+The per-candidate price (`unitCostMicros`, integer micro-USD) is supplied by the caller instead of being hard-coded
+to one provider. The gate computes `candidateCount * unitCostMicros` and compares it with a caller-supplied budget,
+so the same decision is valid for any model provider and any price change.

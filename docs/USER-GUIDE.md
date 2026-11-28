@@ -8754,3 +8754,19 @@ its integer support, and an `ablations` array showing what would change if you d
 measure of how much each write matters. This is a library helper, not a model call: it costs nothing (¥0), changes no
 store, and calls no network. All values are integer thousandths, and the independent Python verifier re-derives the
 same reading from the same fixture, so the decision you compute locally is the decision the benchmark measures.
+
+
+### Decide whether a paid proposer is worth calling (`proposerValue`)
+
+If you are about to spend money on a model that proposes better experience records, ask a free question first: is
+this corpus one where a proposer can help? `proposerValue(input)` is a free, pure helper that answers it. Give it
+three integer rates in thousandths — `fragmentationMilli` (the share of repairs the deterministic fold did not
+reach), `witnessMilli` (how trustworthy the evidence is) and `chainedShareMilli` (how much of the defect is a chain
+rather than prose) — plus the number of candidates and your per-candidate cost in integer micro-USD. The gate pays
+only when fragmentation reaches its floor, the witness is strong, the defect is prose rather than chaining and the
+total fits your budget; otherwise it says `prose-not-the-problem`, `weak-witness`, `grouping-first`, `over-budget` or
+`no-candidates`, each with a distinct verdict so you know whether to stop, abstain or try the cheaper split arm.
+The result gives you the exact cost, how far over budget you are if at all, the deciding signal, and an `ablations`
+array naming which single signal actually flipped the decision. Costs are injected rather than hard-coded, so the
+same gate works with any provider. This is a library helper, not a model call: it costs nothing (¥0), changes no
+store and calls no network, and the independent Python verifier re-derives the same integers from the same fixture.

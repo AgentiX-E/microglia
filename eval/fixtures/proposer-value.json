@@ -1,0 +1,152 @@
+{
+  "schema": "microglia/proposer-value-inputs@1",
+  "cases": [
+    {
+      "id": "worth-proposing",
+      "input": {
+        "id": "pv-worth",
+        "fragmentationMilli": 600,
+        "witnessMilli": 700,
+        "chainedShareMilli": 100,
+        "candidateCount": 15,
+        "unitCostMicros": 10000,
+        "budgetMicros": 200000
+      },
+      "note": "High fragmentation + strong witness + low chaining + under budget: the prose IS the problem and the model arm is worth $0.15 -> admit/worth-proposing."
+    },
+    {
+      "id": "prose-not-the-problem",
+      "input": {
+        "id": "pv-low-frag",
+        "fragmentationMilli": 100,
+        "witnessMilli": 700,
+        "chainedShareMilli": 100,
+        "candidateCount": 15,
+        "unitCostMicros": 10000,
+        "budgetMicros": 200000
+      },
+      "note": "Fragmentation 100 < floor 300: the deterministic fold already reaches the repairs, so paying a proposer buys nothing -> reject/prose-not-the-problem."
+    },
+    {
+      "id": "over-budget",
+      "input": {
+        "id": "pv-over-budget",
+        "fragmentationMilli": 600,
+        "witnessMilli": 700,
+        "chainedShareMilli": 100,
+        "candidateCount": 30,
+        "unitCostMicros": 10000,
+        "budgetMicros": 200000
+      },
+      "note": "30 * 10000 = 300000 micros > budget 200000, over by 100000 -> reject/over-budget even though the value signals are high."
+    },
+    {
+      "id": "no-candidates",
+      "input": {
+        "id": "pv-empty",
+        "fragmentationMilli": 600,
+        "witnessMilli": 700,
+        "chainedShareMilli": 100,
+        "candidateCount": 0,
+        "unitCostMicros": 10000,
+        "budgetMicros": 200000
+      },
+      "note": "Nothing to propose: an empty candidate set is vacuous, not a cheap success -> reject/no-candidates."
+    },
+    {
+      "id": "weak-witness",
+      "input": {
+        "id": "pv-weak-witness",
+        "fragmentationMilli": 600,
+        "witnessMilli": 300,
+        "chainedShareMilli": 100,
+        "candidateCount": 15,
+        "unitCostMicros": 10000,
+        "budgetMicros": 200000
+      },
+      "note": "Fragmentation is high but witness 300 < floor 500: the model arm cannot be trusted here -> abstain/weak-witness (no decision, not a rejection)."
+    },
+    {
+      "id": "grouping-first",
+      "input": {
+        "id": "pv-grouping",
+        "fragmentationMilli": 600,
+        "witnessMilli": 700,
+        "chainedShareMilli": 500,
+        "candidateCount": 15,
+        "unitCostMicros": 10000,
+        "budgetMicros": 200000
+      },
+      "note": "Chained share 500 > ceiling 300: the defect is a chain needing a split (R104c), not prose -> reweight/grouping-first (cheaper arm first)."
+    },
+    {
+      "id": "boundary-fragmentation",
+      "input": {
+        "id": "pv-bound-frag",
+        "fragmentationMilli": 300,
+        "witnessMilli": 700,
+        "chainedShareMilli": 100,
+        "candidateCount": 15,
+        "unitCostMicros": 10000,
+        "budgetMicros": 200000
+      },
+      "note": "Fragmentation exactly at floor 300: the gate is >=, so prose is worth fixing -> admit/worth-proposing."
+    },
+    {
+      "id": "boundary-budget",
+      "input": {
+        "id": "pv-bound-budget",
+        "fragmentationMilli": 600,
+        "witnessMilli": 700,
+        "chainedShareMilli": 100,
+        "candidateCount": 20,
+        "unitCostMicros": 10000,
+        "budgetMicros": 200000
+      },
+      "note": "Cost exactly 200000 equals budget: over-budget is a strict >, so spending the whole budget is allowed -> admit."
+    },
+    {
+      "id": "boundary-chained",
+      "input": {
+        "id": "pv-bound-chain",
+        "fragmentationMilli": 600,
+        "witnessMilli": 700,
+        "chainedShareMilli": 300,
+        "candidateCount": 15,
+        "unitCostMicros": 10000,
+        "budgetMicros": 200000
+      },
+      "note": "Chained share exactly at ceiling 300: grouping-first needs a strict >, so it does not fire -> admit."
+    },
+    {
+      "id": "priority-prose-before-witness",
+      "input": {
+        "id": "pv-priority",
+        "fragmentationMilli": 100,
+        "witnessMilli": 300,
+        "chainedShareMilli": 500,
+        "candidateCount": 15,
+        "unitCostMicros": 10000,
+        "budgetMicros": 200000
+      },
+      "note": "Three value rungs fire at once; the strictest wins by fixed priority: cost -> fragmentation -> witness -> chaining -> admit -> reject/prose-not-the-problem."
+    },
+    {
+      "id": "ablation-decisive-fragmentation",
+      "input": {
+        "id": "pv-abl",
+        "fragmentationMilli": 100,
+        "witnessMilli": 700,
+        "chainedShareMilli": 100,
+        "candidateCount": 15,
+        "unitCostMicros": 10000,
+        "budgetMicros": 200000,
+        "ablations": [
+          { "id": "a-frag", "removedSignal": "fragmentation" },
+          { "id": "a-cost", "removedSignal": "cost" }
+        ]
+      },
+      "note": "Baseline rejects on low fragmentation. Removing that signal flips to admit (changed); removing cost leaves reject (unchanged) — the gate that decided is named by falsification."
+    }
+  ]
+}

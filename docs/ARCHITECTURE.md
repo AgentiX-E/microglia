@@ -6681,3 +6681,26 @@ paths, as in the other readers). Full `pnpm check` exits 0; README core layer up
 13,464 → 13,768 lines); coupling snapshot regenerated (276 → 277 modules, 11 checks, core still 0 scenario-coupled);
 `--expect-files` 41 → 42. Wired as a source into R254's off-by-default observer; no model was called, zero cost and
 zero rendering regression.
+
+
+### R256 — Proposer value: the gate in front of a paid arm
+
+`packages/core/src/apply/proposer-value.ts` exports `proposerValue(input)`, a pure zero-cost function that decides
+whether a paid model arm is worth calling at all. It is the machine form of R104b's registered prediction — "no gain
+unless `fragmentation` is high, a proposer fixes prose" — which earlier plans treated as prose and priced directly.
+The gate fires six rungs in strict priority: `no-candidates` (an empty set is vacuous), `over-budget`
+(`candidateCount * unitCostMicros > budgetMicros`, strict `>`), `prose-not-the-problem` (`fragmentationMilli < 300`,
+the deterministic fold already reached the repairs), `weak-witness` (`witnessMilli < 500`, abstain rather than
+reject), `grouping-first` (`chainedShareMilli > 300`, the cheaper split arm goes first), and `worth-proposing`
+(otherwise pay). Every firing rung is collected and the strictest wins by a severity table, not by check order;
+three inequality boundaries are falsifiable (fragmentation `>=`, budget strict `>`, chaining strict `>`). Cost is
+integer micro-USD with `unitCostMicros` injected by the caller, so the gate is provider-agnostic. Ablations neutralise
+one signal at a time and report whether the verdict flips, naming the gate that actually decided. This is the
+cost-minimisation answer to generator/candidate-pool work: the expensive version (a fine-tuned generator plus a pool
+of 5-21 heterogeneous candidates) is a text-to-SQL leaderboard technique that belongs to `AgentiX-E/nl2charts` and is
+an explicit non-goal of the frozen S3; here the same intent is met without a model, without training and without
+vertical coupling. New module: 31 tests, TS 100% across statements/branches (52/52)/functions/lines; the independent
+`proposer_value.py` reader re-derives cost, over-budget, every firing rung, verdict, deciding signal and each ablation
+from fixture bytes, 98% combined statements+branches (open arcs are argparse/exit paths, as in the other readers).
+Full `pnpm check` exits 0; README core layer updated (60 → 61 modules, 13,768 → 14,073 lines); coupling snapshot
+regenerated (277 → 278 modules, 11 checks, core still 0 scenario-coupled); `--expect-files` 42 → 43.

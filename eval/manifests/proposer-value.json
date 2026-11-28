@@ -1,0 +1,197 @@
+{
+  "schema": "microglia/proposer-value@1",
+  "fixtureSchema": "microglia/proposer-value-inputs@1",
+  "cases": [
+    {
+      "id": "worth-proposing",
+      "expected": {
+        "id": "pv-worth",
+        "verdict": "admit",
+        "reason": "worth-proposing",
+        "decidingSignal": "none",
+        "estimatedCostMicros": 150000,
+        "overBudgetByMicros": 0,
+        "candidateCount": 15,
+        "fragmentationFloorMilli": 300,
+        "witnessFloorMilli": 500,
+        "chainedCeilingMilli": 300,
+        "ablations": []
+      }
+    },
+    {
+      "id": "prose-not-the-problem",
+      "expected": {
+        "id": "pv-low-frag",
+        "verdict": "reject",
+        "reason": "prose-not-the-problem",
+        "decidingSignal": "fragmentation",
+        "estimatedCostMicros": 150000,
+        "overBudgetByMicros": 0,
+        "candidateCount": 15,
+        "fragmentationFloorMilli": 300,
+        "witnessFloorMilli": 500,
+        "chainedCeilingMilli": 300,
+        "ablations": []
+      }
+    },
+    {
+      "id": "over-budget",
+      "expected": {
+        "id": "pv-over-budget",
+        "verdict": "reject",
+        "reason": "over-budget",
+        "decidingSignal": "cost",
+        "estimatedCostMicros": 300000,
+        "overBudgetByMicros": 100000,
+        "candidateCount": 30,
+        "fragmentationFloorMilli": 300,
+        "witnessFloorMilli": 500,
+        "chainedCeilingMilli": 300,
+        "ablations": []
+      }
+    },
+    {
+      "id": "no-candidates",
+      "expected": {
+        "id": "pv-empty",
+        "verdict": "reject",
+        "reason": "no-candidates",
+        "decidingSignal": "candidate-count",
+        "estimatedCostMicros": 0,
+        "overBudgetByMicros": 0,
+        "candidateCount": 0,
+        "fragmentationFloorMilli": 300,
+        "witnessFloorMilli": 500,
+        "chainedCeilingMilli": 300,
+        "ablations": []
+      }
+    },
+    {
+      "id": "weak-witness",
+      "expected": {
+        "id": "pv-weak-witness",
+        "verdict": "abstain",
+        "reason": "weak-witness",
+        "decidingSignal": "witness",
+        "estimatedCostMicros": 150000,
+        "overBudgetByMicros": 0,
+        "candidateCount": 15,
+        "fragmentationFloorMilli": 300,
+        "witnessFloorMilli": 500,
+        "chainedCeilingMilli": 300,
+        "ablations": []
+      }
+    },
+    {
+      "id": "grouping-first",
+      "expected": {
+        "id": "pv-grouping",
+        "verdict": "reweight",
+        "reason": "grouping-first",
+        "decidingSignal": "chaining",
+        "estimatedCostMicros": 150000,
+        "overBudgetByMicros": 0,
+        "candidateCount": 15,
+        "fragmentationFloorMilli": 300,
+        "witnessFloorMilli": 500,
+        "chainedCeilingMilli": 300,
+        "ablations": []
+      }
+    },
+    {
+      "id": "boundary-fragmentation",
+      "expected": {
+        "id": "pv-bound-frag",
+        "verdict": "admit",
+        "reason": "worth-proposing",
+        "decidingSignal": "none",
+        "estimatedCostMicros": 150000,
+        "overBudgetByMicros": 0,
+        "candidateCount": 15,
+        "fragmentationFloorMilli": 300,
+        "witnessFloorMilli": 500,
+        "chainedCeilingMilli": 300,
+        "ablations": []
+      }
+    },
+    {
+      "id": "boundary-budget",
+      "expected": {
+        "id": "pv-bound-budget",
+        "verdict": "admit",
+        "reason": "worth-proposing",
+        "decidingSignal": "none",
+        "estimatedCostMicros": 200000,
+        "overBudgetByMicros": 0,
+        "candidateCount": 20,
+        "fragmentationFloorMilli": 300,
+        "witnessFloorMilli": 500,
+        "chainedCeilingMilli": 300,
+        "ablations": []
+      }
+    },
+    {
+      "id": "boundary-chained",
+      "expected": {
+        "id": "pv-bound-chain",
+        "verdict": "admit",
+        "reason": "worth-proposing",
+        "decidingSignal": "none",
+        "estimatedCostMicros": 150000,
+        "overBudgetByMicros": 0,
+        "candidateCount": 15,
+        "fragmentationFloorMilli": 300,
+        "witnessFloorMilli": 500,
+        "chainedCeilingMilli": 300,
+        "ablations": []
+      }
+    },
+    {
+      "id": "priority-prose-before-witness",
+      "expected": {
+        "id": "pv-priority",
+        "verdict": "reject",
+        "reason": "prose-not-the-problem",
+        "decidingSignal": "fragmentation",
+        "estimatedCostMicros": 150000,
+        "overBudgetByMicros": 0,
+        "candidateCount": 15,
+        "fragmentationFloorMilli": 300,
+        "witnessFloorMilli": 500,
+        "chainedCeilingMilli": 300,
+        "ablations": []
+      }
+    },
+    {
+      "id": "ablation-decisive-fragmentation",
+      "expected": {
+        "id": "pv-abl",
+        "verdict": "reject",
+        "reason": "prose-not-the-problem",
+        "decidingSignal": "fragmentation",
+        "estimatedCostMicros": 150000,
+        "overBudgetByMicros": 0,
+        "candidateCount": 15,
+        "fragmentationFloorMilli": 300,
+        "witnessFloorMilli": 500,
+        "chainedCeilingMilli": 300,
+        "ablations": [
+          {
+            "id": "a-frag",
+            "removedSignal": "fragmentation",
+            "beforeVerdict": "reject",
+            "afterVerdict": "admit",
+            "changed": true
+          },
+          {
+            "id": "a-cost",
+            "removedSignal": "cost",
+            "beforeVerdict": "reject",
+            "afterVerdict": "reject",
+            "changed": false
+          }
+        ]
+      }
+    }
+  ]
+}
