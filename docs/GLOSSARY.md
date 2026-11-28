@@ -3514,3 +3514,23 @@ derived from the verdict alone — the two are never conflated.
 For an ablation that removes one stage, the pair (`beforeVerdict`, `afterVerdict`) and the boolean `changed`. It is
 the marginal contribution of that gate under the same composition rule. Removing the only stage is defined: with
 no gate left to object, the after verdict is `admit`.
+
+
+### Factual support (R255)
+
+An integer thousandth in [0,1000] expressing how strongly a candidate memory is supported by the source context it
+was extracted from: 0 = contradicted, 500 = ambiguous, 1000 = fully supported. Under the ConsistencyGate-style
+admission gate, the rounded mean of K such samples is compared against the threshold with `>=` (the boundary is
+admitted), or a single-pass yes/no log-probability softmax is converted to the same scale.
+
+### Adaptive threshold (R255)
+
+`tau* = tauMin + round((tauMax - tauMin) * min(1, |M|/C))` — the admission bar grows monotonically with memory
+occupancy `|M|/C`, from `tauMin` when the store is empty to `tauMax` when it is full (capped at `tauMax` above
+capacity). It makes a fact held to a stricter standard as memory fills, without any model call.
+
+### Contradicted vs insufficient-support (R255)
+
+Two rejection reasons. `contradicted` means every support sample was zero — the source context directly refutes the
+candidate. `insufficient-support` means some support existed but the rounded mean was below the threshold. The
+distinction lets a host treat a refuted fact differently from a merely unproven one.

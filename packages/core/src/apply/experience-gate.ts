@@ -38,7 +38,7 @@
  */
 import { MicrogliaError } from '../kernel/index.js';
 
-/** The ten criteria, plus the cost lane. Closed and ordered; a stage may name no other source. */
+/** The eleven criteria, plus the cost lane. Closed and ordered; a stage may name no other source. */
 export const EXPERIENCE_GATE_SOURCES = [
   'view-consistency',
   'abstraction-lifecycle',
@@ -47,6 +47,7 @@ export const EXPERIENCE_GATE_SOURCES = [
   'memory-admission',
   'memory-confidence',
   'memory-gain-ledger',
+  'consistency-admission',
   'state-role',
   'competition-domain',
   'cost-429',

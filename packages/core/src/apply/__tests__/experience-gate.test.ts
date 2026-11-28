@@ -28,7 +28,7 @@ const base = (stages: readonly GateStage[], over: Partial<ExperienceGateInput> =
 });
 
 describe('experienceGate — closed vocabularies', () => {
-  it('declares exactly the ten criteria as gate sources', () => {
+  it('declares exactly the eleven criteria as gate sources', () => {
     expect([...EXPERIENCE_GATE_SOURCES]).toEqual([
       'view-consistency',
       'abstraction-lifecycle',
@@ -37,6 +37,7 @@ describe('experienceGate — closed vocabularies', () => {
       'memory-admission',
       'memory-confidence',
       'memory-gain-ledger',
+      'consistency-admission',
       'state-role',
       'competition-domain',
       'cost-429',

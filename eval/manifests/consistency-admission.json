@@ -1,0 +1,181 @@
+{
+  "schema": "microglia/consistency-admission@1",
+  "fixtureSchema": "microglia/consistency-admission-inputs@1",
+  "cases": [
+    {
+      "id": "fully-supported",
+      "expected": {
+        "id": "ep-supported",
+        "verdict": "admit",
+        "reason": "supported",
+        "decidingId": "c1",
+        "decidingReason": "supported",
+        "decidingSupportMilli": 1000,
+        "thresholdMilli": 700,
+        "candidateCount": 1,
+        "admitCount": 1,
+        "rejectCount": 0,
+        "ablations": []
+      }
+    },
+    {
+      "id": "contradicted",
+      "expected": {
+        "id": "ep-contradicted",
+        "verdict": "reject",
+        "reason": "contradicted",
+        "decidingId": "c1",
+        "decidingReason": "contradicted",
+        "decidingSupportMilli": 0,
+        "thresholdMilli": 700,
+        "candidateCount": 1,
+        "admitCount": 0,
+        "rejectCount": 1,
+        "ablations": []
+      }
+    },
+    {
+      "id": "boundary-at-threshold",
+      "expected": {
+        "id": "ep-boundary",
+        "verdict": "admit",
+        "reason": "supported",
+        "decidingId": "c1",
+        "decidingReason": "supported",
+        "decidingSupportMilli": 700,
+        "thresholdMilli": 700,
+        "candidateCount": 1,
+        "admitCount": 1,
+        "rejectCount": 0,
+        "ablations": []
+      }
+    },
+    {
+      "id": "just-below-threshold",
+      "expected": {
+        "id": "ep-below",
+        "verdict": "reject",
+        "reason": "insufficient-support",
+        "decidingId": "c1",
+        "decidingReason": "insufficient-support",
+        "decidingSupportMilli": 699,
+        "thresholdMilli": 700,
+        "candidateCount": 1,
+        "admitCount": 0,
+        "rejectCount": 1,
+        "ablations": []
+      }
+    },
+    {
+      "id": "ambiguous-support",
+      "expected": {
+        "id": "ep-ambiguous",
+        "verdict": "reject",
+        "reason": "insufficient-support",
+        "decidingId": "c1",
+        "decidingReason": "insufficient-support",
+        "decidingSupportMilli": 500,
+        "thresholdMilli": 700,
+        "candidateCount": 1,
+        "admitCount": 0,
+        "rejectCount": 1,
+        "ablations": []
+      }
+    },
+    {
+      "id": "mixed-set-one-contradiction-dominates",
+      "expected": {
+        "id": "ep-mixed",
+        "verdict": "reject",
+        "reason": "contradicted",
+        "decidingId": "bad",
+        "decidingReason": "contradicted",
+        "decidingSupportMilli": 0,
+        "thresholdMilli": 700,
+        "candidateCount": 3,
+        "admitCount": 2,
+        "rejectCount": 1,
+        "ablations": [
+          {
+            "id": "drop-bad",
+            "removedCandidateId": "bad",
+            "beforeVerdict": "reject",
+            "afterVerdict": "admit",
+            "changed": true
+          },
+          {
+            "id": "drop-good",
+            "removedCandidateId": "good",
+            "beforeVerdict": "reject",
+            "afterVerdict": "reject",
+            "changed": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "adaptive-sparse-memory",
+      "expected": {
+        "id": "ep-sparse",
+        "verdict": "admit",
+        "reason": "supported",
+        "decidingId": "c1",
+        "decidingReason": "supported",
+        "decidingSupportMilli": 500,
+        "thresholdMilli": 400,
+        "candidateCount": 1,
+        "admitCount": 1,
+        "rejectCount": 0,
+        "ablations": []
+      }
+    },
+    {
+      "id": "adaptive-full-memory",
+      "expected": {
+        "id": "ep-full",
+        "verdict": "reject",
+        "reason": "insufficient-support",
+        "decidingId": "c1",
+        "decidingReason": "insufficient-support",
+        "decidingSupportMilli": 500,
+        "thresholdMilli": 800,
+        "candidateCount": 1,
+        "admitCount": 0,
+        "rejectCount": 1,
+        "ablations": []
+      }
+    },
+    {
+      "id": "logprob-supported",
+      "expected": {
+        "id": "ep-logprob-yes",
+        "verdict": "admit",
+        "reason": "supported",
+        "decidingId": "c1",
+        "decidingReason": "supported",
+        "decidingSupportMilli": 900,
+        "thresholdMilli": 700,
+        "candidateCount": 1,
+        "admitCount": 1,
+        "rejectCount": 0,
+        "ablations": []
+      }
+    },
+    {
+      "id": "logprob-contradicted",
+      "expected": {
+        "id": "ep-logprob-no",
+        "verdict": "reject",
+        "reason": "insufficient-support",
+        "decidingId": "c1",
+        "decidingReason": "insufficient-support",
+        "decidingSupportMilli": 100,
+        "thresholdMilli": 700,
+        "candidateCount": 1,
+        "admitCount": 0,
+        "rejectCount": 1,
+        "ablations": []
+      }
+    }
+  ]
+}

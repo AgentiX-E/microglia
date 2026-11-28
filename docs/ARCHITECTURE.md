@@ -6657,3 +6657,27 @@ updated (58 → 59 modules, 13,146 → 13,464 lines); coupling snapshot regenera
 core still 0 scenario-coupled); `--expect-files` 40 → 41. Wired as an off-by-default observer in `buildPack`:
 rendered bytes, ids and fingerprint are unchanged, so there is zero regression. This is the seam R104b's paid
 proposer needs: candidate → criteria → R254 composition → R253 net-gain and domain gate → witness.
+
+
+### R255 — Consistency gate: write-time factual support
+
+`packages/core/src/apply/consistency-admission.ts` exports `consistencyAdmission(input)`, a pure function that gates
+whether a candidate memory may be written based on its factual support in the source context. This is the correctness
+criterion that novelty/recency/utility admission is structurally blind to (ConsistencyGate, arXiv 2607.22962): a
+hallucinated detail is as novel, recent and seemingly useful as a correct one. Three faithful modes are supported.
+`fixed` takes K soft support scores `s_k` in [0,1000] (0 = contradicted, 500 = ambiguous, 1000 = fully supported),
+computes `p = round(sum(s_k)/K)` and admits iff `p >= tau` — the comparison is `>=`, not `>`, and the paper recommends
+tau=700, K=5. `logprob` reads yes/no log-probabilities from one forward pass and converts `softmax(yes,no)[0]` once
+at the boundary using a numerically stable max subtraction. `adaptive` scales the threshold with occupancy:
+`tau* = tauMin + round((tauMax - tauMin) * min(1, |M|/C))`, permissive when memory is sparse and strict as it fills.
+A candidate with all-zero samples is `reject/contradicted`; a candidate below threshold with any positive support is
+`reject/insufficient-support`. The set verdict is the strictest reason present (first wins a tie), counts partition
+the set, and each ablation removes one candidate and reports before/after/changed. The module is the twelfth source
+fed into R254's experience gate (eleven criteria plus the cost lane). All numbers are integer thousandths; the
+`consistency_admission.py` reader re-derives every field from the fixture bytes with no shared code, and
+`consistency-admission-manifest.test.ts` binds the product to the same reading. New module: 62 tests, TS 100% across
+statements/branches/functions/lines; Python reader 98% combined statements+branches (open arcs are argparse/exit
+paths, as in the other readers). Full `pnpm check` exits 0; README core layer updated (59 → 60 modules,
+13,464 → 13,768 lines); coupling snapshot regenerated (276 → 277 modules, 11 checks, core still 0 scenario-coupled);
+`--expect-files` 41 → 42. Wired as a source into R254's off-by-default observer; no model was called, zero cost and
+zero rendering regression.

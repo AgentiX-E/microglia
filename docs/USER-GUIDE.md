@@ -8738,3 +8738,19 @@ observer (off by default), so enabling it does not change the rendered bytes, th
 — it only exposes the decision for a host to act on. All scores are integer thousandths, and the same reading is
 re-derived by the independent Python verifier from the same fixture, so the decision you compute locally is the
 decision the benchmark measures.
+
+
+### Check whether a memory is actually supported before you write it (`consistencyAdmission`)
+
+A memory that remembers the wrong thing faithfully is worse than one that forgets. `consistencyAdmission(input)` is
+a free, pure helper that answers one question at write time: is this candidate fact actually supported by the source
+context it came from? Pass a threshold and a list of candidates, each with either K soft support samples
+(`supportsMilli`, integers in [0,1000]: 0 = contradicted, 500 = ambiguous, 1000 = fully supported) or a pair of
+yes/no log-probabilities. With `fixed`, the candidate is admitted iff the rounded sample mean reaches `tauMilli`
+(the boundary counts as admitted); with `adaptive`, the threshold rises as your store fills, so the same fact is held
+to a stricter bar when memory is nearly full. A candidate scoring zero throughout is reported as `contradicted`;
+one merely below the bar is `insufficient-support`. The result gives you a set `verdict`, the deciding candidate and
+its integer support, and an `ablations` array showing what would change if you dropped any one candidate — a direct
+measure of how much each write matters. This is a library helper, not a model call: it costs nothing (¥0), changes no
+store, and calls no network. All values are integer thousandths, and the independent Python verifier re-derives the
+same reading from the same fixture, so the decision you compute locally is the decision the benchmark measures.

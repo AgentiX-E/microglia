@@ -154,6 +154,21 @@ export {
 } from './memory-gain-ledger.js';
 
 export {
+  CONSISTENCY_REASONS,
+  CONSISTENCY_VERDICTS,
+  consistencyAdmission,
+  type ConsistencyAblation,
+  type ConsistencyAblationReading,
+  type ConsistencyAdmission,
+  type ConsistencyAdmissionInput,
+  type ConsistencyCandidate,
+  type ConsistencyEvidence,
+  type ConsistencyReason,
+  type ConsistencyThreshold,
+  type ConsistencyVerdict,
+} from './consistency-admission.js';
+
+export {
   EXPERIENCE_VERDICTS,
   EXPERIENCE_GATE_SOURCES,
   GATE_DISPOSITIONS,

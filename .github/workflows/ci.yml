@@ -395,9 +395,20 @@ jobs:
             eval/tools/experience_gate.py --check --manifest eval/manifests/experience-gate.json
           python3 -m coverage run --append --branch --include="*/experience_gate.py" \
             eval/tools/experience_gate.py --verify --manifest eval/manifests/experience-gate.json --fixture eval/fixtures/experience-gate.json
+          # R255. Consistency gate: write-time factual-support admission (ConsistencyGate, arXiv 2607.22962), the
+          # correctness criterion novelty/recency/utility admission is structurally blind to. K-sample mean with
+          # >= tau, single-pass logprob softmax and occupancy-scaled adaptive tau; independent reader re-derives
+          # every threshold, support, verdict, reason, deciding id and ablation delta from fixture bytes, and
+          # consistency-admission-manifest.test.ts binds the TS product to the same reading.
+          python3 -m coverage run --append --branch --include="*/consistency_admission.py" \
+            eval/tools/consistency_admission.py --self-test
+          python3 -m coverage run --append --branch --include="*/consistency_admission.py" \
+            eval/tools/consistency_admission.py --check --manifest eval/manifests/consistency-admission.json
+          python3 -m coverage run --append --branch --include="*/consistency_admission.py" \
+            eval/tools/consistency_admission.py --verify --manifest eval/manifests/consistency-admission.json --fixture eval/fixtures/consistency-admission.json
           python3 -m coverage json -o coverage-python.json
           python3 scripts/check-python-coverage.py --self-test
-          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 41
+          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 42
 
       - name: The rounds this project owes, and the date each one was registered for
         # The failure this prevents is not a wrong number, it is a round that quietly stops being planned: R216b's

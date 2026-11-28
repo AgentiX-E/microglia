@@ -1,0 +1,121 @@
+{
+  "schema": "microglia/consistency-admission-inputs@1",
+  "cases": [
+    {
+      "id": "fully-supported",
+      "input": {
+        "id": "ep-supported",
+        "threshold": { "mode": "fixed", "tauMilli": 700 },
+        "candidates": [
+          { "id": "c1", "evidence": { "kind": "samples", "supportsMilli": [1000, 1000, 1000, 1000, 1000] } }
+        ]
+      },
+      "note": "K=5 all fully supported: mean=1000 >= tau 700 -> admit/supported."
+    },
+    {
+      "id": "contradicted",
+      "input": {
+        "id": "ep-contradicted",
+        "threshold": { "mode": "fixed", "tauMilli": 700 },
+        "candidates": [
+          { "id": "c1", "evidence": { "kind": "samples", "supportsMilli": [0, 0, 0, 0, 0] } }
+        ]
+      },
+      "note": "Every sample contradicts the source context: mean=0 -> reject/contradicted."
+    },
+    {
+      "id": "boundary-at-threshold",
+      "input": {
+        "id": "ep-boundary",
+        "threshold": { "mode": "fixed", "tauMilli": 700 },
+        "candidates": [
+          { "id": "c1", "evidence": { "kind": "samples", "supportsMilli": [700, 700, 700, 700, 700] } }
+        ]
+      },
+      "note": "Admission is >= not >: mean=700 equals tau 700 -> admit (the paper's exact rule)."
+    },
+    {
+      "id": "just-below-threshold",
+      "input": {
+        "id": "ep-below",
+        "threshold": { "mode": "fixed", "tauMilli": 700 },
+        "candidates": [
+          { "id": "c1", "evidence": { "kind": "samples", "supportsMilli": [699, 699, 699, 699, 699] } }
+        ]
+      },
+      "note": "One thousandth below the fixed threshold: mean=699 < 700 -> reject/insufficient-support."
+    },
+    {
+      "id": "ambiguous-support",
+      "input": {
+        "id": "ep-ambiguous",
+        "threshold": { "mode": "fixed", "tauMilli": 700 },
+        "candidates": [
+          { "id": "c1", "evidence": { "kind": "samples", "supportsMilli": [300, 400, 500, 600, 700] } }
+        ]
+      },
+      "note": "Ambiguous samples average 2500/5=500 < 700 -> reject/insufficient-support (not full contradiction)."
+    },
+    {
+      "id": "mixed-set-one-contradiction-dominates",
+      "input": {
+        "id": "ep-mixed",
+        "threshold": { "mode": "fixed", "tauMilli": 700 },
+        "candidates": [
+          { "id": "good", "evidence": { "kind": "samples", "supportsMilli": [1000, 1000, 1000, 1000, 1000] } },
+          { "id": "bad", "evidence": { "kind": "samples", "supportsMilli": [0, 0, 0, 0, 0] } },
+          { "id": "mid", "evidence": { "kind": "samples", "supportsMilli": [700, 700, 700, 700, 700] } }
+        ],
+        "ablations": [
+          { "id": "drop-bad", "removedCandidateId": "bad" },
+          { "id": "drop-good", "removedCandidateId": "good" }
+        ]
+      },
+      "note": "One contradicted candidate spoils the write; ablation dropping it flips reject->admit, dropping a good one does not."
+    },
+    {
+      "id": "adaptive-sparse-memory",
+      "input": {
+        "id": "ep-sparse",
+        "threshold": { "mode": "adaptive", "tauMinMilli": 400, "tauMaxMilli": 800, "memorySize": 0, "capacity": 500 },
+        "candidates": [
+          { "id": "c1", "evidence": { "kind": "samples", "supportsMilli": [500, 500, 500, 500, 500] } }
+        ]
+      },
+      "note": "Empty memory: adaptive tau* = 400 + 400*0/500 = 400; mean 500 >= 400 -> admit."
+    },
+    {
+      "id": "adaptive-full-memory",
+      "input": {
+        "id": "ep-full",
+        "threshold": { "mode": "adaptive", "tauMinMilli": 400, "tauMaxMilli": 800, "memorySize": 500, "capacity": 500 },
+        "candidates": [
+          { "id": "c1", "evidence": { "kind": "samples", "supportsMilli": [500, 500, 500, 500, 500] } }
+        ]
+      },
+      "note": "Full memory: same mean 500 but adaptive tau* = 800 -> reject. Occupancy alone flips the write."
+    },
+    {
+      "id": "logprob-supported",
+      "input": {
+        "id": "ep-logprob-yes",
+        "threshold": { "mode": "fixed", "tauMilli": 700 },
+        "candidates": [
+          { "id": "c1", "evidence": { "kind": "logprob", "yesLog": -0.1, "noLog": -2.3 } }
+        ]
+      },
+      "note": "Single-pass softmax: 1/(1+exp(-2.2)) ~ 0.9003 -> 900 >= 700 -> admit."
+    },
+    {
+      "id": "logprob-contradicted",
+      "input": {
+        "id": "ep-logprob-no",
+        "threshold": { "mode": "fixed", "tauMilli": 700 },
+        "candidates": [
+          { "id": "c1", "evidence": { "kind": "logprob", "yesLog": -2.3, "noLog": -0.1 } }
+        ]
+      },
+      "note": "Single-pass softmax: 1/(1+exp(2.2)) ~ 0.0997 -> 100 < 700 -> reject/insufficient-support."
+    }
+  ]
+}
