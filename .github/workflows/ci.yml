@@ -383,9 +383,21 @@ jobs:
             eval/tools/memory_gain_ledger.py --check --manifest eval/manifests/memory-gain-ledger.json
           python3 -m coverage run --append --branch --include="*/memory_gain_ledger.py" \
             eval/tools/memory_gain_ledger.py --verify --manifest eval/manifests/memory-gain-ledger.json --fixture eval/fixtures/memory-gain-ledger.json
+          # R254. Experience gate: compose the ten criteria's verdicts into one executable product decision under a
+          # strict priority ladder, downgrade declared advisory rejects, and attribute each ablation's marginal
+          # contribution. This is the orchestration seam the product's recall/distill path needs before R104b.
+          # This reader re-derives every verdict, reason, deciding stage, integer score, count and ablation delta
+          # from a stage set's bytes, --verify refuses a drifted manifest, and experience-gate-manifest.test.ts binds
+          # the TS product to the same reading. All three run under coverage so argparse branches are counted.
+          python3 -m coverage run --append --branch --include="*/experience_gate.py" \
+            eval/tools/experience_gate.py --self-test
+          python3 -m coverage run --append --branch --include="*/experience_gate.py" \
+            eval/tools/experience_gate.py --check --manifest eval/manifests/experience-gate.json
+          python3 -m coverage run --append --branch --include="*/experience_gate.py" \
+            eval/tools/experience_gate.py --verify --manifest eval/manifests/experience-gate.json --fixture eval/fixtures/experience-gate.json
           python3 -m coverage json -o coverage-python.json
           python3 scripts/check-python-coverage.py --self-test
-          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 40
+          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 41
 
       - name: The rounds this project owes, and the date each one was registered for
         # The failure this prevents is not a wrong number, it is a round that quietly stops being planned: R216b's

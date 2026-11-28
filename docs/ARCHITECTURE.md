@@ -6607,3 +6607,53 @@ plus 12 binding tests; Python reader 99% combined statements+branches over self-
 are assertion-failure and CLI-exit paths, as in the other readers). README core layer updated (57 → 58 modules,
 12,778 → 13,146 lines); coupling snapshot regenerated (274 → 275 modules, 11 checks); bundle unchanged (library
 helper, not on the render path); `--expect-files` 39 → 40; 13 workflows parse.
+
+## 8.130 From measured criteria to one executed decision: the experience gate (R254)
+
+### The structural gap this closes
+
+An audit found that all ten criteria (R244-R253) are pure functions exported from `apply/index.ts` but invoked by
+no call on the product's real `recall`/`distill` path — they appear only in tests and evaluation fixtures. A
+criterion nothing calls cannot constrain the negative effect and cannot make a shipped product use the measured
+configuration: the evaluation and the product read different things. Every criterion names R104b's paid proposer as
+its wiring point, so this round adds its zero-cost prerequisite: the orchestration seam itself.
+
+### The composition rule
+
+`experienceGate(input)` in `packages/core/src/apply/experience-gate.ts` takes stages — one per criterion, each
+carrying the disposition that criterion already computed under its own three-reader contract (`admit`, `reweight`,
+`abstain`, `reject`), its own reason, and an integer-thousandth score used only for readback. A source declared
+advisory has its `reject` downgraded to `reweight` (domain-boundary and cost criteria warn rather than veto). The
+set verdict is the strictest effective disposition, severity `admit < reweight < abstain < reject`, with the first
+stage winning a tie for determinism. The set reason is a function of the verdict alone, never of a stage's self
+report. Counts partition the stage total by effective disposition. Each ablation removes one stage, re-runs the
+ladder and reports the before/after/changed triple — the marginal contribution of that gate, in the same
+falsifiable style as R253's ledger.
+
+| Condition (strict priority) | verdict | reason |
+|---|---|---|
+| any hard reject | `reject` | `hard-gate-rejected` |
+| else any abstain | `abstain` | `abstention-required` |
+| else any reweight | `reweight` | `reweight-required` |
+| all admit | `admit` | `all-admitted` |
+
+### A real bug the coverage requirement found
+
+Driving the ablation boundary to 100% branch coverage exposed a genuine crash: removing the only stage left an
+empty list, and `compose([])` dereferenced `stages[0]`, throwing `Cannot read properties of undefined`. The fix is
+an explicit empty-set identity — removing the only gate leaves nothing to object, so the verdict is `admit` with no
+deciding stage — applied identically in the TypeScript product and the independent Python reader, with two
+regression tests. This was surfaced by the coverage discipline, not patched after the fact.
+
+### Contract and gates
+
+Eight fixture cases cover all four verdicts, advisory downgrade, tie ordering, ablation attribution and the single
+stage. The Python reader `experience_gate.py` re-derives every verdict/reason/deciding-stage/count/ablation from a
+stage set's bytes with no shared code; `--check` re-audits its own arithmetic and `--self-test` drives every guard,
+determinism and tamper. `experience-gate-manifest.test.ts` binds the product function field by field. The new module
+is 100% across all four coverage dimensions (43 tests). The Python reader is 98% combined (open arcs are CLI
+argparse/exit paths, as in the other readers). Full `pnpm check` exits 0 (326 files, 6754 tests); README core layer
+updated (58 → 59 modules, 13,146 → 13,464 lines); coupling snapshot regenerated (275 → 276 modules, 11 checks,
+core still 0 scenario-coupled); `--expect-files` 40 → 41. Wired as an off-by-default observer in `buildPack`:
+rendered bytes, ids and fingerprint are unchanged, so there is zero regression. This is the seam R104b's paid
+proposer needs: candidate → criteria → R254 composition → R253 net-gain and domain gate → witness.

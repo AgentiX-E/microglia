@@ -8701,3 +8701,40 @@ changes neither number is not doing work.
 costs nothing (¥0). All rates and gains are reported as integer thousandths, so what you see and what the independent
 benchmark reader measures are the very same integers — no drift. Use it to decide whether a memory configuration is
 worth shipping at all, before spending anything on a paid benchmark run.
+
+### Turning several criteria into one decision (R254)
+
+The ten criteria each tell you one thing. `experienceGate(input)` tells you what to do when they speak at once. It
+is a pure function — no store, no model, no cost (¥0) — that composes a list of stage verdicts into one executable
+decision:
+
+```ts
+import { experienceGate } from '@agentix-e/microglia-core/apply';
+
+const decision = experienceGate({
+  id: 'episode-42',
+  stages: [
+    { id: 'consistency', source: 'view-consistency', disposition: 'reject', reason: 'cross-view flip', scoreMilli: 120 },
+    { id: 'confidence',  source: 'memory-confidence', disposition: 'admit',  reason: 'reliable',     scoreMilli: 828 },
+  ],
+  advisorySources: ['cost-429'],           // these warn (reject -> reweight) instead of vetoing
+  ablations: [{ id: 'no-consistency', removedStageId: 'consistency' }],
+});
+
+decision.verdict;          // 'reject' — the strictest effective disposition wins
+decision.reason;           // 'hard-gate-rejected' — derived from the verdict
+decision.decidingStageId;  // 'consistency' — first stage at the strictest severity
+decision.ablations[0];     // { beforeVerdict: 'reject', afterVerdict: 'admit', changed: true }
+```
+
+The rules are short: the strictest effective disposition wins (`admit < reweight < abstain < reject`); a source you
+list in `advisorySources` cannot hard-reject — its `reject` is downgraded to `reweight`; ties go to the stage listed
+first; and the four counts always partition the stage list. An ablation removes one stage and re-runs the ladder so
+you can see whether that gate actually decided the outcome. Removing the only stage is well-defined: with no gate
+left to object, the verdict is `admit`.
+
+`experienceGate` is a library helper, not a model call. The product's `buildPack` can attach the decision as an
+observer (off by default), so enabling it does not change the rendered bytes, the cited ids or the pack fingerprint
+— it only exposes the decision for a host to act on. All scores are integer thousandths, and the same reading is
+re-derived by the independent Python verifier from the same fixture, so the decision you compute locally is the
+decision the benchmark measures.

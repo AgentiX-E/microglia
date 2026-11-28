@@ -154,6 +154,23 @@ export {
 } from './memory-gain-ledger.js';
 
 export {
+  EXPERIENCE_VERDICTS,
+  EXPERIENCE_GATE_SOURCES,
+  GATE_DISPOSITIONS,
+  GATE_REASONS,
+  experienceGate,
+  type ExperienceGateInput,
+  type ExperienceGateResult,
+  type ExperienceGateSource,
+  type ExperienceVerdict,
+  type GateAblation,
+  type GateAblationReading,
+  type GateDisposition,
+  type GateReason,
+  type GateStage,
+} from './experience-gate.js';
+
+export {
   decideSpeak,
   suppressionOf,
   type SpeakInput,

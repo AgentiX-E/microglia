@@ -1,0 +1,103 @@
+{
+  "schema": "microglia/experience-gate-inputs@1",
+  "cases": [
+    {
+      "id": "all-admit",
+      "input": {
+        "id": "ep-all-admit",
+        "stages": [
+          { "id": "s1", "source": "memory-confidence", "disposition": "admit", "reason": "reliable", "scoreMilli": 828 },
+          { "id": "s2", "source": "state-role", "disposition": "admit", "reason": "current", "scoreMilli": 1000 }
+        ]
+      },
+      "note": "Every stage admits: verdict admit, reason all-admitted, deciding stage is the first."
+    },
+    {
+      "id": "hard-reject-dominates",
+      "input": {
+        "id": "ep-hard",
+        "stages": [
+          { "id": "s1", "source": "memory-confidence", "disposition": "admit", "reason": "reliable", "scoreMilli": 828 },
+          { "id": "s2", "source": "memory-gain-ledger", "disposition": "reject", "reason": "poisoning-exceeds-budget", "scoreMilli": 120 },
+          { "id": "s3", "source": "state-role", "disposition": "reweight", "reason": "historical", "scoreMilli": 600 }
+        ]
+      },
+      "note": "A hard safety reject dominates a reweight and an admit; counts partition all three stages."
+    },
+    {
+      "id": "advisory-reject-downgraded",
+      "input": {
+        "id": "ep-advisory",
+        "advisorySources": ["competition-domain"],
+        "stages": [
+          { "id": "s1", "source": "memory-confidence", "disposition": "admit", "reason": "reliable", "scoreMilli": 828 },
+          { "id": "s2", "source": "competition-domain", "disposition": "reject", "reason": "out-of-domain", "scoreMilli": 100 }
+        ]
+      },
+      "note": "A declared advisory source cannot hard-reject; its reject is downgraded to reweight."
+    },
+    {
+      "id": "abstain-beats-reweight",
+      "input": {
+        "id": "ep-abstain",
+        "stages": [
+          { "id": "s1", "source": "state-role", "disposition": "reweight", "reason": "historical", "scoreMilli": 600 },
+          { "id": "s2", "source": "memory-admission", "disposition": "abstain", "reason": "unlinked-evidence", "scoreMilli": 400 },
+          { "id": "s3", "source": "revision-integrity", "disposition": "reweight", "reason": "residual", "scoreMilli": 700 }
+        ]
+      },
+      "note": "Abstain outranks reweight even when two reweights precede it; the deciding stage is the abstention."
+    },
+    {
+      "id": "first-wins-tie",
+      "input": {
+        "id": "ep-tie",
+        "stages": [
+          { "id": "s1", "source": "stale-revocation", "disposition": "reject", "reason": "polluted", "scoreMilli": 200 },
+          { "id": "s2", "source": "view-consistency", "disposition": "reject", "reason": "inconsistent", "scoreMilli": 150 }
+        ]
+      },
+      "note": "Two hard rejects tie on severity; the first wins and reports its own reason and score."
+    },
+    {
+      "id": "ablation-decisive",
+      "input": {
+        "id": "ep-abl",
+        "stages": [
+          { "id": "s1", "source": "memory-confidence", "disposition": "admit", "reason": "reliable", "scoreMilli": 828 },
+          { "id": "s2", "source": "memory-gain-ledger", "disposition": "reject", "reason": "utility-collapse", "scoreMilli": 100 }
+        ],
+        "ablations": [
+          { "id": "a1", "removedStageId": "s2" },
+          { "id": "a2", "removedStageId": "s1" }
+        ]
+      },
+      "note": "Removing the decisive gate flips the verdict (changed); removing a dominated one does not."
+    },
+    {
+      "id": "mixed-partition",
+      "input": {
+        "id": "ep-mixed",
+        "advisorySources": ["cost-429"],
+        "stages": [
+          { "id": "s1", "source": "memory-confidence", "disposition": "admit", "reason": "reliable", "scoreMilli": 900 },
+          { "id": "s2", "source": "state-role", "disposition": "reweight", "reason": "transition", "scoreMilli": 650 },
+          { "id": "s3", "source": "memory-admission", "disposition": "abstain", "reason": "conflict", "scoreMilli": 450 },
+          { "id": "s4", "source": "cost-429", "disposition": "reject", "reason": "rate-limited", "scoreMilli": 50 },
+          { "id": "s5", "source": "abstraction-lifecycle", "disposition": "reject", "reason": "harmful-abstraction", "scoreMilli": 80 }
+        ]
+      },
+      "note": "All four effective dispositions partition one stage set; the advisory reject is a reweight."
+    },
+    {
+      "id": "single-stage",
+      "input": {
+        "id": "ep-single",
+        "stages": [
+          { "id": "only", "source": "view-consistency", "disposition": "admit", "reason": "consistent", "scoreMilli": 770 }
+        ]
+      },
+      "note": "A single stage is a valid gate: its disposition is the verdict and it is decisive."
+    }
+  ]
+}

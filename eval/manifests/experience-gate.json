@@ -1,0 +1,157 @@
+{
+  "schema": "microglia/experience-gate@1",
+  "fixtureSchema": "microglia/experience-gate-inputs@1",
+  "cases": [
+    {
+      "id": "all-admit",
+      "expected": {
+        "id": "ep-all-admit",
+        "verdict": "admit",
+        "reason": "all-admitted",
+        "decidingStageId": "s1",
+        "decidingReason": "reliable",
+        "decidingScoreMilli": 828,
+        "stageCount": 2,
+        "admitCount": 2,
+        "reweightCount": 0,
+        "abstainCount": 0,
+        "rejectCount": 0,
+        "ablations": []
+      }
+    },
+    {
+      "id": "hard-reject-dominates",
+      "expected": {
+        "id": "ep-hard",
+        "verdict": "reject",
+        "reason": "hard-gate-rejected",
+        "decidingStageId": "s2",
+        "decidingReason": "poisoning-exceeds-budget",
+        "decidingScoreMilli": 120,
+        "stageCount": 3,
+        "admitCount": 1,
+        "reweightCount": 1,
+        "abstainCount": 0,
+        "rejectCount": 1,
+        "ablations": []
+      }
+    },
+    {
+      "id": "advisory-reject-downgraded",
+      "expected": {
+        "id": "ep-advisory",
+        "verdict": "reweight",
+        "reason": "reweight-required",
+        "decidingStageId": "s2",
+        "decidingReason": "out-of-domain",
+        "decidingScoreMilli": 100,
+        "stageCount": 2,
+        "admitCount": 1,
+        "reweightCount": 1,
+        "abstainCount": 0,
+        "rejectCount": 0,
+        "ablations": []
+      }
+    },
+    {
+      "id": "abstain-beats-reweight",
+      "expected": {
+        "id": "ep-abstain",
+        "verdict": "abstain",
+        "reason": "abstention-required",
+        "decidingStageId": "s2",
+        "decidingReason": "unlinked-evidence",
+        "decidingScoreMilli": 400,
+        "stageCount": 3,
+        "admitCount": 0,
+        "reweightCount": 2,
+        "abstainCount": 1,
+        "rejectCount": 0,
+        "ablations": []
+      }
+    },
+    {
+      "id": "first-wins-tie",
+      "expected": {
+        "id": "ep-tie",
+        "verdict": "reject",
+        "reason": "hard-gate-rejected",
+        "decidingStageId": "s1",
+        "decidingReason": "polluted",
+        "decidingScoreMilli": 200,
+        "stageCount": 2,
+        "admitCount": 0,
+        "reweightCount": 0,
+        "abstainCount": 0,
+        "rejectCount": 2,
+        "ablations": []
+      }
+    },
+    {
+      "id": "ablation-decisive",
+      "expected": {
+        "id": "ep-abl",
+        "verdict": "reject",
+        "reason": "hard-gate-rejected",
+        "decidingStageId": "s2",
+        "decidingReason": "utility-collapse",
+        "decidingScoreMilli": 100,
+        "stageCount": 2,
+        "admitCount": 1,
+        "reweightCount": 0,
+        "abstainCount": 0,
+        "rejectCount": 1,
+        "ablations": [
+          {
+            "id": "a1",
+            "removedStageId": "s2",
+            "beforeVerdict": "reject",
+            "afterVerdict": "admit",
+            "changed": true
+          },
+          {
+            "id": "a2",
+            "removedStageId": "s1",
+            "beforeVerdict": "reject",
+            "afterVerdict": "reject",
+            "changed": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "mixed-partition",
+      "expected": {
+        "id": "ep-mixed",
+        "verdict": "reject",
+        "reason": "hard-gate-rejected",
+        "decidingStageId": "s5",
+        "decidingReason": "harmful-abstraction",
+        "decidingScoreMilli": 80,
+        "stageCount": 5,
+        "admitCount": 1,
+        "reweightCount": 2,
+        "abstainCount": 1,
+        "rejectCount": 1,
+        "ablations": []
+      }
+    },
+    {
+      "id": "single-stage",
+      "expected": {
+        "id": "ep-single",
+        "verdict": "admit",
+        "reason": "all-admitted",
+        "decidingStageId": "only",
+        "decidingReason": "consistent",
+        "decidingScoreMilli": 770,
+        "stageCount": 1,
+        "admitCount": 1,
+        "reweightCount": 0,
+        "abstainCount": 0,
+        "rejectCount": 0,
+        "ablations": []
+      }
+    }
+  ]
+}

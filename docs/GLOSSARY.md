@@ -3488,3 +3488,29 @@ removing source added 14, and removing time-scale separation cost 5.4 points of 
 The win-rate improvement over the no-memory baseline, `netGainMilli = winRateMilli − baselineWinMilli`, in integer
 thousandths. A non-positive net gain means the memory is no better than having none, and yields `no-net-gain`.
 Reporting it as an integer keeps the product and the independent evaluation reader in exact agreement.
+
+### Experience gate (R254)
+
+The orchestration seam that composes the ten independent criteria into one executable product decision. Each input
+stage carries a criterion's verdict (`admit`, `reweight`, `abstain`, `reject`); the set verdict is the strictest
+effective disposition. Before R254 the criteria were pure functions called only by tests and evaluation fixtures,
+so none constrained the product's real recall/distill path. The gate is that missing link and the zero-cost
+prerequisite for R104b's paid proposer.
+
+### Effective disposition (R254)
+
+A stage's disposition after advisory downgrade: a source declared advisory has its `reject` reduced to `reweight`,
+so domain-boundary and cost criteria warn rather than veto. All severity ordering, verdicts and count partitions
+are computed over effective dispositions, so the product and the independent reader compare the same values.
+
+### Deciding stage (R254)
+
+The stage at the strictest effective severity that sets the set verdict; on a tie the earlier stage wins, which
+makes the reading deterministic. Its own reason is reported as `decidingReason`, while the set-level `reason` is
+derived from the verdict alone — the two are never conflated.
+
+### Gate ablation contribution (R254)
+
+For an ablation that removes one stage, the pair (`beforeVerdict`, `afterVerdict`) and the boolean `changed`. It is
+the marginal contribution of that gate under the same composition rule. Removing the only stage is defined: with
+no gate left to object, the after verdict is `admit`.
