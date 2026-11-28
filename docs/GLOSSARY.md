@@ -3312,3 +3312,32 @@ reason is reported for a readback; it never overrides the disposition it explain
 persisting it. Default three, an integer of at least one. Harm is not gated by this floor — a claim that hurt on a
 single observed outcome is still discarded. Raising the floor demands more evidence before a rule becomes a stored
 object.
+
+### Competition domain (R248)
+
+The field a system or leaderboard belongs to, for the purpose of deciding what microglia competes with. Two domains
+matter: **memory** (memory-augmented task success — microglia's field) and **host** (NL2SQL / text2charts / data2charts
+— `nl2charts`' field). `classifyCompetitionDomain` reduces a candidate description to one verdict. The deciding input
+is the *unit of the number*, not the system's name: a memory-on/off gain is memory territory wherever it is measured;
+an absolute vertical task score belongs to the host.
+
+### Amplifier role (R248)
+
+The situation where a memory gain is measured *inside* a host scenario — for example, adding microglia's pack to an
+NL2SQL pipeline. `classifyCompetitionDomain` sets `amplifierRole: true` only here. The host (`nl2charts`) owns the
+core vertical function; microglia supplies the generic memory layer and is an amplifier, never a competitor in that
+vertical. This is the intended way the two projects relate.
+
+### Ambiguous domain (R248)
+
+The verdict when a candidate's measurement labels contain both memory-domain and host-domain signals and the unit is
+unknown. The gate refuses to auto-assign such a candidate: guessing would recreate the category error — a host task
+score promoted into a microglia competitor — that the boundary exists to prevent. Supply the measured `unit` to
+resolve it.
+
+### Signal label (R248)
+
+A closed, ASCII, case-insensitive tag in a candidate's `measures` list that counts as evidence for one domain — for
+example `longmemeval`, `locomo`, `memoryagentbench` for memory, or `bird-ex`, `chart-accuracy`, `execution-accuracy`
+for host. An unlisted label is ignored and reported as neither signal: absence of evidence is not evidence of a
+domain. A host artifact (`sql-query`, `chart`, `visualization`) also counts as one host signal.

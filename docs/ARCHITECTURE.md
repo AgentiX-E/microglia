@@ -6273,3 +6273,55 @@ committed before R247 stays byte-identical. New module 100% on all four TypeScri
 behaviour and binding; Python reader 97.8% over self-test + check + verify, self-test 66/66; README core layer
 updated (51 → 52 modules, 11,243 → 11,425 lines); coupling snapshot regenerated (268 → 269 modules, 11 checks);
 bundle unchanged (module is opt-in, not on the render path); `--expect-files` 33 → 34; 13 workflows parse.
+
+## 8.124 The competition field is part of the contract (R248)
+
+> **Status, 28 Nov: read, ¥0, no model called.** A scope boundary was stated in prose for many rounds and still
+> misread in summaries: BIRD execution accuracy was repeatedly quoted as if it were a microglia target. It is not.
+> The user's standing instruction (R248) makes it explicit: microglia competes in **memory-augmented task success**
+> — does a memory layer raise success, at what cost. NL2SQL, text2charts and data2charts belong to
+> `AgentiX-E/nl2charts`, which owns the core vertical function; microglia is only its **memory capability
+> amplifier** and must stay decoupled. This round turns that boundary into a pure, three-reader-pinned decision.
+
+**The code already honoured the boundary; the reading did not.** `core` has zero dependencies, zero scenario types in
+any public signature, and a free-form `task` string; `packages/sql` is a separate adapter (zero deps) that a host
+may or may not embed. README §"What this is" already calls text-to-SQL "the hostile case, not the product" and the
+BIRD systems "hosts whose pipeline could embed it". What was missing was a machine-checkable rule that classifies a
+system or leaderboard into its field, so a summary cannot silently promote a host task score into a microglia
+competitor.
+
+**The module.** `packages/core/src/apply/competition-domain.ts` exports
+`classifyCompetitionDomain(candidate)`. The deciding input is **the unit of the number**, not the system's name:
+
+| unit / signals | verdict | reason |
+|---|---|---|
+| `memory-gain` (memory-on vs memory-off) | `memory` | `measured-memory-gain` |
+| `memory-gain` measured inside a SQL/chart host | `memory`, `amplifierRole: true` | `measured-memory-gain` |
+| absolute score, host measure label present | `host` | `host-task-score` |
+| absolute score, host artifact only | `host` | `host-artifact` |
+| absolute score on a memory benchmark | `memory` | `memory-benchmark` |
+| unit unknown, memory signals only | `memory` | `memory-benchmark` |
+| unit unknown, host signals only | `host` | `host-task-score` / `host-artifact` |
+| unit unknown, both memory and host signals | `ambiguous` | `mixed-signals` |
+| no signals | `other` | `no-signal` |
+
+A tie is `ambiguous`, never auto-assigned — an auto-assignment would recreate the category error this gate exists to
+stop. Signal labels (`LongMemEval`, `LoCoMo`, `BIRD EX`, `chart accuracy`, …) are a closed ASCII set matched
+case-insensitively; an unlisted label carries no evidence rather than a guessed verdict. `amplifierRole` is true only
+when a memory gain was measured inside a host scenario: nl2charts owns the core function, microglia supplies the
+memory layer.
+
+**Three readers, one reading.** `eval/fixtures/competition-domain.json` holds eleven real candidates from the field —
+AskData and GrainSQL on BIRD (host), Mem0 and Mastra on LongMemEval (memory), microglia-as-amplifier inside a SQL host
+(memory + amplifier), a mixed-signals vendor (`ambiguous`), and an unlabeled system (`other`). The Python reader
+`eval/tools/competition_domain.py --verify` re-derives every verdict, reason, count and amplifier flag from those
+bytes with no shared code; `--check` re-adds the verdict ladder from the manifest's own unit and counts; `--self-test`
+drives 59 boundary, tamper and CLI assertions. `competition-domain-manifest.test.ts` derives the same reading with the
+product's own function and compares every field.
+
+**Discipline and gates.** Pure and deterministic; it classifies a *description* the caller supplies, fetching and
+scoring nothing. Guards refuse a blank name, a non-array measure list, a non-string label, an unknown artifact or an
+unknown unit rather than defaulting to `other`. New module 100% on all four TypeScript dimensions; 36 tests across
+behaviour and binding; Python reader 96.0% over self-test + check + verify, self-test 59/59; README core layer
+updated (52 → 53 modules, 11,425 → 11,636 lines); coupling snapshot regenerated (269 → 270 modules, 11 checks);
+bundle unchanged (module is a library helper, not on the render path); `--expect-files` 34 → 35; 13 workflows parse.

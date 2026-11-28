@@ -1,0 +1,138 @@
+{
+  "schema": "microglia/competition-domain@1",
+  "fixtureSchema": "microglia/competition-domain-candidates@1",
+  "cases": [
+    {
+      "id": "askdata-bird",
+      "expected": {
+        "verdict": "host",
+        "reason": "host-task-score",
+        "amplifierRole": false,
+        "name": "AskData",
+        "unit": "absolute-task-score",
+        "memorySignals": 0,
+        "hostSignals": 2
+      }
+    },
+    {
+      "id": "grainsql-bird",
+      "expected": {
+        "verdict": "host",
+        "reason": "host-task-score",
+        "amplifierRole": false,
+        "name": "GrainSQL",
+        "unit": "absolute-task-score",
+        "memorySignals": 0,
+        "hostSignals": 2
+      }
+    },
+    {
+      "id": "chart-gen",
+      "expected": {
+        "verdict": "host",
+        "reason": "host-task-score",
+        "amplifierRole": false,
+        "name": "chart-gen",
+        "unit": "absolute-task-score",
+        "memorySignals": 0,
+        "hostSignals": 2
+      }
+    },
+    {
+      "id": "viz-only-artifact",
+      "expected": {
+        "verdict": "host",
+        "reason": "host-artifact",
+        "amplifierRole": false,
+        "name": "viz-tool",
+        "unit": "absolute-task-score",
+        "memorySignals": 0,
+        "hostSignals": 1
+      }
+    },
+    {
+      "id": "mem0-longmemeval",
+      "expected": {
+        "verdict": "memory",
+        "reason": "memory-benchmark",
+        "amplifierRole": false,
+        "name": "Mem0",
+        "unit": "absolute-task-score",
+        "memorySignals": 1,
+        "hostSignals": 0
+      }
+    },
+    {
+      "id": "mastra-longmemeval",
+      "expected": {
+        "verdict": "memory",
+        "reason": "memory-benchmark",
+        "amplifierRole": false,
+        "name": "Mastra",
+        "unit": "absolute-task-score",
+        "memorySignals": 1,
+        "hostSignals": 0
+      }
+    },
+    {
+      "id": "mem0-locomo-gain",
+      "expected": {
+        "verdict": "memory",
+        "reason": "measured-memory-gain",
+        "amplifierRole": false,
+        "name": "Mem0-gain",
+        "unit": "memory-gain",
+        "memorySignals": 1,
+        "hostSignals": 0
+      }
+    },
+    {
+      "id": "microglia-in-nl2charts",
+      "expected": {
+        "verdict": "memory",
+        "reason": "measured-memory-gain",
+        "amplifierRole": true,
+        "name": "microglia-amplifier",
+        "unit": "memory-gain",
+        "memorySignals": 0,
+        "hostSignals": 2
+      }
+    },
+    {
+      "id": "hindsight-memoryagentbench",
+      "expected": {
+        "verdict": "memory",
+        "reason": "memory-benchmark",
+        "amplifierRole": false,
+        "name": "Hindsight",
+        "unit": "unknown",
+        "memorySignals": 1,
+        "hostSignals": 0
+      }
+    },
+    {
+      "id": "mixed-signals",
+      "expected": {
+        "verdict": "ambiguous",
+        "reason": "mixed-signals",
+        "amplifierRole": false,
+        "name": "mixed-vendor",
+        "unit": "unknown",
+        "memorySignals": 1,
+        "hostSignals": 1
+      }
+    },
+    {
+      "id": "unknown-throughput",
+      "expected": {
+        "verdict": "other",
+        "reason": "no-signal",
+        "amplifierRole": false,
+        "name": "random-sys",
+        "unit": "unknown",
+        "memorySignals": 0,
+        "hostSignals": 0
+      }
+    }
+  ]
+}

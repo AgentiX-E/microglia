@@ -8355,3 +8355,54 @@ store's format.
 *mechanism* — accumulate experience, make abstractions temporary unless proven — on this project's own data, and
 pins it the way every reading here is pinned: the product's TypeScript function, an independent Python reader and
 a committed manifest must agree field by field, or the build stops.
+
+## 32.105 Knowing which field a benchmark row belongs to (R248)
+
+**A confusion worth avoiding.** A memory library is often compared with whatever headline number appears near it in
+a document. That produces a category error: an NL2SQL execution-accuracy score measures a chart/SQL product, not the
+value of a memory layer — even if the document also talks about memory. This project fixes the boundary:
+
+- **microglia's field** is *memory-augmented task success*: does adding a memory layer raise success, and at what
+  cost? Benchmarks such as LongMemEval and LoCoMo, and any memory-on vs memory-off ablation, belong here.
+- **nl2charts' field** is NL2SQL / text2charts / data2charts: BIRD execution accuracy, chart accuracy and similar
+  vertical task scores. microglia does not compete here; it is the memory capability amplifier that a host such as
+  nl2charts embeds. The core vertical function stays in nl2charts.
+
+**The rule is about the number, not the name.** `classifyCompetitionDomain(candidate)` returns a `verdict`:
+
+| what was measured | verdict | meaning |
+|---|---|---|
+| a memory-on/off gain | `memory` | microglia's field, wherever it was measured |
+| a memory gain inside a SQL/chart host | `memory` with `amplifierRole: true` | microglia amplifies the host; nl2charts owns the core |
+| an absolute NL2SQL or chart score | `host` | nl2charts' field, not a microglia target |
+| an absolute score on a memory benchmark | `memory` | still microglia's field |
+| both memory and host signals, unit unknown | `ambiguous` | not assigned automatically |
+| nothing recognisable | `other` | no evidence |
+
+**A worked example.**
+
+```ts
+import { classifyCompetitionDomain } from '@agentix-e/microglia-apply';
+
+// An NL2SQL leaderboard row: nl2charts' field, not ours.
+classifyCompetitionDomain({
+  name: 'AskData', measures: ['bird-ex'], artifact: 'sql-query', unit: 'absolute-task-score',
+});
+// → { verdict: 'host', reason: 'host-task-score', amplifierRole: false }
+
+// The same benchmark, but the number is a memory-on/off gain: microglia amplifies the host.
+classifyCompetitionDomain({
+  name: 'microglia-amplifier', measures: ['bird-ex'], artifact: 'sql-query', unit: 'memory-gain',
+});
+// → { verdict: 'memory', amplifierRole: true }
+```
+
+**What you supply.** The function classifies a *description* — a name, a list of measurement labels, an artifact kind
+and the unit the number was measured in. It fetches nothing and scores nothing. The `unit` is the primary input;
+measurement labels are a closed, case-insensitive fallback used only when the unit is `unknown`. If both memory and
+host labels appear and the unit is unknown, the verdict is `ambiguous` rather than a guess — refusing to guess is the
+point, because a guess is how a host task score becomes a false competitor.
+
+**What it is not.** It does not rank systems, does not claim any accuracy number, and does not change the library.
+It is a small, testable way to keep a documented boundary honest: the product's TypeScript function, an independent
+Python reader and a committed manifest must agree field by field, or the build stops.

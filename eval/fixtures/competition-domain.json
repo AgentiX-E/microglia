@@ -1,0 +1,54 @@
+{
+  "schema": "microglia/competition-domain-candidates@1",
+  "cases": [
+    {
+      "id": "askdata-bird",
+      "candidate": { "name": "AskData", "measures": ["bird-ex"], "artifact": "sql-query", "unit": "absolute-task-score" },
+      "note": "BIRD execution accuracy is nl2charts' field, not a microglia target."
+    },
+    {
+      "id": "grainsql-bird",
+      "candidate": { "name": "GrainSQL", "measures": ["bird-ex"], "artifact": "sql-query", "unit": "absolute-task-score" }
+    },
+    {
+      "id": "chart-gen",
+      "candidate": { "name": "chart-gen", "measures": ["chart-accuracy"], "artifact": "chart", "unit": "absolute-task-score" }
+    },
+    {
+      "id": "viz-only-artifact",
+      "candidate": { "name": "viz-tool", "measures": [], "artifact": "visualization", "unit": "absolute-task-score" }
+    },
+    {
+      "id": "mem0-longmemeval",
+      "candidate": { "name": "Mem0", "measures": ["longmemeval"], "artifact": "memory-pack", "unit": "absolute-task-score" },
+      "note": "A memory benchmark belongs to microglia's field even as an absolute score."
+    },
+    {
+      "id": "mastra-longmemeval",
+      "candidate": { "name": "Mastra", "measures": ["longmemeval"], "artifact": "memory-pack", "unit": "absolute-task-score" }
+    },
+    {
+      "id": "mem0-locomo-gain",
+      "candidate": { "name": "Mem0-gain", "measures": ["locomo"], "artifact": "memory-pack", "unit": "memory-gain" },
+      "note": "measured memory-on/off gain: the unit that defines microglia's field"
+    },
+    {
+      "id": "microglia-in-nl2charts",
+      "candidate": { "name": "microglia-amplifier", "measures": ["bird-ex"], "artifact": "sql-query", "unit": "memory-gain" },
+      "note": "memory gain measured inside a SQL host: microglia is the amplifier, nl2charts owns the core"
+    },
+    {
+      "id": "hindsight-memoryagentbench",
+      "candidate": { "name": "Hindsight", "measures": ["memoryagentbench"], "artifact": "memory-pack", "unit": "unknown" }
+    },
+    {
+      "id": "mixed-signals",
+      "candidate": { "name": "mixed-vendor", "measures": ["longmemeval", "bird-ex"], "artifact": "memory-pack", "unit": "unknown" },
+      "note": "claims both fields; refused auto-assignment"
+    },
+    {
+      "id": "unknown-throughput",
+      "candidate": { "name": "random-sys", "measures": ["throughput"], "artifact": "report", "unit": "unknown" }
+    }
+  ]
+}

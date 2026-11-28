@@ -36,6 +36,22 @@ export {
 } from './abstraction-lifecycle.js';
 
 export {
+  classifyCompetitionDomain,
+  DOMAIN_ARTIFACTS,
+  DOMAIN_REASONS,
+  DOMAIN_UNITS,
+  DOMAIN_VERDICTS,
+  HOST_ARTIFACTS,
+  type DomainArtifact,
+  type DomainCandidate,
+  type DomainClassification,
+  type DomainReason,
+  type DomainUnit,
+  type DomainVerdict,
+  type HostArtifact,
+} from './competition-domain.js';
+
+export {
   VIEW_VERDICTS,
   viewConsensus,
   type ViewConsensus,

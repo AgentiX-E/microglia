@@ -314,9 +314,19 @@ jobs:
             eval/tools/abstraction_lifecycle.py --check --manifest eval/manifests/abstraction-lifecycle.json
           python3 -m coverage run --append --branch --include="*/abstraction_lifecycle.py" \
             eval/tools/abstraction_lifecycle.py --verify --manifest eval/manifests/abstraction-lifecycle.json --fixture eval/fixtures/abstraction-lifecycle.json
+          # R248. Scope boundary: microglia competes in memory-augmented task success; NL2SQL / chart / data-viz
+          # belong to nl2charts, where microglia is only the memory amplifier. This reader re-derives each domain
+          # from a candidate's bytes, --verify refuses a drifted manifest, and competition-domain-manifest.test.ts
+          # binds the TS product to the same reading. All three run under coverage so main()'s branches are counted.
+          python3 -m coverage run --append --branch --include="*/competition_domain.py" \
+            eval/tools/competition_domain.py --self-test
+          python3 -m coverage run --append --branch --include="*/competition_domain.py" \
+            eval/tools/competition_domain.py --check --manifest eval/manifests/competition-domain.json
+          python3 -m coverage run --append --branch --include="*/competition_domain.py" \
+            eval/tools/competition_domain.py --verify --manifest eval/manifests/competition-domain.json --fixture eval/fixtures/competition-domain.json
           python3 -m coverage json -o coverage-python.json
           python3 scripts/check-python-coverage.py --self-test
-          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 34
+          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 35
 
       - name: The rounds this project owes, and the date each one was registered for
         # The failure this prevents is not a wrong number, it is a round that quietly stops being planned: R216b's
