@@ -1,0 +1,129 @@
+{
+  "schema": "microglia/memory-admission-inputs@1",
+  "cases": [
+    {
+      "id": "valid-lesson",
+      "input": {
+        "id": "ep-valid",
+        "query": { "id": "q-1", "key": "task", "boundary": "current" },
+        "candidates": [
+          { "id": "c1", "key": "task", "outcome": "success", "detail": "sufficient", "conflict": "none", "evidence": { "linked": true, "reachable": true } }
+        ]
+      },
+      "note": "A successful, sufficient, non-conflicting lesson with linked evidence is admitted (WikiTrace baseline)."
+    },
+    {
+      "id": "unlinked-but-valid",
+      "input": {
+        "id": "ep-unlinked",
+        "query": { "id": "q-2", "key": "task", "boundary": "current" },
+        "candidates": [
+          { "id": "c1", "key": "task", "outcome": "success", "detail": "sufficient", "conflict": "none", "evidence": { "linked": false, "reachable": false } }
+        ]
+      },
+      "note": "When no check is needed, an unlinked lesson still admits."
+    },
+    {
+      "id": "task-boundary-trap",
+      "input": {
+        "id": "ep-boundary",
+        "query": { "id": "q-3", "key": "task", "boundary": "deploy" },
+        "candidates": [
+          { "id": "c1", "key": "task", "outcome": "success", "detail": "sufficient", "conflict": "boundary", "evidence": { "linked": true, "reachable": true } }
+        ]
+      },
+      "note": "MemTrapBench Task Boundary trap: the lesson belongs to a different live task and is withheld before any check (92.29/94.39/31.05)."
+    },
+    {
+      "id": "verify-details",
+      "input": {
+        "id": "ep-detail",
+        "query": { "id": "q-4", "key": "task", "boundary": "current" },
+        "candidates": [
+          { "id": "c1", "key": "task", "outcome": "success", "detail": "insufficient", "conflict": "none", "evidence": { "linked": true, "reachable": true } }
+        ]
+      },
+      "note": "WikiTrace: lesson lacks detail needed to act; reachable evidence -> escalate to verify."
+    },
+    {
+      "id": "unverifiable-detail",
+      "input": {
+        "id": "ep-detail-dead",
+        "query": { "id": "q-5", "key": "task", "boundary": "current" },
+        "candidates": [
+          { "id": "c1", "key": "task", "outcome": "success", "detail": "insufficient", "conflict": "none", "evidence": { "linked": true, "reachable": false } }
+        ]
+      },
+      "note": "Insufficient detail with unreachable evidence cannot be checked -> reject."
+    },
+    {
+      "id": "verify-conflict",
+      "input": {
+        "id": "ep-rule",
+        "query": { "id": "q-6", "key": "task", "boundary": "current" },
+        "candidates": [
+          { "id": "c1", "key": "task", "outcome": "success", "detail": "sufficient", "conflict": "rule", "evidence": { "linked": true, "reachable": true } }
+        ]
+      },
+      "note": "WikiTrace: lesson conflicts with another; reachable evidence -> escalate to verify."
+    },
+    {
+      "id": "unverifiable-conflict",
+      "input": {
+        "id": "ep-rule-dead",
+        "query": { "id": "q-7", "key": "task", "boundary": "current" },
+        "candidates": [
+          { "id": "c1", "key": "task", "outcome": "success", "detail": "sufficient", "conflict": "rule", "evidence": { "linked": true, "reachable": false } }
+        ]
+      },
+      "note": "Rule conflict with unreachable evidence -> reject."
+    },
+    {
+      "id": "verify-failed-source",
+      "input": {
+        "id": "ep-failed",
+        "query": { "id": "q-8", "key": "task", "boundary": "current" },
+        "candidates": [
+          { "id": "c1", "key": "task", "outcome": "failure", "detail": "sufficient", "conflict": "none", "evidence": { "linked": true, "reachable": true } }
+        ]
+      },
+      "note": "WikiTrace: lesson comes from a failed task; reachable evidence -> escalate to verify."
+    },
+    {
+      "id": "unverifiable-failed-source",
+      "input": {
+        "id": "ep-failed-dead",
+        "query": { "id": "q-9", "key": "task", "boundary": "current" },
+        "candidates": [
+          { "id": "c1", "key": "task", "outcome": "failure", "detail": "sufficient", "conflict": "none", "evidence": { "linked": true, "reachable": false } }
+        ]
+      },
+      "note": "Failed-task lesson with unreachable evidence -> reject."
+    },
+    {
+      "id": "mixed-reject-dominates",
+      "input": {
+        "id": "ep-mixed",
+        "query": { "id": "q-10", "key": "task", "boundary": "current" },
+        "candidates": [
+          { "id": "good", "key": "task", "outcome": "success", "detail": "sufficient", "conflict": "none", "evidence": { "linked": true, "reachable": true } },
+          { "id": "check", "key": "task", "outcome": "success", "detail": "insufficient", "conflict": "none", "evidence": { "linked": true, "reachable": true } },
+          { "id": "trap", "key": "task", "outcome": "success", "detail": "sufficient", "conflict": "boundary", "evidence": { "linked": true, "reachable": true } }
+        ]
+      },
+      "note": "One boundary trap spoils the set: reject dominates, counts partition 1/1/1."
+    },
+    {
+      "id": "escalate-dominates-no-reject",
+      "input": {
+        "id": "ep-escalate",
+        "query": { "id": "q-11", "key": "task", "boundary": "current" },
+        "candidates": [
+          { "id": "good", "key": "task", "outcome": "success", "detail": "sufficient", "conflict": "none", "evidence": { "linked": true, "reachable": true } },
+          { "id": "check", "key": "task", "outcome": "failure", "detail": "sufficient", "conflict": "none", "evidence": { "linked": true, "reachable": true } }
+        ]
+      },
+      "note": "An escalation with no rejection makes the whole set escalate."
+    }
+  ]
+}

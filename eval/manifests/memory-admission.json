@@ -1,0 +1,160 @@
+{
+  "schema": "microglia/memory-admission@1",
+  "fixtureSchema": "microglia/memory-admission-inputs@1",
+  "cases": [
+    {
+      "id": "valid-lesson",
+      "expected": {
+        "id": "ep-valid",
+        "queryKey": "task",
+        "verdict": "admit",
+        "reason": "valid-lesson",
+        "decidingId": "c1",
+        "candidateCount": 1,
+        "admitCount": 1,
+        "escalateCount": 0,
+        "rejectCount": 0
+      }
+    },
+    {
+      "id": "unlinked-but-valid",
+      "expected": {
+        "id": "ep-unlinked",
+        "queryKey": "task",
+        "verdict": "admit",
+        "reason": "valid-lesson",
+        "decidingId": "c1",
+        "candidateCount": 1,
+        "admitCount": 1,
+        "escalateCount": 0,
+        "rejectCount": 0
+      }
+    },
+    {
+      "id": "task-boundary-trap",
+      "expected": {
+        "id": "ep-boundary",
+        "queryKey": "task",
+        "verdict": "reject",
+        "reason": "task-boundary-violation",
+        "decidingId": "c1",
+        "candidateCount": 1,
+        "admitCount": 0,
+        "escalateCount": 0,
+        "rejectCount": 1
+      }
+    },
+    {
+      "id": "verify-details",
+      "expected": {
+        "id": "ep-detail",
+        "queryKey": "task",
+        "verdict": "escalate",
+        "reason": "verify-details",
+        "decidingId": "c1",
+        "candidateCount": 1,
+        "admitCount": 0,
+        "escalateCount": 1,
+        "rejectCount": 0
+      }
+    },
+    {
+      "id": "unverifiable-detail",
+      "expected": {
+        "id": "ep-detail-dead",
+        "queryKey": "task",
+        "verdict": "reject",
+        "reason": "unverifiable-detail",
+        "decidingId": "c1",
+        "candidateCount": 1,
+        "admitCount": 0,
+        "escalateCount": 0,
+        "rejectCount": 1
+      }
+    },
+    {
+      "id": "verify-conflict",
+      "expected": {
+        "id": "ep-rule",
+        "queryKey": "task",
+        "verdict": "escalate",
+        "reason": "verify-conflict",
+        "decidingId": "c1",
+        "candidateCount": 1,
+        "admitCount": 0,
+        "escalateCount": 1,
+        "rejectCount": 0
+      }
+    },
+    {
+      "id": "unverifiable-conflict",
+      "expected": {
+        "id": "ep-rule-dead",
+        "queryKey": "task",
+        "verdict": "reject",
+        "reason": "unverifiable-conflict",
+        "decidingId": "c1",
+        "candidateCount": 1,
+        "admitCount": 0,
+        "escalateCount": 0,
+        "rejectCount": 1
+      }
+    },
+    {
+      "id": "verify-failed-source",
+      "expected": {
+        "id": "ep-failed",
+        "queryKey": "task",
+        "verdict": "escalate",
+        "reason": "verify-failed-source",
+        "decidingId": "c1",
+        "candidateCount": 1,
+        "admitCount": 0,
+        "escalateCount": 1,
+        "rejectCount": 0
+      }
+    },
+    {
+      "id": "unverifiable-failed-source",
+      "expected": {
+        "id": "ep-failed-dead",
+        "queryKey": "task",
+        "verdict": "reject",
+        "reason": "unverifiable-failed-source",
+        "decidingId": "c1",
+        "candidateCount": 1,
+        "admitCount": 0,
+        "escalateCount": 0,
+        "rejectCount": 1
+      }
+    },
+    {
+      "id": "mixed-reject-dominates",
+      "expected": {
+        "id": "ep-mixed",
+        "queryKey": "task",
+        "verdict": "reject",
+        "reason": "task-boundary-violation",
+        "decidingId": "trap",
+        "candidateCount": 3,
+        "admitCount": 1,
+        "escalateCount": 1,
+        "rejectCount": 1
+      }
+    },
+    {
+      "id": "escalate-dominates-no-reject",
+      "expected": {
+        "id": "ep-escalate",
+        "queryKey": "task",
+        "verdict": "escalate",
+        "reason": "verify-failed-source",
+        "decidingId": "check",
+        "candidateCount": 2,
+        "admitCount": 1,
+        "escalateCount": 1,
+        "rejectCount": 0
+      }
+    }
+  ]
+}

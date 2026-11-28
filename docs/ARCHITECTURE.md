@@ -6432,3 +6432,63 @@ Python reader 100% statements and 99% branches over self-test + check + verify (
 guard). README core layer updated (54 → 55 modules, 11,854 → 12,140 lines); coupling snapshot regenerated (271 →
 272 modules, 11 checks); bundle unchanged (library helper, not on the render path); `--expect-files` 36 → 37;
 13 workflows parse.
+
+## 8.127 Retrieval is not the decision: a retrieved lesson still has to be admitted (R251)
+
+R249 gates whether an explicit revision reached every derived site; R250 gates whether new evidence displaced the
+stale value it invalidated. Both stop *before* the retrieval set is handed to a model. MemTrapBench (arXiv 2608.20202)
+measures a separate failure boundary after retrieval: valid, semantically related history can anchor the actor on an
+obsolete strategy or a false belief. In its matched Task Boundary control the same, independently solvable query
+scores 92.29 with no memory, 94.39 with trap-free history, and 31.05 with trap-inducing history — the history is
+retrieved correctly and the answer is still wrong, so the harm is in the decision that follows retrieval. On Gemini
+the no-memory arm averages 85.16 against 71.17 for the strongest memory arm. Memory Trust Gap (arXiv 2609.01852)
+shows the same over-trust is capability-gated and grows when a stale value is dressed as the newest.
+
+WikiTrace (arXiv 2611.14320) supplies the mechanism. A lesson distilled from a trajectory labelled only
+success/failure is handed over without the trajectory, leaving the agent no way to check it — the source of
+memory-induced degradation. WikiTrace stores each insight linked to a success/failure diagnosis and to the raw
+trajectory, and descends through those links with terminal tools when an insight lacks detail needed to act, conflicts
+with another, or comes from a failed task. Across five agentic benchmarks it beats both existing memory approaches
+and a baseline given the same insights without evidence, and cuts regression from 6.5% to 4.5%.
+
+`packages/core/src/apply/memory-admission.ts` exports `memoryAdmission(input)`, a pure audit of one retrieval episode.
+A `query` carries an `id`, a `key` and a `boundary` (the live task the lessons must serve). Each retrieved `candidate`
+carries an `id`, a `key`, an `outcome` (success/failure of its source task), a `detail` level, a `conflict` kind
+(`none`/`rule`/`boundary`) and an `evidence` link (`linked` to the raw trajectory, `reachable` through terminal tools).
+An unreachable link must also be unlinked; a link cannot be walked if it does not exist.
+
+| condition (checked in order) | disposition | reason |
+|---|---|---|
+| `conflict === 'boundary'` | `reject` | `task-boundary-violation` |
+| `detail === 'insufficient'`, evidence reachable | `escalate` | `verify-details` |
+| `detail === 'insufficient'`, link unreachable | `reject` | `unverifiable-detail` |
+| `conflict === 'rule'`, evidence reachable | `escalate` | `verify-conflict` |
+| `conflict === 'rule'`, link unreachable | `reject` | `unverifiable-conflict` |
+| `outcome === 'failure'`, evidence reachable | `escalate` | `verify-failed-source` |
+| `outcome === 'failure'`, link unreachable | `reject` | `unverifiable-failed-source` |
+| sound lesson, no check needed | `admit` | `valid-lesson` |
+
+The three WikiTrace checks are ordered detail -> rule -> failed-source, matching its own description; a boundary
+conflict is withheld before any check. An unreachable link turns a would-be escalation into a rejection: an insight
+you cannot check is an insight you must not follow. The set verdict is the strictest disposition present — `reject`
+dominates `escalate` dominates `admit` — and `reason` / `decidingId` name the most severe candidate. One boundary trap
+is enough to spoil a batch of otherwise good lessons, so the set is only as safe as its worst member. The three
+disposition counts partition the candidate total.
+
+**Three readers, one reading.** `eval/fixtures/memory-admission.json` holds eleven episodes: a sound lesson, an
+unlinked-but-sound lesson, the MemTrapBench task-boundary trap, each WikiTrace check in reachable and unreachable
+form, and two aggregation cases. `eval/tools/memory_admission.py --verify` re-derives every verdict, reason, decider
+and count from those bytes with no shared code; `--check` re-adds the arithmetic (disposition partition,
+reason/verdict family, strictest-candidate consistency); `--self-test` drives 90 boundary, tamper and CLI assertions.
+`memory-admission-manifest.test.ts` derives the same reading with the product's own function and compares every
+field.
+
+**Discipline and gates.** Pure and deterministic; it audits a *description* the caller supplies, editing and fetching
+nothing, at ¥0 with no model call. Guards refuse a blank episode id, a non-object query, a blank query id/key/boundary,
+a non-array or empty candidate set, a non-object candidate, a blank or duplicate candidate id, a blank candidate key,
+an unknown outcome/detail/conflict, a non-object evidence, non-boolean evidence flags, and a reachable link that is
+not linked. New module 100% on all four TypeScript dimensions (169/169 statements, 64/64 branches, 2/2 functions);
+49 tests across behaviour and binding; Python reader 100% statements and 99% branches over self-test + check + verify
+(the only open arc is the module import guard). README core layer updated (55 → 56 modules, 12,140 → 12,442 lines);
+coupling snapshot regenerated (272 → 273 modules, 11 checks); bundle unchanged (library helper, not on the render
+path); `--expect-files` 37 → 38; 13 workflows parse.

@@ -3394,3 +3394,28 @@ One of three closed values describing what the store did to a retrieved item: `a
 its disposition is not `active`; a current item must be `active` for the episode to be clean. Revoking the current
 value is `over-revoked` (`current-removed`), violating TEPA's key-current assumption that revocation leave the correct
 value available.
+
+### Admission gate (R251)
+
+The decision, after retrieval and before a model sees the context, of which retrieved lessons may be used. A lesson is
+`admitted` when it is sound, `escalated` when it needs its linked evidence checked first, or `rejected` when it is a
+task-boundary trap or cannot be checked. `memoryAdmission` audits a described retrieval set and returns the strictest
+verdict in it. It is the consumer-side counterpart to R249/R250: those gate what was written and whether stale values
+were displaced; this decides whether a correctly retrieved lesson is the right thing to use — the boundary
+MemTrapBench (arXiv 2608.20202) measured at 31.05 with a trap versus 94.39 trap-free.
+
+### Task-boundary trap (R251)
+
+A retrieved lesson that belongs to a different live task than the current query. MemTrapBench (arXiv 2608.20202)
+plants these in otherwise independently solvable queries; with trap-inducing history the same query scores 31.05,
+against 94.39 with trap-free history and 92.29 with no memory. In the admission gate a `boundary` conflict is
+rejected before any evidence check, because the harm is not that the lesson is wrong but that it answers a different
+task.
+
+### Evidence link (R251)
+
+The pointer from a distilled insight to the raw trajectory it came from, which lets an agent verify the insight before
+acting on it. WikiTrace (arXiv 2611.14320) stores each insight with a success/failure diagnosis and the trajectory, and
+descends through the link when the insight lacks needed detail, conflicts with another, or comes from a failed task.
+In the gate a link is `linked` when it points at a trajectory and `reachable` when a terminal tool can walk to it; a
+reachable link must also be linked, and an unreachable link converts a would-be escalation into a rejection.

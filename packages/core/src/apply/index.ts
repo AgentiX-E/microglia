@@ -104,6 +104,27 @@ export {
 } from './state-role.js';
 
 export {
+  ADMISSION_REASONS,
+  ADMISSION_VERDICTS,
+  CONFLICT_KINDS,
+  DETAIL_LEVELS,
+  DISPOSITIONS,
+  LESSON_OUTCOMES,
+  memoryAdmission,
+  type AdmissionCandidate,
+  type AdmissionQuery,
+  type AdmissionReason,
+  type AdmissionVerdict,
+  type ConflictKind,
+  type DetailLevel,
+  type Disposition,
+  type EvidenceLink,
+  type LessonOutcome,
+  type MemoryAdmission,
+  type MemoryAdmissionInput,
+} from './memory-admission.js';
+
+export {
   decideSpeak,
   suppressionOf,
   type SpeakInput,

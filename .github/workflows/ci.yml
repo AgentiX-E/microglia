@@ -348,9 +348,21 @@ jobs:
             eval/tools/stale_revocation.py --check --manifest eval/manifests/stale-revocation.json
           python3 -m coverage run --append --branch --include="*/stale_revocation.py" \
             eval/tools/stale_revocation.py --verify --manifest eval/manifests/stale-revocation.json --fixture eval/fixtures/stale-revocation.json
+          # R251. Evidence-linked admission: after retrieval, withhold task-boundary traps and check any lesson that
+          # lacks detail, conflicts, or comes from a failed task. WikiTrace (arXiv 2611.14320) links each insight to
+          # its trajectory for that check; MemTrapBench (arXiv 2608.20202) measures trap history scoring 31.05 vs
+          # 94.39 trap-free. This reader re-derives each verdict, reason and count from a candidate set's bytes,
+          # --verify refuses a drifted manifest, and memory-admission-manifest.test.ts binds the TS product to the
+          # same reading. All three run under coverage so main()'s argparse branches are counted.
+          python3 -m coverage run --append --branch --include="*/memory_admission.py" \
+            eval/tools/memory_admission.py --self-test
+          python3 -m coverage run --append --branch --include="*/memory_admission.py" \
+            eval/tools/memory_admission.py --check --manifest eval/manifests/memory-admission.json
+          python3 -m coverage run --append --branch --include="*/memory_admission.py" \
+            eval/tools/memory_admission.py --verify --manifest eval/manifests/memory-admission.json --fixture eval/fixtures/memory-admission.json
           python3 -m coverage json -o coverage-python.json
           python3 scripts/check-python-coverage.py --self-test
-          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 37
+          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 38
 
       - name: The rounds this project owes, and the date each one was registered for
         # The failure this prevents is not a wrong number, it is a round that quietly stops being planned: R216b's

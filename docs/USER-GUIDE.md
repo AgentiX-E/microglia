@@ -8518,3 +8518,59 @@ For `extend`, an older value on the same key is not stale at all.
 cheap, deterministic check you can run over an episode before the retrieval set is handed to a model: the product's
 TypeScript function, an independent Python reader and a committed manifest must agree field by field, or the build
 stops. That keeps the documented revocation policy honest rather than trusting a paragraph no test recomputes.
+
+## 32.108 Deciding whether a retrieved memory should reach the model (R251)
+
+R249 covers an explicit revision you decide to make; R250 covers whether new evidence displaced an old memory. This
+section covers the decision *after* retrieval: a memory can be found correctly and still be the wrong thing to use.
+MemTrapBench (arXiv 2608.20202) gave the same, independently solvable query 94.39 with trap-free history and 31.05
+with a task-boundary trap — the history was retrieved, the answer was wrong. WikiTrace (arXiv 2611.14320) shows the
+fix: keep each lesson linked to the trajectory it came from, and check the link when the lesson is thin, contradictory,
+or from a failed task.
+
+The library exposes `memoryAdmission`, a pure function that audits one retrieval episode you describe:
+
+```ts
+import { memoryAdmission } from '@agentix-e/microglia-apply';
+
+// A lesson from a different live task: withhold it before any check.
+memoryAdmission({
+  id: 'ep-1',
+  query: { id: 'q-1', key: 'task', boundary: 'checkout' },
+  candidates: [
+    { id: 'c1', key: 'task', outcome: 'success', detail: 'sufficient', conflict: 'boundary',
+      evidence: { linked: true, reachable: true } },
+  ],
+});
+// → { verdict: 'reject', reason: 'task-boundary-violation', decidingId: 'c1', rejectCount: 1, ... }
+
+// A thin lesson whose evidence can be walked: escalate rather than follow it blindly.
+memoryAdmission({
+  id: 'ep-2',
+  query: { id: 'q-2', key: 'task', boundary: 'checkout' },
+  candidates: [
+    { id: 'c1', key: 'task', outcome: 'success', detail: 'insufficient', conflict: 'none',
+      evidence: { linked: true, reachable: true } },
+  ],
+});
+// → { verdict: 'escalate', reason: 'verify-details', escalateCount: 1 }
+```
+
+**What you supply.** An episode `id`; a `query` with an `id`, a `key` (the lookup key) and a `boundary` (the live task
+the lessons must serve); and the `candidates` currently retrieved. Each candidate has a unique `id`, a `key`, an
+`outcome` (`success`/`failure` of the source task), a `detail` level (`sufficient`/`insufficient` to act), a `conflict`
+kind (`none`/`rule`/`boundary`) and an `evidence` link — `linked` means it points to the raw trajectory, `reachable`
+means a terminal tool can walk to it. A reachable link must also be linked. You describe what your retrieval returned;
+the function neither fetches memory nor edits any store.
+
+**How to read the result.** Each candidate gets a disposition: `admit` (sound, no check needed), `escalate` (check the
+evidence before acting), or `reject` (withhold). `verdict` is the strictest disposition in the set — one rejected trap
+makes the whole set `reject` — and `reason` plus `decidingId` name the candidate that decided it. `admitCount`,
+`escalateCount` and `rejectCount` sum to `candidateCount`. A boundary conflict is always rejected first. An
+insufficient-detail, rule-conflict or failed-source lesson escalates if its evidence is reachable, and is rejected if
+it is not: an insight you cannot check is an insight you must not follow.
+
+**What it is not.** It does not perform the check, does not fetch the trajectory, does not score accuracy, and does not
+call a model. It is a cheap, deterministic check you can run before a retrieval set is handed to a model: the
+product's TypeScript function, an independent Python reader and a committed manifest must agree field by field, or
+the build stops. That keeps the documented admission policy honest rather than trusting a paragraph no test recomputes.
