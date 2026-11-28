@@ -1,0 +1,176 @@
+{
+  "schema": "microglia/memory-gain-ledger@1",
+  "fixtureSchema": "microglia/memory-gain-ledger@1",
+  "cases": [
+    {
+      "id": "safe-useful",
+      "expected": {
+        "id": "safe-useful",
+        "verdict": "admit",
+        "reason": "net-positive",
+        "decidingId": "full",
+        "decidingNetGainMilli": 54,
+        "armCount": 1,
+        "admitCount": 1,
+        "rejectCount": 0,
+        "contributions": []
+      }
+    },
+    {
+      "id": "poisoning-timeliness",
+      "expected": {
+        "id": "poisoning-timeliness",
+        "verdict": "reject",
+        "reason": "poisoning-exceeds-budget",
+        "decidingId": "timeliness",
+        "decidingNetGainMilli": 54,
+        "armCount": 1,
+        "admitCount": 0,
+        "rejectCount": 1,
+        "contributions": []
+      }
+    },
+    {
+      "id": "utility-collapse",
+      "expected": {
+        "id": "utility-collapse",
+        "verdict": "reject",
+        "reason": "utility-collapse",
+        "decidingId": "over-defence",
+        "decidingNetGainMilli": 54,
+        "armCount": 1,
+        "admitCount": 0,
+        "rejectCount": 1,
+        "contributions": []
+      }
+    },
+    {
+      "id": "false-accept",
+      "expected": {
+        "id": "false-accept",
+        "verdict": "reject",
+        "reason": "false-accept-exceeds-budget",
+        "decidingId": "loose",
+        "decidingNetGainMilli": 54,
+        "armCount": 1,
+        "admitCount": 0,
+        "rejectCount": 1,
+        "contributions": []
+      }
+    },
+    {
+      "id": "no-net-gain",
+      "expected": {
+        "id": "no-net-gain",
+        "verdict": "reject",
+        "reason": "no-net-gain",
+        "decidingId": "worse",
+        "decidingNetGainMilli": -11,
+        "armCount": 1,
+        "admitCount": 0,
+        "rejectCount": 1,
+        "contributions": []
+      }
+    },
+    {
+      "id": "zero-net-gain",
+      "expected": {
+        "id": "zero-net-gain",
+        "verdict": "reject",
+        "reason": "no-net-gain",
+        "decidingId": "flat",
+        "decidingNetGainMilli": 0,
+        "armCount": 1,
+        "admitCount": 0,
+        "rejectCount": 1,
+        "contributions": []
+      }
+    },
+    {
+      "id": "rounding-half-up",
+      "expected": {
+        "id": "rounding-half-up",
+        "verdict": "admit",
+        "reason": "net-positive",
+        "decidingId": "frac",
+        "decidingNetGainMilli": 125,
+        "armCount": 1,
+        "admitCount": 1,
+        "rejectCount": 0,
+        "contributions": []
+      }
+    },
+    {
+      "id": "priority-poison",
+      "expected": {
+        "id": "priority-poison",
+        "verdict": "reject",
+        "reason": "poisoning-exceeds-budget",
+        "decidingId": "b-poison",
+        "decidingNetGainMilli": 54,
+        "armCount": 4,
+        "admitCount": 0,
+        "rejectCount": 4,
+        "contributions": []
+      }
+    },
+    {
+      "id": "mixed-set",
+      "expected": {
+        "id": "mixed-set",
+        "verdict": "reject",
+        "reason": "poisoning-exceeds-budget",
+        "decidingId": "bad-first",
+        "decidingNetGainMilli": 54,
+        "armCount": 3,
+        "admitCount": 1,
+        "rejectCount": 2,
+        "contributions": []
+      }
+    },
+    {
+      "id": "ablation-attribution",
+      "expected": {
+        "id": "ablation-attribution",
+        "verdict": "admit",
+        "reason": "net-positive",
+        "decidingId": "full",
+        "decidingNetGainMilli": 54,
+        "armCount": 4,
+        "admitCount": 4,
+        "rejectCount": 0,
+        "contributions": [
+          {
+            "id": "authenticity",
+            "poisonDeltaMilli": 220,
+            "followDeltaMilli": 0
+          },
+          {
+            "id": "source",
+            "poisonDeltaMilli": 140,
+            "followDeltaMilli": 0
+          },
+          {
+            "id": "timescale",
+            "poisonDeltaMilli": 0,
+            "followDeltaMilli": 54
+          }
+        ]
+      }
+    },
+    {
+      "id": "all-admit",
+      "expected": {
+        "id": "all-admit",
+        "verdict": "admit",
+        "reason": "net-positive",
+        "decidingId": "a",
+        "decidingNetGainMilli": 54,
+        "armCount": 2,
+        "admitCount": 2,
+        "rejectCount": 0,
+        "contributions": []
+      }
+    }
+  ]
+}

@@ -3453,3 +3453,38 @@ The decision to withhold a memory entirely because support is insufficient. MMA'
 should know when not to answer: a low-confidence, stale or contradicted item is safer omitted than used. In the gate,
 a score below `abstainBelow` (default 0.50) abstains — `conflict-overwhelms` when a negative consensus dominates,
 `below-threshold` otherwise. On a set, one abstain determines the verdict.
+
+### Net-gain ledger (R253)
+
+The end-to-end check of whether a memory policy helps at all: it scores personalisation utility (follow-through,
+net win-rate gain over the no-memory baseline) and memory safety (poisoning and false acceptance) together, and
+refuses a policy that is unsafe OR useless. Its verdict is `net-positive` only when every axis clears. It is the
+tenth pure gate and follows CAPTURE (arXiv 2609.02265), which reports 71.5% win rate, 83.5% follow-through, 11.5%
+poisoning and 8.9% false acceptance.
+
+### Poisoning acceptance / zeta_safe (R253)
+
+The share of adversarial memory updates a policy accepts (`poisonAccepts / poisonAttempts`), and the budget it must
+stay under. CAPTURE (arXiv 2609.02265) holds poisoning to 11.5%; a timeliness-only policy reaches 51.6%. `ζ_safe`
+is the safety threshold from CAPTURE's constrained objective — a memory entry may not relax it. Exceeding the
+budget yields `poisoning-exceeds-budget` even when the policy is otherwise useful.
+
+### Utility collapse (R253)
+
+The opposite failure to poisoning: a policy so defensive that it withholds nearly every memory claim, so the
+benefit of long-term memory disappears. In 2601.05504 a conservative judge rejected all 23 candidates (mean trust
+0.28) and erased long-term memory's value. In the ledger, follow-through below `followFloorMilli` yields
+`utility-collapse` even when poisoning is zero — zero poisoning with no benefit is useless, not safe.
+
+### Ablation contribution (R253)
+
+The marginal effect of one component, measured by comparing a full policy against a variant with that component
+removed. The ledger reports the poisoning delta (`poisonDeltaMilli`) and follow-through delta (`followDeltaMilli`)
+for each ablation. This follows CAPTURE's ablations: removing the authenticity gate added 22 points of poisoning,
+removing source added 14, and removing time-scale separation cost 5.4 points of follow-through.
+
+### Net gain (R253)
+
+The win-rate improvement over the no-memory baseline, `netGainMilli = winRateMilli − baselineWinMilli`, in integer
+thousandths. A non-positive net gain means the memory is no better than having none, and yields `no-net-gain`.
+Reporting it as an integer keeps the product and the independent evaluation reader in exact agreement.

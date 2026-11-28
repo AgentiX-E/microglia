@@ -141,6 +141,19 @@ export {
 } from './memory-confidence.js';
 
 export {
+  GAIN_REASONS,
+  GAIN_VERDICTS,
+  memoryGainLedger,
+  type GainAblation,
+  type GainArm,
+  type GainContribution,
+  type GainReason,
+  type GainVerdict,
+  type MemoryGain,
+  type MemoryGainInput,
+} from './memory-gain-ledger.js';
+
+export {
   decideSpeak,
   suppressionOf,
   type SpeakInput,

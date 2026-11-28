@@ -1,0 +1,174 @@
+{
+  "schema": "microglia/memory-gain-ledger@1",
+  "note": "Each case supplies a memory policy (arms) and its evaluation thresholds. The independent reader re-derives the verdict, reason, deciding arm, integer rates, counts and ablation deltas from these bytes. Rate numbers follow CAPTURE (arXiv 2609.02265): 71.5% win rate, 83.5% follow-through, 11.5% poisoning, 8.9% false acceptance; timeliness RAG 85.7% follow-through / 51.6% poisoning; ablations +22pp/+14pp poisoning, -5.4pp follow-through. Utility-collapse follows 2601.05504 (a conservative judge rejected all 23 candidates, erasing the memory benefit).",
+  "cases": [
+    {
+      "id": "safe-useful",
+      "note": "Safe and useful: poisoning 115 under budget 200, follow-through 835 over floor 700, win gain +54. Admitted.",
+      "input": {
+        "id": "safe-useful",
+        "baselineWinMilli": 661,
+        "poisonBudgetMilli": 200,
+        "followFloorMilli": 700,
+        "falseAcceptBudgetMilli": 150,
+        "arms": [
+          { "id": "full", "trials": 1000, "wins": 715, "trueUpdates": 1000, "followThrough": 835, "benignNonUpdates": 1000, "falseAccepts": 89, "poisonAttempts": 1000, "poisonAccepts": 115 }
+        ]
+      }
+    },
+    {
+      "id": "poisoning-timeliness",
+      "note": "Timeliness RAG: high follow-through 857 but poisoning 516 breaches the 200 safety budget. Refused even though useful.",
+      "input": {
+        "id": "poisoning-timeliness",
+        "baselineWinMilli": 661,
+        "poisonBudgetMilli": 200,
+        "followFloorMilli": 700,
+        "falseAcceptBudgetMilli": 150,
+        "arms": [
+          { "id": "timeliness", "trials": 1000, "wins": 715, "trueUpdates": 1000, "followThrough": 857, "benignNonUpdates": 1000, "falseAccepts": 89, "poisonAttempts": 1000, "poisonAccepts": 516 }
+        ]
+      }
+    },
+    {
+      "id": "utility-collapse",
+      "note": "Over-defence: zero poisoning but follow-through 0 below the 700 floor. The memory benefit is gone, so it is useless, not safe.",
+      "input": {
+        "id": "utility-collapse",
+        "baselineWinMilli": 661,
+        "poisonBudgetMilli": 200,
+        "followFloorMilli": 700,
+        "falseAcceptBudgetMilli": 150,
+        "arms": [
+          { "id": "over-defence", "trials": 1000, "wins": 715, "trueUpdates": 100, "followThrough": 0, "benignNonUpdates": 1000, "falseAccepts": 89, "poisonAttempts": 100, "poisonAccepts": 0 }
+        ]
+      }
+    },
+    {
+      "id": "false-accept",
+      "note": "Benign non-updates are written as preferences at 160 per 1000, above the 150 budget. Refused.",
+      "input": {
+        "id": "false-accept",
+        "baselineWinMilli": 661,
+        "poisonBudgetMilli": 200,
+        "followFloorMilli": 700,
+        "falseAcceptBudgetMilli": 150,
+        "arms": [
+          { "id": "loose", "trials": 1000, "wins": 715, "trueUpdates": 1000, "followThrough": 835, "benignNonUpdates": 1000, "falseAccepts": 160, "poisonAttempts": 1000, "poisonAccepts": 115 }
+        ]
+      }
+    },
+    {
+      "id": "no-net-gain",
+      "note": "Win rate 650 is below the no-memory baseline 661: net gain -11. Memory hurts, so refused.",
+      "input": {
+        "id": "no-net-gain",
+        "baselineWinMilli": 661,
+        "poisonBudgetMilli": 200,
+        "followFloorMilli": 700,
+        "falseAcceptBudgetMilli": 150,
+        "arms": [
+          { "id": "worse", "trials": 1000, "wins": 650, "trueUpdates": 1000, "followThrough": 835, "benignNonUpdates": 1000, "falseAccepts": 89, "poisonAttempts": 1000, "poisonAccepts": 115 }
+        ]
+      }
+    },
+    {
+      "id": "zero-net-gain",
+      "note": "Win rate equals the baseline: net gain zero is not positive. Refused.",
+      "input": {
+        "id": "zero-net-gain",
+        "baselineWinMilli": 661,
+        "poisonBudgetMilli": 200,
+        "followFloorMilli": 700,
+        "falseAcceptBudgetMilli": 150,
+        "arms": [
+          { "id": "flat", "trials": 1000, "wins": 661, "trueUpdates": 1000, "followThrough": 835, "benignNonUpdates": 1000, "falseAccepts": 89, "poisonAttempts": 1000, "poisonAccepts": 115 }
+        ]
+      }
+    },
+    {
+      "id": "rounding-half-up",
+      "note": "Non-round denominators: 1/8 -> 125, 1/3 -> 333, 2/3 -> 667. All integer thousandths, no float in the manifest.",
+      "input": {
+        "id": "rounding-half-up",
+        "baselineWinMilli": 0,
+        "poisonBudgetMilli": 700,
+        "followFloorMilli": 0,
+        "falseAcceptBudgetMilli": 150,
+        "arms": [
+          { "id": "frac", "trials": 8, "wins": 1, "trueUpdates": 3, "followThrough": 1, "benignNonUpdates": 1000, "falseAccepts": 89, "poisonAttempts": 3, "poisonAccepts": 2 }
+        ]
+      }
+    },
+    {
+      "id": "priority-poison",
+      "note": "Four arms, each failing a different rung. Poisoning is strictest, so the set reason is poisoning-exceeds-budget and decidingId is b-poison (first among the strictest).",
+      "input": {
+        "id": "priority-poison",
+        "baselineWinMilli": 661,
+        "poisonBudgetMilli": 200,
+        "followFloorMilli": 700,
+        "falseAcceptBudgetMilli": 150,
+        "arms": [
+          { "id": "a-collapse", "trials": 1000, "wins": 715, "trueUpdates": 100, "followThrough": 0, "benignNonUpdates": 1000, "falseAccepts": 89, "poisonAttempts": 100, "poisonAccepts": 0 },
+          { "id": "b-poison", "trials": 1000, "wins": 715, "trueUpdates": 1000, "followThrough": 835, "benignNonUpdates": 1000, "falseAccepts": 89, "poisonAttempts": 1000, "poisonAccepts": 900 },
+          { "id": "c-false", "trials": 1000, "wins": 715, "trueUpdates": 1000, "followThrough": 835, "benignNonUpdates": 1000, "falseAccepts": 900, "poisonAttempts": 1000, "poisonAccepts": 115 },
+          { "id": "d-nogain", "trials": 1000, "wins": 1, "trueUpdates": 1000, "followThrough": 835, "benignNonUpdates": 1000, "falseAccepts": 89, "poisonAttempts": 1000, "poisonAccepts": 115 }
+        ]
+      }
+    },
+    {
+      "id": "mixed-set",
+      "note": "Three arms: one safe, two poisoned. Set verdict is reject, counts partition (1 admit / 2 reject), decidingId is bad-first on the strictest tie.",
+      "input": {
+        "id": "mixed-set",
+        "baselineWinMilli": 661,
+        "poisonBudgetMilli": 200,
+        "followFloorMilli": 700,
+        "falseAcceptBudgetMilli": 150,
+        "arms": [
+          { "id": "good", "trials": 1000, "wins": 715, "trueUpdates": 1000, "followThrough": 835, "benignNonUpdates": 1000, "falseAccepts": 89, "poisonAttempts": 1000, "poisonAccepts": 115 },
+          { "id": "bad-first", "trials": 1000, "wins": 715, "trueUpdates": 1000, "followThrough": 835, "benignNonUpdates": 1000, "falseAccepts": 89, "poisonAttempts": 1000, "poisonAccepts": 500 },
+          { "id": "bad-second", "trials": 1000, "wins": 715, "trueUpdates": 1000, "followThrough": 835, "benignNonUpdates": 1000, "falseAccepts": 89, "poisonAttempts": 1000, "poisonAccepts": 600 }
+        ]
+      }
+    },
+    {
+      "id": "ablation-attribution",
+      "note": "Four arms with three ablations. Removing the authenticity gate is +220pp poisoning, removing source is +140pp, removing time scales is -54pp follow-through (CAPTURE's ablation pattern).",
+      "input": {
+        "id": "ablation-attribution",
+        "baselineWinMilli": 661,
+        "poisonBudgetMilli": 400,
+        "followFloorMilli": 700,
+        "falseAcceptBudgetMilli": 150,
+        "arms": [
+          { "id": "full", "trials": 1000, "wins": 715, "trueUpdates": 1000, "followThrough": 835, "benignNonUpdates": 1000, "falseAccepts": 89, "poisonAttempts": 1000, "poisonAccepts": 115 },
+          { "id": "w-o-auth", "trials": 1000, "wins": 715, "trueUpdates": 1000, "followThrough": 835, "benignNonUpdates": 1000, "falseAccepts": 89, "poisonAttempts": 1000, "poisonAccepts": 335 },
+          { "id": "w-o-source", "trials": 1000, "wins": 715, "trueUpdates": 1000, "followThrough": 835, "benignNonUpdates": 1000, "falseAccepts": 89, "poisonAttempts": 1000, "poisonAccepts": 255 },
+          { "id": "w-o-timescale", "trials": 1000, "wins": 715, "trueUpdates": 1000, "followThrough": 781, "benignNonUpdates": 1000, "falseAccepts": 89, "poisonAttempts": 1000, "poisonAccepts": 115 }
+        ],
+        "ablations": [
+          { "id": "authenticity", "baseArmId": "full", "ablatedArmId": "w-o-auth" },
+          { "id": "source", "baseArmId": "full", "ablatedArmId": "w-o-source" },
+          { "id": "timescale", "baseArmId": "full", "ablatedArmId": "w-o-timescale" }
+        ]
+      }
+    },
+    {
+      "id": "all-admit",
+      "note": "Two safe and useful arms: the whole set is admitted and both counts reflect that.",
+      "input": {
+        "id": "all-admit",
+        "baselineWinMilli": 661,
+        "poisonBudgetMilli": 200,
+        "followFloorMilli": 700,
+        "falseAcceptBudgetMilli": 150,
+        "arms": [
+          { "id": "a", "trials": 1000, "wins": 715, "trueUpdates": 1000, "followThrough": 835, "benignNonUpdates": 1000, "falseAccepts": 89, "poisonAttempts": 1000, "poisonAccepts": 115 },
+          { "id": "b", "trials": 1000, "wins": 800, "trueUpdates": 1000, "followThrough": 835, "benignNonUpdates": 1000, "falseAccepts": 89, "poisonAttempts": 1000, "poisonAccepts": 115 }
+        ]
+      }
+    }
+  ]
+}

@@ -6546,3 +6546,64 @@ neighbor. New module 100% on all four TypeScript dimensions; 43 behaviour tests 
 and CLI-exit paths). README core layer updated (56 → 57 modules,
 12,442 → 12,778 lines); coupling snapshot regenerated (273 → 274 modules, 11 checks); bundle unchanged (library
 helper, not on the render path); `--expect-files` 38 → 39; 13 workflows parse.
+
+## 8.129 Knowing whether the memory flywheel helps at all: a net-gain ledger (R253)
+
+R246-R252 gate *what* we write, whether corrections stick, whether a revision reached every copy, whether new
+evidence displaced the stale value, whether a retrieved lesson should be used, and how much each retrieved item
+may be trusted. None of them asks the end-to-end question that the standing research question keeps probing: does
+the memory policy improve the task, or does it hurt? The user's position is that *how we use memory* — not just
+what we store — is itself the source of the negative effect. R253 turns that into a falsifiable, zero-cost
+measurement with two axes that must both clear.
+
+**Two failure modes, one ledger.** A memory policy fails in two opposite ways, and a single-axis score hides both:
+
+- **Poisoning / false acceptance** — corrupt or benign-non-update claims enter memory and steer the agent. CAPTURE
+  (arXiv 2609.02265) reports 11.5% poisoning and 8.9% false acceptance; a timeliness-only policy reaches 85.7%
+  follow-through but 51.6% poisoning. A-MemGuard (arXiv 2510.02373) cuts retrieval attack success from 100% to
+  2.13% while keeping benign accuracy — safety and utility must be measured together.
+- **Utility collapse** — the policy is so defensive that it withholds everything. In 2601.05504 a conservative
+  judge rejected all 23 candidates (mean trust 0.28), erasing the entire benefit of long-term memory. Zero
+  poisoning with no follow-through is not safe, it is useless.
+
+CAPTURE evaluates personalisation and safety jointly (71.5% win rate, 83.5% follow-through, 11.5% poisoning,
+8.9% false acceptance, 0.27 dynamic regret) and attributes each component by ablation (+22pp poisoning without
+the authenticity gate, +14pp without source, −5.4pp follow-through without time scales). This module reproduces
+that dual measurement and ablation.
+
+`packages/core/src/apply/memory-gain-ledger.ts` exports `memoryGainLedger(input)`, a pure audit of one evaluation
+episode. Each arm supplies integer counts: `trials/wins`, `trueUpdates/followThrough`,
+`benignNonUpdates/falseAccepts`, `poisonAttempts/poisonAccepts`. Four rates and the net gain are computed in
+integer thousandths (half-up, so the product and reader compare integers): `winRateMilli`, `followMilli`,
+`falseAcceptMilli`, `poisonMilli`, and `netGainMilli = winRateMilli − baselineWinMilli`.
+
+| condition (checked in order) | disposition | reason |
+|---|---|---|
+| `poisonMilli > poisonBudgetMilli` (zeta_safe) | `reject` | `poisoning-exceeds-budget` |
+| `followMilli < followFloorMilli` | `reject` | `utility-collapse` |
+| `falseAcceptMilli > falseAcceptBudgetMilli` | `reject` | `false-accept-exceeds-budget` |
+| `netGainMilli <= 0` | `reject` | `no-net-gain` |
+| otherwise | `admit` | `net-positive` |
+
+An unsafe policy is refused even when useful; a useless (collapsed) policy is refused even when perfectly safe.
+The set verdict is the strictest disposition present (`reject` dominates `admit`); `reason` / `decidingId` name
+the most severe arm, first wins a tie, and the three counts partition the arm total. Every optional `ablation`
+compares an ablated arm against a base arm, reporting `poisonDeltaMilli` and `followDeltaMilli` — the marginal
+safety and utility contribution of the removed component.
+
+**Three readers, one reading.** `eval/fixtures/memory-gain-ledger.json` holds eleven episodes: safe-and-useful,
+timeliness poisoning, utility collapse, false acceptance, negative and zero net gain, fractional rounding, a
+four-way priority case, a mixed set, an ablation attribution and an all-admit set. `eval/tools/memory_gain_ledger.py
+--verify` re-derives every verdict, reason, deciding arm, rate, count and ablation delta from those bytes with no
+shared code; `--check` re-adds the arithmetic (count partition, verdict/reason family, rate ordering);
+`--self-test` drives 109 boundary, rounding, determinism and tamper assertions. `memory-gain-ledger-manifest.test.ts`
+derives the same reading with the product's own function and compares every field.
+
+**Discipline and gates.** Pure and deterministic; it audits a *description* the caller supplies, editing and
+fetching nothing, at ¥0 with no model call. Guards refuse a blank id, an out-of-range or non-integer threshold, a
+non-array or empty arms set, a malformed or duplicate arm, any count out of its `[0, denominator]` range, and a
+malformed, duplicate or dangling ablation. New module 100% on all four TypeScript dimensions; 21 behaviour tests
+plus 12 binding tests; Python reader 99% combined statements+branches over self-test + check + verify (open arcs
+are assertion-failure and CLI-exit paths, as in the other readers). README core layer updated (57 → 58 modules,
+12,778 → 13,146 lines); coupling snapshot regenerated (274 → 275 modules, 11 checks); bundle unchanged (library
+helper, not on the render path); `--expect-files` 39 → 40; 13 workflows parse.
