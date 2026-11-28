@@ -6542,6 +6542,7 @@ weight, a non-finite or non-positive half-life, thresholds outside `[0,1]` or re
 empty item set, a non-object item, a blank or duplicate item id, an unknown source, a negative or non-finite age, a
 non-array neighbor set, a non-object neighbor, and a non-positive weight or out-of-range confidence/support on any
 neighbor. New module 100% on all four TypeScript dimensions; 43 behaviour tests plus 16 binding tests; Python reader
-100% statements and branches over self-test + check + verify. README core layer updated (56 → 57 modules,
+98% over lines and branches combined (464/473, self-test + check + verify; the open arcs are the assertion-failure
+and CLI-exit paths). README core layer updated (56 → 57 modules,
 12,442 → 12,778 lines); coupling snapshot regenerated (273 → 274 modules, 11 checks); bundle unchanged (library
 helper, not on the render path); `--expect-files` 38 → 39; 13 workflows parse.

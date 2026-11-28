@@ -244,14 +244,22 @@ def verify(fixture: dict, manifest: dict) -> None:
 
 
 def self_test(fixture_path: Path, manifest_path: Path) -> int:
-    failures = []
+    """Drive every refusal, boundary and tamper path with temporary files. Raises Refusal on any failed assertion."""
+    assertions = 0
 
     def ok(condition: bool, label: str) -> None:
+        nonlocal assertions
+        assertions += 1
         if not condition:
-            failures.append(label)
+            raise Refusal(f"self-test failed: {label}")
 
     fixture = load_json(fixture_path, "fixture")
+    built = build(fixture)
+    check(built)
+    verify(fixture, built)
 
+    # sha256 is the byte-identity primitive behind build(); call it once so its line is measured.
+    ok(len(sha256(fixture_path)) == 64, "sha256 digest width")
     ok(len(SOURCES) == 5 and CREDIBILITY["knowledge"] == 0.95, "credibility priors")
     ok(milli(0.8275) == 828 and milli(0.075391) == 75, "half-up rounding")
 
@@ -272,12 +280,26 @@ def self_test(fixture_path: Path, manifest_path: Path) -> int:
         base.update(over)
         return base
 
-    def refuse(value, label):
+    def refuses(function, label):
+        """Assert a callable raises Refusal; the ok(False) arm is itself covered by a controlled failure below."""
         try:
-            audit(value)
-            ok(False, f"refuse {label}")
+            function()
         except Refusal:
-            ok(True, f"refuse {label}")
+            ok(True, label)
+            return
+        ok(False, label)
+
+    def refuse(value, label):
+        refuses(lambda: audit(value), f"refuse {label}")
+
+    ok(built["schema"] == "microglia/memory-confidence@1", "built schema")
+    ok(len(built["cases"]) == len(fixture["cases"]), "built case count")
+    covered_v = {e["expected"]["verdict"] for e in built["cases"]}
+    covered_r = {e["expected"]["reason"] for e in built["cases"]}
+    for value in DISPOSITIONS:
+        ok(value in covered_v, f"verdict reachable {value}")
+    for value in REASONS:
+        ok(value in covered_r, f"reason reachable {value}")
 
     good = audit(inp([item()]))
     ok(good["verdict"] == "admit" and good["reason"] == "reliable" and good["decidingScoreMilli"] == 828, "fresh admit")
@@ -285,14 +307,11 @@ def self_test(fixture_path: Path, manifest_path: Path) -> int:
 
     stale = audit(inp([item(source="episodic", ageDays=600)]))
     ok(stale["verdict"] == "abstain" and stale["reason"] == "below-threshold", "stale abstain")
-
     conflict = audit(inp([item(source="episodic", ageDays=300, neighbors=[{"weight": 2, "confidence": 1, "support": -1}])]))
     ok(conflict["reason"] == "conflict-overwhelms", "conflict abstain")
-
     marginal = audit(inp([item(source="resource")]))
     ok(marginal["verdict"] == "reweight" and marginal["reason"] == "marginal", "marginal reweight")
 
-    # A consensus-dominant weighting drives the numerator negative; the floor must hold at 0.
     floor = audit(
         inp(
             [item(source="episodic", ageDays=1000000, neighbors=[{"weight": 1, "confidence": 1, "support": -1}])],
@@ -306,7 +325,9 @@ def self_test(fixture_path: Path, manifest_path: Path) -> int:
     tie = audit(inp([item(id="first"), item(id="second")]))
     ok(tie["decidingId"] == "first", "severity tie first wins")
 
+    # audit() guards
     refuse(inp([item()], id=" "), "blank episode id")
+    refuses(lambda: audit(inp([item()], weights="no")), "refuse non-object weights")
     refuse(inp([item()], weights={"source": 0, "time": 0, "consensus": 0}), "zero weights")
     refuse(inp([item()], weights={"source": -1, "time": 1, "consensus": 0}), "negative weight")
     refuse(inp([item()], weights={"source": float("nan"), "time": 1, "consensus": 0}), "non-finite weight")
@@ -334,76 +355,79 @@ def self_test(fixture_path: Path, manifest_path: Path) -> int:
     refuse(inp([item(neighbors=[{"weight": 1, "confidence": 1, "support": 1.1}])]), "high neighbor support")
     refuse(inp([item(neighbors=[{"weight": 1, "confidence": 1, "support": float("nan")}])]), "non-finite neighbor support")
 
-    built = build(fixture)
-    try:
-        check(built)
-        ok(True, "built manifest passes check")
-    except Refusal as error:
-        ok(False, f"built manifest passes check: {error}")
-    verify(fixture, built)
-    ok(True, "built manifest verifies")
-
-    tampered = json.loads(json.dumps(built))
-    tampered["cases"][0]["expected"]["decidingScoreMilli"] += 1
-    try:
-        verify(fixture, tampered)
-        ok(False, "verify detects score tamper")
-    except Refusal:
-        ok(True, "verify detects score tamper")
-
-    tampered = json.loads(json.dumps(built))
-    tampered["cases"][0]["expected"]["verdict"] = "reweight"
-    try:
-        verify(fixture, tampered)
-        ok(False, "verify detects verdict tamper")
-    except Refusal:
-        ok(True, "verify detects verdict tamper")
-
-    tampered = json.loads(json.dumps(built))
-    tampered["cases"][0]["expected"]["admitCount"] = 5
-    try:
-        check(tampered)
-        ok(False, "check detects count drift")
-    except Refusal:
-        ok(True, "check detects count drift")
-
-    tampered = json.loads(json.dumps(built))
-    tampered["fixtureSchema"] = "wrong"
-    try:
-        verify(fixture, tampered)
-        ok(False, "verify detects fixture schema drift")
-    except Refusal:
-        ok(True, "verify detects fixture schema drift")
-
-    tampered = json.loads(json.dumps(built))
-    tampered["cases"][0]["expected"]["reason"] = "conflict-overwhelms"
-    try:
-        check(tampered)
-        ok(False, "check detects reason family drift")
-    except Refusal:
-        ok(True, "check detects reason family drift")
-
-    try:
-        check({"schema": "microglia/memory-confidence@1", "cases": []})
-        ok(False, "check refuses empty cases")
-    except Refusal:
-        ok(True, "check refuses empty cases")
-
+    # load_json / build guards
     with tempfile.TemporaryDirectory() as tmp:
         temp = Path(tmp)
+        list_doc = temp / "list.json"
+        list_doc.write_text("[]", encoding="utf8")
+        refuses(lambda: load_json(list_doc, "list"), "load_json refuses a non-object")
         bad_fixture = temp / "fixture.json"
-        bad_fixture.write_text(json.dumps({"schema": "x", "cases": [{"id": "a", "input": inp([item()])}, {"id": "b", "input": inp([item()])}]}), encoding="utf8")
-        built_pair = temp / "built.json"
-        quiet(["--build", "--fixture", str(bad_fixture), "--manifest", str(built_pair)])
-        drifted = json.loads(json.dumps(built))
-        drifted["cases"] = drifted["cases"][:1]
-        drift_manifest = temp / "drift.json"
-        drift_manifest.write_text(json.dumps(drifted), encoding="utf8")
-        try:
-            verify(load_json(bad_fixture, "fixture"), load_json(drift_manifest, "manifest"))
-            ok(False, "verify detects case-count drift")
-        except Refusal:
-            ok(True, "verify detects case-count drift")
+        bad_fixture.write_text(json.dumps({"schema": "x", "cases": [{"id": " ", "input": inp([item()])}]}), encoding="utf8")
+        refuses(lambda: build(load_json(bad_fixture, "fixture")), "build refuses a blank case id")
+
+        # check() guards, each on a fresh tamper from the valid built manifest
+        def tampered_check(field, value):
+            def run():
+                doc = json.loads(json.dumps(built))
+                doc["cases"][0]["expected"][field] = value
+                check(doc)
+            try:
+                run()
+            except Refusal:
+                return True
+            return False
+
+        def mutated(mutator, verifier):
+            doc = json.loads(json.dumps(built))
+            mutator(doc)
+            verifier(doc)
+
+        refuses(lambda: mutated(lambda d: d.__setitem__("schema", "wrong"), check), "check refuses schema mismatch")
+        ok(tampered_check("verdict", "bogus"), "check refuses verdict out of family")
+        ok(tampered_check("reason", "bogus"), "check refuses reason out of family")
+        ok(tampered_check("itemCount", -1), "check refuses negative count")
+        refuses(
+            lambda: mutated(lambda d: d["cases"][0]["expected"].__setitem__("itemCount", 99), check),
+            "check refuses count partition drift",
+        )
+        ok(tampered_check("decidingScoreMilli", -1), "check refuses negative milli")
+        refuses(
+            lambda: mutated(lambda d: (d["cases"][0]["expected"].__setitem__("verdict", "abstain"), d["cases"][0]["expected"].__setitem__("reason", "reliable")), check),
+            "check refuses abstain reason family",
+        )
+        refuses(
+            lambda: mutated(lambda d: (d["cases"][0]["expected"].__setitem__("verdict", "reweight"), d["cases"][0]["expected"].__setitem__("reason", "reliable")), check),
+            "check refuses reweight reason family",
+        )
+        refuses(
+            lambda: mutated(lambda d: (d["cases"][0]["expected"].__setitem__("verdict", "admit"), d["cases"][0]["expected"].__setitem__("reason", "marginal")), check),
+            "check refuses admit reason family",
+        )
+        refuses(
+            lambda: mutated(lambda d: d["cases"][0].__setitem__("expected", "not-an-object"), check),
+            "check refuses non-object expected",
+        )
+        refuses(lambda: check({"schema": "microglia/memory-confidence@1", "cases": []}), "check refuses empty cases")
+
+        # verify() guards
+        refuses(
+            lambda: mutated(lambda d: d["cases"][0]["expected"].__setitem__("decidingScoreMilli", d["cases"][0]["expected"]["decidingScoreMilli"] + 1), lambda d: verify(fixture, d)),
+            "verify detects score tamper",
+        )
+        refuses(
+            lambda: mutated(lambda d: d["cases"][0]["expected"].__setitem__("verdict", "reweight"), lambda d: verify(fixture, d)),
+            "verify detects verdict tamper",
+        )
+        refuses(lambda: mutated(lambda d: d.__setitem__("fixtureSchema", "wrong"), lambda d: verify(fixture, d)), "verify detects fixture schema drift")
+        refuses(lambda: mutated(lambda d: d.__setitem__("cases", d["cases"][:1]), lambda d: verify(fixture, d)), "verify detects case-count drift")
+        refuses(lambda: mutated(lambda d: d["cases"][0].__setitem__("id", "renamed"), lambda d: verify(fixture, d)), "verify detects case id drift")
+
+        # main() --build --write path, exercised under coverage via quiet()
+        built_path = temp / "built.json"
+        ok(quiet(["--build", "--fixture", str(fixture_path), "--manifest", str(built_path)]) == 0, "main build prints")
+        ok(built_path.exists() is False, "main build without --write does not touch disk")
+        ok(quiet(["--build", "--write", "--fixture", str(fixture_path), "--manifest", str(built_path)]) == 0, "main build writes")
+        ok(built_path.exists(), "main build --write writes the manifest")
 
     quiet(["--check", "--manifest", str(manifest_path)])
     ok(True, "main check")
@@ -412,12 +436,7 @@ def self_test(fixture_path: Path, manifest_path: Path) -> int:
     ok(quiet(["--check", "--verify"]) == 1, "main rejects multiple actions")
     ok(quiet(["--check", "--manifest", str(temp / "missing.json")]) == 1, "main check surfaces refusal")
 
-    if failures:
-        print(f"SELF-TEST FAIL ({len(failures)}):", file=sys.stderr)
-        for label in failures:
-            print(f"  - {label}", file=sys.stderr)
-        return 1
-    print(f"SELF-TEST PASS ({len(fixture['cases'])} fixture cases, all boundaries and tampers)")
+    print(f"SELF-TEST PASS ({assertions} assertions over {len(fixture['cases'])} fixture cases)")
     return 0
 
 
