@@ -8461,3 +8461,60 @@ is a `method-violation` because there is no provenance left to augment.
 It is a cheap, deterministic check you can run over a revision plan before committing it: the product's TypeScript
 function, an independent Python reader and a committed manifest must agree field by field, or the build stops. This
 keeps the documented revision policy honest rather than trusting a paragraph that no test recomputes.
+
+## 32.107 Checking whether new evidence actually displaced the old memory (R250)
+
+R249 covers an explicit revision you decide to make. This section covers the more common case: a new fact arrives, an
+older memory quietly becomes wrong, and you want to know whether the retrieval set still contains the stale value. TEPA
+(arXiv 2608.07429) found that under a full reversal, append-only memory and last-write-wins both scored 0.210 — *below*
+the no-memory baseline of 0.309 — while revoking the stale precedent held 0.950. STALE (arXiv 2605.06527) explains why
+the old value lingers: a new value can exclude an old one over the same attribute (co-reference conflict) or invalidate
+a related attribute through a dependency chain (propagation conflict).
+
+The library exposes `staleRevocation`, a pure function that audits one episode you describe:
+
+```ts
+import { staleRevocation } from '@agentix-e/microglia-apply';
+
+// A tool preference flipped. The new value is live, but the old one is still active in the retrieval set.
+staleRevocation({
+  id: 'pref-change',
+  evidence: { id: 'ev-1', key: 'stack', relation: 'co-reference', serial: 50 },
+  items: [
+    { id: 'cur', key: 'stack', serial: 50, disposition: 'active' },
+    { id: 'old', key: 'stack', serial: 20, disposition: 'active' },
+  ],
+});
+// → { verdict: 'polluted', reason: 'stale-still-active', activeStaleCount: 1, ... }
+
+// The same flip after the old value was revoked and the current one kept: clean.
+staleRevocation({
+  id: 'pref-change-clean',
+  evidence: { id: 'ev-1', key: 'stack', relation: 'co-reference', serial: 50 },
+  items: [
+    { id: 'cur', key: 'stack', serial: 50, disposition: 'active' },
+    { id: 'old', key: 'stack', serial: 20, disposition: 'revoked' },
+  ],
+});
+// → { verdict: 'clean', reason: 'co-reference-resolved', activeStaleCount: 0 }
+```
+
+**What you supply.** An episode `id`, one `evidence` item with an `id`, a conflict `key`, a `relation` and a `serial`,
+and the list of `items` currently in the retrieval set. Each item has a unique `id`, a `key`, a `serial` and a
+`disposition`: `active` (still exposed), `revoked` (marked withdrawn) or `superseded` (replaced). The `relation` is
+`extend` (new information only; older values legitimately coexist), `co-reference` (the new value excludes older
+values on the same key) or `propagation` (also invalidates the keys in `invalidates` through a dependency chain).
+You describe what your store holds; the function neither edits the store nor fetches anything.
+
+**How to read the result.** `verdict` is `clean`, `polluted`, `over-revoked` or `unresolved`; `reason` names the
+deciding rule. `staleCount` is the number of values the new evidence displaces, and splits into `activeStaleCount`
+(still exposed) and `handledStaleCount` (revoked or superseded). A `polluted` verdict means at least one stale value is
+still reachable — the state TEPA measured as below the no-memory baseline. `over-revoked` means the revocation also
+removed the current value; `unresolved` means no item carries the current value so the gate cannot confirm one.
+For `co-reference` and `propagation`, aim for `clean`: retire every stale value and keep the current one `active`.
+For `extend`, an older value on the same key is not stale at all.
+
+**What it is not.** It does not perform the revocation, does not score accuracy, and does not call a model. It is a
+cheap, deterministic check you can run over an episode before the retrieval set is handed to a model: the product's
+TypeScript function, an independent Python reader and a committed manifest must agree field by field, or the build
+stops. That keeps the documented revocation policy honest rather than trusting a paragraph no test recomputes.

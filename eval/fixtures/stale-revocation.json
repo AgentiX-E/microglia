@@ -1,0 +1,139 @@
+{
+  "schema": "microglia/stale-revocation-inputs@1",
+  "cases": [
+    {
+      "id": "extend-coexists",
+      "input": {
+        "id": "ep-extend",
+        "evidence": { "id": "ev-1", "key": "lang", "relation": "extend", "serial": 10 },
+        "items": [
+          { "id": "cur", "key": "lang", "serial": 10, "disposition": "active" },
+          { "id": "old", "key": "lang", "serial": 3, "disposition": "active" }
+        ]
+      },
+      "note": "extend only adds information, so an older value on the same key legitimately coexists."
+    },
+    {
+      "id": "coreference-resolved",
+      "input": {
+        "id": "ep-pref",
+        "evidence": { "id": "ev-2", "key": "editor", "relation": "co-reference", "serial": 20 },
+        "items": [
+          { "id": "cur", "key": "editor", "serial": 20, "disposition": "active" },
+          { "id": "old", "key": "editor", "serial": 8, "disposition": "revoked" }
+        ]
+      },
+      "note": "New value excludes the old one over the same attribute; the old one was revoked."
+    },
+    {
+      "id": "coreference-superseded",
+      "input": {
+        "id": "ep-tool",
+        "evidence": { "id": "ev-3", "key": "tool", "relation": "co-reference", "serial": 30 },
+        "items": [
+          { "id": "cur", "key": "tool", "serial": 30, "disposition": "active" },
+          { "id": "old", "key": "tool", "serial": 12, "disposition": "superseded" }
+        ]
+      },
+      "note": "A superseded stale item is handled just like a revoked one."
+    },
+    {
+      "id": "propagation-resolved",
+      "input": {
+        "id": "ep-fracture",
+        "evidence": { "id": "ev-4", "key": "health", "relation": "propagation", "serial": 40, "invalidates": ["commute"] },
+        "items": [
+          { "id": "cur", "key": "health", "serial": 40, "disposition": "active" },
+          { "id": "old", "key": "health", "serial": 15, "disposition": "revoked" },
+          { "id": "bike", "key": "commute", "serial": 25, "disposition": "superseded" }
+        ]
+      },
+      "note": "STALE propagation conflict: a leg fracture invalidates the commuting mode through a dependency chain."
+    },
+    {
+      "id": "append-only-pollution",
+      "input": {
+        "id": "ep-append",
+        "evidence": { "id": "ev-5", "key": "stack", "relation": "co-reference", "serial": 50 },
+        "items": [
+          { "id": "cur", "key": "stack", "serial": 50, "disposition": "active" },
+          { "id": "old", "key": "stack", "serial": 20, "disposition": "active" }
+        ]
+      },
+      "note": "TEPA append-only under full reversal: the stale precedent stays exposed and pollutes retrieval."
+    },
+    {
+      "id": "multi-stale-pollution",
+      "input": {
+        "id": "ep-multi",
+        "evidence": { "id": "ev-6", "key": "stack", "relation": "co-reference", "serial": 60 },
+        "items": [
+          { "id": "cur", "key": "stack", "serial": 60, "disposition": "active" },
+          { "id": "a", "key": "stack", "serial": 10, "disposition": "active" },
+          { "id": "b", "key": "stack", "serial": 30, "disposition": "active" },
+          { "id": "c", "key": "stack", "serial": 45, "disposition": "revoked" }
+        ]
+      },
+      "note": "Several stale values remain exposed; only the active ones count toward the pollution index."
+    },
+    {
+      "id": "propagated-still-active",
+      "input": {
+        "id": "ep-prop-bad",
+        "evidence": { "id": "ev-7", "key": "health", "relation": "propagation", "serial": 70, "invalidates": ["commute"] },
+        "items": [
+          { "id": "cur", "key": "health", "serial": 70, "disposition": "active" },
+          { "id": "old", "key": "health", "serial": 30, "disposition": "revoked" },
+          { "id": "bike", "key": "commute", "serial": 50, "disposition": "active" }
+        ]
+      },
+      "note": "The propagated stale key is still active; this is the more specific finding over a plain stale site."
+    },
+    {
+      "id": "over-revoked-current",
+      "input": {
+        "id": "ep-over",
+        "evidence": { "id": "ev-8", "key": "pref", "relation": "co-reference", "serial": 80 },
+        "items": [
+          { "id": "cur", "key": "pref", "serial": 80, "disposition": "revoked" },
+          { "id": "old", "key": "pref", "serial": 40, "disposition": "revoked" }
+        ]
+      },
+      "note": "Revocation removed the current value too, violating TEPA's key-current assumption."
+    },
+    {
+      "id": "no-current-evidence",
+      "input": {
+        "id": "ep-nocur",
+        "evidence": { "id": "ev-9", "key": "pref", "relation": "co-reference", "serial": 90 },
+        "items": [
+          { "id": "old", "key": "pref", "serial": 20, "disposition": "revoked" }
+        ]
+      },
+      "note": "No item carries the current value for the evidence key; the gate cannot confirm a live current value."
+    },
+    {
+      "id": "pollution-over-revocation",
+      "input": {
+        "id": "ep-prio",
+        "evidence": { "id": "ev-10", "key": "pref", "relation": "co-reference", "serial": 100 },
+        "items": [
+          { "id": "cur", "key": "pref", "serial": 100, "disposition": "revoked" },
+          { "id": "old", "key": "pref", "serial": 55, "disposition": "active" }
+        ]
+      },
+      "note": "Pollution dominates over over-revocation: an exposed stale value is the measured harm."
+    },
+    {
+      "id": "extend-no-current",
+      "input": {
+        "id": "ep-ext-nocur",
+        "evidence": { "id": "ev-11", "key": "note", "relation": "extend", "serial": 110 },
+        "items": [
+          { "id": "old", "key": "note", "serial": 60, "disposition": "active" }
+        ]
+      },
+      "note": "Even for extend, a missing current value is unresolved rather than clean."
+    }
+  ]
+}

@@ -69,6 +69,22 @@ export {
 } from './revision-integrity.js';
 
 export {
+  EVIDENCE_RELATIONS,
+  ITEM_DISPOSITIONS,
+  REVOCATION_REASONS,
+  REVOCATION_VERDICTS,
+  staleRevocation,
+  type EvidenceRelation,
+  type ItemDisposition,
+  type RevocationEvidence,
+  type RevocationItem,
+  type RevocationReason,
+  type RevocationVerdict,
+  type StaleRevocation,
+  type StaleRevocationInput,
+} from './stale-revocation.js';
+
+export {
   VIEW_VERDICTS,
   viewConsensus,
   type ViewConsensus,

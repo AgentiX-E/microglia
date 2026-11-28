@@ -1,0 +1,182 @@
+{
+  "schema": "microglia/stale-revocation@1",
+  "fixtureSchema": "microglia/stale-revocation-inputs@1",
+  "cases": [
+    {
+      "id": "extend-coexists",
+      "expected": {
+        "id": "ep-extend",
+        "relation": "extend",
+        "verdict": "clean",
+        "reason": "extend-safe",
+        "itemCount": 2,
+        "currentCount": 1,
+        "currentActive": true,
+        "staleCount": 0,
+        "activeStaleCount": 0,
+        "handledStaleCount": 0,
+        "propagationKeys": 0
+      }
+    },
+    {
+      "id": "coreference-resolved",
+      "expected": {
+        "id": "ep-pref",
+        "relation": "co-reference",
+        "verdict": "clean",
+        "reason": "co-reference-resolved",
+        "itemCount": 2,
+        "currentCount": 1,
+        "currentActive": true,
+        "staleCount": 1,
+        "activeStaleCount": 0,
+        "handledStaleCount": 1,
+        "propagationKeys": 0
+      }
+    },
+    {
+      "id": "coreference-superseded",
+      "expected": {
+        "id": "ep-tool",
+        "relation": "co-reference",
+        "verdict": "clean",
+        "reason": "co-reference-resolved",
+        "itemCount": 2,
+        "currentCount": 1,
+        "currentActive": true,
+        "staleCount": 1,
+        "activeStaleCount": 0,
+        "handledStaleCount": 1,
+        "propagationKeys": 0
+      }
+    },
+    {
+      "id": "propagation-resolved",
+      "expected": {
+        "id": "ep-fracture",
+        "relation": "propagation",
+        "verdict": "clean",
+        "reason": "propagation-resolved",
+        "itemCount": 3,
+        "currentCount": 1,
+        "currentActive": true,
+        "staleCount": 2,
+        "activeStaleCount": 0,
+        "handledStaleCount": 2,
+        "propagationKeys": 1
+      }
+    },
+    {
+      "id": "append-only-pollution",
+      "expected": {
+        "id": "ep-append",
+        "relation": "co-reference",
+        "verdict": "polluted",
+        "reason": "stale-still-active",
+        "itemCount": 2,
+        "currentCount": 1,
+        "currentActive": true,
+        "staleCount": 1,
+        "activeStaleCount": 1,
+        "handledStaleCount": 0,
+        "propagationKeys": 0
+      }
+    },
+    {
+      "id": "multi-stale-pollution",
+      "expected": {
+        "id": "ep-multi",
+        "relation": "co-reference",
+        "verdict": "polluted",
+        "reason": "stale-still-active",
+        "itemCount": 4,
+        "currentCount": 1,
+        "currentActive": true,
+        "staleCount": 3,
+        "activeStaleCount": 2,
+        "handledStaleCount": 1,
+        "propagationKeys": 0
+      }
+    },
+    {
+      "id": "propagated-still-active",
+      "expected": {
+        "id": "ep-prop-bad",
+        "relation": "propagation",
+        "verdict": "polluted",
+        "reason": "propagated-still-active",
+        "itemCount": 3,
+        "currentCount": 1,
+        "currentActive": true,
+        "staleCount": 2,
+        "activeStaleCount": 1,
+        "handledStaleCount": 1,
+        "propagationKeys": 1
+      }
+    },
+    {
+      "id": "over-revoked-current",
+      "expected": {
+        "id": "ep-over",
+        "relation": "co-reference",
+        "verdict": "over-revoked",
+        "reason": "current-removed",
+        "itemCount": 2,
+        "currentCount": 1,
+        "currentActive": false,
+        "staleCount": 1,
+        "activeStaleCount": 0,
+        "handledStaleCount": 1,
+        "propagationKeys": 0
+      }
+    },
+    {
+      "id": "no-current-evidence",
+      "expected": {
+        "id": "ep-nocur",
+        "relation": "co-reference",
+        "verdict": "unresolved",
+        "reason": "no-current-evidence",
+        "itemCount": 1,
+        "currentCount": 0,
+        "currentActive": false,
+        "staleCount": 1,
+        "activeStaleCount": 0,
+        "handledStaleCount": 1,
+        "propagationKeys": 0
+      }
+    },
+    {
+      "id": "pollution-over-revocation",
+      "expected": {
+        "id": "ep-prio",
+        "relation": "co-reference",
+        "verdict": "polluted",
+        "reason": "stale-still-active",
+        "itemCount": 2,
+        "currentCount": 1,
+        "currentActive": false,
+        "staleCount": 1,
+        "activeStaleCount": 1,
+        "handledStaleCount": 0,
+        "propagationKeys": 0
+      }
+    },
+    {
+      "id": "extend-no-current",
+      "expected": {
+        "id": "ep-ext-nocur",
+        "relation": "extend",
+        "verdict": "unresolved",
+        "reason": "no-current-evidence",
+        "itemCount": 1,
+        "currentCount": 0,
+        "currentActive": false,
+        "staleCount": 0,
+        "activeStaleCount": 0,
+        "handledStaleCount": 0,
+        "propagationKeys": 0
+      }
+    }
+  ]
+}

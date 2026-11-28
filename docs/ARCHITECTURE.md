@@ -6376,3 +6376,59 @@ reader 100% statements and 99% branches over self-test + check + verify (the onl
 guard). README core layer updated (53 → 54 modules, 11,636 → 11,854 lines); coupling snapshot regenerated (270 →
 271 modules, 11 checks); bundle unchanged (library helper, not on the render path); `--expect-files` 35 → 36;
 13 workflows parse.
+
+## 8.126 New evidence is only as good as the stale values it displaces (R250)
+
+R249 gates whether an explicit revision reached every derived site. It does not cover the case that dominates a long-lived
+agent: a new observation arrives, implicitly invalidates an older memory, and no retraction is ever issued. TEPA
+(arXiv 2608.07429) measures the damage directly: under a full reversal, append-only memory and last-write-wins both fall
+to 0.210 success — *below* the no-memory baseline of 0.309, a pollution index of 0.318 — while revoking the stale
+precedent holds 0.950, with a paired difference of 0.167 (CI [0.162, 0.172]). Its Proposition 2 bounds the excess risk
+of append-only over revocable memory by q·eta: the probability a stale item stays exposed times the chance the decision
+follows it. The concern is not that retrieval fails to find the new value; it is that retrieval also returns the old one.
+STALE (arXiv 2605.06527) explains how invalidation happens without anyone saying "that is wrong": a new value can
+logically exclude an old one over the same attribute (co-reference conflict) or reach a related attribute through a
+dependency chain (propagation conflict). MMA (arXiv 2602.16493) adds that agents treat retrieved items as uniformly
+trustworthy despite staleness, so an exposed stale item is a commitment the agent will act on, not inert noise.
+
+`packages/core/src/apply/stale-revocation.ts` exports `staleRevocation(input)`, a pure audit of one episode. The
+`evidence` carries a new value, a conflict `key`, a `serial`, and a `relation`: `extend` adds information (older values
+legitimately coexist), `co-reference` means the new value excludes older values on the same key, and `propagation`
+also invalidates the keys listed in `invalidates`. The `items` are the memories currently in the retrieval set, each
+with a `key`, a `serial`, and a `disposition`: `active` (still exposed), `revoked`, or `superseded`. Current items share
+the evidence key and serial; stale items are older values on that key (except for `extend`) plus, for propagation, any
+item on an invalidated key. A stale item is exposed while its disposition is `active`.
+
+| condition (checked in order) | verdict | reason |
+|---|---|---|
+| any stale item still `active` | `polluted` | `stale-still-active` |
+| an invalidated key still `active` | `polluted` | `propagated-still-active` |
+| the current value is `revoked`/`superseded` | `over-revoked` | `current-removed` |
+| no item carries the current value | `unresolved` | `no-current-evidence` |
+| `extend`, current kept | `clean` | `extend-safe` |
+| `co-reference`, stale retired, current kept | `clean` | `co-reference-resolved` |
+| `propagation`, cascade retired, current kept | `clean` | `propagation-resolved` |
+
+Pollution dominates, then over-revocation, then a missing current value, then clean: exposing a stale item is the
+measured harm, so it is reported even when the current value was also revoked or is absent. Within pollution, an
+exposed invalidated key is the more specific finding and outranks a plain stale value, while the count still includes
+both. `staleCount` partitions into `activeStaleCount` + `handledStaleCount`.
+
+**Three readers, one reading.** `eval/fixtures/stale-revocation.json` holds eleven episodes: the TEPA append-only case,
+a multi-stale pollution case, a STALE propagation cascade resolved and unresolved, an over-revoked current value, a
+missing current value, and the extend-coexistence case. `eval/tools/stale_revocation.py --verify` re-derives every
+verdict, reason and count from those bytes with no shared code; `--check` re-adds the arithmetic (stale partition,
+reason/verdict families, key-current conditions, propagation keys only on a propagation relation); `--self-test`
+drives 85 boundary, tamper and CLI assertions. `stale-revocation-manifest.test.ts` derives the same reading with the
+product's own function and compares every field.
+
+**Discipline and gates.** Pure and deterministic; it audits a *description* the caller supplies, editing and fetching
+nothing, at ¥0 with no model call. Guards refuse a blank episode id, a non-object evidence, a blank evidence id/key, an
+unknown relation, a negative or non-finite serial, a non-array invalidates, a blank invalidated key, an invalidated key
+equal to the evidence key, invalidates on a non-propagation relation, a non-array/empty item list, a non-object item,
+a blank/duplicate item id, a blank item key, a bad item serial, and an unknown disposition. New module 100% on all four
+TypeScript dimensions (174/174 statements, 73/73 branches, 2/2 functions); 56 tests across behaviour and binding;
+Python reader 100% statements and 99% branches over self-test + check + verify (the only open arc is the module import
+guard). README core layer updated (54 → 55 modules, 11,854 → 12,140 lines); coupling snapshot regenerated (271 →
+272 modules, 11 checks); bundle unchanged (library helper, not on the render path); `--expect-files` 36 → 37;
+13 workflows parse.

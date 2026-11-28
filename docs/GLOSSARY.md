@@ -3370,3 +3370,27 @@ augmentation against 0.530 with replacement. In the gate, a correction whose sou
 One of four closed values describing how a revision handled a site where a claim lived: `live` (untouched, still
 carries the old value), `augmented` (original kept and a fact attached), `tombstoned` (marked withdrawn, excluded from
 retrieval) or `purged` (bytes removed). The four site-state counts in the readback partition the total `siteCount`.
+
+### Stale revocation (R250)
+
+The property that new evidence displaced every older memory it invalidated before the retrieval set is handed to a
+model. `staleRevocation` audits a described episode and returns a verdict (`clean`, `polluted`, `over-revoked`,
+`unresolved`), a reason and counts that split stale items into exposed and handled. It is the use-side counterpart to
+R249: that gate decides whether an *explicit* revision reached every derived site; this decides whether an *implicit*
+invalidation actually retired the stale value, which is the state TEPA measured scoring below the no-memory baseline.
+
+### Evidence relation (R250)
+
+One of three closed values describing how new evidence meets past memories: `extend` (new information only; older
+values on the same key legitimately coexist), `co-reference` (the new value logically excludes older values on the
+same attribute) or `propagation` (the new value also invalidates related attributes through a dependency chain, listed
+in `invalidates`). The two conflict types come from STALE (arXiv 2605.06527); only `propagation` may carry
+`invalidates`.
+
+### Item disposition (R250)
+
+One of three closed values describing what the store did to a retrieved item: `active` (still exposed to retrieval),
+`revoked` (marked withdrawn) or `superseded` (replaced by a newer value). A stale item counts as handled exactly when
+its disposition is not `active`; a current item must be `active` for the episode to be clean. Revoking the current
+value is `over-revoked` (`current-removed`), violating TEPA's key-current assumption that revocation leave the correct
+value available.
