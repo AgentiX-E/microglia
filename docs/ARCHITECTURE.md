@@ -6325,3 +6325,54 @@ unknown unit rather than defaulting to `other`. New module 100% on all four Type
 behaviour and binding; Python reader 96.0% over self-test + check + verify, self-test 59/59; README core layer
 updated (52 → 53 modules, 11,425 → 11,636 lines); coupling snapshot regenerated (269 → 270 modules, 11 checks);
 bundle unchanged (module is a library helper, not on the render path); `--expect-files` 34 → 35; 13 workflows parse.
+
+## 8.125 A revision is only as good as its worst derived site (R249)
+
+Writing a memory and revising one are not symmetric, and the asymmetry is where a second class of negative effect
+comes from — the first, R246/R247, being whether a single correction is stable and whether a class of claims should
+persist at all. Two measured results make the asymmetry concrete. Deploy-Time Memory (arXiv 2606.10062) defines a
+Forgetting Residual Score (FRS): removing only the raw record leaves a derived summary recoverable in roughly 20% of
+instances, and only a full-pipeline purge or a tombstone redaction drives the residual to zero. LongMemEval (ICLR
+2025, arXiv 2410.10813) measures the correction direction: keys that *keep* the original value and attach a fact
+(K=V+fact) raise Recall@5 from 0.582 to 0.644, whereas *replacing* the original with the fact alone falls to 0.530.
+The standing concern — that what we remember, and how we use it, produces the negative effect — is precisely a
+revision that leaves a stale derived copy, or that overwrites provenance.
+
+`packages/core/src/apply/revision-integrity.ts` exports `revisionIntegrity(input)`, a pure audit of a revision across
+every site where a claim lives. Each site carries a `kind` (`source`, `summary`, `fact-key`, `embedding`, `citation`)
+and a `state`: `live` (untouched), `augmented` (original kept plus a fact/key attached), `tombstoned` (marked
+withdrawn, excluded from retrieval) or `purged` (bytes removed). The audit has two axes and a priority order:
+
+| condition (checked in order) | verdict | reason |
+|---|---|---|
+| retract with an augmented site | `residual` | `augment-retains-claim` |
+| any live site | `residual` | `live-site` |
+| correct with no source | `method-violation` | `no-source-to-augment` |
+| correct whose source is not augmented | `method-violation` | `replace-drops-provenance` |
+| every site purged | `complete` | `full-purge` |
+| correct, source augmented, no live site | `complete` | `augmented-and-covered` |
+| retract, every site tombstoned | `complete` | `tombstone-coverage` |
+
+Coverage is checked before method, and method before completion: reporting a correction as complete while a derived
+summary is still live would recreate the very asymmetry the gate exists to stop. For a retract, an augmented site
+is the more specific finding and is reported ahead of the generic live-site case, while the `residualSites` count
+still includes both. The readback — id, intent, verdict, reason, and the site-state counts — is what the product
+ships and what the evaluation re-derives.
+
+**Three readers, one reading.** `eval/fixtures/revision-integrity.json` holds eleven real revision shapes — the FRS
+case (raw purged, summary live), a full purge, a tombstone-covered retract, an augmented retract, a LongMemEval-style
+augmented correction, a correction with a stale summary, an orphan correction, and replace/tombstone provenance
+violations. `eval/tools/revision_integrity.py --verify` re-derives every verdict, reason and count from those bytes
+with no shared code; `--check` re-adds the arithmetic (counts partition the site total, residual reasons carry a
+positive count, complete verdicts carry a complete reason); `--self-test` drives 69 boundary, tamper and CLI
+assertions. `revision-integrity-manifest.test.ts` derives the same reading with the product's own function and
+compares every field.
+
+**Discipline and gates.** Pure and deterministic; it audits a *description* the caller supplies, editing and fetching
+nothing, at ¥0 with no model call. Guards refuse a blank revision id, an unknown intent, a non-array or empty site
+list, a blank or duplicate site id, and an unknown site kind or state rather than defaulting. New module 100% on all
+four TypeScript dimensions (123/123 statements, 45/45 branches); 39 tests across behaviour and binding; Python
+reader 100% statements and 99% branches over self-test + check + verify (the only open arc is the module import
+guard). README core layer updated (53 → 54 modules, 11,636 → 11,854 lines); coupling snapshot regenerated (270 →
+271 modules, 11 checks); bundle unchanged (library helper, not on the render path); `--expect-files` 35 → 36;
+13 workflows parse.

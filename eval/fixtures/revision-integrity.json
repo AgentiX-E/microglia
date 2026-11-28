@@ -1,0 +1,138 @@
+{
+  "schema": "microglia/revision-integrity-inputs@1",
+  "cases": [
+    {
+      "id": "frs-summary-residual",
+      "input": {
+        "id": "pref-blue",
+        "intent": "retract",
+        "sites": [
+          { "id": "raw", "kind": "source", "state": "purged" },
+          { "id": "digest", "kind": "summary", "state": "live" }
+        ]
+      },
+      "note": "Deploy-Time Memory FRS: deleting only the raw record leaves the derived summary recoverable."
+    },
+    {
+      "id": "full-purge-clean",
+      "input": {
+        "id": "poisoned-template",
+        "intent": "retract",
+        "sites": [
+          { "id": "raw", "kind": "source", "state": "purged" },
+          { "id": "digest", "kind": "summary", "state": "purged" },
+          { "id": "vec", "kind": "embedding", "state": "purged" }
+        ]
+      },
+      "note": "Full-pipeline purge drives the forgetting residual to zero."
+    },
+    {
+      "id": "tombstone-covered-retract",
+      "input": {
+        "id": "stale-fact",
+        "intent": "retract",
+        "sites": [
+          { "id": "raw", "kind": "source", "state": "tombstoned" },
+          { "id": "digest", "kind": "summary", "state": "tombstoned" },
+          { "id": "fk", "kind": "fact-key", "state": "tombstoned" }
+        ]
+      },
+      "note": "Tombstone redaction excludes every derived site from retrieval."
+    },
+    {
+      "id": "augment-retains-retracted-claim",
+      "input": {
+        "id": "false-memory",
+        "intent": "retract",
+        "sites": [
+          { "id": "raw", "kind": "source", "state": "augmented" },
+          { "id": "digest", "kind": "summary", "state": "tombstoned" }
+        ]
+      },
+      "note": "Augmenting keeps the original value, so a retracted claim still surfaces."
+    },
+    {
+      "id": "augment-live-double-residual",
+      "input": {
+        "id": "false-memory-2",
+        "intent": "retract",
+        "sites": [
+          { "id": "raw", "kind": "source", "state": "augmented" },
+          { "id": "digest", "kind": "summary", "state": "live" }
+        ]
+      },
+      "note": "Both an augmented and a live site carry the old value."
+    },
+    {
+      "id": "correct-augment-covered",
+      "input": {
+        "id": "preference-change",
+        "intent": "correct",
+        "sites": [
+          { "id": "raw", "kind": "source", "state": "augmented" },
+          { "id": "digest", "kind": "summary", "state": "tombstoned" },
+          { "id": "fk", "kind": "fact-key", "state": "purged" },
+          { "id": "vec", "kind": "embedding", "state": "tombstoned" }
+        ]
+      },
+      "note": "LongMemEval K=V+fact: keep the original, augment the fact, retire stale derivatives."
+    },
+    {
+      "id": "correct-live-summary-residual",
+      "input": {
+        "id": "update-with-stale-digest",
+        "intent": "correct",
+        "sites": [
+          { "id": "raw", "kind": "source", "state": "augmented" },
+          { "id": "digest", "kind": "summary", "state": "live" }
+        ]
+      },
+      "note": "A stale summary contradicts the correction until it is retired."
+    },
+    {
+      "id": "correct-no-source",
+      "input": {
+        "id": "orphan-update",
+        "intent": "correct",
+        "sites": [
+          { "id": "digest", "kind": "summary", "state": "tombstoned" },
+          { "id": "fk", "kind": "fact-key", "state": "tombstoned" }
+        ]
+      },
+      "note": "Without a source there is no provenance to augment."
+    },
+    {
+      "id": "correct-replace-drops-provenance",
+      "input": {
+        "id": "overwrite-fact",
+        "intent": "correct",
+        "sites": [
+          { "id": "raw", "kind": "source", "state": "purged" },
+          { "id": "fk", "kind": "fact-key", "state": "augmented" }
+        ]
+      },
+      "note": "LongMemEval: replacing the original with the fact alone loses detail (0.530 vs 0.644)."
+    },
+    {
+      "id": "correct-tombstone-source-violation",
+      "input": {
+        "id": "silent-update",
+        "intent": "correct",
+        "sites": [
+          { "id": "raw", "kind": "source", "state": "tombstoned" },
+          { "id": "fk", "kind": "fact-key", "state": "augmented" }
+        ]
+      },
+      "note": "Removing the source on a correction also drops provenance."
+    },
+    {
+      "id": "citation-only-retract",
+      "input": {
+        "id": "bad-citation",
+        "intent": "retract",
+        "sites": [{ "id": "cite", "kind": "citation", "state": "tombstoned" }]
+      },
+      "note": "A single tombstoned citation site is a complete retract."
+    }
+  ]
+}

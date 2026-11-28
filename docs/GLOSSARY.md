@@ -3341,3 +3341,32 @@ A closed, ASCII, case-insensitive tag in a candidate's `measures` list that coun
 example `longmemeval`, `locomo`, `memoryagentbench` for memory, or `bird-ex`, `chart-accuracy`, `execution-accuracy`
 for host. An unlisted label is ignored and reported as neither signal: absence of evidence is not evidence of a
 domain. A host artifact (`sql-query`, `chart`, `visualization`) also counts as one host signal.
+
+### Revision integrity (R249)
+
+The property that a retraction or correction actually reached every site where a claim was stored, and used the right
+method. `revisionIntegrity` audits a described revision and returns a verdict (`complete`, `residual`,
+`method-violation`), a reason and a `residualSites` count. It is the write-side counterpart to R246/R247: those decide
+whether a single correction is stable and whether a class of claims should persist; this decides whether a completed
+revision left any stale copy behind.
+
+### Forgetting Residual Score / FRS (R249)
+
+A measure from Deploy-Time Memory (arXiv 2606.10062) of how much deleted information remains recoverable from derived
+memory layers. Removing only the raw record leaves derived summaries recoverable in about 20% of instances; only a
+full-pipeline purge or a tombstone redaction drives the score to zero. It is the evidence behind treating a live
+derived site as a residual in the revision-integrity gate.
+
+### Augment, not replace (R249)
+
+The correction method that LongMemEval (ICLR 2025) measured as superior: keep the original value and attach the new
+fact as an additional key (K=V+fact), rather than overwriting the original with the fact. Recall@5 was 0.644 with
+augmentation against 0.530 with replacement. In the gate, a correction whose source is not `augmented` is a
+`method-violation` (`replace-drops-provenance`), while a *retraction* whose source is augmented is a `residual`
+(`augment-retains-claim`) because the old claim still surfaces.
+
+### Site state (R249)
+
+One of four closed values describing how a revision handled a site where a claim lived: `live` (untouched, still
+carries the old value), `augmented` (original kept and a fact attached), `tombstoned` (marked withdrawn, excluded from
+retrieval) or `purged` (bytes removed). The four site-state counts in the readback partition the total `siteCount`.

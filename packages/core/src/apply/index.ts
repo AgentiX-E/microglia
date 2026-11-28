@@ -52,6 +52,23 @@ export {
 } from './competition-domain.js';
 
 export {
+  REVISION_INTENTS,
+  REVISION_REASONS,
+  REVISION_VERDICTS,
+  revisionIntegrity,
+  SITE_KINDS,
+  SITE_STATES,
+  type RevisionInput,
+  type RevisionIntegrity,
+  type RevisionIntent,
+  type RevisionReason,
+  type RevisionSite,
+  type RevisionVerdict,
+  type SiteKind,
+  type SiteState,
+} from './revision-integrity.js';
+
+export {
   VIEW_VERDICTS,
   viewConsensus,
   type ViewConsensus,

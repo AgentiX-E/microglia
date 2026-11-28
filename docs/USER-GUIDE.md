@@ -8406,3 +8406,58 @@ point, because a guess is how a host task score becomes a false competitor.
 **What it is not.** It does not rank systems, does not claim any accuracy number, and does not change the library.
 It is a small, testable way to keep a documented boundary honest: the product's TypeScript function, an independent
 Python reader and a committed manifest must agree field by field, or the build stops.
+
+## 32.106 Checking whether a memory revision really took effect (R249)
+
+A memory system that remembers correctly can still revise incorrectly. This section covers the write-side question
+that R246 (is one correction stable?) and R247 (should this class persist?) leave open: after you retract or correct a
+fact, does the change reach every place the fact was copied to, and was the right method used? Two measured results
+motivate it. Deploy-Time Memory (arXiv 2606.10062) found that deleting only the raw record leaves a derived summary
+recoverable in about 20% of instances; LongMemEval (ICLR 2025) found that keeping the original and attaching a fact
+(K=V+fact, Recall@5 0.644) beats replacing the original (0.530).
+
+The library exposes `revisionIntegrity`, a pure function that audits a revision you describe:
+
+```ts
+import { revisionIntegrity } from '@agentix-e/microglia-apply';
+
+// A retraction that purged the raw record but left the derived summary untouched: the old value still surfaces.
+revisionIntegrity({
+  id: 'pref-blue',
+  intent: 'retract',
+  sites: [
+    { id: 'raw', kind: 'source', state: 'purged' },
+    { id: 'digest', kind: 'summary', state: 'live' },
+  ],
+});
+// → { verdict: 'residual', reason: 'live-site', residualSites: 1, siteCount: 2, ... }
+
+// A correction that kept the original, augmented the fact and retired the stale summary: complete.
+revisionIntegrity({
+  id: 'preference-change',
+  intent: 'correct',
+  sites: [
+    { id: 'raw', kind: 'source', state: 'augmented' },
+    { id: 'digest', kind: 'summary', state: 'tombstoned' },
+    { id: 'fk', kind: 'fact-key', state: 'purged' },
+  ],
+});
+// → { verdict: 'complete', reason: 'augmented-and-covered', residualSites: 0 }
+```
+
+**What you supply.** A revision `id`, an `intent` (`retract` or `correct`), and every `site` where the claim lives.
+A site has a unique `id`, a `kind` (`source`, `summary`, `fact-key`, `embedding`, `citation`) and a `state`:
+`live`, `augmented` (original kept, fact attached), `tombstoned` (withdrawn, excluded from retrieval) or `purged`
+(bytes removed). You describe what your store did; the function neither edits the store nor fetches anything.
+
+**How to read the result.** `verdict` is `complete`, `residual` or `method-violation`. `reason` names the deciding
+rule. `residualSites` counts the sites that still carry the old value — for a retract that includes both live and
+augmented sites. The four site-state counts always sum to `siteCount`. For a retract, aim for `full-purge` or
+`tombstone-coverage`; for a correction, keep the source `augmented` and retire every derived site that could
+contradict it, which yields `augmented-and-covered`. A correction with no source, or with a purged/tombstoned source,
+is a `method-violation` because there is no provenance left to augment.
+
+**What it is not.** It does not perform the deletion or correction, does not score accuracy, and does not call a model.
+It is a cheap, deterministic check you can run over a revision plan before committing it: the product's TypeScript
+function, an independent Python reader and a committed manifest must agree field by field, or the build stops. This
+keeps the documented revision policy honest rather than trusting a paragraph that no test recomputes.

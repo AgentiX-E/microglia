@@ -1,0 +1,182 @@
+{
+  "schema": "microglia/revision-integrity@1",
+  "fixtureSchema": "microglia/revision-integrity-inputs@1",
+  "cases": [
+    {
+      "id": "frs-summary-residual",
+      "expected": {
+        "id": "pref-blue",
+        "intent": "retract",
+        "verdict": "residual",
+        "reason": "live-site",
+        "siteCount": 2,
+        "liveSites": 1,
+        "augmentedSites": 0,
+        "tombstonedSites": 0,
+        "purgedSites": 1,
+        "residualSites": 1,
+        "hasSource": true
+      }
+    },
+    {
+      "id": "full-purge-clean",
+      "expected": {
+        "id": "poisoned-template",
+        "intent": "retract",
+        "verdict": "complete",
+        "reason": "full-purge",
+        "siteCount": 3,
+        "liveSites": 0,
+        "augmentedSites": 0,
+        "tombstonedSites": 0,
+        "purgedSites": 3,
+        "residualSites": 0,
+        "hasSource": true
+      }
+    },
+    {
+      "id": "tombstone-covered-retract",
+      "expected": {
+        "id": "stale-fact",
+        "intent": "retract",
+        "verdict": "complete",
+        "reason": "tombstone-coverage",
+        "siteCount": 3,
+        "liveSites": 0,
+        "augmentedSites": 0,
+        "tombstonedSites": 3,
+        "purgedSites": 0,
+        "residualSites": 0,
+        "hasSource": true
+      }
+    },
+    {
+      "id": "augment-retains-retracted-claim",
+      "expected": {
+        "id": "false-memory",
+        "intent": "retract",
+        "verdict": "residual",
+        "reason": "augment-retains-claim",
+        "siteCount": 2,
+        "liveSites": 0,
+        "augmentedSites": 1,
+        "tombstonedSites": 1,
+        "purgedSites": 0,
+        "residualSites": 1,
+        "hasSource": true
+      }
+    },
+    {
+      "id": "augment-live-double-residual",
+      "expected": {
+        "id": "false-memory-2",
+        "intent": "retract",
+        "verdict": "residual",
+        "reason": "augment-retains-claim",
+        "siteCount": 2,
+        "liveSites": 1,
+        "augmentedSites": 1,
+        "tombstonedSites": 0,
+        "purgedSites": 0,
+        "residualSites": 2,
+        "hasSource": true
+      }
+    },
+    {
+      "id": "correct-augment-covered",
+      "expected": {
+        "id": "preference-change",
+        "intent": "correct",
+        "verdict": "complete",
+        "reason": "augmented-and-covered",
+        "siteCount": 4,
+        "liveSites": 0,
+        "augmentedSites": 1,
+        "tombstonedSites": 2,
+        "purgedSites": 1,
+        "residualSites": 0,
+        "hasSource": true
+      }
+    },
+    {
+      "id": "correct-live-summary-residual",
+      "expected": {
+        "id": "update-with-stale-digest",
+        "intent": "correct",
+        "verdict": "residual",
+        "reason": "live-site",
+        "siteCount": 2,
+        "liveSites": 1,
+        "augmentedSites": 1,
+        "tombstonedSites": 0,
+        "purgedSites": 0,
+        "residualSites": 1,
+        "hasSource": true
+      }
+    },
+    {
+      "id": "correct-no-source",
+      "expected": {
+        "id": "orphan-update",
+        "intent": "correct",
+        "verdict": "method-violation",
+        "reason": "no-source-to-augment",
+        "siteCount": 2,
+        "liveSites": 0,
+        "augmentedSites": 0,
+        "tombstonedSites": 2,
+        "purgedSites": 0,
+        "residualSites": 0,
+        "hasSource": false
+      }
+    },
+    {
+      "id": "correct-replace-drops-provenance",
+      "expected": {
+        "id": "overwrite-fact",
+        "intent": "correct",
+        "verdict": "method-violation",
+        "reason": "replace-drops-provenance",
+        "siteCount": 2,
+        "liveSites": 0,
+        "augmentedSites": 1,
+        "tombstonedSites": 0,
+        "purgedSites": 1,
+        "residualSites": 0,
+        "hasSource": true
+      }
+    },
+    {
+      "id": "correct-tombstone-source-violation",
+      "expected": {
+        "id": "silent-update",
+        "intent": "correct",
+        "verdict": "method-violation",
+        "reason": "replace-drops-provenance",
+        "siteCount": 2,
+        "liveSites": 0,
+        "augmentedSites": 1,
+        "tombstonedSites": 1,
+        "purgedSites": 0,
+        "residualSites": 0,
+        "hasSource": true
+      }
+    },
+    {
+      "id": "citation-only-retract",
+      "expected": {
+        "id": "bad-citation",
+        "intent": "retract",
+        "verdict": "complete",
+        "reason": "tombstone-coverage",
+        "siteCount": 1,
+        "liveSites": 0,
+        "augmentedSites": 0,
+        "tombstonedSites": 1,
+        "purgedSites": 0,
+        "residualSites": 0,
+        "hasSource": false
+      }
+    }
+  ]
+}
